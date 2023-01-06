@@ -24,7 +24,7 @@ public class MetArtNetworkRipper : ISiteRipper
         throw new NotImplementedException();
     }
 
-    public async Task ScrapeScenes(string shortName)
+    public async Task ScrapeScenesAsync(string shortName)
     {
         var site = await _repository.GetSiteAsync(shortName);
 

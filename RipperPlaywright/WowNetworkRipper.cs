@@ -5,6 +5,7 @@ using RipperPlaywright.Pages;
 using System;
 using System.Net;
 using System.Security.Cryptography.X509Certificates;
+using System.Text.RegularExpressions;
 
 [PornNetwork("wow")]
 [PornSite("ultrafilms")]
@@ -14,37 +15,26 @@ public class WowNetworkRipper : ISiteRipper
     private readonly SqliteContext _sqliteContext;
     private readonly Repository _repository;
 
-    private Func<IPage, ILocator> LoginButton = (IPage page) => page.GetByRole(AriaRole.Link, new() { NameString = "Sign in" });
-
     public WowNetworkRipper()
     {
         _sqliteContext = new SqliteContext();
         _repository = new Repository(_sqliteContext);
     }
 
-    public async Task ScrapeScenes(string shortName)
+    public async Task ScrapeScenesAsync(string shortName)
     {
         var site = await _repository.GetSiteAsync(shortName);
         IPage page = await PlaywrightFactory.CreatePageAsync(site, true);
 
         var rippingPath = $@"I:\Ripping\{site.Name}\";
 
-        Thread.Sleep(5000);
+        var loginPage = new WowLoginPage(page);
+        await loginPage.LoginIfNeededAsync(site);
 
-        if (await LoginButton(page).IsVisibleAsync())
-        {
-            await LoginButton(page).ClickAsync();
-            await page.WaitForLoadStateAsync();
-
-            await page.GetByPlaceholder("E-Mail").TypeAsync(site.Username);
-            await page.GetByPlaceholder("Password").TypeAsync(site.Password);
-            await page.GetByText("Get Inside").ClickAsync();
-            await page.WaitForLoadStateAsync();
-        }
+        await _repository.UpdateStorageStateAsync(site, await page.Context.StorageStateAsync());
 
         await page.GetByRole(AriaRole.Link, new() { NameString = "Films" }).Nth(1).ClickAsync();
         await page.WaitForLoadStateAsync();
-
         await page.GetByRole(AriaRole.Complementary).GetByText("Wow Girls").ClickAsync();
         await page.WaitForLoadStateAsync();
 
@@ -54,7 +44,7 @@ public class WowNetworkRipper : ISiteRipper
         for (int currentPage = 1; currentPage <= totalPages; currentPage++)
         {
             Thread.Sleep(10000);
-            var currentScenes = await page.Locator("section.cf_content > ul > li > div.content_item > a").ElementHandlesAsync();
+            var currentScenes = await page.Locator("section.cf_content > ul > li > div.content_item > a.title").ElementHandlesAsync();
             Console.WriteLine($"Page {currentPage}/{totalPages} contains {currentScenes.Count} scenes");
 
             foreach (var currentScene in currentScenes)
@@ -66,7 +56,15 @@ public class WowNetworkRipper : ISiteRipper
                         var relativeUrl = await currentScene.GetAttributeAsync("href");
                         var url = site.Url + relativeUrl;
 
-                        var sceneShortName = relativeUrl.Substring(relativeUrl.LastIndexOf("/film/") + "/film/".Length + 1);
+                        string pattern = @"/film/(?<id>\w+)/.*";
+                        Match match = Regex.Match(relativeUrl, pattern);
+                        if (!match.Success)
+                        {
+                            Console.WriteLine($@"Could not determine ID from ""{relativeUrl}"" using pattern {pattern}. Skipping...");
+                            continue;
+                        }
+
+                        var sceneShortName = match.Groups["id"].Value;
                         var existingSceneEntity = await _sqliteContext.Scenes.FirstOrDefaultAsync(s => s.ShortName == sceneShortName);
                         if (existingSceneEntity != null)
                         {
@@ -133,16 +131,6 @@ public class WowNetworkRipper : ISiteRipper
                 await page.Locator("div.nav.next").ClickAsync();
             }
         }
-
-        await page.ReloadAsync();
-        await page.WaitForLoadStateAsync();
-        Thread.Sleep(5000);
-
-        var siteEntityFoo = await _sqliteContext.Sites.FirstOrDefaultAsync(s => s.ShortName == site.ShortName);
-        if (siteEntityFoo != null)
-        {
-            await _repository.UpdateStorageStateAsync(site, await page.Context.StorageStateAsync());
-        }
     }
 
     public async Task DownloadAsync(string shortName, DownloadConditions conditions)
@@ -157,21 +145,10 @@ public class WowNetworkRipper : ISiteRipper
         var site = await _repository.GetSiteAsync(shortName);
         IPage page = await PlaywrightFactory.CreatePageAsync(site, true);
 
+        var loginPage = new WowLoginPage(page);
+        await loginPage.LoginIfNeededAsync(site);
+
         var rippingPath = $@"I:\Ripping\{site.Name}\";
-
-        Thread.Sleep(5000);
-
-        if (await LoginButton(page).IsVisibleAsync())
-        {
-            await LoginButton(page).ClickAsync();
-            await page.WaitForLoadStateAsync();
-
-            await page.GetByPlaceholder("E-Mail").TypeAsync(site.Username);
-            await page.GetByPlaceholder("Password").TypeAsync(site.Password);
-            await page.GetByText("Get Inside").ClickAsync();
-            await page.WaitForLoadStateAsync();
-        }
-
         foreach (var scene in matchingScenes)
         {
             await page.GotoAsync(scene.Url);

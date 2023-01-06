@@ -84,8 +84,23 @@ namespace RipperPlaywright
 
         public async Task UpdateStorageStateAsync(Site site, string storageState)
         {
-            var storageStateEntity = await _sqliteContext.StorageStates.FirstAsync(s => s.SiteId == site.Id);
-            storageStateEntity.StorageState = storageState;
+            var storageStateEntity = await _sqliteContext.StorageStates.FirstOrDefaultAsync(s => s.SiteId == site.Id);
+            if (storageStateEntity != null)
+            {
+                storageStateEntity.StorageState = storageState;
+            }
+            else
+            {
+                var siteEntity = await _sqliteContext.Sites.FirstAsync(s => s.Id == site.Id);
+                _sqliteContext.StorageStates.Add(new StorageStateEntity()
+                {
+                    StorageState = storageState,
+
+                    SiteId = siteEntity.Id,
+                    Site = siteEntity
+                });
+            }
+            
             await _sqliteContext.SaveChangesAsync();
         }
     }
