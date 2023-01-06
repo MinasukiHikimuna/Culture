@@ -22,111 +22,12 @@ public class WowNetworkRipper : ISiteRipper
         _repository = new Repository(_sqliteContext);
     }
 
-    public async Task DownloadAsync(string shortName, DownloadConditions conditions)
-    {
-        var matchingScenes = await _sqliteContext.Scenes
-            .Include(s => s.Performers)
-            .Include(s => s.Tags)
-            .Include(s => s.Site)
-            .Where(s => conditions.DateRange.Start <= s.ReleaseDate && s.ReleaseDate <= conditions.DateRange.End)
-        .ToListAsync();
-
-        var site = await _repository.GetSiteAsync(shortName);
-
-        IBrowserContext context = null;
-
-        var playwright = await Playwright.CreateAsync();
-        var browser = await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
-        {
-            Headless = false,
-        });
-
-        context = await browser.NewContextAsync(new BrowserNewContextOptions()
-        {
-            BaseURL = site.Url,
-            ViewportSize = new ViewportSize { Width = 1920, Height = 1080 },
-            StorageState = site.StorageState
-        });
-
-        var rippingPath = $@"I:\Ripping\{site.Name}\";
-
-        var page = await context.NewPageAsync();
-
-        await page.GotoAsync("/");
-        await page.WaitForLoadStateAsync();
-
-        Thread.Sleep(5000);
-
-        if (await LoginButton(page).IsVisibleAsync())
-        {
-            await LoginButton(page).ClickAsync();
-            await page.WaitForLoadStateAsync();
-
-            await page.GetByPlaceholder("E-Mail").TypeAsync(site.Username);
-            await page.GetByPlaceholder("Password").TypeAsync(site.Password);
-            await page.GetByText("Get Inside").ClickAsync();
-            await page.WaitForLoadStateAsync();
-        }
-
-        var newPage = await context.NewPageAsync();
-
-        foreach (var scene in matchingScenes)
-        {
-            await newPage.GotoAsync(scene.Url);
-            await newPage.WaitForLoadStateAsync();
-
-            var performerNames = scene.Performers.Select(p => p.Name).ToList();
-            var performersStr = performerNames.Count() > 1 ? string.Join(", ", performerNames.Take(performerNames.Count() - 1)) + " & " + performerNames.Last() : performerNames.FirstOrDefault();
-
-            // All scenes do not have 60 fps alternatives. In that case 30 fps button is not shown.
-            /* var fps30Locator = newPage.Locator("span").Filter(new() { HasTextString = "30 fps" });
-            if (await fps30Locator.IsVisibleAsync())
-            {
-                await newPage.Locator("span").Filter(new() { HasTextString = "30 fps" }).ClickAsync();
-                await newPage.WaitForLoadStateAsync();
-            }*/
-
-            var downloadUrl = await newPage.GetByRole(AriaRole.Link, new() { NameString = "5568 x 3132" }).GetAttributeAsync("href");
-
-            var waitForDownloadTask = newPage.WaitForDownloadAsync();
-            await newPage.GetByRole(AriaRole.Link, new() { NameString = "5568 x 3132" }).ClickAsync();
-            var download = await waitForDownloadTask;
-            var suggestedFilename = download.SuggestedFilename;
-
-            var suffix = Path.GetExtension(suggestedFilename);
-            var name = $"{performersStr} - {scene.Site.Name} - {scene.ReleaseDate.ToString("yyyy-MM-dd")} - {scene.Name}{suffix}";
-            name = string.Concat(name.Split(Path.GetInvalidFileNameChars()));
-
-            var path = Path.Join(rippingPath, name);
-            await download.SaveAsAsync(path);
-        }
-    }
-
-    public async Task RipAsync(string shortName)
+    public async Task ScrapeScenes(string shortName)
     {
         var site = await _repository.GetSiteAsync(shortName);
-
-        IBrowserContext context = null;
-
-        var playwright = await Playwright.CreateAsync();
-        var browser = await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
-        {
-            Headless = true,
-        });
-
-        context = await browser.NewContextAsync(new BrowserNewContextOptions()
-        {
-            BaseURL = site.Url,
-            ViewportSize = new ViewportSize { Width = 1920, Height = 1080 },
-            StorageState = site.StorageState
-        });
+        IPage page = await PlaywrightFactory.CreatePageAsync(site, true);
 
         var rippingPath = $@"I:\Ripping\{site.Name}\";
-
-        var page = await context.NewPageAsync();
-
-        await page.GotoAsync("/");
-        await page.WaitForLoadStateAsync();
 
         Thread.Sleep(5000);
 
@@ -152,8 +53,6 @@ public class WowNetworkRipper : ISiteRipper
 
         for (int currentPage = 1; currentPage <= totalPages; currentPage++)
         {
-            string? name = null;
-
             Thread.Sleep(10000);
             var currentScenes = await page.Locator("section.cf_content > ul > li > div.content_item > a").ElementHandlesAsync();
             Console.WriteLine($"Page {currentPage}/{totalPages} contains {currentScenes.Count} scenes");
@@ -182,13 +81,6 @@ public class WowNetworkRipper : ISiteRipper
                         var newPage = await page.Context.RunAndWaitForPageAsync(async () =>
                         {
                             await currentScene.ClickAsync(new ElementHandleClickOptions() { Button = MouseButton.Middle });
-                        });
-
-                        await context.Tracing.StartAsync(new()
-                        {
-                            Screenshots = true,
-                            Snapshots = true,
-                            Sources = true
                         });
 
                         await newPage.WaitForLoadStateAsync();
@@ -232,15 +124,6 @@ public class WowNetworkRipper : ISiteRipper
                     catch (Exception ex)
                     {
                         Console.WriteLine(ex.ToString());
-
-                        if (context != null)
-                        {
-                            var path = Path.Combine(rippingPath, $"trace_{DateTime.Now.ToString("yyyyMMdd_HHmmss")}.zip");
-                            await context.Tracing.StopAsync(new()
-                            {
-                                Path = path
-                            });
-                        }
                     }
                 }
             }
@@ -259,6 +142,65 @@ public class WowNetworkRipper : ISiteRipper
         if (siteEntityFoo != null)
         {
             await _repository.UpdateStorageStateAsync(site, await page.Context.StorageStateAsync());
+        }
+    }
+
+    public async Task DownloadAsync(string shortName, DownloadConditions conditions)
+    {
+        var matchingScenes = await _sqliteContext.Scenes
+            .Include(s => s.Performers)
+            .Include(s => s.Tags)
+            .Include(s => s.Site)
+            .Where(s => conditions.DateRange.Start <= s.ReleaseDate && s.ReleaseDate <= conditions.DateRange.End)
+        .ToListAsync();
+
+        var site = await _repository.GetSiteAsync(shortName);
+        IPage page = await PlaywrightFactory.CreatePageAsync(site, true);
+
+        var rippingPath = $@"I:\Ripping\{site.Name}\";
+
+        Thread.Sleep(5000);
+
+        if (await LoginButton(page).IsVisibleAsync())
+        {
+            await LoginButton(page).ClickAsync();
+            await page.WaitForLoadStateAsync();
+
+            await page.GetByPlaceholder("E-Mail").TypeAsync(site.Username);
+            await page.GetByPlaceholder("Password").TypeAsync(site.Password);
+            await page.GetByText("Get Inside").ClickAsync();
+            await page.WaitForLoadStateAsync();
+        }
+
+        foreach (var scene in matchingScenes)
+        {
+            await page.GotoAsync(scene.Url);
+            await page.WaitForLoadStateAsync();
+
+            var performerNames = scene.Performers.Select(p => p.Name).ToList();
+            var performersStr = performerNames.Count() > 1 ? string.Join(", ", performerNames.Take(performerNames.Count() - 1)) + " & " + performerNames.Last() : performerNames.FirstOrDefault();
+
+            // All scenes do not have 60 fps alternatives. In that case 30 fps button is not shown.
+            /* var fps30Locator = newPage.Locator("span").Filter(new() { HasTextString = "30 fps" });
+            if (await fps30Locator.IsVisibleAsync())
+            {
+                await newPage.Locator("span").Filter(new() { HasTextString = "30 fps" }).ClickAsync();
+                await newPage.WaitForLoadStateAsync();
+            }*/
+
+            var downloadUrl = await page.GetByRole(AriaRole.Link, new() { NameString = "5568 x 3132" }).GetAttributeAsync("href");
+
+            var waitForDownloadTask = page.WaitForDownloadAsync();
+            await page.GetByRole(AriaRole.Link, new() { NameString = "5568 x 3132" }).ClickAsync();
+            var download = await waitForDownloadTask;
+            var suggestedFilename = download.SuggestedFilename;
+
+            var suffix = Path.GetExtension(suggestedFilename);
+            var name = $"{performersStr} - {scene.Site.Name} - {scene.ReleaseDate.ToString("yyyy-MM-dd")} - {scene.Name}{suffix}";
+            name = string.Concat(name.Split(Path.GetInvalidFileNameChars()));
+
+            var path = Path.Join(rippingPath, name);
+            await download.SaveAsAsync(path);
         }
     }
 }

@@ -2,7 +2,7 @@
 {
     public interface ISiteRipper
     {
-        Task RipAsync(string shortName);
+        Task ScrapeScenes(string shortName);
         Task DownloadAsync(string shortName, DownloadConditions conditions);
     }
 }

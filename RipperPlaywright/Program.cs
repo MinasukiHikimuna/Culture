@@ -9,7 +9,7 @@ class PlaywrightExample
         {
             const string shortName = "wowgirls";
             ISiteRipper? siteRipper = GetSiteRipper(shortName);
-            await siteRipper.RipAsync(shortName);
+            await siteRipper.ScrapeScenes(shortName);
 
             /*await siteRipper.DownloadAsync(
                 shortName,
