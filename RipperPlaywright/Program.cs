@@ -1,4 +1,5 @@
 ﻿using RipperPlaywright;
+using Serilog;
 using System.Reflection;
 
 class PlaywrightExample
@@ -7,8 +8,18 @@ class PlaywrightExample
     {
         try
         {
+#if DEBUG
+            args = new string[] { "sexart", "scenes" };
+#endif
+
+            using var log = new LoggerConfiguration()
+                .WriteTo.Console()
+                .CreateLogger();
+
             string shortName = args[0];
             ISiteRipper? siteRipper = GetSiteRipper(shortName);
+
+            log.Information($"Culture Extractor, using {siteRipper.GetType()}");
 
             var browserSettings = new BrowserSettings(true);
 
@@ -30,7 +41,7 @@ class PlaywrightExample
         }
         catch (Exception ex)
         {
-            Console.WriteLine(ex.ToString());
+            Log.Error(ex.ToString(), ex);
         }
     }
 

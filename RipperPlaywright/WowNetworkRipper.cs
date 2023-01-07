@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Playwright;
 using RipperPlaywright.Pages.WowNetwork;
+using Serilog;
 using System.Net;
 using System.Text.RegularExpressions;
 using static System.Formats.Asn1.AsnWriter;
@@ -42,7 +43,7 @@ public class WowNetworkRipper : ISiteRipper
         {
             Thread.Sleep(10000);
             var currentScenes = await filmsPage.GetCurrentScenesAsync();
-            Console.WriteLine($"Page {currentPage}/{totalPages} contains {currentScenes.Count} scenes");
+            Log.Information($"Page {currentPage}/{totalPages} contains {currentScenes.Count} scenes");
 
             foreach (var currentScene in currentScenes)
             {
@@ -57,13 +58,13 @@ public class WowNetworkRipper : ISiteRipper
                         Match match = Regex.Match(relativeUrl, pattern);
                         if (!match.Success)
                         {
-                            Console.WriteLine($@"Could not determine ID from ""{relativeUrl}"" using pattern {pattern}. Skipping...");
+                            Log.Information($@"Could not determine ID from ""{relativeUrl}"" using pattern {pattern}. Skipping...");
                             continue;
                         }
 
                         if (retries > 0)
                         {
-                            Console.WriteLine($"Retrying {retries + 1} attempt for {relativeUrl}");
+                            Log.Information($"Retrying {retries + 1} attempt for {relativeUrl}");
                         }
 
                         var sceneShortName = match.Groups["id"].Value;
@@ -109,7 +110,7 @@ public class WowNetworkRipper : ISiteRipper
 
                         await filmsPage.DownloadPreviewImageAsync(currentScene, existingScene);
 
-                        Console.WriteLine($"{DateTime.Now} Scraped scene {existingScene.Id}: {url}");
+                        Log.Information($"Scraped scene {existingScene.Id}: {url}");
 
                         Thread.Sleep(3000);
 
@@ -117,7 +118,7 @@ public class WowNetworkRipper : ISiteRipper
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine(ex.ToString());
+                        Log.Error(ex.ToString(), ex);
                     }
                 }
             }
@@ -148,7 +149,7 @@ public class WowNetworkRipper : ISiteRipper
         {
             Thread.Sleep(10000);
             var currentGalleries = await galleriesPage.GetCurrentGalleriesAsync();
-            Console.WriteLine($"Page {currentPage}/{totalPages} contains {currentGalleries.Count} scenes");
+            Log.Information($"Page {currentPage}/{totalPages} contains {currentGalleries.Count} scenes");
 
             foreach (var currentGallery in currentGalleries)
             {
@@ -163,13 +164,13 @@ public class WowNetworkRipper : ISiteRipper
                         Match match = Regex.Match(relativeUrl, pattern);
                         if (!match.Success)
                         {
-                            Console.WriteLine($@"Could not determine ID from ""{relativeUrl}"" using pattern {pattern}. Skipping...");
+                            Log.Information($@"Could not determine ID from ""{relativeUrl}"" using pattern {pattern}. Skipping...");
                             continue;
                         }
 
                         if (retries > 0)
                         {
-                            Console.WriteLine($"Retrying {retries + 1} attempt for {relativeUrl}");
+                            Log.Information($"Retrying {retries + 1} attempt for {relativeUrl}");
                         }
 
                         var galleryShortName = match.Groups["id"].Value;
@@ -214,7 +215,7 @@ public class WowNetworkRipper : ISiteRipper
 
                         await galleriesPage.DownloadPreviewImageAsync(currentGallery, existingGallery);
 
-                        Console.WriteLine($"{DateTime.Now} Scraped gallery {existingGallery.Id}: {url}");
+                        Log.Information($"Scraped gallery {existingGallery.Id}: {url}");
 
                         Thread.Sleep(3000);
 
@@ -222,7 +223,7 @@ public class WowNetworkRipper : ISiteRipper
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine(ex.ToString());
+                        Log.Error(ex.ToString(), ex);
                     }
                 }
             }

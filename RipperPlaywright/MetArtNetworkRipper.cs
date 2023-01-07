@@ -2,6 +2,7 @@
 using Microsoft.Playwright;
 using RipperPlaywright;
 using RipperPlaywright.Pages;
+using Serilog;
 
 [PornNetwork("metart")]
 [PornSite("metart")]
@@ -100,7 +101,7 @@ public class MetArtNetworkRipper : ISiteRipper
             {
                 Thread.Sleep(10000);
                 var currentScenes = await page.Locator("div.card-media a").ElementHandlesAsync();
-                Console.WriteLine($"Page {currentPage}/{totalPages} contains {currentScenes.Count} scenes");
+                Log.Information($"Page {currentPage}/{totalPages} contains {currentScenes.Count} scenes");
 
                 foreach (var currentScene in currentScenes.Skip(currentPage == 1 ? 1 : 0))
                 {
@@ -119,7 +120,7 @@ public class MetArtNetworkRipper : ISiteRipper
 
                             if (retries > 0)
                             {
-                                Console.WriteLine($"Retrying {retries + 1} attempt for {foo}");
+                                Log.Information($"Retrying {retries + 1} attempt for {foo}");
                             }
 
                             var newPage = await page.Context.RunAndWaitForPageAsync(async () =>
@@ -182,7 +183,7 @@ public class MetArtNetworkRipper : ISiteRipper
                             );
                             await _repository.SaveSceneAsync(scene);
 
-                            // Console.WriteLine($"{DateTime.Now} Downloaded: {path}");
+                            // Log.Information($"Downloaded: {path}");
 
                             Thread.Sleep(15000);
 
@@ -190,7 +191,7 @@ public class MetArtNetworkRipper : ISiteRipper
                         }
                         catch (Exception ex)
                         {
-                            Console.WriteLine(ex.ToString());
+                            Log.Error(ex.Message, ex);
                         }
                     }
                 }
