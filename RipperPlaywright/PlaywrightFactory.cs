@@ -4,12 +4,12 @@ namespace RipperPlaywright
 {
     public static class PlaywrightFactory
     {
-        public static async Task<IPage> CreatePageAsync(Site site, bool headless)
+        public static async Task<IPage> CreatePageAsync(Site site, BrowserSettings browserSettings)
         {
             var playwright = await Playwright.CreateAsync();
             var browser = await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
             {
-                Headless = headless,
+                Headless = browserSettings.Headless,
             });
             var context = await browser.NewContextAsync(new BrowserNewContextOptions()
             {

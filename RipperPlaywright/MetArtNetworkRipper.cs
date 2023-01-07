@@ -19,17 +19,17 @@ public class MetArtNetworkRipper : ISiteRipper
         _repository = new Repository(_sqliteContext);
     }
 
-    public Task DownloadAsync(string shortName, DownloadConditions conditions)
+    public Task DownloadAsync(string shortName, DownloadConditions conditions, BrowserSettings browserSettings)
     {
         throw new NotImplementedException();
     }
 
-    public Task ScrapeGalleriesAsync(string shortName)
+    public Task ScrapeGalleriesAsync(string shortName, BrowserSettings browserSettings)
     {
         throw new NotImplementedException();
     }
 
-    public async Task ScrapeScenesAsync(string shortName)
+    public async Task ScrapeScenesAsync(string shortName, BrowserSettings browserSettings)
     {
         var site = await _repository.GetSiteAsync(shortName);
 
@@ -41,7 +41,7 @@ public class MetArtNetworkRipper : ISiteRipper
             var playwright = await Playwright.CreateAsync();
             var browser = await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
             {
-                Headless = true,
+                Headless = browserSettings.Headless,
             });
 
             context = await browser.NewContextAsync(new BrowserNewContextOptions()

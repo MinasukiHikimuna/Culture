@@ -23,10 +23,10 @@ public class WowNetworkRipper : ISiteRipper
         _repository = new Repository(_sqliteContext);
     }
 
-    public async Task ScrapeScenesAsync(string shortName)
+    public async Task ScrapeScenesAsync(string shortName, BrowserSettings browserSettings)
     {
         var site = await _repository.GetSiteAsync(shortName);
-        IPage page = await PlaywrightFactory.CreatePageAsync(site, true);
+        IPage page = await PlaywrightFactory.CreatePageAsync(site, browserSettings);
 
         var loginPage = new WowLoginPage(page);
         await loginPage.LoginIfNeededAsync(site);
@@ -129,10 +129,10 @@ public class WowNetworkRipper : ISiteRipper
         }
     }
 
-    public async Task ScrapeGalleriesAsync(string shortName)
+    public async Task ScrapeGalleriesAsync(string shortName, BrowserSettings browserSettings)
     {
         var site = await _repository.GetSiteAsync(shortName);
-        IPage page = await PlaywrightFactory.CreatePageAsync(site, false);
+        IPage page = await PlaywrightFactory.CreatePageAsync(site, browserSettings);
 
         var loginPage = new WowLoginPage(page);
         await loginPage.LoginIfNeededAsync(site);
@@ -234,7 +234,7 @@ public class WowNetworkRipper : ISiteRipper
         }
     }
 
-    public async Task DownloadAsync(string shortName, DownloadConditions conditions)
+    public async Task DownloadAsync(string shortName, DownloadConditions conditions, BrowserSettings browserSettings)
     {
         var matchingScenes = await _sqliteContext.Scenes
             .Include(s => s.Performers)
@@ -244,7 +244,7 @@ public class WowNetworkRipper : ISiteRipper
         .ToListAsync();
 
         var site = await _repository.GetSiteAsync(shortName);
-        IPage page = await PlaywrightFactory.CreatePageAsync(site, true);
+        IPage page = await PlaywrightFactory.CreatePageAsync(site, browserSettings);
 
         var loginPage = new WowLoginPage(page);
         await loginPage.LoginIfNeededAsync(site);

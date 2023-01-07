@@ -3,13 +3,24 @@ using System.Reflection;
 
 class PlaywrightExample
 {
-    public static async Task Main()
+    public static async Task Main(string[] args)
     {
         try
         {
-            const string shortName = "wowgirls";
+            string shortName = args[0];
             ISiteRipper? siteRipper = GetSiteRipper(shortName);
-            await siteRipper.ScrapeGalleriesAsync(shortName);
+
+            var browserSettings = new BrowserSettings(true);
+
+            switch (args[1])
+            {
+                case "scenes":
+                    await siteRipper.ScrapeScenesAsync(shortName, browserSettings);
+                    break;
+                case "galleries":
+                    await siteRipper.ScrapeGalleriesAsync(shortName, browserSettings);
+                    break;
+            }
 
             /*await siteRipper.DownloadAsync(
                 shortName,
