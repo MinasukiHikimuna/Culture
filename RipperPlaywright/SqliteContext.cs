@@ -21,49 +21,6 @@ namespace RipperPlaywright
         // special "local" folder for your platform.
         protected override void OnConfiguring(DbContextOptionsBuilder options)
             => options.UseSqlite($"Data Source={DbPath}");
-
-        protected override void OnModelCreating(ModelBuilder modelBuilder)
-        {
-            // SiteEntity
-            modelBuilder.Entity<SiteEntity>()
-                .HasAlternateKey(r => r.ShortName);
-            modelBuilder.Entity<SiteEntity>()
-                .HasAlternateKey(r => r.Name);
-            modelBuilder.Entity<SiteEntity>()
-                .HasAlternateKey(r => r.Url);
-
-            // SiteTagEntity
-            modelBuilder.Entity<SiteTagEntity>()
-                .HasAlternateKey(r => r.ShortName);
-            modelBuilder.Entity<SiteTagEntity>()
-                .HasAlternateKey(r => r.Name);
-            modelBuilder.Entity<SiteTagEntity>()
-                .HasAlternateKey(r => r.Url);
-
-            // SitePerformerEntity
-            modelBuilder.Entity<SitePerformerEntity>()
-                .HasAlternateKey(r => r.ShortName);
-            modelBuilder.Entity<SitePerformerEntity>()
-                .HasAlternateKey(r => r.Name);
-            modelBuilder.Entity<SitePerformerEntity>()
-                .HasAlternateKey(r => r.Url);
-
-            // SceneEntity
-            modelBuilder.Entity<SceneEntity>()
-                .HasAlternateKey(r => r.ShortName);
-            modelBuilder.Entity<SceneEntity>()
-                .HasAlternateKey(r => r.Name);
-            modelBuilder.Entity<SceneEntity>()
-                .HasAlternateKey(r => r.Url);
-
-            // GalleryEntity
-            modelBuilder.Entity<GalleryEntity>()
-                .HasAlternateKey(r => r.ShortName);
-            modelBuilder.Entity<GalleryEntity>()
-                .HasAlternateKey(r => r.Name);
-            modelBuilder.Entity<GalleryEntity>()
-                .HasAlternateKey(r => r.Url);
-        }
     }
 
     public class SiteEntity
