@@ -1,15 +1,16 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Playwright;
-using RipperPlaywright;
-using RipperPlaywright.Pages;
-using System;
+using RipperPlaywright.Pages.WowNetwork;
 using System.Net;
-using System.Security.Cryptography.X509Certificates;
 using System.Text.RegularExpressions;
 
+namespace RipperPlaywright;
+
 [PornNetwork("wow")]
-[PornSite("ultrafilms")]
+[PornSite("allfinegirls")]
 [PornSite("wowgirls")]
+[PornSite("wowporn")]
+[PornSite("ultrafilms")]
 public class WowNetworkRipper : ISiteRipper
 {
     private readonly SqliteContext _sqliteContext;
@@ -26,25 +27,20 @@ public class WowNetworkRipper : ISiteRipper
         var site = await _repository.GetSiteAsync(shortName);
         IPage page = await PlaywrightFactory.CreatePageAsync(site, true);
 
-        var rippingPath = $@"I:\Ripping\{site.Name}\";
-
         var loginPage = new WowLoginPage(page);
         await loginPage.LoginIfNeededAsync(site);
 
         await _repository.UpdateStorageStateAsync(site, await page.Context.StorageStateAsync());
 
-        await page.GetByRole(AriaRole.Link, new() { NameString = "Films" }).Nth(1).ClickAsync();
-        await page.WaitForLoadStateAsync();
-        await page.GetByRole(AriaRole.Complementary).GetByText("Wow Girls").ClickAsync();
-        await page.WaitForLoadStateAsync();
+        var filmsPage = new WowFilmsPage(page);
+        await filmsPage.OpenFilmsPageAsync(shortName);
 
-        var totalPagesStr = await page.Locator("div.pages > span").Last.TextContentAsync();
-        var totalPages = int.Parse(totalPagesStr);
+        var totalPages = await filmsPage.GetFilmsPagesAsync(); 
 
         for (int currentPage = 1; currentPage <= totalPages; currentPage++)
         {
             Thread.Sleep(10000);
-            var currentScenes = await page.Locator("section.cf_content > ul > li > div.content_item > a.title").ElementHandlesAsync();
+            var currentScenes = await filmsPage.GetCurrentScenesAsync(); ;
             Console.WriteLine($"Page {currentPage}/{totalPages} contains {currentScenes.Count} scenes");
 
             foreach (var currentScene in currentScenes)
@@ -113,7 +109,7 @@ public class WowNetworkRipper : ISiteRipper
 
                         await newPage.CloseAsync();
 
-                        Console.WriteLine($"{DateTime.Now} Scraped: {url}");
+                        Console.WriteLine($"{DateTime.Now} Scraped scene {sceneId}: {url}");
 
                         Thread.Sleep(3000);
 
@@ -128,7 +124,7 @@ public class WowNetworkRipper : ISiteRipper
 
             if (currentPage != totalPages)
             {
-                await page.Locator("div.nav.next").ClickAsync();
+                await filmsPage.GoToNextFilmsPageAsync();
             }
         }
     }

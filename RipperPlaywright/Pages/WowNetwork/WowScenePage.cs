@@ -1,6 +1,6 @@
 ﻿using Microsoft.Playwright;
 
-namespace RipperPlaywright.Pages
+namespace RipperPlaywright.Pages.WowNetwork
 {
     public class WowScenePage
     {
