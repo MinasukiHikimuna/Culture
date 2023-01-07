@@ -1,5 +1,4 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using static System.Formats.Asn1.AsnWriter;
 
 namespace RipperPlaywright
 {
@@ -12,42 +11,62 @@ namespace RipperPlaywright
             _sqliteContext = sqliteContext;
         }
 
+        public async Task<IEnumerable<Site>> GetSitesAsync()
+        {
+            var siteEntities = await _sqliteContext.Sites
+                .Include(s => s.StorageState)
+                .OrderBy(s => s.Name)
+                .ToListAsync();
+
+            return siteEntities.Select(Convert).AsEnumerable();
+        }
+
         public async Task<Site> GetSiteAsync(string shortName)
         {
             var siteEntity = await _sqliteContext.Sites
                 .Include(s => s.StorageState)
                 .FirstAsync(site => site.ShortName == shortName);
 
-            return new Site(
-                siteEntity.Id,
-                siteEntity.ShortName,
-                siteEntity.Name,
-                siteEntity.Url,
-                siteEntity.Username,
-                siteEntity.Password,
-                siteEntity.StorageState?.StorageState ?? string.Empty);
+            return Convert(siteEntity);
         }
 
-        public async Task<Scene> GetSceneAsync(string siteShortName, string sceneShortName)
+        public async Task<IEnumerable<Scene>> GetScenesAsync()
+        {
+            var siteEntities = await _sqliteContext.Scenes
+                .Include(s => s.Site)
+                .Include(s => s.Performers)
+                .Include(s => s.Tags)
+                .OrderBy(s => s.Site.Name)
+                .ThenByDescending(s => s.ReleaseDate)
+                .ToListAsync();
+
+            return siteEntities.Select(Convert).AsEnumerable();
+        }
+
+        public async Task<Scene?> GetSceneAsync(string siteShortName, string sceneShortName)
         {
             var sceneEntity = await _sqliteContext.Scenes
                 .Include(s => s.Site)
                 .Include(s => s.Performers)
                 .Include(s => s.Tags)
-                .FirstAsync(s => s.Site.ShortName == siteShortName && s.ShortName == sceneShortName);
+                .FirstOrDefaultAsync(s => s.Site.ShortName == siteShortName && s.ShortName == sceneShortName);
 
-            return Convert(sceneEntity);
+            return sceneEntity != null
+                ? Convert(sceneEntity)
+                : null;
         }
 
-        public async Task<Gallery> GetGalleryAsync(string siteShortName, string galleryShortScene)
+        public async Task<Gallery?> GetGalleryAsync(string siteShortName, string galleryShortScene)
         {
             var sceneEntity = await _sqliteContext.Galleries
                 .Include(s => s.Site)
                 .Include(s => s.Performers)
                 .Include(s => s.Tags)
-                .FirstAsync(s => s.Site.ShortName == siteShortName && s.ShortName == galleryShortScene);
+                .FirstOrDefaultAsync(s => s.Site.ShortName == siteShortName && s.ShortName == galleryShortScene);
 
-            return Convert(sceneEntity);
+            return sceneEntity != null
+                ? Convert(sceneEntity)
+                : null;
         }
 
         public async Task<Scene> SaveSceneAsync(Scene scene)
