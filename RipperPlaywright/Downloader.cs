@@ -11,7 +11,7 @@ namespace RipperPlaywright
             var rippingPath = $@"I:\Ripping\{scene.Site.Name}\Images\";
             Directory.CreateDirectory(rippingPath);
 
-            await WebClient.DownloadFileTaskAsync(new Uri(imageUrl), Path.Combine(rippingPath, "{sceneId}.jpg"));
+            await WebClient.DownloadFileTaskAsync(new Uri(imageUrl), Path.Combine(rippingPath, $"{sceneId}.jpg"));
         }
     }
 }
