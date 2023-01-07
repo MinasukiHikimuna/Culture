@@ -6,6 +6,7 @@ namespace RipperPlaywright
     {
         public DbSet<SiteEntity> Sites { get; set; }
         public DbSet<SceneEntity> Scenes { get; set; }
+        public DbSet<GalleryEntity> Galleries { get; set; }
         public DbSet<SitePerformerEntity> Performers { get; set; }
         public DbSet<SiteTagEntity> Tags { get; set; }
         public DbSet<StorageStateEntity> StorageStates { get; set; }
@@ -92,6 +93,7 @@ namespace RipperPlaywright
         public required string ShortName { get; set; }
         public required string Name { get; set; }
         public required string Url { get; set; }
+        public required string Description { get; set; }
         public required int Pictures { get; set; }
         public required ICollection<SitePerformerEntity> Performers { get; set; }
         public required ICollection<SiteTagEntity> Tags { get; set; }

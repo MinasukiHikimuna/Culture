@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using static System.Formats.Asn1.AsnWriter;
 
 namespace RipperPlaywright
 {
@@ -27,39 +28,23 @@ namespace RipperPlaywright
                 siteEntity.StorageState?.StorageState ?? string.Empty);
         }
 
-        public async Task<int> SaveSceneAsync(Scene scene)
+        public async Task<Scene> GetSceneAsync(string siteShortName, string sceneShortName)
+        {
+            var sceneEntity = await _sqliteContext.Scenes
+                .Include(s => s.Site)
+                .Include(s => s.Performers)
+                .Include(s => s.Tags)
+                .FirstAsync(s => s.Site.ShortName == siteShortName && s.ShortName == sceneShortName);
+
+            return Convert(sceneEntity);
+        }
+
+        public async Task<Scene> SaveSceneAsync(Scene scene)
         {
             var siteEntity = await _sqliteContext.Sites.FirstAsync(s => s.Id == scene.Site.Id);
 
-            var performers = scene.Performers.Select(p => new SitePerformerEntity() { Name = p.Name, ShortName = p.Id, Url = p.Url, SiteId = siteEntity.Id, Site = siteEntity, Scenes = new List<SceneEntity>() }).ToList();
-            var shortNames = performers.Select(p => p.ShortName).ToList();
-
-            var existingPerformers = await _sqliteContext.Performers.Where(p => shortNames.Contains(p.ShortName)).ToListAsync();
-            var existingPerformerShortNames = existingPerformers.Select(p => p.ShortName).ToList();
-
-            var newPerformers = performers.Where(p => !existingPerformerShortNames.Contains(p.ShortName)).ToList();
-            await _sqliteContext.Performers.AddRangeAsync(newPerformers);
-
-            await _sqliteContext.SaveChangesAsync();
-
-            var allPerformers = existingPerformers.Concat(newPerformers).ToList();
-
-
-
-            var tags = scene.Tags.Select(p => new SiteTagEntity() { Name = p.Name, ShortName = p.Id, Url = p.Url, SiteId = siteEntity.Id, Site = siteEntity, Scenes = new List<SceneEntity>() }).ToList();
-            var tagShortNames = tags.Select(t => t.ShortName).ToList();
-
-            var existingTags = await _sqliteContext.Tags.Where(t => tagShortNames.Contains(t.ShortName)).ToListAsync();
-            var existingTagShortNames = existingTags.Select(t => t.ShortName).ToList();
-
-            var newTags = tags.Where(t => !existingTagShortNames.Contains(t.ShortName)).ToList();
-            await _sqliteContext.Tags.AddRangeAsync(newTags);
-
-            await _sqliteContext.SaveChangesAsync();
-
-            var allTags = existingTags.Concat(newTags).ToList();
-
-
+            List<SitePerformerEntity> performerEntities = await GetOrCreatePerformersAsync(scene.Performers, siteEntity);
+            List<SiteTagEntity> tagEntities = await GetOrCreateTagsAsync(scene.Tags, siteEntity);
 
             var sceneEntity = new SceneEntity()
             {
@@ -69,8 +54,8 @@ namespace RipperPlaywright
                 Url = scene.Url,
                 Description = scene.Description,
                 Duration = scene.Duration,
-                Performers = allPerformers,
-                Tags = allTags,
+                Performers = performerEntities,
+                Tags = tagEntities,
 
                 SiteId = siteEntity.Id,
                 Site = siteEntity
@@ -79,7 +64,67 @@ namespace RipperPlaywright
             await _sqliteContext.Scenes.AddAsync(sceneEntity);
             await _sqliteContext.SaveChangesAsync();
 
-            return sceneEntity.Id;
+            return Convert(sceneEntity);
+        }
+
+        public async Task<int> SaveGalleryAsync(Gallery gallery)
+        {
+            var siteEntity = await _sqliteContext.Sites.FirstAsync(s => s.Id == gallery.Site.Id);
+
+            List<SitePerformerEntity> performerEntities = await GetOrCreatePerformersAsync(gallery.Performers, siteEntity);
+            List<SiteTagEntity> tagEntities = await GetOrCreateTagsAsync(gallery.Tags, siteEntity);
+
+            var galleryEntity = new GalleryEntity()
+            {
+                ReleaseDate = gallery.ReleaseDate,
+                ShortName = gallery.ShortName,
+                Name = gallery.Name,
+                Url = gallery.Url,
+                Description = gallery.Description,
+                Pictures = gallery.Pictures,
+                Performers = performerEntities,
+                Tags = tagEntities,
+
+                SiteId = siteEntity.Id,
+                Site = siteEntity
+            };
+
+            await _sqliteContext.Galleries.AddAsync(galleryEntity);
+            await _sqliteContext.SaveChangesAsync();
+
+            return galleryEntity.Id;
+        }
+
+        private async Task<List<SitePerformerEntity>> GetOrCreatePerformersAsync(IEnumerable<SitePerformer> performers, SiteEntity siteEntity)
+        {
+            var performerEntities = performers.Select(p => new SitePerformerEntity() { Name = p.Name, ShortName = p.Id, Url = p.Url, SiteId = siteEntity.Id, Site = siteEntity, Scenes = new List<SceneEntity>() }).ToList();
+            var shortNames = performerEntities.Select(p => p.ShortName).ToList();
+
+            var existingPerformers = await _sqliteContext.Performers.Where(p => shortNames.Contains(p.ShortName)).ToListAsync();
+            var existingPerformerShortNames = existingPerformers.Select(p => p.ShortName).ToList();
+
+            var newPerformers = performerEntities.Where(p => !existingPerformerShortNames.Contains(p.ShortName)).ToList();
+            await _sqliteContext.Performers.AddRangeAsync(newPerformers);
+
+            await _sqliteContext.SaveChangesAsync();
+
+            return existingPerformers.Concat(newPerformers).ToList();
+        }
+
+        private async Task<List<SiteTagEntity>> GetOrCreateTagsAsync(IEnumerable<SiteTag> tags, SiteEntity siteEntity)
+        {
+            var tagEntities = tags.Select(p => new SiteTagEntity() { Name = p.Name, ShortName = p.Id, Url = p.Url, SiteId = siteEntity.Id, Site = siteEntity, Scenes = new List<SceneEntity>() }).ToList();
+            var tagShortNames = tagEntities.Select(t => t.ShortName).ToList();
+
+            var existingTags = await _sqliteContext.Tags.Where(t => tagShortNames.Contains(t.ShortName)).ToListAsync();
+            var existingTagShortNames = existingTags.Select(t => t.ShortName).ToList();
+
+            var newTags = tagEntities.Where(t => !existingTagShortNames.Contains(t.ShortName)).ToList();
+            await _sqliteContext.Tags.AddRangeAsync(newTags);
+
+            await _sqliteContext.SaveChangesAsync();
+
+            return existingTags.Concat(newTags).ToList();
         }
 
         public async Task UpdateStorageStateAsync(Site site, string storageState)
@@ -102,6 +147,49 @@ namespace RipperPlaywright
             }
             
             await _sqliteContext.SaveChangesAsync();
+        }
+
+        private static Site Convert(SiteEntity siteEntity)
+        {
+            return new Site(
+                siteEntity.Id,
+                siteEntity.ShortName,
+                siteEntity.Name,
+                siteEntity.Url,
+                siteEntity.Username,
+                siteEntity.Password,
+                siteEntity.StorageState?.StorageState ?? string.Empty);
+        }
+
+        private static Scene Convert(SceneEntity sceneEntity)
+        {
+            return new Scene(
+                sceneEntity.Id,
+                Convert(sceneEntity.Site),
+                sceneEntity.ReleaseDate,
+                sceneEntity.ShortName,
+                sceneEntity.Name,
+                sceneEntity.Url,
+                sceneEntity.Description,
+                sceneEntity.Duration,
+                sceneEntity.Performers.Select(Convert),
+                sceneEntity.Tags.Select(Convert));
+        }
+
+        private static SitePerformer Convert(SitePerformerEntity performerEntity)
+        {
+            return new SitePerformer(
+                performerEntity.ShortName ?? performerEntity.Name,
+                performerEntity.Name,
+                performerEntity.Url ?? string.Empty);
+        }
+
+        private static SiteTag Convert(SiteTagEntity siteTagEntity)
+        {
+            return new SiteTag(
+                siteTagEntity.ShortName ?? siteTagEntity.Name,
+                siteTagEntity.Name,
+                siteTagEntity.Url ?? string.Empty);
         }
     }
 }

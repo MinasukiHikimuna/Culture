@@ -20,6 +20,7 @@
         string Url);
 
     public record Scene(
+        int? Id,
         Site Site,
         DateOnly ReleaseDate,
         string ShortName,
@@ -27,6 +28,17 @@
         string Url,
         string Description,
         double Duration,
+        IEnumerable<SitePerformer> Performers,
+        IEnumerable<SiteTag> Tags);
+
+    public record Gallery(
+        Site Site,
+        DateOnly ReleaseDate,
+        string ShortName,
+        string Name,
+        string Url,
+        string Description,
+        int Pictures,
         IEnumerable<SitePerformer> Performers,
         IEnumerable<SiteTag> Tags);
 

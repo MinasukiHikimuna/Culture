@@ -24,6 +24,11 @@ public class MetArtNetworkRipper : ISiteRipper
         throw new NotImplementedException();
     }
 
+    public Task ScrapeGalleriesAsync(string shortName)
+    {
+        throw new NotImplementedException();
+    }
+
     public async Task ScrapeScenesAsync(string shortName)
     {
         var site = await _repository.GetSiteAsync(shortName);
@@ -164,6 +169,7 @@ public class MetArtNetworkRipper : ISiteRipper
                             await newPage.CloseAsync();
 
                             var scene = new Scene(
+                                null,
                                 site,
                                 releaseDate,
                                 sceneShortName,

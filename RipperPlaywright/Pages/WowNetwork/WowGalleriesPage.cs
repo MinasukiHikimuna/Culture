@@ -2,11 +2,11 @@
 
 namespace RipperPlaywright.Pages.WowNetwork
 {
-    public class WowFilmsPage
+    public class WowGalleriesPage
     {
         private readonly IPage _page;
 
-        public WowFilmsPage(IPage page)
+        public WowGalleriesPage(IPage page)
         {
             _page = page;
         }
@@ -14,9 +14,9 @@ namespace RipperPlaywright.Pages.WowNetwork
         /// <summary>
         /// Expects to be on Home page
         /// </summary>
-        public async Task OpenFilmsPageAsync(string shortName)
+        public async Task OpenGalleriesPageAsync(string shortName)
         {
-            await _page.GetByRole(AriaRole.Link, new() { NameString = "Films" }).Nth(1).ClickAsync();
+            await _page.GetByRole(AriaRole.Link, new() { NameString = "Galleries" }).Nth(1).ClickAsync();
             await _page.WaitForLoadStateAsync();
 
             while ((await _page.Locator(".cf_s_site").ElementHandlesAsync()).Count() > 0)
@@ -46,19 +46,19 @@ namespace RipperPlaywright.Pages.WowNetwork
             }
         }
 
-        public async Task<int> GetFilmsPagesAsync()
+        public async Task<int> GetGalleriesPagesAsync()
         {
             var totalPagesStr = await _page.Locator("div.pages > span").Last.TextContentAsync();
             var totalPages = int.Parse(totalPagesStr);
             return totalPages;
         }
 
-        public Task<IReadOnlyList<IElementHandle>> GetCurrentScenesAsync()
+        public Task<IReadOnlyList<IElementHandle>> GetCurrentGalleriesAsync()
         {
             return _page.Locator("section.cf_content > ul > li > div.content_item > a.icon").ElementHandlesAsync();
         }
 
-        public Task GoToNextFilmsPageAsync()
+        public Task GoToNextPageAsync()
         {
             return _page.Locator("div.nav.next").ClickAsync();
         }
