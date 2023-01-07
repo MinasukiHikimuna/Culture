@@ -102,10 +102,7 @@ public class WowNetworkRipper : ISiteRipper
 
                         var previewElement = await newPage.Locator(".jw-preview").GetAttributeAsync("style");
                         var imageUrl = previewElement.Split(@"""")[1];
-                        using (WebClient client = new WebClient())
-                        {
-                            await client.DownloadFileTaskAsync(new Uri(imageUrl), $@"I:\Ripping\{site.Name}\Images\{sceneId}.jpg");
-                        }
+                        await new Downloader().DownloadSceneImage(scene, imageUrl, sceneId);
 
                         await newPage.CloseAsync();
 
