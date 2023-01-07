@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Playwright;
 using RipperPlaywright.Pages.WowNetwork;
+using System.Net;
 using System.Text.RegularExpressions;
 using static System.Formats.Asn1.AsnWriter;
 
@@ -106,12 +107,7 @@ public class WowNetworkRipper : ISiteRipper
                             throw new Exception($"Scene ID was null for {existingScene.ShortName}");
                         }
 
-                        var previewElement = await currentScene.QuerySelectorAsync("span > img");
-                        var imageUrl = await previewElement.GetAttributeAsync("src");
-                        string pattern2 = "icon_\\d+x\\d+.jpg";
-                        string replacement = "icon_3840x2160.jpg";
-                        string output = Regex.Replace(imageUrl, pattern2, replacement);
-                        await new Downloader().DownloadSceneImage(existingScene, output, (int) existingScene.Id);
+                        await filmsPage.DownloadPreviewImageAsync(currentScene, existingScene);
 
                         Console.WriteLine($"{DateTime.Now} Scraped scene {existingScene.Id}: {url}");
 
@@ -171,55 +167,54 @@ public class WowNetworkRipper : ISiteRipper
                             continue;
                         }
 
-                        var galleryShortName = match.Groups["id"].Value;
-                        var existingGalleryEntity = await _sqliteContext.Galleries.FirstOrDefaultAsync(s => s.ShortName == galleryShortName);
-                        if (existingGalleryEntity != null)
-                        {
-                            continue;
-                        }
-
                         if (retries > 0)
                         {
                             Console.WriteLine($"Retrying {retries + 1} attempt for {relativeUrl}");
                         }
 
-                        var newPage = await page.Context.RunAndWaitForPageAsync(async () =>
+                        var galleryShortName = match.Groups["id"].Value;
+                        var existingGallery = await _repository.GetGalleryAsync(shortName, galleryShortName);
+                        if (existingGallery == null)
                         {
-                            await currentGallery.ClickAsync(new ElementHandleClickOptions() { Button = MouseButton.Middle });
-                        });
+                            var newPage = await page.Context.RunAndWaitForPageAsync(async () =>
+                            {
+                                await currentGallery.ClickAsync(new ElementHandleClickOptions() { Button = MouseButton.Middle });
+                            });
 
-                        await newPage.WaitForLoadStateAsync();
+                            await newPage.WaitForLoadStateAsync();
 
-                        var galleryPage = new WowGalleryPage(newPage);
-                        var releaseDate = await galleryPage.ScrapeReleaseDateAsync();
-                        var title = await galleryPage.ScrapeTitleAsync();
-                        var performers = await galleryPage.ScrapePerformersAsync();
-                        var tags = await galleryPage.ScrapeTagsAsync();
-                        var pictures = await galleryPage.ScrapePicturesAsync();
+                            var galleryPage = new WowGalleryPage(newPage);
+                            var releaseDate = await galleryPage.ScrapeReleaseDateAsync();
+                            var title = await galleryPage.ScrapeTitleAsync();
+                            var performers = await galleryPage.ScrapePerformersAsync();
+                            var tags = await galleryPage.ScrapeTagsAsync();
+                            var pictures = await galleryPage.ScrapePicturesAsync();
 
-                        var gallery = new Gallery(
-                            site,
-                            releaseDate,
-                            galleryShortName,
-                            title,
-                            url,
-                            string.Empty,
-                            pictures,
-                            performers,
-                            tags
-                        );
-                        var galleryId = await _repository.SaveGalleryAsync(gallery);
+                            var gallery = new Gallery(
+                                null,
+                                site,
+                                releaseDate,
+                                galleryShortName,
+                                title,
+                                url,
+                                string.Empty,
+                                pictures,
+                                performers,
+                                tags
+                            );
+                            existingGallery = await _repository.SaveGalleryAsync(gallery);
 
-                        var previewElement = await currentGallery.QuerySelectorAsync("span > img");
-                        var imageUrl = await previewElement.GetAttributeAsync("src");
-                        string pattern2 = "icon_\\d+x\\d+.jpg";
-                        string replacement = "icon_3840x2160.jpg";
-                        string output = Regex.Replace(imageUrl, pattern2, replacement);
-                        await new Downloader().DownloadGalleryImage(gallery, output, galleryId);
+                            await newPage.CloseAsync();
+                        }
 
-                        await newPage.CloseAsync();
+                        if (existingGallery.Id == null)
+                        {
+                            throw new Exception($"Gallery ID was null for {existingGallery.ShortName}");
+                        }
 
-                        Console.WriteLine($"{DateTime.Now} Scraped gallery {galleryId}: {url}");
+                        await galleriesPage.DownloadPreviewImageAsync(currentGallery, existingGallery);
+
+                        Console.WriteLine($"{DateTime.Now} Scraped gallery {existingGallery.Id}: {url}");
 
                         Thread.Sleep(3000);
 

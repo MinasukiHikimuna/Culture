@@ -32,6 +32,7 @@
         IEnumerable<SiteTag> Tags);
 
     public record Gallery(
+        int? Id,
         Site Site,
         DateOnly ReleaseDate,
         string ShortName,

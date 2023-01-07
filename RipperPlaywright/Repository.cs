@@ -39,6 +39,17 @@ namespace RipperPlaywright
             return Convert(sceneEntity);
         }
 
+        public async Task<Gallery> GetGalleryAsync(string siteShortName, string galleryShortScene)
+        {
+            var sceneEntity = await _sqliteContext.Galleries
+                .Include(s => s.Site)
+                .Include(s => s.Performers)
+                .Include(s => s.Tags)
+                .FirstAsync(s => s.Site.ShortName == siteShortName && s.ShortName == galleryShortScene);
+
+            return Convert(sceneEntity);
+        }
+
         public async Task<Scene> SaveSceneAsync(Scene scene)
         {
             var siteEntity = await _sqliteContext.Sites.FirstAsync(s => s.Id == scene.Site.Id);
@@ -67,7 +78,7 @@ namespace RipperPlaywright
             return Convert(sceneEntity);
         }
 
-        public async Task<int> SaveGalleryAsync(Gallery gallery)
+        public async Task<Gallery> SaveGalleryAsync(Gallery gallery)
         {
             var siteEntity = await _sqliteContext.Sites.FirstAsync(s => s.Id == gallery.Site.Id);
 
@@ -92,7 +103,7 @@ namespace RipperPlaywright
             await _sqliteContext.Galleries.AddAsync(galleryEntity);
             await _sqliteContext.SaveChangesAsync();
 
-            return galleryEntity.Id;
+            return Convert(galleryEntity);
         }
 
         private async Task<List<SitePerformerEntity>> GetOrCreatePerformersAsync(IEnumerable<SitePerformer> performers, SiteEntity siteEntity)
@@ -174,6 +185,21 @@ namespace RipperPlaywright
                 sceneEntity.Duration,
                 sceneEntity.Performers.Select(Convert),
                 sceneEntity.Tags.Select(Convert));
+        }
+
+        private static Gallery Convert(GalleryEntity galleryEntity)
+        {
+            return new Gallery(
+                galleryEntity.Id,
+                Convert(galleryEntity.Site),
+                galleryEntity.ReleaseDate,
+                galleryEntity.ShortName,
+                galleryEntity.Name,
+                galleryEntity.Url,
+                galleryEntity.Description,
+                galleryEntity.Pictures,
+                galleryEntity.Performers.Select(Convert),
+                galleryEntity.Tags.Select(Convert));
         }
 
         private static SitePerformer Convert(SitePerformerEntity performerEntity)

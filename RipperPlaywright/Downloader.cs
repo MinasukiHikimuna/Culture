@@ -11,7 +11,7 @@ namespace RipperPlaywright
             var rippingPath = $@"I:\Ripping\{scene.Site.Name}\Metadata\SceneImages\";
             Directory.CreateDirectory(rippingPath);
 
-            await WebClient.DownloadFileTaskAsync(new Uri(imageUrl), Path.Combine(rippingPath, $"{sceneId}.jpg"));
+            await DownloadFileAsync(imageUrl, sceneId, rippingPath);
         }
 
         public async Task DownloadGalleryImage(Gallery gallery, string imageUrl, int galleryId)
@@ -19,7 +19,15 @@ namespace RipperPlaywright
             var rippingPath = $@"I:\Ripping\{gallery.Site.Name}\Metadata\GalleryImages\";
             Directory.CreateDirectory(rippingPath);
 
-            await WebClient.DownloadFileTaskAsync(new Uri(imageUrl), Path.Combine(rippingPath, $"{galleryId}.jpg"));
+            await DownloadFileAsync(imageUrl, galleryId, rippingPath);
+        }
+
+        private static async Task DownloadFileAsync(string imageUrl, int fileId, string rippingPath)
+        {
+            var tempPath = Path.Combine(rippingPath, $"{Guid.NewGuid()}.jpg");
+            var finalPath = Path.Combine(rippingPath, $"{fileId}.jpg");
+            await WebClient.DownloadFileTaskAsync(new Uri(imageUrl), tempPath);
+            File.Move(tempPath, finalPath, true);
         }
     }
 }

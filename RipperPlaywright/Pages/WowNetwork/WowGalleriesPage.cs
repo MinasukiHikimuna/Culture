@@ -1,4 +1,6 @@
 ﻿using Microsoft.Playwright;
+using System.Net;
+using System.Text.RegularExpressions;
 
 namespace RipperPlaywright.Pages.WowNetwork
 {
@@ -61,6 +63,26 @@ namespace RipperPlaywright.Pages.WowNetwork
         public Task GoToNextPageAsync()
         {
             return _page.Locator("div.nav.next").ClickAsync();
+        }
+
+        public async Task DownloadPreviewImageAsync(IElementHandle sceneHandle, Gallery gallery)
+        {
+            var previewElement = await sceneHandle.QuerySelectorAsync("span > img");
+            var imageUrl = await previewElement.GetAttributeAsync("src");
+            string pattern2 = "icon_\\d+x\\d+.jpg";
+            string replacement = "icon_3840x2160.jpg";
+            string highQualityImageUrl = Regex.Replace(imageUrl, pattern2, replacement);
+            try
+            {
+                await new Downloader().DownloadGalleryImage(gallery, highQualityImageUrl, (int)gallery.Id);
+            }
+            catch (WebException ex)
+            {
+                if (ex.Status == WebExceptionStatus.ProtocolError && (ex.Response as HttpWebResponse)?.StatusCode == HttpStatusCode.NotFound)
+                {
+                    await new Downloader().DownloadGalleryImage(gallery, imageUrl, (int)gallery.Id);
+                }
+            }
         }
     }
 }
