@@ -41,10 +41,9 @@ namespace RipperPlaywright.Pages.WowNetwork
             if (!string.IsNullOrWhiteSpace(siteName))
             {
                 await _page.GetByRole(AriaRole.Complementary).GetByText(siteName).ClickAsync();
+                await _page.WaitForSelectorAsync(".cf_s_site");
                 await _page.WaitForLoadStateAsync();
             }
-
-            await _page.WaitForSelectorAsync(".cf_s_site");
         }
 
         public async Task<int> GetFilmsPagesAsync()

@@ -27,7 +27,10 @@ namespace RipperPlaywright.Pages.WowNetwork
             {
                 await _signInButton.ClickAsync();
                 await _page.WaitForLoadStateAsync();
+            }
 
+            if (await _getInsideButton.IsVisibleAsync())
+            {
                 await _emailInput.TypeAsync(site.Username);
                 await _passwordInput.TypeAsync(site.Password);
                 await _getInsideButton.ClickAsync();

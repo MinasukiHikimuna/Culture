@@ -1,7 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Playwright;
 using RipperPlaywright.Pages.WowNetwork;
-using System.Net;
 using System.Text.RegularExpressions;
 
 namespace RipperPlaywright;
@@ -25,7 +24,7 @@ public class WowNetworkRipper : ISiteRipper
     public async Task ScrapeScenesAsync(string shortName)
     {
         var site = await _repository.GetSiteAsync(shortName);
-        IPage page = await PlaywrightFactory.CreatePageAsync(site, true);
+        IPage page = await PlaywrightFactory.CreatePageAsync(site, false);
 
         var loginPage = new WowLoginPage(page);
         await loginPage.LoginIfNeededAsync(site);
@@ -40,7 +39,7 @@ public class WowNetworkRipper : ISiteRipper
         for (int currentPage = 1; currentPage <= totalPages; currentPage++)
         {
             Thread.Sleep(10000);
-            var currentScenes = await filmsPage.GetCurrentScenesAsync(); ;
+            var currentScenes = await filmsPage.GetCurrentScenesAsync();
             Console.WriteLine($"Page {currentPage}/{totalPages} contains {currentScenes.Count} scenes");
 
             foreach (var currentScene in currentScenes)
