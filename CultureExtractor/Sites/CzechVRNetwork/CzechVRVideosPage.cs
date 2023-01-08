@@ -68,9 +68,14 @@ namespace CultureExtractor.Sites.WowNetwork
 
         public async Task DownloadPreviewImageAsync(IElementHandle sceneHandle, Scene scene)
         {
-            var previewElement = await sceneHandle.QuerySelectorAsync("img");
-            var originalUrl = await previewElement.GetAttributeAsync("src");
-            await new Downloader().DownloadSceneImage(scene, originalUrl);
+            var downloader = new Downloader();
+
+            if (!downloader.SceneImageExists(scene))
+            {
+                var previewElement = await sceneHandle.QuerySelectorAsync("img");
+                var originalUrl = await previewElement.GetAttributeAsync("src");
+                await downloader.DownloadSceneImageAsync(scene, originalUrl);
+            }
         }
     }
 }

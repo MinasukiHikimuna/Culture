@@ -68,6 +68,13 @@ namespace CultureExtractor.Sites.WowNetwork
 
         public async Task DownloadPreviewImageAsync(IElementHandle sceneHandle, Scene scene)
         {
+            var downloader = new Downloader();
+
+            if (downloader.SceneImageExists(scene))
+            {
+                return;
+            }
+
             var previewElement = await sceneHandle.QuerySelectorAsync("span > img");
             var originalUrl = await previewElement.GetAttributeAsync("src");
 
@@ -88,7 +95,7 @@ namespace CultureExtractor.Sites.WowNetwork
                 try
                 {
 
-                    await new Downloader().DownloadSceneImage(scene, candidate);
+                    await new Downloader().DownloadSceneImageAsync(scene, candidate);
                     Log.Verbose($"Successfully downloaded preview from {candidate}.");
                     break;
                 }
