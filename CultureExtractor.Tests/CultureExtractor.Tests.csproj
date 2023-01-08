@@ -19,7 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\RipperPlaywright\RipperPlaywright.csproj" />
+    <ProjectReference Include="..\CultureExtractor\CultureExtractor.csproj" />
   </ItemGroup>
 
 </Project>
