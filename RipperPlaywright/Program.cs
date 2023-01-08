@@ -10,11 +10,12 @@ class PlaywrightExample
         {
             if (System.Diagnostics.Debugger.IsAttached)
             {
-                args = new string[] { "wowporn", "galleries" };
+                args = new string[] { "allfinegirls", "scenes" };
             }
 
             using var log = new LoggerConfiguration()
                 .WriteTo.Console()
+                .MinimumLevel.Verbose()
                 .CreateLogger();
             Log.Logger = log;
 
