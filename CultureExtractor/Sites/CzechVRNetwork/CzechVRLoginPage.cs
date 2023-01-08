@@ -30,15 +30,14 @@ public class CzechVRLoginPage
             await loginPage.GetByPlaceholder("Username").TypeAsync(site.Username);
             await loginPage.GetByPlaceholder("Password").TypeAsync(site.Password);
             await loginPage.GetByRole(AriaRole.Button, new() { NameString = "CLICK HERE TO LOGIN" }).ClickAsync();
+            await loginPage.GetByRole(AriaRole.Button, new() { NameString = "CLICK HERE TO LOGIN" }).WaitForAsync(new LocatorWaitForOptions()
+            {
+                State = WaitForSelectorState.Detached
+            });
             await loginPage.WaitForLoadStateAsync();
 
-            Thread.Sleep(10000);
+            Thread.Sleep(1000);
 
-            // Log.Warning("CAPTCHA required! Please enter manually.");
-            // Thread.Sleep(60000);
-            // await loginPage.Locator("#rc-imageselect").WaitForAsync(new LocatorWaitForOptions() { State = WaitForSelectorState.Detached, Timeout = 60000 });
-
-            // await loginPage.CloseAsync();
             Log.Information($"Logged in as {site.Username}.");
         }
         else
