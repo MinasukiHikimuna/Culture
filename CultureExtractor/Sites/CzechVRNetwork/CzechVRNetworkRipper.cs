@@ -1,5 +1,4 @@
 ﻿using CultureExtractor.Sites.WowNetwork;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Playwright;
 using Serilog;
 using System.Text.RegularExpressions;
@@ -8,6 +7,9 @@ namespace CultureExtractor.Sites.CzechVRNetwork;
 
 [PornNetwork("czechvr")]
 [PornSite("czechvr")]
+[PornSite("czechvrcasting")]
+[PornSite("czechvrfetish")]
+[PornSite("czechvrintimacy")]
 public class CzechVRNetworkRipper : ISiteRipper
 {
     private readonly SqliteContext _sqliteContext;
@@ -56,7 +58,7 @@ public class CzechVRNetworkRipper : ISiteRipper
                         var imagehandle = await currentScene.QuerySelectorAsync("img");
                         var imageUrl = await imagehandle.GetAttributeAsync("src");
 
-                        string pattern = @"(\d+)-czechvr-big.jpg";
+                        string pattern = @"(\d+)-\w+-big.jpg";
                         Match match = Regex.Match(imageUrl, pattern);
                         if (!match.Success)
                         {

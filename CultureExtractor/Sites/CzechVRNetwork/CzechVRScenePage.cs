@@ -22,7 +22,7 @@ namespace CultureExtractor.Sites.WowNetwork
         public async Task<string> ScrapeTitleAsync()
         {
             var title = await _page.Locator("div.post > div.left > div.nazev > h2").TextContentAsync();
-            string pattern = @"Czech VR \d+ - (.*)";
+            string pattern = @"\w+ \d+ - (.*)";
             Match match = Regex.Match(title, pattern);
             if (!match.Success)
             {
