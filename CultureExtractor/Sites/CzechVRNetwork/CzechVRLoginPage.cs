@@ -39,6 +39,11 @@ public class CzechVRLoginPage
             // await loginPage.Locator("#rc-imageselect").WaitForAsync(new LocatorWaitForOptions() { State = WaitForSelectorState.Detached, Timeout = 60000 });
 
             // await loginPage.CloseAsync();
+            Log.Information($"Logged in as {site.Username}.");
+        }
+        else
+        {
+            Log.Verbose("Login was not necessary.");
         }
     }
 }
