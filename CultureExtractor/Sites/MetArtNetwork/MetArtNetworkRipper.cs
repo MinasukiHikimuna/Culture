@@ -1,7 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Playwright;
-using CultureExtractor;
 using Serilog;
+using CultureExtractor.Interfaces;
 
 namespace CultureExtractor.Sites.MetArtNetwork;
 

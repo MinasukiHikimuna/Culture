@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using CultureExtractor.Interfaces;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Playwright;
 using Serilog;
 using System.Text.RegularExpressions;

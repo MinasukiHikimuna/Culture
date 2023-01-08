@@ -1,4 +1,4 @@
-﻿namespace CultureExtractor;
+﻿namespace CultureExtractor.Interfaces;
 
 public interface ISiteRipper
 {

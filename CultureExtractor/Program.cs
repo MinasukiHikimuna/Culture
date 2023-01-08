@@ -1,4 +1,5 @@
-﻿using Serilog;
+﻿using CultureExtractor.Interfaces;
+using Serilog;
 using System.Reflection;
 
 namespace CultureExtractor;

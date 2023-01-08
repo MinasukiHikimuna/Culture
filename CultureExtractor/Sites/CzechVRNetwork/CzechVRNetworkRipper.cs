@@ -1,4 +1,5 @@
-﻿using CultureExtractor.Sites.WowNetwork;
+﻿using CultureExtractor.Interfaces;
+using CultureExtractor.Sites.WowNetwork;
 using Microsoft.Playwright;
 using Serilog;
 using System.Text.RegularExpressions;
