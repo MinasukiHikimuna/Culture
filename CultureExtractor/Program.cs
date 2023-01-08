@@ -1,4 +1,4 @@
-﻿using RipperPlaywright;
+﻿using CultureExtractor;
 using Serilog;
 using System.Reflection;
 

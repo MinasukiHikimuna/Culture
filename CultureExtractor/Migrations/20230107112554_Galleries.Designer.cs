@@ -4,11 +4,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
-using RipperPlaywright;
+using CultureExtractor;
 
 #nullable disable
 
-namespace RipperPlaywright.Migrations
+namespace CultureExtractor.Migrations
 {
     [DbContext(typeof(SqliteContext))]
     [Migration("20230107112554_Galleries")]
@@ -20,7 +20,7 @@ namespace RipperPlaywright.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "7.0.1");
 
-            modelBuilder.Entity("RipperPlaywright.GalleryEntity", b =>
+            modelBuilder.Entity("CultureExtractor.GalleryEntity", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -58,7 +58,7 @@ namespace RipperPlaywright.Migrations
                     b.ToTable("Galleries");
                 });
 
-            modelBuilder.Entity("RipperPlaywright.SceneEntity", b =>
+            modelBuilder.Entity("CultureExtractor.SceneEntity", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -96,7 +96,7 @@ namespace RipperPlaywright.Migrations
                     b.ToTable("Scenes");
                 });
 
-            modelBuilder.Entity("RipperPlaywright.SiteEntity", b =>
+            modelBuilder.Entity("CultureExtractor.SiteEntity", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -127,7 +127,7 @@ namespace RipperPlaywright.Migrations
                     b.ToTable("Sites");
                 });
 
-            modelBuilder.Entity("RipperPlaywright.SitePerformerEntity", b =>
+            modelBuilder.Entity("CultureExtractor.SitePerformerEntity", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -158,7 +158,7 @@ namespace RipperPlaywright.Migrations
                     b.ToTable("Performers");
                 });
 
-            modelBuilder.Entity("RipperPlaywright.SiteTagEntity", b =>
+            modelBuilder.Entity("CultureExtractor.SiteTagEntity", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -189,7 +189,7 @@ namespace RipperPlaywright.Migrations
                     b.ToTable("Tags");
                 });
 
-            modelBuilder.Entity("RipperPlaywright.StorageStateEntity", b =>
+            modelBuilder.Entity("CultureExtractor.StorageStateEntity", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -240,9 +240,9 @@ namespace RipperPlaywright.Migrations
                     b.ToTable("SceneEntitySiteTagEntity");
                 });
 
-            modelBuilder.Entity("RipperPlaywright.GalleryEntity", b =>
+            modelBuilder.Entity("CultureExtractor.GalleryEntity", b =>
                 {
-                    b.HasOne("RipperPlaywright.SiteEntity", "Site")
+                    b.HasOne("CultureExtractor.SiteEntity", "Site")
                         .WithMany()
                         .HasForeignKey("SiteId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -251,9 +251,9 @@ namespace RipperPlaywright.Migrations
                     b.Navigation("Site");
                 });
 
-            modelBuilder.Entity("RipperPlaywright.SceneEntity", b =>
+            modelBuilder.Entity("CultureExtractor.SceneEntity", b =>
                 {
-                    b.HasOne("RipperPlaywright.SiteEntity", "Site")
+                    b.HasOne("CultureExtractor.SiteEntity", "Site")
                         .WithMany()
                         .HasForeignKey("SiteId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -262,13 +262,13 @@ namespace RipperPlaywright.Migrations
                     b.Navigation("Site");
                 });
 
-            modelBuilder.Entity("RipperPlaywright.SitePerformerEntity", b =>
+            modelBuilder.Entity("CultureExtractor.SitePerformerEntity", b =>
                 {
-                    b.HasOne("RipperPlaywright.GalleryEntity", null)
+                    b.HasOne("CultureExtractor.GalleryEntity", null)
                         .WithMany("Performers")
                         .HasForeignKey("GalleryEntityId");
 
-                    b.HasOne("RipperPlaywright.SiteEntity", "Site")
+                    b.HasOne("CultureExtractor.SiteEntity", "Site")
                         .WithMany()
                         .HasForeignKey("SiteId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -277,13 +277,13 @@ namespace RipperPlaywright.Migrations
                     b.Navigation("Site");
                 });
 
-            modelBuilder.Entity("RipperPlaywright.SiteTagEntity", b =>
+            modelBuilder.Entity("CultureExtractor.SiteTagEntity", b =>
                 {
-                    b.HasOne("RipperPlaywright.GalleryEntity", null)
+                    b.HasOne("CultureExtractor.GalleryEntity", null)
                         .WithMany("Tags")
                         .HasForeignKey("GalleryEntityId");
 
-                    b.HasOne("RipperPlaywright.SiteEntity", "Site")
+                    b.HasOne("CultureExtractor.SiteEntity", "Site")
                         .WithMany()
                         .HasForeignKey("SiteId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -292,11 +292,11 @@ namespace RipperPlaywright.Migrations
                     b.Navigation("Site");
                 });
 
-            modelBuilder.Entity("RipperPlaywright.StorageStateEntity", b =>
+            modelBuilder.Entity("CultureExtractor.StorageStateEntity", b =>
                 {
-                    b.HasOne("RipperPlaywright.SiteEntity", "Site")
+                    b.HasOne("CultureExtractor.SiteEntity", "Site")
                         .WithOne("StorageState")
-                        .HasForeignKey("RipperPlaywright.StorageStateEntity", "SiteId")
+                        .HasForeignKey("CultureExtractor.StorageStateEntity", "SiteId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -305,13 +305,13 @@ namespace RipperPlaywright.Migrations
 
             modelBuilder.Entity("SceneEntitySitePerformerEntity", b =>
                 {
-                    b.HasOne("RipperPlaywright.SitePerformerEntity", null)
+                    b.HasOne("CultureExtractor.SitePerformerEntity", null)
                         .WithMany()
                         .HasForeignKey("PerformersId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("RipperPlaywright.SceneEntity", null)
+                    b.HasOne("CultureExtractor.SceneEntity", null)
                         .WithMany()
                         .HasForeignKey("ScenesId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -320,27 +320,27 @@ namespace RipperPlaywright.Migrations
 
             modelBuilder.Entity("SceneEntitySiteTagEntity", b =>
                 {
-                    b.HasOne("RipperPlaywright.SceneEntity", null)
+                    b.HasOne("CultureExtractor.SceneEntity", null)
                         .WithMany()
                         .HasForeignKey("ScenesId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("RipperPlaywright.SiteTagEntity", null)
+                    b.HasOne("CultureExtractor.SiteTagEntity", null)
                         .WithMany()
                         .HasForeignKey("TagsId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("RipperPlaywright.GalleryEntity", b =>
+            modelBuilder.Entity("CultureExtractor.GalleryEntity", b =>
                 {
                     b.Navigation("Performers");
 
                     b.Navigation("Tags");
                 });
 
-            modelBuilder.Entity("RipperPlaywright.SiteEntity", b =>
+            modelBuilder.Entity("CultureExtractor.SiteEntity", b =>
                 {
                     b.Navigation("StorageState");
                 });

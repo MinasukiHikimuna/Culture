@@ -1,8 +1,8 @@
 using FluentAssertions;
 using Microsoft.Playwright;
-using RipperPlaywright.Pages;
+using CultureExtractor.Pages;
 
-namespace RipperPlaywright.Tests;
+namespace CultureExtractor.Tests;
 
 public class Tests
 {

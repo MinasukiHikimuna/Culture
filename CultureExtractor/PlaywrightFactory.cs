@@ -1,6 +1,6 @@
 ﻿using Microsoft.Playwright;
 
-namespace RipperPlaywright
+namespace CultureExtractor
 {
     public static class PlaywrightFactory
     {

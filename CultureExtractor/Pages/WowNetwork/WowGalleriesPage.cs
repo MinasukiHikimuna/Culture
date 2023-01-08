@@ -3,7 +3,7 @@ using Serilog;
 using System.Net;
 using System.Text.RegularExpressions;
 
-namespace RipperPlaywright.Pages.WowNetwork
+namespace CultureExtractor.Pages.WowNetwork
 {
     public class WowGalleriesPage
     {

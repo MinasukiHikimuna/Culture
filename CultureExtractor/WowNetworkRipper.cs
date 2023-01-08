@@ -1,12 +1,12 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Playwright;
-using RipperPlaywright.Pages.WowNetwork;
+using CultureExtractor.Pages.WowNetwork;
 using Serilog;
 using System.Net;
 using System.Text.RegularExpressions;
 using static System.Formats.Asn1.AsnWriter;
 
-namespace RipperPlaywright;
+namespace CultureExtractor;
 
 [PornNetwork("wow")]
 [PornSite("allfinegirls")]

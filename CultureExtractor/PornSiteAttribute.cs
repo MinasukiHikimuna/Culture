@@ -1,4 +1,4 @@
-﻿namespace RipperPlaywright
+﻿namespace CultureExtractor
 {
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
     public class PornSiteAttribute : Attribute

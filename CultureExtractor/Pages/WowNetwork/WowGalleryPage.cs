@@ -1,6 +1,6 @@
 ﻿using Microsoft.Playwright;
 
-namespace RipperPlaywright.Pages.WowNetwork
+namespace CultureExtractor.Pages.WowNetwork
 {
     public class WowGalleryPage
     {

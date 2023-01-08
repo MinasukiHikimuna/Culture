@@ -1,6 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 
-namespace RipperPlaywright
+namespace CultureExtractor
 {
     public class Repository
     {

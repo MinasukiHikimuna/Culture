@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace RipperPlaywright.Migrations
+namespace CultureExtractor.Migrations
 {
     /// <inheritdoc />
     public partial class RemoveInvalidConstraints : Migration

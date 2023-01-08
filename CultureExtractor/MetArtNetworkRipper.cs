@@ -1,7 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Playwright;
-using RipperPlaywright;
-using RipperPlaywright.Pages;
+using CultureExtractor;
+using CultureExtractor.Pages;
 using Serilog;
 
 [PornNetwork("metart")]

@@ -1,4 +1,4 @@
-﻿namespace RipperPlaywright
+﻿namespace CultureExtractor
 {
     public interface ISiteRipper
     {

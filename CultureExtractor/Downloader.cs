@@ -1,6 +1,6 @@
 ﻿using System.Net;
 
-namespace RipperPlaywright
+namespace CultureExtractor
 {
     public class Downloader
     {
