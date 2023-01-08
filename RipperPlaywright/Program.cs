@@ -8,13 +8,15 @@ class PlaywrightExample
     {
         try
         {
-#if DEBUG
-            args = new string[] { "sexart", "scenes" };
-#endif
+            if (System.Diagnostics.Debugger.IsAttached)
+            {
+                args = new string[] { "wowporn", "galleries" };
+            }
 
             using var log = new LoggerConfiguration()
                 .WriteTo.Console()
                 .CreateLogger();
+            Log.Logger = log;
 
             string shortName = args[0];
             ISiteRipper? siteRipper = GetSiteRipper(shortName);
