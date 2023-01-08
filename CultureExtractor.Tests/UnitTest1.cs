@@ -1,6 +1,6 @@
+using CultureExtractor.Sites.MetArtNetwork;
 using FluentAssertions;
 using Microsoft.Playwright;
-using CultureExtractor.Pages;
 
 namespace CultureExtractor.Tests;
 

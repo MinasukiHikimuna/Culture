@@ -1,10 +1,8 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Playwright;
-using CultureExtractor.Pages.WowNetwork;
+using CultureExtractor.Sites.WowNetwork;
 using Serilog;
-using System.Net;
 using System.Text.RegularExpressions;
-using static System.Formats.Asn1.AsnWriter;
 
 namespace CultureExtractor;
 

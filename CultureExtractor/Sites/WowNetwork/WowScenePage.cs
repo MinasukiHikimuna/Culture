@@ -1,6 +1,6 @@
 ﻿using Microsoft.Playwright;
 
-namespace CultureExtractor.Pages.WowNetwork
+namespace CultureExtractor.Sites.WowNetwork
 {
     public class WowScenePage
     {

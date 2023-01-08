@@ -1,8 +1,9 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Playwright;
 using CultureExtractor;
-using CultureExtractor.Pages;
 using Serilog;
+
+namespace CultureExtractor.Sites.MetArtNetwork;
 
 [PornNetwork("metart")]
 [PornSite("metart")]

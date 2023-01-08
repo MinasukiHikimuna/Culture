@@ -1,6 +1,6 @@
 ﻿using Microsoft.Playwright;
 
-namespace CultureExtractor.Pages
+namespace CultureExtractor.Sites.MetArtNetwork
 {
     public class MetArtScenePage
     {
