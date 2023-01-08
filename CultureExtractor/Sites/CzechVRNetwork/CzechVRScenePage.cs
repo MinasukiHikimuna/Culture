@@ -97,7 +97,7 @@ namespace CultureExtractor.Sites.WowNetwork
 
         public async Task<string> ScrapeDescriptionAsync()
         {
-            var content = await _page.Locator("div.post > div.left > div.text > p").TextContentAsync();
+            var content = await _page.Locator("div.post > div.left > div.text").TextContentAsync();
             return content.Replace("\n\t", "");
         }
     }
