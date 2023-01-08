@@ -97,19 +97,13 @@ public class WowNetworkRipper : ISiteRipper
                             );
                             existingScene = await _repository.SaveSceneAsync(scene);
 
+                            await filmsPage.DownloadPreviewImageAsync(currentScene, existingScene);
+                            Log.Information($"Scraped scene {existingScene.Id}: {url}");
+
                             await newPage.CloseAsync();
+
+                            Thread.Sleep(3000);
                         }
-
-                        if (existingScene.Id == null)
-                        {
-                            throw new Exception($"Scene ID was null for {existingScene.ShortName}");
-                        }
-
-                        await filmsPage.DownloadPreviewImageAsync(currentScene, existingScene);
-
-                        Log.Information($"Scraped scene {existingScene.Id}: {url}");
-
-                        Thread.Sleep(3000);
 
                         break;
                     }
