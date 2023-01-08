@@ -1,60 +1,59 @@
 ﻿using System.Net;
 
-namespace CultureExtractor
+namespace CultureExtractor;
+
+public class Downloader
 {
-    public class Downloader
+    private static readonly WebClient WebClient = new();
+
+    public bool SceneImageExists(Scene scene)
     {
-        private static readonly WebClient WebClient = new();
+        // TODO: extension might not be jpg
+        var path = $@"I:\Ripping\{scene.Site.Name}\Metadata\SceneImages\{scene.Id}.jpg";
+        return File.Exists(path);
+    }
 
-        public bool SceneImageExists(Scene scene)
+    public bool GalleryImageExists(Gallery gallery)
+    {
+        // TODO: extension might not be jpg
+        var path = $@"I:\Ripping\{gallery.Site.Name}\Metadata\GalleryImages\{gallery.Id}.jpg";
+        return File.Exists(path);
+    }
+
+    public async Task DownloadSceneImageAsync(Scene scene, string imageUrl)
+    {
+        var rippingPath = $@"I:\Ripping\{scene.Site.Name}\Metadata\SceneImages\";
+        Directory.CreateDirectory(rippingPath);
+
+        await DownloadFileAsync(imageUrl, (int)scene.Id, rippingPath);
+    }
+
+    public async Task DownloadGalleryImageasync(Gallery gallery, string imageUrl)
+    {
+        var rippingPath = $@"I:\Ripping\{gallery.Site.Name}\Metadata\GalleryImages\";
+        Directory.CreateDirectory(rippingPath);
+
+        await DownloadFileAsync(imageUrl, (int)gallery.Id, rippingPath);
+    }
+
+    private static async Task DownloadFileAsync(string imageUrl, int fileId, string rippingPath)
+    {
+        string? tempPath = null;
+        try
         {
-            // TODO: extension might not be jpg
-            var path = $@"I:\Ripping\{scene.Site.Name}\Metadata\SceneImages\{scene.Id}.jpg";
-            return File.Exists(path);
+            tempPath = Path.Combine(rippingPath, $"{Guid.NewGuid()}.jpg");
+            var finalPath = Path.Combine(rippingPath, $"{fileId}.jpg");
+            await WebClient.DownloadFileTaskAsync(new Uri(imageUrl), tempPath);
+            File.Move(tempPath, finalPath, true);
         }
-
-        public bool GalleryImageExists(Gallery gallery)
+        catch 
         {
-            // TODO: extension might not be jpg
-            var path = $@"I:\Ripping\{gallery.Site.Name}\Metadata\GalleryImages\{gallery.Id}.jpg";
-            return File.Exists(path);
-        }
-
-        public async Task DownloadSceneImageAsync(Scene scene, string imageUrl)
-        {
-            var rippingPath = $@"I:\Ripping\{scene.Site.Name}\Metadata\SceneImages\";
-            Directory.CreateDirectory(rippingPath);
-
-            await DownloadFileAsync(imageUrl, (int)scene.Id, rippingPath);
-        }
-
-        public async Task DownloadGalleryImageasync(Gallery gallery, string imageUrl)
-        {
-            var rippingPath = $@"I:\Ripping\{gallery.Site.Name}\Metadata\GalleryImages\";
-            Directory.CreateDirectory(rippingPath);
-
-            await DownloadFileAsync(imageUrl, (int)gallery.Id, rippingPath);
-        }
-
-        private static async Task DownloadFileAsync(string imageUrl, int fileId, string rippingPath)
-        {
-            string? tempPath = null;
-            try
+            if (!string.IsNullOrWhiteSpace(tempPath))
             {
-                tempPath = Path.Combine(rippingPath, $"{Guid.NewGuid()}.jpg");
-                var finalPath = Path.Combine(rippingPath, $"{fileId}.jpg");
-                await WebClient.DownloadFileTaskAsync(new Uri(imageUrl), tempPath);
-                File.Move(tempPath, finalPath, true);
+                File.Delete(tempPath);
             }
-            catch 
-            {
-                if (!string.IsNullOrWhiteSpace(tempPath))
-                {
-                    File.Delete(tempPath);
-                }
 
-                throw;
-            }
+            throw;
         }
     }
 }

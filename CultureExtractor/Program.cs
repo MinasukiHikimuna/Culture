@@ -1,6 +1,7 @@
-﻿using CultureExtractor;
-using Serilog;
+﻿using Serilog;
 using System.Reflection;
+
+namespace CultureExtractor;
 
 class PlaywrightExample
 {
