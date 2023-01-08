@@ -36,7 +36,7 @@ public class CzechVRNetworkRipper : ISiteRipper
 
         for (int currentPage = 1; currentPage <= totalPages; currentPage++)
         {
-            Thread.Sleep(10000);
+            Thread.Sleep(5000);
             var currentScenes = await videosPage.GetCurrentScenesAsync();
             Log.Information($"Page {currentPage}/{totalPages} contains {currentScenes.Count} scenes");
 
@@ -103,18 +103,13 @@ public class CzechVRNetworkRipper : ISiteRipper
                             existingScene = await _repository.SaveSceneAsync(scene);
 
                             await newPage.CloseAsync();
+
+                            await videosPage.DownloadPreviewImageAsync(currentScene, existingScene);
+
+                            Log.Information($"Scraped scene {existingScene.Id}: {url}");
+
+                            Thread.Sleep(3000);
                         }
-
-                        if (existingScene.Id == null)
-                        {
-                            throw new Exception($"Scene ID was null for {existingScene.ShortName}");
-                        }
-
-                        await videosPage.DownloadPreviewImageAsync(currentScene, existingScene);
-
-                        Log.Information($"Scraped scene {existingScene.Id}: {url}");
-
-                        Thread.Sleep(3000);
 
                         break;
                     }
