@@ -10,7 +10,7 @@ class PlaywrightExample
         {
             if (System.Diagnostics.Debugger.IsAttached)
             {
-                args = new string[] { "allfinegirls", "scenes" };
+                args = new string[] { "czechvr", "scenes" };
             }
 
             using var log = new LoggerConfiguration()

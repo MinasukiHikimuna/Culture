@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Serilog;
 
 namespace CultureExtractor
 {
@@ -177,6 +178,7 @@ namespace CultureExtractor
             }
             
             await _sqliteContext.SaveChangesAsync();
+            Log.Information($"Updated storage state for {site.Name}.");
         }
 
         private static Site Convert(SiteEntity siteEntity)

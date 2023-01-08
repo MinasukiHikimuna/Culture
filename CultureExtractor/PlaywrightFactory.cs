@@ -18,7 +18,7 @@ namespace CultureExtractor
                 StorageState = site.StorageState
             });
             var page = await context.NewPageAsync();
-            await page.GotoAsync("/");
+            await page.GotoAsync(site.Url);
             await page.WaitForLoadStateAsync();
             return page;
         }
