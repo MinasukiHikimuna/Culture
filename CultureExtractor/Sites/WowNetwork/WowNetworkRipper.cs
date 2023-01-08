@@ -1,10 +1,9 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Playwright;
-using CultureExtractor.Sites.WowNetwork;
 using Serilog;
 using System.Text.RegularExpressions;
 
-namespace CultureExtractor;
+namespace CultureExtractor.Sites.WowNetwork;
 
 [PornNetwork("wow")]
 [PornSite("allfinegirls")]
@@ -35,7 +34,7 @@ public class WowNetworkRipper : ISiteRipper
         var filmsPage = new WowFilmsPage(page);
         await filmsPage.OpenFilmsPageAsync(shortName);
 
-        var totalPages = await filmsPage.GetFilmsPagesAsync(); 
+        var totalPages = await filmsPage.GetFilmsPagesAsync();
 
         for (int currentPage = 1; currentPage <= totalPages; currentPage++)
         {
