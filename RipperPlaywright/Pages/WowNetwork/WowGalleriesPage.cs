@@ -1,4 +1,5 @@
 ﻿using Microsoft.Playwright;
+using Serilog;
 using System.Net;
 using System.Text.RegularExpressions;
 
@@ -68,19 +69,38 @@ namespace RipperPlaywright.Pages.WowNetwork
         public async Task DownloadPreviewImageAsync(IElementHandle sceneHandle, Gallery gallery)
         {
             var previewElement = await sceneHandle.QuerySelectorAsync("span > img");
-            var imageUrl = await previewElement.GetAttributeAsync("src");
-            string pattern2 = "icon_\\d+x\\d+.jpg";
-            string replacement = "icon_3840x2160.jpg";
-            string highQualityImageUrl = Regex.Replace(imageUrl, pattern2, replacement);
-            try
+            var originalUrl = await previewElement.GetAttributeAsync("src");
+
+            string regexPattern = "icon_\\d+x\\d+.jpg";
+
+            // We can't be sure which are found so we need to cycle through them.
+            var candidates = new List<string>()
             {
-                await new Downloader().DownloadGalleryImage(gallery, highQualityImageUrl, (int)gallery.Id);
+                "icon_3840x2160.jpg",
+                "icon_1920x1080.jpg",
+                "icon_1280x720.jpg",
             }
-            catch (WebException ex)
+                .Select(fileName => Regex.Replace(originalUrl, regexPattern, fileName))
+                .Concat(new List<string> { originalUrl });
+
+            foreach (var candidate in candidates)
             {
-                if (ex.Status == WebExceptionStatus.ProtocolError && (ex.Response as HttpWebResponse)?.StatusCode == HttpStatusCode.NotFound)
+                try
                 {
-                    await new Downloader().DownloadGalleryImage(gallery, imageUrl, (int)gallery.Id);
+
+                    await new Downloader().DownloadGalleryImage(gallery, candidate);
+                    Log.Verbose($"Successfully downloaded preview from {candidate}.");
+                    break;
+                }
+                catch (WebException ex)
+                {
+                    if (ex.Status == WebExceptionStatus.ProtocolError && (ex.Response as HttpWebResponse)?.StatusCode == HttpStatusCode.NotFound)
+                    {
+                        Log.Verbose($"Got 404 for preview from {candidate}.");
+                        continue;
+                    }
+
+                    throw;
                 }
             }
         }
