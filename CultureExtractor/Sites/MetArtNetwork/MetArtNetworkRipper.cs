@@ -2,6 +2,7 @@
 using Microsoft.Playwright;
 using Serilog;
 using CultureExtractor.Interfaces;
+using CultureExtractor.Sites.WowNetwork;
 
 namespace CultureExtractor.Sites.MetArtNetwork;
 
@@ -11,7 +12,7 @@ namespace CultureExtractor.Sites.MetArtNetwork;
 [PornSite("sexart")]
 [PornSite("vivthomas")]
 [PornSite("thelifeerotic")]
-public class MetArtNetworkRipper : ISiteRipper
+public class MetArtNetworkRipper : ISiteRipper, ISceneDownloader
 {
     private readonly SqliteContext _sqliteContext;
     private readonly Repository _repository;
@@ -20,11 +21,6 @@ public class MetArtNetworkRipper : ISiteRipper
     {
         _sqliteContext = new SqliteContext();
         _repository = new Repository(_sqliteContext);
-    }
-
-    public Task DownloadAsync(string shortName, DownloadConditions conditions, BrowserSettings browserSettings)
-    {
-        throw new NotImplementedException();
     }
 
     public Task ScrapeGalleriesAsync(string shortName, BrowserSettings browserSettings)
@@ -153,22 +149,6 @@ public class MetArtNetworkRipper : ISiteRipper
                             var performerNames = performers.Select(p => p.Name).ToList();
                             var performersStr = performerNames.Count() > 1 ? string.Join(", ", performerNames.Take(performerNames.Count() - 1)) + " & " + performerNames.Last() : performerNames.FirstOrDefault();
 
-                            /* await newPage.Locator("div svg.fa-film").ClickAsync();
-
-                            var downloadUrl = await newPage.Locator("div.dropdown-menu a").Filter(new() { HasTextString = "360p SD" }).GetAttributeAsync("href");
-
-                            var waitForDownloadTask = newPage.WaitForDownloadAsync();
-                            await newPage.Locator("div.dropdown-menu a").Filter(new() { HasTextString = "360p SD" }).ClickAsync();
-                            var download = await waitForDownloadTask;
-                            var suggestedFilename = download.SuggestedFilename;
-
-                            var suffix = Path.GetExtension(suggestedFilename);
-                            var name = $"{performersStr} - {siteEntity.Name} - {releaseDate.ToString("yyyy-MM-dd")} - {title}{suffix}";
-                            name = string.Concat(name.Split(Path.GetInvalidFileNameChars()));
-
-                            var path = Path.Join(rippingPath, name); ;
-                            await download.SaveAsAsync(path);*/
-
                             await newPage.CloseAsync();
 
                             var scene = new Scene(
@@ -185,9 +165,9 @@ public class MetArtNetworkRipper : ISiteRipper
                             );
                             await _repository.SaveSceneAsync(scene);
 
-                            // Log.Information($"Downloaded: {path}");
+                            Log.Information($"Scraped scene {scene.Id}: {url}");
 
-                            Thread.Sleep(15000);
+                            Thread.Sleep(3000);
 
                             break;
                         }
@@ -219,10 +199,86 @@ public class MetArtNetworkRipper : ISiteRipper
             if (context != null)
             {
                 var path = Path.Combine(rippingPath, $"trace_{DateTime.Now.ToString("yyyyMMdd_HHmmss")}.zip");
-                await context.Tracing.StopAsync(new() 
+                await context.Tracing.StopAsync(new()
                 {
                     Path = path
                 });
+            }
+        }
+    }
+
+    public async Task DownloadScenesAsync(string shortName, DownloadConditions conditions, BrowserSettings browserSettings)
+    {
+        var site = await _repository.GetSiteAsync(shortName);
+
+        var matchingScenes = await _sqliteContext.Scenes
+            .Include(s => s.Performers)
+            .Include(s => s.Tags)
+            .Include(s => s.Site)
+            .OrderBy(s => s.ReleaseDate)
+            .Where(s => s.SiteId == site.Id)
+            .Where(s => conditions.DateRange == null || (conditions.DateRange.Start <= s.ReleaseDate && s.ReleaseDate <= conditions.DateRange.End))
+            .Where(s => conditions.PerformerShortName == null || s.Performers.Any(p => p.ShortName == conditions.PerformerShortName))
+        .ToListAsync();
+
+        var matchingScenesStr = string.Join($"{Environment.NewLine}    ", matchingScenes.Select(s => $"{s.Site.Name} - {s.ReleaseDate.ToString("yyyy-MM-dd")} - {s.Name}"));
+
+        Log.Information($"Found {matchingScenes.Count()} scenes:{Environment.NewLine}{matchingScenesStr}");
+
+        if (!matchingScenes.Any())
+        {
+            Log.Information("Nothing to download.");
+            return;
+        }
+
+        IPage page = await PlaywrightFactory.CreatePageAsync(site, browserSettings);
+
+        var loginPage = new WowLoginPage(page);
+        await loginPage.LoginIfNeededAsync(site);
+
+        var rippingPath = $@"I:\Ripping\{site.Name}\";
+        foreach (var scene in matchingScenes)
+        {
+            for (int retries = 0; retries < 3; retries++)
+            {
+                try
+                {
+                    await page.GotoAsync(scene.Url);
+                    await page.WaitForLoadStateAsync();
+
+                    if (retries > 0)
+                    {
+                        Log.Information($"Retrying {retries + 1} attempt for {scene.Url}");
+                    }
+
+                    var performerNames = scene.Performers.Select(p => p.Name).ToList();
+                    var performersStr = performerNames.Count() > 1 ? string.Join(", ", performerNames.Take(performerNames.Count() - 1)) + " & " + performerNames.Last() : performerNames.FirstOrDefault();
+
+                    await page.Locator("div svg.fa-film").ClickAsync();
+
+                    var downloadUrl = await page.Locator("div.dropdown-menu a").Filter(new() { HasTextString = "360p SD" }).GetAttributeAsync("href");
+
+                    var waitForDownloadTask = page.WaitForDownloadAsync();
+                    await page.Locator("div.dropdown-menu a").Filter(new() { HasTextString = "360p SD" }).ClickAsync();
+                    var download = await waitForDownloadTask;
+                    var suggestedFilename = download.SuggestedFilename;
+
+                    var suffix = Path.GetExtension(suggestedFilename);
+                    var name = $"{performersStr} - {scene.Name} - {scene.ReleaseDate.ToString("yyyy-MM-dd")} - {scene.Name}{suffix}";
+                    name = string.Concat(name.Split(Path.GetInvalidFileNameChars()));
+
+                    var path = Path.Join(rippingPath, name);
+
+                    Log.Verbose($"Downloading\r\n    URL:  {downloadUrl}\r\n    Path: {path}");
+
+                    await download.SaveAsAsync(path);
+                    break;
+                }
+                catch (PlaywrightException ex)
+                {
+                    Log.Error(ex.Message, ex);
+                    // Let's try again
+                }
             }
         }
     }

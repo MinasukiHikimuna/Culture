@@ -44,8 +44,13 @@ public record Gallery(
     IEnumerable<SiteTag> Tags);
 
 public record DownloadConditions(
-    DateRange DateRange
-);
+    DateRange? DateRange,
+    string? PerformerShortName
+)
+{
+    public static DownloadConditions All() => new(null, null);
+    public static DownloadConditions Performer(string performerShortName) => new(null, performerShortName);
+}
 
 public record DateRange(
     DateOnly Start,

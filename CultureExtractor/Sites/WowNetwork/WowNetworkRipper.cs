@@ -11,7 +11,7 @@ namespace CultureExtractor.Sites.WowNetwork;
 [PornSite("wowgirls")]
 [PornSite("wowporn")]
 [PornSite("ultrafilms")]
-public class WowNetworkRipper : ISiteRipper
+public class WowNetworkRipper : ISiteRipper, ISceneDownloader
 {
     private readonly SqliteContext _sqliteContext;
     private readonly Repository _repository;
@@ -227,16 +227,30 @@ public class WowNetworkRipper : ISiteRipper
         }
     }
 
-    public async Task DownloadAsync(string shortName, DownloadConditions conditions, BrowserSettings browserSettings)
+    public async Task DownloadScenesAsync(string shortName, DownloadConditions conditions, BrowserSettings browserSettings)
     {
+        var site = await _repository.GetSiteAsync(shortName);
+
         var matchingScenes = await _sqliteContext.Scenes
             .Include(s => s.Performers)
             .Include(s => s.Tags)
             .Include(s => s.Site)
-            .Where(s => conditions.DateRange.Start <= s.ReleaseDate && s.ReleaseDate <= conditions.DateRange.End)
+            .OrderBy(s => s.ReleaseDate)
+            .Where(s => s.SiteId == site.Id)
+            .Where(s => conditions.DateRange == null || (conditions.DateRange.Start <= s.ReleaseDate && s.ReleaseDate <= conditions.DateRange.End))
+            .Where(s => conditions.PerformerShortName == null || s.Performers.Any(p => p.ShortName == conditions.PerformerShortName))
         .ToListAsync();
 
-        var site = await _repository.GetSiteAsync(shortName);
+        var matchingScenesStr = string.Join($"{Environment.NewLine}    ", matchingScenes.Select(s => $"{s.Site.Name} - {s.ReleaseDate.ToString("yyyy-MM-dd")} - {s.Name}"));
+
+        Log.Information($"Found {matchingScenes.Count()} scenes:{Environment.NewLine}    {matchingScenesStr}");
+
+        if (!matchingScenes.Any())
+        {
+            Log.Information("Nothing to download.");
+            return;
+        }
+
         IPage page = await PlaywrightFactory.CreatePageAsync(site, browserSettings);
 
         var loginPage = new WowLoginPage(page);
@@ -245,33 +259,55 @@ public class WowNetworkRipper : ISiteRipper
         var rippingPath = $@"I:\Ripping\{site.Name}\";
         foreach (var scene in matchingScenes)
         {
-            await page.GotoAsync(scene.Url);
-            await page.WaitForLoadStateAsync();
-
-            var performerNames = scene.Performers.Select(p => p.Name).ToList();
-            var performersStr = performerNames.Count() > 1 ? string.Join(", ", performerNames.Take(performerNames.Count() - 1)) + " & " + performerNames.Last() : performerNames.FirstOrDefault();
-
-            // All scenes do not have 60 fps alternatives. In that case 30 fps button is not shown.
-            /* var fps30Locator = newPage.Locator("span").Filter(new() { HasTextString = "30 fps" });
-            if (await fps30Locator.IsVisibleAsync())
+            for (int retries = 0; retries < 3; retries++)
             {
-                await newPage.Locator("span").Filter(new() { HasTextString = "30 fps" }).ClickAsync();
-                await newPage.WaitForLoadStateAsync();
-            }*/
+                try
+                {
+                    await page.GotoAsync(scene.Url);
+                    await page.WaitForLoadStateAsync();
 
-            var downloadUrl = await page.GetByRole(AriaRole.Link, new() { NameString = "5568 x 3132" }).GetAttributeAsync("href");
+                    if (retries > 0)
+                    {
+                        Log.Information($"Retrying {retries + 1} attempt for {scene.Url}");
+                    }
 
-            var waitForDownloadTask = page.WaitForDownloadAsync();
-            await page.GetByRole(AriaRole.Link, new() { NameString = "5568 x 3132" }).ClickAsync();
-            var download = await waitForDownloadTask;
-            var suggestedFilename = download.SuggestedFilename;
+                    var performerNames = scene.Performers.Select(p => p.Name).ToList();
+                    var performersStr = performerNames.Count() > 1 ? string.Join(", ", performerNames.Take(performerNames.Count() - 1)) + " & " + performerNames.Last() : performerNames.FirstOrDefault();
 
-            var suffix = Path.GetExtension(suggestedFilename);
-            var name = $"{performersStr} - {scene.Site.Name} - {scene.ReleaseDate.ToString("yyyy-MM-dd")} - {scene.Name}{suffix}";
-            name = string.Concat(name.Split(Path.GetInvalidFileNameChars()));
+                    // All scenes do not have 60 fps alternatives. In that case 30 fps button is not shown.
+                    var fps30Locator = page.Locator("span").Filter(new() { HasTextString = "30 fps" });
+                    if (await fps30Locator.IsVisibleAsync())
+                    {
+                        await page.Locator("span").Filter(new() { HasTextString = "30 fps" }).ClickAsync();
+                        await page.WaitForLoadStateAsync();
+                    }
 
-            var path = Path.Join(rippingPath, name);
-            await download.SaveAsAsync(path);
+                    var desiredQuality = "960 x 540";
+
+                    var downloadUrl = await page.GetByRole(AriaRole.Link, new() { NameString = desiredQuality }).GetAttributeAsync("href");
+
+                    var waitForDownloadTask = page.WaitForDownloadAsync();
+                    await page.GetByRole(AriaRole.Link, new() { NameString = desiredQuality }).ClickAsync();
+                    var download = await waitForDownloadTask;
+                    var suggestedFilename = download.SuggestedFilename;
+
+                    var suffix = Path.GetExtension(suggestedFilename);
+                    var name = $"{performersStr} - {scene.Site.Name} - {scene.ReleaseDate.ToString("yyyy-MM-dd")} - {scene.Name}{suffix}";
+                    name = string.Concat(name.Split(Path.GetInvalidFileNameChars()));
+
+                    var path = Path.Join(rippingPath, name);
+
+                    Log.Verbose($"Downloading\r\n    URL:  {downloadUrl}\r\n    Path: {path}");
+
+                    await download.SaveAsAsync(path);
+                    break;
+                }
+                catch (PlaywrightException ex)
+                {
+                    Log.Error(ex.Message, ex);
+                    // Let's try again
+                }
+            }
         }
     }
 }
