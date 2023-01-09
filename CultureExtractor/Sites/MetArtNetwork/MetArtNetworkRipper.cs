@@ -10,6 +10,7 @@ namespace CultureExtractor.Sites.MetArtNetwork;
 [PornSite("metartx")]
 [PornSite("sexart")]
 [PornSite("vivthomas")]
+[PornSite("thelifeerotic")]
 public class MetArtNetworkRipper : ISiteRipper
 {
     private readonly SqliteContext _sqliteContext;
