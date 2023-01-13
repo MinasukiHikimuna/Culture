@@ -66,7 +66,7 @@ public class MetArtNetworkRipper : ISiteRipper, ISceneDownloader
             await page.WaitForLoadStateAsync();
             Thread.Sleep(5000);
 
-            if (!page.Url.EndsWith("/updates"))
+            if (await page.IsVisibleAsync(".sign-in"))
             {
                 if (await page.Locator("#onetrust-accept-btn-handler").IsVisibleAsync())
                 {
