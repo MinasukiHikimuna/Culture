@@ -99,6 +99,8 @@ public class MetArtNetworkRipper : ISiteRipper, ISceneDownloader
             {
             }
 
+            await _repository.UpdateStorageStateAsync(site, await page.Context.StorageStateAsync());
+
             await page.Locator("nav a[href='/movies']").ClickAsync();
             await page.WaitForLoadStateAsync();
 
