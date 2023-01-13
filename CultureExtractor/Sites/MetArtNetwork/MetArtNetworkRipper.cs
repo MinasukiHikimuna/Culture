@@ -264,7 +264,7 @@ public class MetArtNetworkRipper : ISiteRipper, ISceneDownloader
                     var suggestedFilename = download.SuggestedFilename;
 
                     var suffix = Path.GetExtension(suggestedFilename);
-                    var name = $"{performersStr} - {scene.Name} - {scene.ReleaseDate.ToString("yyyy-MM-dd")} - {scene.Name}{suffix}";
+                    var name = $"{performersStr} - {site.Name} - {scene.ReleaseDate.ToString("yyyy-MM-dd")} - {scene.Name}{suffix}";
                     name = string.Concat(name.Split(Path.GetInvalidFileNameChars()));
 
                     var path = Path.Join(rippingPath, name);
