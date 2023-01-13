@@ -86,7 +86,14 @@ public class MetArtNetworkRipper : ISiteRipper, ISceneDownloader
             try
             {
                 await page.WaitForLoadStateAsync();
+                if (await page.Locator(".close-btn").IsVisibleAsync())
+                {
                 await page.Locator(".close-btn").ClickAsync();
+            }
+                if (await page.Locator(".fa-times-circle").IsVisibleAsync())
+                {
+                    await page.Locator(".fa-times-circle").ClickAsync();
+                }
             }
             catch (Exception ex)
             {
@@ -94,6 +101,23 @@ public class MetArtNetworkRipper : ISiteRipper, ISceneDownloader
 
             await page.Locator("nav a[href='/movies']").ClickAsync();
             await page.WaitForLoadStateAsync();
+
+            // Close the modal dialog if one is shown.
+            try
+            {
+                await page.WaitForLoadStateAsync();
+                if (await page.Locator(".close-btn").IsVisibleAsync())
+                {
+                    await page.Locator(".close-btn").ClickAsync();
+                }
+                if (await page.Locator(".fa-times-circle").IsVisibleAsync())
+                {
+                    await page.Locator(".fa-times-circle").ClickAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+            }
 
             var totalPagesStr = await page.Locator("nav.pagination > a:nth-child(5)").TextContentAsync();
             var totalPages = int.Parse(totalPagesStr);
