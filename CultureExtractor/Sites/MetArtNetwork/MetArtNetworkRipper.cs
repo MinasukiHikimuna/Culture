@@ -76,8 +76,8 @@ public class MetArtNetworkRipper : ISiteRipper, ISceneDownloader
                 await page.ClickAsync(".sign-in");
                 await page.WaitForLoadStateAsync();
 
-                await page.Locator("[name='email']").TypeAsync("thardas@protonmail.com");
-                await page.Locator("[name='password']").TypeAsync("vXxKHg2CV8*7-gXN");
+                await page.Locator("[name='email']").TypeAsync(site.Username);
+                await page.Locator("[name='password']").TypeAsync(site.Password);
                 await page.Locator("button[type='submit']").ClickAsync();
                 await page.WaitForLoadStateAsync();
             }
