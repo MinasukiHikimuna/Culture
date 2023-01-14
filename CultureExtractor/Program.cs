@@ -1,6 +1,5 @@
 ﻿using CultureExtractor.Interfaces;
 using Serilog;
-using System.Reflection;
 
 namespace CultureExtractor;
 
@@ -12,7 +11,7 @@ class PlaywrightExample
         {
             if (System.Diagnostics.Debugger.IsAttached)
             {
-                args = new string[] { "sexart", "downloadscenes" };
+                args = new string[] { "sexart", "scrapescenes" };
             }
 
             using var log = new LoggerConfiguration()
