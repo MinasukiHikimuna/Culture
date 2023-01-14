@@ -61,7 +61,7 @@ public class NetworkRipper
 
             if (totalPages == int.MaxValue)
             {
-                Log.Information($"First batch of infinite page contains {currentScenes.Count} scenes");
+                Log.Information($"Batch {currentPage} of infinite page contains {currentScenes.Count} scenes");
             }
             else
             {
