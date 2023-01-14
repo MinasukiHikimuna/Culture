@@ -12,7 +12,7 @@ class PlaywrightExample
         {
             if (System.Diagnostics.Debugger.IsAttached)
             {
-                args = new string[] { "dorcelclub", "downloadscenes" };
+                args = new string[] { "sexart", "downloadscenes" };
             }
 
             using var log = new LoggerConfiguration()

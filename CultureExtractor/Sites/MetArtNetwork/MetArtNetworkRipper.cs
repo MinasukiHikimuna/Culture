@@ -2,7 +2,6 @@
 using Microsoft.Playwright;
 using Serilog;
 using CultureExtractor.Interfaces;
-using CultureExtractor.Sites.WowNetwork;
 
 namespace CultureExtractor.Sites.MetArtNetwork;
 
@@ -15,7 +14,7 @@ namespace CultureExtractor.Sites.MetArtNetwork;
 [PornSite("eternaldesire")]
 [PornSite("straplez")]
 [PornSite("hustler")]
-public class MetArtNetworkRipper : ISceneScraper
+public class MetArtNetworkRipper : ISceneScraper, ISceneDownloader
 {
     private readonly SqliteContext _sqliteContext;
     private readonly Repository _repository;
@@ -24,264 +23,6 @@ public class MetArtNetworkRipper : ISceneScraper
     {
         _sqliteContext = new SqliteContext();
         _repository = new Repository(_sqliteContext);
-    }
-
-    public async Task ScrapeGalleriesAsync(string shortName, BrowserSettings browserSettings)
-    {
-        throw new NotImplementedException();
-    }
-
-    public async Task ScrapeScenesAsync(string shortName, BrowserSettings browserSettings)
-    {
-        var site = await _repository.GetSiteAsync(shortName);
-
-        IBrowserContext context = null;
-        var rippingPath = $@"I:\Ripping\{site.Name}\";
-
-        try
-        {
-            var playwright = await Playwright.CreateAsync();
-            var browser = await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
-            {
-                Headless = browserSettings.Headless,
-            });
-
-            context = await browser.NewContextAsync(new BrowserNewContextOptions()
-            {
-                BaseURL = site.Url,
-                ViewportSize = new ViewportSize { Width = 1920, Height = 1080 },
-                StorageState = site.StorageState
-            });
-
-            await context.Tracing.StartAsync(new()
-            {
-                Screenshots = true,
-                Snapshots = true,
-                Sources = true
-            });
-
-            var page = await context.NewPageAsync();
-
-            await page.GotoAsync("/");
-            await page.WaitForLoadStateAsync();
-
-
-
-
-            var totalPagesStr = await page.Locator("nav.pagination > a:nth-child(5)").TextContentAsync();
-            var totalPages = int.Parse(totalPagesStr);
-
-            for (int currentPage = 1; currentPage <= totalPages; currentPage++)
-            {
-                Thread.Sleep(10000);
-                var currentScenes = await page.Locator("div.card-media a").ElementHandlesAsync();
-                Log.Information($"Page {currentPage}/{totalPages} contains {currentScenes.Count} scenes");
-
-                foreach (var currentScene in currentScenes.Skip(currentPage == 1 ? 1 : 0))
-                {
-                    for (int retries = 0; retries < 3; retries++)
-                    {
-                        try
-                        {
-                            var foo = await currentScene.GetAttributeAsync("href");
-
-                            var sceneShortName = foo.Substring(foo.LastIndexOf("/movie/") + "/movie/".Length + 1);
-                            var existingSceneEntity = await _sqliteContext.Scenes.FirstOrDefaultAsync(s => s.ShortName == sceneShortName);
-                            if (existingSceneEntity != null)
-                            {
-                                continue;
-                            }
-
-                            if (retries > 0)
-                            {
-                                Log.Information($"Retrying {retries + 1} attempt for {foo}");
-                            }
-
-                            var newPage = await page.Context.RunAndWaitForPageAsync(async () =>
-                            {
-                                await currentScene.ClickAsync(new ElementHandleClickOptions() { Button = MouseButton.Middle });
-                            });
-
-                            await newPage.WaitForLoadStateAsync();
-
-                            var url = site.Url + foo;
-
-                            var metArtScenePage = new MetArtScenePage(newPage);
-                            var releaseDate = await metArtScenePage.ScrapeReleaseDateAsync();
-                            var duration = await metArtScenePage.ScrapeDurationAsync();
-                            var description = await metArtScenePage.ScrapeDescriptionAsync();
-                            var name = await metArtScenePage.ScrapeTitleAsync();
-                            var performers = await metArtScenePage.ScrapePerformersAsync(site.Url);
-
-                            var wholeDetails = await newPage.Locator("div.movie-details > div > div > div > ul").TextContentAsync();
-
-
-                            var tagElements = await newPage.Locator("div.tags-wrapper > div > a").ElementHandlesAsync();
-                            foreach (var tagElement in tagElements)
-                            {
-                                var tagName = await tagElement.TextContentAsync();
-                            }
-
-                            var performerNames = performers.Select(p => p.Name).ToList();
-                            var performersStr = performerNames.Count() > 1 ? string.Join(", ", performerNames.Take(performerNames.Count() - 1)) + " & " + performerNames.Last() : performerNames.FirstOrDefault();
-
-                            await newPage.CloseAsync();
-
-                            var scene = new Scene(
-                                null,
-                                site,
-                                releaseDate,
-                                sceneShortName,
-                                name,
-                                url,
-                                description,
-                                duration.TotalSeconds,
-                                performers,
-                                new List<SiteTag>()
-                            );
-                            var savedScene = await _repository.SaveSceneAsync(scene);
-
-                            Log.Information($"Scraped scene {savedScene.Id}: {url}");
-
-                            Thread.Sleep(3000);
-
-                            break;
-                        }
-                        catch (Exception ex)
-                        {
-                            Log.Error(ex.Message, ex);
-                        }
-                    }
-                }
-
-                if (currentPage != totalPages)
-                {
-                    await page.GetByRole(AriaRole.Link, new() { NameString = ">" }).ClickAsync();
-                }
-            }
-
-            await page.ReloadAsync();
-            await page.WaitForLoadStateAsync();
-            Thread.Sleep(5000);
-
-            var siteEntityFoo = await _sqliteContext.Sites.FirstOrDefaultAsync(s => s.ShortName == site.ShortName);
-            if (siteEntityFoo != null)
-            {
-                await _repository.UpdateStorageStateAsync(site, await page.Context.StorageStateAsync());
-            }
-        }
-        finally
-        {
-            if (context != null)
-            {
-                var path = Path.Combine(rippingPath, $"trace_{DateTime.Now.ToString("yyyyMMdd_HHmmss")}.zip");
-                await context.Tracing.StopAsync(new()
-                {
-                    Path = path
-                });
-            }
-        }
-    }
-
-    public async Task DownloadScenesAsync(string shortName, DownloadConditions conditions, BrowserSettings browserSettings)
-    {
-        var site = await _repository.GetSiteAsync(shortName);
-
-        var matchingScenes = await _sqliteContext.Scenes
-            .Include(s => s.Performers)
-            .Include(s => s.Tags)
-            .Include(s => s.Site)
-            .OrderBy(s => s.ReleaseDate)
-            .Where(s => s.SiteId == site.Id)
-            .Where(s => conditions.DateRange == null || (conditions.DateRange.Start <= s.ReleaseDate && s.ReleaseDate <= conditions.DateRange.End))
-            .Where(s => conditions.PerformerShortName == null || s.Performers.Any(p => p.ShortName == conditions.PerformerShortName))
-        .ToListAsync();
-
-        var matchingScenesStr = string.Join($"{Environment.NewLine}    ", matchingScenes.Select(s => $"{s.Site.Name} - {s.ReleaseDate.ToString("yyyy-MM-dd")} - {s.Name}"));
-
-        Log.Information($"Found {matchingScenes.Count()} scenes:{Environment.NewLine}{matchingScenesStr}");
-
-        if (!matchingScenes.Any())
-        {
-            Log.Information("Nothing to download.");
-            return;
-        }
-
-        IPage page = await PlaywrightFactory.CreatePageAsync(site, browserSettings);
-
-        if (await page.IsVisibleAsync(".sign-in"))
-        {
-            if (await page.Locator("#onetrust-accept-btn-handler").IsVisibleAsync())
-            {
-                await page.Locator("#onetrust-accept-btn-handler").ClickAsync();
-            }
-
-            await page.ClickAsync(".sign-in");
-            await page.WaitForLoadStateAsync();
-
-            await page.Locator("[name='email']").TypeAsync("thardas@protonmail.com");
-            await page.Locator("[name='password']").TypeAsync("vXxKHg2CV8*7-gXN");
-            await page.Locator("button[type='submit']").ClickAsync();
-            await page.WaitForLoadStateAsync();
-        }
-
-        var rippingPath = $@"I:\Ripping\{site.Name}\";
-        foreach (var scene in matchingScenes)
-        {
-            for (int retries = 0; retries < 3; retries++)
-            {
-                try
-                {
-                    await page.GotoAsync(scene.Url);
-                    await page.WaitForLoadStateAsync();
-
-                    if (retries > 0)
-                    {
-                        Log.Information($"Retrying {retries + 1} attempt for {scene.Url}");
-                    }
-
-                    var performerNames = scene.Performers.Select(p => p.Name).ToList();
-                    var performersStr = performerNames.Count() > 1 ? string.Join(", ", performerNames.Take(performerNames.Count() - 1)) + " & " + performerNames.Last() : performerNames.FirstOrDefault();
-
-                    await page.Locator("div svg.fa-film").ClickAsync();
-
-                    var downloadUrl = await page.Locator("div.dropdown-menu a").Filter(new() { HasTextString = "360p SD" }).GetAttributeAsync("href");
-
-                    var waitForDownloadTask = page.WaitForDownloadAsync();
-                    await page.Locator("div.dropdown-menu a").Filter(new() { HasTextString = "360p SD" }).ClickAsync();
-                    var download = await waitForDownloadTask;
-                    var suggestedFilename = download.SuggestedFilename;
-
-                    var suffix = Path.GetExtension(suggestedFilename);
-                    var name = $"{performersStr} - {site.Name} - {scene.ReleaseDate.ToString("yyyy-MM-dd")} - {scene.Name}{suffix}";
-                    name = string.Concat(name.Split(Path.GetInvalidFileNameChars()));
-
-                    var path = Path.Join(rippingPath, name);
-
-                    Log.Verbose($"Downloading\r\n    URL:  {downloadUrl}\r\n    Path: {path}");
-
-                    await download.SaveAsAsync(path);
-                    break;
-                }
-                catch (PlaywrightException ex)
-                {
-                    Log.Error(ex.Message, ex);
-                    // Let's try again
-                }
-                catch (TimeoutException ex)
-                {
-                    if (ex.Message.Contains("waiting for Locator"))
-                    {
-                        Log.Error(ex.Message, ex);
-                        // Let's try again
-                    }
-                    else
-                    {
-                        throw;
-                    }
-                }
-            }
-        }
     }
 
     public async Task LoginAsync(Site site, IPage page)
@@ -418,5 +159,33 @@ public class MetArtNetworkRipper : ISceneScraper
     public async Task GoToNextFilmsPageAsync(IPage page)
     {
         await page.GetByRole(AriaRole.Link, new() { NameString = ">" }).ClickAsync();
+    }
+
+    public async Task DownloadSceneAsync(SceneEntity scene, IPage page, string rippingPath)
+    {
+        await page.GotoAsync(scene.Url);
+        await page.WaitForLoadStateAsync();
+
+        var performerNames = scene.Performers.Select(p => p.Name).ToList();
+        var performersStr = performerNames.Count() > 1 ? string.Join(", ", performerNames.Take(performerNames.Count() - 1)) + " & " + performerNames.Last() : performerNames.FirstOrDefault();
+
+        await page.Locator("div svg.fa-film").ClickAsync();
+
+        var downloadUrl = await page.Locator("div.dropdown-menu a").Filter(new() { HasTextString = "360p SD" }).GetAttributeAsync("href");
+
+        var waitForDownloadTask = page.WaitForDownloadAsync();
+        await page.Locator("div.dropdown-menu a").Filter(new() { HasTextString = "360p SD" }).ClickAsync();
+        var download = await waitForDownloadTask;
+        var suggestedFilename = download.SuggestedFilename;
+
+        var suffix = Path.GetExtension(suggestedFilename);
+        var name = $"{performersStr} - {scene.Site.Name} - {scene.ReleaseDate.ToString("yyyy-MM-dd")} - {scene.Name}{suffix}";
+        name = string.Concat(name.Split(Path.GetInvalidFileNameChars()));
+
+        var path = Path.Join(rippingPath, name);
+
+        Log.Verbose($"Downloading\r\n    URL:  {downloadUrl}\r\n    Path: {path}");
+
+        await download.SaveAsAsync(path);
     }
 }
