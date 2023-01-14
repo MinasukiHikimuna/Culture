@@ -2,7 +2,7 @@
 
 namespace CultureExtractor.Interfaces;
 
-public interface ISceneDownloader : ISite
+public interface ISceneDownloader : ISiteScraper
 {
     Task DownloadSceneAsync(SceneEntity scene, IPage page, string rippingPath);
 }

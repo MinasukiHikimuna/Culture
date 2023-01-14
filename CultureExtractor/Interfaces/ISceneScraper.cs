@@ -2,7 +2,7 @@
 
 namespace CultureExtractor.Interfaces;
 
-public interface ISceneScraper : ISite
+public interface ISceneScraper : ISiteScraper
 {
     Task<int> NavigateToScenesAndReturnPageCountAsync(Site site, IPage page);
     Task<IReadOnlyList<IElementHandle>> GetCurrentScenesAsync(IPage page);

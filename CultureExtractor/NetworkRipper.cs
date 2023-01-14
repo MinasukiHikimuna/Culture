@@ -47,11 +47,7 @@ public class NetworkRipper
 
     private async Task ScrapeScenesAsync(ISceneScraper sceneScraper, Site site, BrowserSettings browserSettings)
     {
-        IPage page = await PlaywrightFactory.CreatePageAsync(site, browserSettings);
-        await sceneScraper.LoginAsync(site, page);
-
-        await _repository.UpdateStorageStateAsync(site, await page.Context.StorageStateAsync());
-
+        IPage page = await CreatePageAndLoginAsync(sceneScraper, site, browserSettings);
         var totalPages = await sceneScraper.NavigateToScenesAndReturnPageCountAsync(site, page);
 
         for (int currentPage = 1; currentPage <= totalPages; currentPage++)
@@ -59,14 +55,9 @@ public class NetworkRipper
             Thread.Sleep(5000);
             var currentScenes = await sceneScraper.GetCurrentScenesAsync(page);
 
-            if (totalPages == int.MaxValue)
-            {
-                Log.Information($"Batch {currentPage} of infinite page contains {currentScenes.Count} scenes");
-            }
-            else
-            {
-                Log.Information($"Page {currentPage}/{totalPages} contains {currentScenes.Count} scenes");
-            }
+            Log.Information(totalPages == int.MaxValue
+                ? $"Batch {currentPage} of infinite page contains {currentScenes.Count} scenes"
+                : $"Page {currentPage}/{totalPages} contains {currentScenes.Count} scenes");
             
             foreach (var currentScene in currentScenes)
             {
@@ -140,11 +131,7 @@ public class NetworkRipper
             return;
         }
 
-        IPage page = await PlaywrightFactory.CreatePageAsync(site, browserSettings);
-
-        await sceneDownloader.LoginAsync(site, page);
-
-        await _repository.UpdateStorageStateAsync(site, await page.Context.StorageStateAsync());
+        IPage page = await CreatePageAndLoginAsync(sceneDownloader, site, browserSettings);
 
         var rippingPath = $@"I:\Ripping\{site.Name}\";
         foreach (var scene in matchingScenes)
@@ -168,6 +155,15 @@ public class NetworkRipper
                 }
             }
         }
+    }
+
+    private async Task<IPage> CreatePageAndLoginAsync(ISiteScraper siteScraper, Site site, BrowserSettings browserSettings)
+    {
+        IPage page = await PlaywrightFactory.CreatePageAsync(site, browserSettings);
+        await siteScraper.LoginAsync(site, page);
+
+        await _repository.UpdateStorageStateAsync(site, await page.Context.StorageStateAsync());
+        return page;
     }
 
     private static T GetRipper<T>(string shortName) where T : class

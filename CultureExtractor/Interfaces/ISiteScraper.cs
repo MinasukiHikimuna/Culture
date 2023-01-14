@@ -2,7 +2,7 @@
 
 namespace CultureExtractor.Interfaces;
 
-public interface ISite
+public interface ISiteScraper
 {
     Task LoginAsync(Site site, IPage page);
 }
