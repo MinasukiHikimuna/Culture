@@ -164,6 +164,8 @@ public class CzechVRNetworkRipper : ISiteRipper, ISceneDownloader
         var loginPage = new CzechVRLoginPage(page);
         await loginPage.LoginIfNeededAsync(site);
 
+        await _repository.UpdateStorageStateAsync(site, await page.Context.StorageStateAsync());
+
         var rippingPath = $@"I:\Ripping\{site.Name}\";
         foreach (var scene in matchingScenes)
         {

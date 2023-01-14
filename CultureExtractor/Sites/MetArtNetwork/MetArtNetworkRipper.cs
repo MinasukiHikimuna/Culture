@@ -88,8 +88,8 @@ public class MetArtNetworkRipper : ISiteRipper, ISceneDownloader
                 await page.WaitForLoadStateAsync();
                 if (await page.Locator(".close-btn").IsVisibleAsync())
                 {
-                await page.Locator(".close-btn").ClickAsync();
-            }
+                    await page.Locator(".close-btn").ClickAsync();
+                }
                 if (await page.Locator(".fa-times-circle").IsVisibleAsync())
                 {
                     await page.Locator(".fa-times-circle").ClickAsync();
@@ -192,9 +192,9 @@ public class MetArtNetworkRipper : ISiteRipper, ISceneDownloader
                                 performers,
                                 new List<SiteTag>()
                             );
-                            await _repository.SaveSceneAsync(scene);
+                            var savedScene = await _repository.SaveSceneAsync(scene);
 
-                            Log.Information($"Scraped scene {scene.Id}: {url}");
+                            Log.Information($"Scraped scene {savedScene.Id}: {url}");
 
                             Thread.Sleep(3000);
 
@@ -262,8 +262,21 @@ public class MetArtNetworkRipper : ISiteRipper, ISceneDownloader
 
         IPage page = await PlaywrightFactory.CreatePageAsync(site, browserSettings);
 
-        var loginPage = new WowLoginPage(page);
-        await loginPage.LoginIfNeededAsync(site);
+        if (await page.IsVisibleAsync(".sign-in"))
+        {
+            if (await page.Locator("#onetrust-accept-btn-handler").IsVisibleAsync())
+            {
+                await page.Locator("#onetrust-accept-btn-handler").ClickAsync();
+            }
+
+            await page.ClickAsync(".sign-in");
+            await page.WaitForLoadStateAsync();
+
+            await page.Locator("[name='email']").TypeAsync("thardas@protonmail.com");
+            await page.Locator("[name='password']").TypeAsync("vXxKHg2CV8*7-gXN");
+            await page.Locator("button[type='submit']").ClickAsync();
+            await page.WaitForLoadStateAsync();
+        }
 
         var rippingPath = $@"I:\Ripping\{site.Name}\";
         foreach (var scene in matchingScenes)
@@ -307,6 +320,18 @@ public class MetArtNetworkRipper : ISiteRipper, ISceneDownloader
                 {
                     Log.Error(ex.Message, ex);
                     // Let's try again
+                }
+                catch (TimeoutException ex)
+                {
+                    if (ex.Message.Contains("waiting for Locator"))
+                    {
+                        Log.Error(ex.Message, ex);
+                        // Let's try again
+                    }
+                    else
+                    {
+                        throw;
+                    }
                 }
             }
         }
