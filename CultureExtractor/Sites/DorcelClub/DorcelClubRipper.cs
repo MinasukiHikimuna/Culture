@@ -11,26 +11,29 @@ public class DorcelClubRipper : ISceneScraper, ISceneDownloader
 {
     public async Task LoginAsync(Site site, IPage page)
     {
-        var logoutButton = page.Locator("div.actions > a.logout");
-        if (!await logoutButton.IsEnabledAsync())
+        var loginButton = page.Locator("a.login");
+        if (await loginButton.IsVisibleAsync())
         {
-            await page.FrameLocator("iframe").GetByRole(AriaRole.Link, new() { NameString = "Enter and accept cookies" }).ClickAsync();
+            await loginButton.ClickAsync();
 
-            await page.GetByRole(AriaRole.Link, new() { NameString = "Login Login" }).ClickAsync();
+            Thread.Sleep(5000);
 
-            await page.GetByPlaceholder("Email address").ClickAsync();
-            await page.GetByPlaceholder("Email address").FillAsync(site.Username);
-            await page.GetByPlaceholder("Password").ClickAsync();
-            await page.GetByPlaceholder("Password").FillAsync(site.Password);
-
-            if (await page.Locator("div.captcha").IsVisibleAsync())
+            if (await page.GetByPlaceholder("Email address").IsVisibleAsync())
             {
-                Log.Error("CAPTCHA required!");
+                await page.GetByPlaceholder("Email address").ClickAsync();
+                await page.GetByPlaceholder("Email address").FillAsync(site.Username);
+                await page.GetByPlaceholder("Password").ClickAsync();
+                await page.GetByPlaceholder("Password").FillAsync(site.Password);
+
+                if (await page.Locator("div.captcha").IsVisibleAsync())
+                {
+                    Log.Error("CAPTCHA required!");
+                }
+
+                await page.GetByRole(AriaRole.Button, new() { NameString = "Confirm" }).ClickAsync();
+
+                await page.GetByRole(AriaRole.Banner).GetByRole(AriaRole.Link, new() { NameString = "Videos" }).Filter(new() { HasTextString = "Videos" }).ClickAsync();
             }
-
-            await page.GetByRole(AriaRole.Button, new() { NameString = "Confirm" }).ClickAsync();
-
-            await page.GetByRole(AriaRole.Banner).GetByRole(AriaRole.Link, new() { NameString = "Videos" }).Filter(new() { HasTextString = "Videos" }).ClickAsync();
         }
 
         if (!(await page.Locator("div.languages > .selected-item").TextContentAsync()).Contains("English"))
