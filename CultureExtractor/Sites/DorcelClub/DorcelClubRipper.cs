@@ -114,10 +114,18 @@ public class DorcelClubRipper : ISceneScraper, ISceneDownloader
         }
 
         var fullTextLocator = page.Locator("div.content-description > div.content-text > span.full");
-        string descriptionRaw = await fullTextLocator.IsVisibleAsync()
-            ? await fullTextLocator.TextContentAsync()
-            : await page.Locator("div.content-description > div.content-text").TextContentAsync();
-        string description = descriptionRaw.Replace("\n", "").Trim();
+        var briefDescriptionLocator = page.Locator("div.content-description > div.content-text");
+
+        string description = string.Empty;
+        if (await fullTextLocator.IsVisibleAsync())
+        {
+            description = await fullTextLocator.TextContentAsync();
+        }
+        else if (await briefDescriptionLocator.IsVisibleAsync())
+        {
+            description = await briefDescriptionLocator.TextContentAsync();
+        }
+        description = description.Replace("\n", "").Trim();
 
         return new Scene(
             null,
