@@ -1,4 +1,5 @@
 ﻿using CultureExtractor.Interfaces;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Playwright;
 using Serilog;
 using System.Reflection;
@@ -33,7 +34,11 @@ public class NetworkRipper
             case JobType.DownloadScenes:
                 ISceneDownloader? sceneDownloader = GetRipper<ISceneDownloader>(shortName);
                 Log.Information($"Culture Extractor, using {sceneDownloader.GetType()}");
-                await sceneDownloader.DownloadScenesAsync(shortName, new DownloadConditions(new DateRange(new DateOnly(2015, 11, 29), new DateOnly(2024, 01, 01)), null), browserSettings);
+                await DownloadScenesAsync(
+                    sceneDownloader,
+                    site,
+                    new DownloadConditions(new DateRange(new DateOnly(2015, 11, 29), new DateOnly(2024, 01, 01)), null),
+                    browserSettings);
                 break;
             default:
                 throw new Exception($"Could not find a ripper for job {Enum.GetName(jobType)} with site short name {shortName}");
@@ -110,6 +115,58 @@ public class NetworkRipper
             if (currentPage != totalPages)
             {
                 await sceneScraper.GoToNextFilmsPageAsync(page);
+            }
+        }
+    }
+
+    public async Task DownloadScenesAsync(ISceneDownloader sceneDownloader, Site site, DownloadConditions conditions, BrowserSettings browserSettings)
+    {
+        var matchingScenes = await _repository._sqliteContext.Scenes
+            .Include(s => s.Performers)
+            .Include(s => s.Tags)
+            .Include(s => s.Site)
+            .OrderBy(s => s.ReleaseDate)
+            .Where(s => s.SiteId == site.Id)
+            .Where(s => conditions.DateRange == null || (conditions.DateRange.Start <= s.ReleaseDate && s.ReleaseDate <= conditions.DateRange.End))
+            .Where(s => conditions.PerformerShortName == null || s.Performers.Any(p => p.ShortName == conditions.PerformerShortName))
+        .ToListAsync();
+
+        var matchingScenesStr = string.Join($"{Environment.NewLine}    ", matchingScenes.Select(s => $"{s.Site.Name} - {s.ReleaseDate.ToString("yyyy-MM-dd")} - {s.Name}"));
+
+        Log.Information($"Found {matchingScenes.Count()} scenes:{Environment.NewLine}    {matchingScenesStr}");
+
+        if (!matchingScenes.Any())
+        {
+            Log.Information("Nothing to download.");
+            return;
+        }
+
+        IPage page = await PlaywrightFactory.CreatePageAsync(site, browserSettings);
+
+        await sceneDownloader.LoginAsync(site, page);
+
+        await _repository.UpdateStorageStateAsync(site, await page.Context.StorageStateAsync());
+
+        var rippingPath = $@"I:\Ripping\{site.Name}\";
+        foreach (var scene in matchingScenes)
+        {
+            for (int retries = 0; retries < 3; retries++)
+            {
+                try
+                {
+                    if (retries > 0)
+                    {
+                        Log.Information($"Retrying {retries + 1} attempt for {scene.Url}");
+                    }
+
+                    await sceneDownloader.DownloadSceneAsync(scene, page, rippingPath);
+                    break;
+                }
+                catch (PlaywrightException ex)
+                {
+                    // Let's try again
+                    Log.Error(ex.Message, ex);
+                }
             }
         }
     }

@@ -15,7 +15,7 @@ namespace CultureExtractor.Sites.MetArtNetwork;
 [PornSite("eternaldesire")]
 [PornSite("straplez")]
 [PornSite("hustler")]
-public class MetArtNetworkRipper : ISiteRipper, ISceneDownloader
+public class MetArtNetworkRipper : ISiteRipper, ISceneDownloaderLegacy
 {
     private readonly SqliteContext _sqliteContext;
     private readonly Repository _repository;

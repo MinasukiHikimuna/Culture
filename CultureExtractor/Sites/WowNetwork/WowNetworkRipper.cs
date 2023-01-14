@@ -11,7 +11,7 @@ namespace CultureExtractor.Sites.WowNetwork;
 [PornSite("wowgirls")]
 [PornSite("wowporn")]
 [PornSite("ultrafilms")]
-public class WowNetworkRipper : ISiteRipper, ISceneDownloader
+public class WowNetworkRipper : ISiteRipper, ISceneDownloaderLegacy
 {
     private readonly SqliteContext _sqliteContext;
     private readonly Repository _repository;

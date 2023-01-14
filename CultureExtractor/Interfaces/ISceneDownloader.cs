@@ -1,6 +1,8 @@
-﻿namespace CultureExtractor.Interfaces;
+﻿using Microsoft.Playwright;
 
-public interface ISceneDownloader
+namespace CultureExtractor.Interfaces;
+
+public interface ISceneDownloader : ISite
 {
-    Task DownloadScenesAsync(string shortName, DownloadConditions conditions, BrowserSettings browserSettings);
+    Task DownloadSceneAsync(SceneEntity scene, IPage page, string rippingPath);
 }

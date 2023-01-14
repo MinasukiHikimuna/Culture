@@ -11,7 +11,7 @@ namespace CultureExtractor.Sites.CzechVRNetwork;
 [PornSite("czechvrcasting")]
 [PornSite("czechvrfetish")]
 [PornSite("czechvrintimacy")]
-public class CzechVRNetworkRipper : ISiteRipper, ISceneDownloader
+public class CzechVRNetworkRipper : ISiteRipper, ISceneDownloaderLegacy
 {
     private readonly SqliteContext _sqliteContext;
     private readonly Repository _repository;

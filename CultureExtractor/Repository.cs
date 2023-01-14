@@ -5,7 +5,7 @@ namespace CultureExtractor;
 
 public class Repository
 {
-    private readonly SqliteContext _sqliteContext;
+    public readonly SqliteContext _sqliteContext;
 
     public Repository(SqliteContext sqliteContext)
     {

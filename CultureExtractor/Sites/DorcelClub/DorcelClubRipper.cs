@@ -8,7 +8,7 @@ namespace CultureExtractor.Sites.DorcelClub;
 
 [PornNetwork("dorcelclub")]
 [PornSite("dorcelclub")]
-public class DorcelClubRipper : ISceneScraper
+public class DorcelClubRipper : ISceneScraper, ISceneDownloader
 {
     public async Task LoginAsync(Site site, IPage page)
     {
@@ -129,5 +129,36 @@ public class DorcelClubRipper : ISceneScraper
             performers,
             new List<SiteTag>()
         );
+    }
+
+    public async Task DownloadSceneAsync(SceneEntity scene, IPage page, string rippingPath)
+    {
+        await page.GotoAsync(scene.Url);
+        await page.WaitForLoadStateAsync();
+
+        var performerNames = scene.Performers.Select(p => p.Name).ToList();
+        var performersStr = performerNames.Count() > 1 ? string.Join(", ", performerNames.Take(performerNames.Count() - 1)) + " & " + performerNames.Last() : performerNames.FirstOrDefault();
+
+        await page.GetByRole(AriaRole.Link).Filter(new() { HasTextString = "Download the video" }).ClickAsync();
+        await page.Locator("#download-pop-in").GetByText("English").ClickAsync();
+        await page.Locator("div[data-quality=\"360\"][data-lang=\"en\"]").ClickAsync();
+
+        var waitForDownloadTask = page.WaitForDownloadAsync();
+
+        await page.GetByRole(AriaRole.Button, new() { NameString = "Download" }).ClickAsync();
+
+        var download = await waitForDownloadTask;
+        var suggestedFilename = download.SuggestedFilename;
+
+        var suffix = Path.GetExtension(suggestedFilename);
+        var name = $"{performersStr} - {scene.Site.Name} - {scene.ReleaseDate.ToString("yyyy-MM-dd")} - {scene.Name}{suffix}";
+        name = string.Concat(name.Split(Path.GetInvalidFileNameChars()));
+
+        var path = Path.Join(rippingPath, name);
+
+
+        Log.Verbose($"Downloading\r\n    Path: {path}");
+
+        await download.SaveAsAsync(path);
     }
 }
