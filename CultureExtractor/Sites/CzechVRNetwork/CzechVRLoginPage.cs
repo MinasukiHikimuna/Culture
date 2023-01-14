@@ -36,7 +36,7 @@ public class CzechVRLoginPage
             });
             await loginPage.WaitForLoadStateAsync();
 
-            Thread.Sleep(1000);
+            await Task.Delay(1000);
 
             Log.Information($"Logged in as {site.Username}.");
         }

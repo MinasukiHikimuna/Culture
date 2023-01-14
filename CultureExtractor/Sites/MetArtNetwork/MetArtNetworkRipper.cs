@@ -27,7 +27,7 @@ public class MetArtNetworkRipper : ISceneScraper, ISceneDownloader
 
     public async Task LoginAsync(Site site, IPage page)
     {
-        Thread.Sleep(5000);
+        await Task.Delay(5000);
 
         if (await page.IsVisibleAsync(".sign-in"))
         {

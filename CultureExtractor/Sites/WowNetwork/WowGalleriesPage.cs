@@ -30,7 +30,7 @@ public class WowGalleriesPage
             await elementHandle.ClickAsync();
             await elementHandle.IsHiddenAsync();
             await _page.WaitForLoadStateAsync();
-            Thread.Sleep(5000);
+            await Task.Delay(5000);
         }
 
         var siteName = shortName switch

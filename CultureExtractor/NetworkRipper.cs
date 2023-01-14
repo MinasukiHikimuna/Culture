@@ -52,7 +52,7 @@ public class NetworkRipper
 
         for (int currentPage = 1; currentPage <= totalPages; currentPage++)
         {
-            Thread.Sleep(5000);
+            await Task.Delay(5000);
             var currentScenes = await sceneScraper.GetCurrentScenesAsync(page);
 
             Log.Information(totalPages == int.MaxValue
@@ -90,7 +90,7 @@ public class NetworkRipper
 
                             Log.Information($"Scraped scene {savedScene.Id}: {url}");
 
-                            Thread.Sleep(3000);
+                            await Task.Delay(3000);
                         }
 
                         break;

@@ -16,7 +16,7 @@ public class DorcelClubRipper : ISceneScraper, ISceneDownloader
         {
             await loginButton.ClickAsync();
 
-            Thread.Sleep(5000);
+            await Task.Delay(5000);
 
             if (await page.GetByPlaceholder("Email address").IsVisibleAsync())
             {

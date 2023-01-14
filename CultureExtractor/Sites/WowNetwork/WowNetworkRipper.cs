@@ -39,7 +39,7 @@ public class WowNetworkRipper : ISiteRipper, ISceneDownloaderLegacy
 
         for (int currentPage = 1; currentPage <= totalPages; currentPage++)
         {
-            Thread.Sleep(10000);
+            await Task.Delay(10000);
             var currentScenes = await filmsPage.GetCurrentScenesAsync();
             Log.Information($"Page {currentPage}/{totalPages} contains {currentScenes.Count} scenes");
 
@@ -103,7 +103,7 @@ public class WowNetworkRipper : ISiteRipper, ISceneDownloaderLegacy
 
                             await newPage.CloseAsync();
 
-                            Thread.Sleep(3000);
+                            await Task.Delay(3000);
                         }
 
                         break;
@@ -139,7 +139,7 @@ public class WowNetworkRipper : ISiteRipper, ISceneDownloaderLegacy
 
         for (int currentPage = 1; currentPage <= totalPages; currentPage++)
         {
-            Thread.Sleep(10000);
+            await Task.Delay(10000);
             var currentGalleries = await galleriesPage.GetCurrentGalleriesAsync();
             Log.Information($"Page {currentPage}/{totalPages} contains {currentGalleries.Count} scenes");
 
@@ -209,7 +209,7 @@ public class WowNetworkRipper : ISiteRipper, ISceneDownloaderLegacy
 
                         Log.Information($"Scraped gallery {existingGallery.Id}: {url}");
 
-                        Thread.Sleep(3000);
+                        await Task.Delay(3000);
 
                         break;
                     }

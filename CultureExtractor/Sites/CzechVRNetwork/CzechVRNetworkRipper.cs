@@ -39,7 +39,7 @@ public class CzechVRNetworkRipper : ISiteRipper, ISceneDownloaderLegacy
 
         for (int currentPage = 1; currentPage <= totalPages; currentPage++)
         {
-            Thread.Sleep(5000);
+            await Task.Delay(5000);
             var currentScenes = await videosPage.GetCurrentScenesAsync();
             Log.Information($"Page {currentPage}/{totalPages} contains {currentScenes.Count} scenes");
 
@@ -111,7 +111,7 @@ public class CzechVRNetworkRipper : ISiteRipper, ISceneDownloaderLegacy
 
                             Log.Information($"Scraped scene {existingScene.Id}: {url}");
 
-                            Thread.Sleep(3000);
+                            await Task.Delay(3000);
                         }
 
                         break;

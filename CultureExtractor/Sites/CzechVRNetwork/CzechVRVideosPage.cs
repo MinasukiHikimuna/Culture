@@ -33,7 +33,7 @@ public class CzechVRVideosPage
 
         await _page.Locator("#Filtrace").GetByRole(AriaRole.Link, new() { NameString = siteName }).ClickAsync();
         await _page.WaitForLoadStateAsync();
-        Thread.Sleep(5000);
+        await Task.Delay(5000);
     }
 
     public async Task<int> GetVideosPagesAsync()
