@@ -68,7 +68,6 @@ public class NetworkRipper
                 Log.Information($"Page {currentPage}/{totalPages} contains {currentScenes.Count} scenes");
             }
             
-
             foreach (var currentScene in currentScenes)
             {
                 for (int retries = 0; retries < 3; retries++)
@@ -94,7 +93,7 @@ public class NetworkRipper
 
                             var scene = await sceneScraper.ScrapeSceneAsync(site, url, sceneShortName, newPage);
                             var savedScene = await _repository.SaveSceneAsync(scene);
-                            await sceneScraper.DownloadPreviewImageAsync(savedScene, page, currentScene);
+                            await sceneScraper.DownloadPreviewImageAsync(savedScene, newPage, currentScene);
 
                             await newPage.CloseAsync();
 
