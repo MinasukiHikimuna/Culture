@@ -162,7 +162,7 @@ public class MetArtNetworkRipper : ISceneScraper, ISceneDownloader
         await page.GetByRole(AriaRole.Link, new() { NameString = ">" }).ClickAsync();
     }
 
-    public async Task DownloadSceneAsync(SceneEntity scene, IPage page, string rippingPath)
+    public async Task DownloadSceneAsync(SceneEntity scene, IPage page, string rippingPath, DownloadConditions downloadConditions)
     {
         await page.GotoAsync(scene.Url);
         await page.WaitForLoadStateAsync();
@@ -174,7 +174,14 @@ public class MetArtNetworkRipper : ISceneScraper, ISceneDownloader
 
         var availableDownloads = await ParseAvailableDownloads(page);
 
-        AvailableDownload availableDownload = availableDownloads.FirstOrDefault(f => f.ResolutionWidth == 360) ?? availableDownloads.Last();
+        AvailableDownload availableDownload = downloadConditions.PreferredDownloadQuality switch
+        {
+            PreferredDownloadQuality.Phash => availableDownloads.FirstOrDefault(f => f.ResolutionWidth == 360) ?? availableDownloads.Last(),
+            PreferredDownloadQuality.Best => availableDownloads.First(),
+            PreferredDownloadQuality.Worst => availableDownloads.Last(),
+            _ => throw new InvalidOperationException("Could not find a download candidate!")
+        };
+            
 
         var waitForDownloadTask = page.WaitForDownloadAsync();
         await availableDownload.ElementHandle.ClickAsync();

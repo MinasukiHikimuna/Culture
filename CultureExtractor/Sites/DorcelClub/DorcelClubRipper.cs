@@ -87,9 +87,15 @@ public class DorcelClubRipper : ISceneScraper, ISceneDownloader
         var releaseDateRaw = await page.Locator("div.right > span.publish_date").TextContentAsync();
         var releaseDate = DateOnly.Parse(releaseDateRaw);
 
+        // TODO: These should be parsed correctly
+        // - '1h 22'
+        // - '1h'
         var durationRaw = await page.Locator("div.right > span.duration").TextContentAsync();
         TimeSpan duration;
-        if (durationRaw.EndsWith("m"))
+        if (string.IsNullOrEmpty(durationRaw)) {
+            duration = TimeSpan.Zero;
+        }
+        else if (durationRaw.EndsWith("m"))
         {
             duration = TimeSpan.FromMinutes(int.Parse(durationRaw.Replace("m", "")));
         }
@@ -141,7 +147,7 @@ public class DorcelClubRipper : ISceneScraper, ISceneDownloader
         );
     }
 
-    public async Task DownloadSceneAsync(SceneEntity scene, IPage page, string rippingPath)
+    public async Task DownloadSceneAsync(SceneEntity scene, IPage page, string rippingPath, DownloadConditions downloadConditions)
     {
         await page.GotoAsync(scene.Url);
         await page.WaitForLoadStateAsync();

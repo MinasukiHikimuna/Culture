@@ -15,7 +15,7 @@ public class NetworkRipper
         _repository = repository;
     }
 
-    public async Task InitializeAsync(string shortName, JobType jobType, BrowserSettings browserSettings)
+    public async Task InitializeAsync(string shortName, JobType jobType, BrowserSettings browserSettings, DownloadConditions downloadConditions)
     {
         var site = await _repository.GetSiteAsync(shortName);
 
@@ -37,7 +37,7 @@ public class NetworkRipper
                 await DownloadScenesAsync(
                     sceneDownloader,
                     site,
-                    new DownloadConditions(new DateRange(new DateOnly(2015, 11, 29), new DateOnly(2024, 01, 01)), null),
+                    downloadConditions,
                     browserSettings);
                 break;
             default:
@@ -145,7 +145,7 @@ public class NetworkRipper
                         Log.Information($"Retrying {retries + 1} attempt for {scene.Url}");
                     }
 
-                    await sceneDownloader.DownloadSceneAsync(scene, page, rippingPath);
+                    await sceneDownloader.DownloadSceneAsync(scene, page, rippingPath, conditions);
                     await Task.Delay(3000);
 
                     break;

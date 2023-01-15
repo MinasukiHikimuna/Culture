@@ -47,11 +47,12 @@ public record Gallery(
 
 public record DownloadConditions(
     DateRange? DateRange,
-    string? PerformerShortName
+    string? PerformerShortName,
+    PreferredDownloadQuality PreferredDownloadQuality
 )
 {
-    public static DownloadConditions All() => new(null, null);
-    public static DownloadConditions Performer(string performerShortName) => new(null, performerShortName);
+    public static DownloadConditions All(PreferredDownloadQuality preferredDownloadQuality) => new(null, null, preferredDownloadQuality);
+    public static DownloadConditions Performer(string performerShortName, PreferredDownloadQuality preferredDownloadQuality) => new(null, performerShortName, preferredDownloadQuality);
 }
 
 public record DateRange(
@@ -64,3 +65,10 @@ public record AvailableDownload(
     int ResolutionWidth,
     double? FileSize,
     string? Url);
+
+public enum PreferredDownloadQuality
+{
+    Best,
+    Worst,
+    Phash
+}

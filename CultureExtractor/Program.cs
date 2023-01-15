@@ -11,7 +11,7 @@ class PlaywrightExample
         {
             if (System.Diagnostics.Debugger.IsAttached)
             {
-                args = new string[] { "sexart", "scrapescenes" };
+                args = new string[] { "hustler", "downloadscenes" };
             }
 
             using var log = new LoggerConfiguration()
@@ -23,7 +23,7 @@ class PlaywrightExample
             Log.Information("Culture Extractor");
 
             string shortName = args[0];
-            var browserSettings = new BrowserSettings(false);
+            var browserSettings = new BrowserSettings(true);
 
             var jobType = args[1] switch
             {
@@ -36,7 +36,15 @@ class PlaywrightExample
             };
 
             var networkRipper = new NetworkRipper(new Repository(new SqliteContext()));
-            await networkRipper.InitializeAsync(args[0], jobType, browserSettings);
+            await networkRipper.InitializeAsync(
+                args[0],
+                jobType,
+                browserSettings,
+                new DownloadConditions(
+                    new DateRange(
+                        new DateOnly(2017, 01, 01), new DateOnly(2017, 10, 03)),
+                    null,
+                    PreferredDownloadQuality.Phash));
         }
         catch (Exception ex)
         {
