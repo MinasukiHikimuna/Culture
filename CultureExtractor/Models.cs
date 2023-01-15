@@ -1,4 +1,6 @@
-﻿namespace CultureExtractor;
+﻿using Microsoft.Playwright;
+
+namespace CultureExtractor;
 
 public record Site(
     int Id,
@@ -55,3 +57,10 @@ public record DownloadConditions(
 public record DateRange(
     DateOnly Start,
     DateOnly End);
+
+public record AvailableDownload(
+    IElementHandle ElementHandle,
+    string Description,
+    int ResolutionWidth,
+    double? FileSize,
+    string? Url);

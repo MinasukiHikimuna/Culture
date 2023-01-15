@@ -2,6 +2,7 @@
 using Microsoft.Playwright;
 using Serilog;
 using CultureExtractor.Interfaces;
+using System.Runtime.CompilerServices;
 
 namespace CultureExtractor.Sites.MetArtNetwork;
 
@@ -171,10 +172,12 @@ public class MetArtNetworkRipper : ISceneScraper, ISceneDownloader
 
         await page.Locator("div svg.fa-film").ClickAsync();
 
-        var downloadUrl = await page.Locator("div.dropdown-menu a").Filter(new() { HasTextString = "360p SD" }).GetAttributeAsync("href");
+        var availableDownloads = await ParseAvailableDownloads(page);
+
+        AvailableDownload availableDownload = availableDownloads.FirstOrDefault(f => f.ResolutionWidth == 360) ?? availableDownloads.Last();
 
         var waitForDownloadTask = page.WaitForDownloadAsync();
-        await page.Locator("div.dropdown-menu a").Filter(new() { HasTextString = "360p SD" }).ClickAsync();
+        await availableDownload.ElementHandle.ClickAsync();
         var download = await waitForDownloadTask;
         var suggestedFilename = download.SuggestedFilename;
 
@@ -184,8 +187,29 @@ public class MetArtNetworkRipper : ISceneScraper, ISceneDownloader
 
         var path = Path.Join(rippingPath, name);
 
-        Log.Verbose($"Downloading\r\n    URL:  {downloadUrl}\r\n    Path: {path}");
+        Log.Verbose($"Downloading\r\n    URL:  {availableDownload.Url}\r\n    Path: {path}");
 
         await download.SaveAsAsync(path);
+    }
+
+    private static async Task<IList<AvailableDownload>> ParseAvailableDownloads(IPage page)
+    {
+        var downloadLinks = await page.Locator("div.dropdown-menu a").ElementHandlesAsync();
+        var availableDownloads = new List<AvailableDownload>();
+        foreach (var downloadLink in downloadLinks)
+        {
+            var description = await downloadLink.InnerTextAsync();
+            var sizeElement = await downloadLink.QuerySelectorAsync("span.pull-right");
+            var size = await sizeElement.TextContentAsync();
+            var resolution = description.Replace(size, "");
+            var url = await downloadLink.GetAttributeAsync("href");
+            availableDownloads.Add(new (
+                downloadLink,
+                description,
+                HumanParser.ParseResolutionWidth(resolution),
+                HumanParser.ParseFileSize(size),
+                url));
+        }
+        return availableDownloads;
     }
 }
