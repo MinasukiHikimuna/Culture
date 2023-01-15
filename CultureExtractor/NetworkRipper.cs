@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Playwright;
 using Serilog;
+using System.IO;
 using System.Reflection;
 using System.Text.Json;
 
@@ -139,8 +140,17 @@ public class NetworkRipper
         IPage page = await CreatePageAndLoginAsync(sceneDownloader, site, browserSettings);
 
         var rippingPath = $@"I:\Ripping\{site.Name}\";
+        const long minimumFreeDiskSpace = 5L * 1024 * 1024 * 1024;
+        DirectoryInfo targetDirectory = new DirectoryInfo(rippingPath);
+
         foreach (var scene in matchingScenes)
         {
+            DriveInfo drive = new DriveInfo(targetDirectory.Root.FullName);
+            if (drive.AvailableFreeSpace < minimumFreeDiskSpace)
+            {
+                throw new InvalidOperationException($"Drive {drive.Name} has less than {minimumFreeDiskSpace} bytes free.");
+            }
+
             for (int retries = 0; retries < 3; retries++)
             {
                 try
