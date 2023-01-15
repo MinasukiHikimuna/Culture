@@ -146,6 +146,8 @@ public class NetworkRipper
                     }
 
                     await sceneDownloader.DownloadSceneAsync(scene, page, rippingPath);
+                    await Task.Delay(3000);
+
                     break;
                 }
                 catch (PlaywrightException ex)
