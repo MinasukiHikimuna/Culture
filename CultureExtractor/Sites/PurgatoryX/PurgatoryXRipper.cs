@@ -58,7 +58,9 @@ public class PurgatoryXRipper : ISceneScraper, ISceneDownloader
         var linkElement = await currentScene.QuerySelectorAsync("div.container > div.row > a");
         var url = await linkElement.GetAttributeAsync("href");
         var idWithQueryStrings = url.Substring(url.LastIndexOf("/") + 1);
-        var shortName = idWithQueryStrings.Substring(0, idWithQueryStrings.IndexOf("?"));
+        var shortName = idWithQueryStrings.Contains("?")
+            ? idWithQueryStrings.Substring(0, idWithQueryStrings.IndexOf("?"))
+            : idWithQueryStrings;
 
         return (url, shortName);
     }
