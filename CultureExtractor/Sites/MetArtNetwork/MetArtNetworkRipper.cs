@@ -3,6 +3,7 @@ using Microsoft.Playwright;
 using Serilog;
 using CultureExtractor.Interfaces;
 using System.Runtime.CompilerServices;
+using CultureExtractor.Exceptions;
 
 namespace CultureExtractor.Sites.MetArtNetwork;
 
@@ -167,10 +168,18 @@ public class MetArtNetworkRipper : ISceneScraper, ISceneDownloader
         await page.GotoAsync(scene.Url);
         await page.WaitForLoadStateAsync();
 
+        await Task.Delay(3000);
+
         var performerNames = scene.Performers.Select(p => p.Name).ToList();
         var performersStr = performerNames.Count() > 1 ? string.Join(", ", performerNames.Take(performerNames.Count() - 1)) + " & " + performerNames.Last() : performerNames.FirstOrDefault();
 
-        await page.Locator("div svg.fa-film").ClickAsync();
+        var downloadMenuLocator = page.Locator("div svg.fa-film");
+        if (!await downloadMenuLocator.IsVisibleAsync())
+        {
+            throw new DownloadException(false, $"Could not find download menu for {scene.Url}. Skipping...");
+        }
+
+        await downloadMenuLocator.ClickAsync();
 
         var availableDownloads = await ParseAvailableDownloads(page);
 

@@ -1,4 +1,5 @@
-﻿using CultureExtractor.Interfaces;
+﻿using CultureExtractor.Exceptions;
+using CultureExtractor.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Playwright;
 using Serilog;
@@ -159,6 +160,7 @@ public class NetworkRipper
                     }
 
                     var downloadDetails = await sceneDownloader.DownloadSceneAsync(scene, page, rippingPath, conditions);
+
                     _repository._sqliteContext.Downloads.Add(new DownloadEntity()
                     {
                         DownloadedAt = DateTime.Now,
@@ -182,6 +184,18 @@ public class NetworkRipper
                 {
                     // Let's try again
                     Log.Error(ex.Message, ex);
+                }
+                catch (DownloadException ex)
+                {
+                    Log.Error(ex.Message, ex);
+                    if (ex.ShouldRetry)
+                    {
+                        continue;
+                    }
+                    else
+                    {
+                        break;
+                    }
                 }
             }
         }
