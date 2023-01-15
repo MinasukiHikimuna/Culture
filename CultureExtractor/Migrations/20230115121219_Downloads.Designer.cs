@@ -3,6 +3,7 @@ using System;
 using CultureExtractor;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace CultureExtractor.Migrations
 {
     [DbContext(typeof(SqliteContext))]
-    partial class SqliteContextModelSnapshot : ModelSnapshot
+    [Migration("20230115121219_Downloads")]
+    partial class Downloads
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "7.0.1");
@@ -41,7 +44,7 @@ namespace CultureExtractor.Migrations
 
                     b.HasIndex("SceneId");
 
-                    b.ToTable("Downloads");
+                    b.ToTable("DownloadEntities");
                 });
 
             modelBuilder.Entity("CultureExtractor.GalleryEntity", b =>
@@ -267,7 +270,7 @@ namespace CultureExtractor.Migrations
             modelBuilder.Entity("CultureExtractor.DownloadEntity", b =>
                 {
                     b.HasOne("CultureExtractor.SceneEntity", "Scene")
-                        .WithMany("Downloads")
+                        .WithMany()
                         .HasForeignKey("SceneId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -373,11 +376,6 @@ namespace CultureExtractor.Migrations
                     b.Navigation("Performers");
 
                     b.Navigation("Tags");
-                });
-
-            modelBuilder.Entity("CultureExtractor.SceneEntity", b =>
-                {
-                    b.Navigation("Downloads");
                 });
 
             modelBuilder.Entity("CultureExtractor.SiteEntity", b =>

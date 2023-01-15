@@ -147,7 +147,7 @@ public class DorcelClubRipper : ISceneScraper, ISceneDownloader
         );
     }
 
-    public async Task DownloadSceneAsync(SceneEntity scene, IPage page, string rippingPath, DownloadConditions downloadConditions)
+    public async Task<DownloadDetails> DownloadSceneAsync(SceneEntity scene, IPage page, string rippingPath, DownloadConditions downloadConditions)
     {
         await page.GotoAsync(scene.Url);
         await page.WaitForLoadStateAsync();
@@ -176,5 +176,7 @@ public class DorcelClubRipper : ISceneScraper, ISceneDownloader
         Log.Verbose($"Downloading\r\n    Path: {path}");
 
         await download.SaveAsAsync(path);
+
+        return null;
     }
 }

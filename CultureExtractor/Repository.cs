@@ -89,7 +89,9 @@ public class Repository
             Tags = tagEntities,
 
             SiteId = siteEntity.Id,
-            Site = siteEntity
+            Site = siteEntity,
+
+            Downloads = new List<DownloadEntity>()
         };
 
         await _sqliteContext.Scenes.AddAsync(sceneEntity);

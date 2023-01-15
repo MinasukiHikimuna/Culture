@@ -10,6 +10,7 @@ public class SqliteContext : DbContext
     public DbSet<SitePerformerEntity> Performers { get; set; }
     public DbSet<SiteTagEntity> Tags { get; set; }
     public DbSet<StorageStateEntity> StorageStates { get; set; }
+    public DbSet<DownloadEntity> Downloads { get; set; }
 
     public string DbPath { get; }
 
@@ -84,6 +85,8 @@ public class SceneEntity
 
     public required int SiteId { get; set; }
     public required SiteEntity Site { get; set; }
+
+    public required ICollection<DownloadEntity> Downloads { get; set; }
 }
 
 public class GalleryEntity
@@ -100,4 +103,15 @@ public class GalleryEntity
 
     public required int SiteId { get; set; }
     public required SiteEntity Site { get; set; }
+}
+
+public class DownloadEntity
+{
+    public int Id { get; set; }
+    public required DateTime DownloadedAt { get; set; }
+    public required string DownloadQuality { get; set; }
+    public required string DownloadDetails { get; set; }
+
+    public required int SceneId { get; set; }
+    public required SceneEntity Scene { get; set; }
 }

@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Playwright;
 using Serilog;
 using System.Reflection;
+using System.Text.Json;
 
 namespace CultureExtractor;
 
@@ -111,14 +112,18 @@ public class NetworkRipper
 
     public async Task DownloadScenesAsync(ISceneDownloader sceneDownloader, Site site, DownloadConditions conditions, BrowserSettings browserSettings)
     {
+        var preferredDownloadQuality = Enum.GetName(conditions.PreferredDownloadQuality);
+
         var matchingScenes = await _repository._sqliteContext.Scenes
             .Include(s => s.Performers)
             .Include(s => s.Tags)
             .Include(s => s.Site)
+            .Include(s => s.Downloads)
             .OrderBy(s => s.ReleaseDate)
             .Where(s => s.SiteId == site.Id)
             .Where(s => conditions.DateRange == null || (conditions.DateRange.Start <= s.ReleaseDate && s.ReleaseDate <= conditions.DateRange.End))
             .Where(s => conditions.PerformerShortName == null || s.Performers.Any(p => p.ShortName == conditions.PerformerShortName))
+            .Where(s => !s.Downloads.Any(d => d.DownloadQuality == preferredDownloadQuality))
         .ToListAsync();
 
         var matchingScenesStr = string.Join($"{Environment.NewLine}    ", matchingScenes.Select(s => $"{s.Site.Name} - {s.ReleaseDate.ToString("yyyy-MM-dd")} - {s.Name}"));
@@ -145,7 +150,17 @@ public class NetworkRipper
                         Log.Information($"Retrying {retries + 1} attempt for {scene.Url}");
                     }
 
-                    await sceneDownloader.DownloadSceneAsync(scene, page, rippingPath, conditions);
+                    var downloadDetails = await sceneDownloader.DownloadSceneAsync(scene, page, rippingPath, conditions);
+                    _repository._sqliteContext.Downloads.Add(new DownloadEntity()
+                    {
+                        DownloadedAt = DateTime.Now,
+                        DownloadDetails = JsonSerializer.Serialize(downloadDetails),
+                        DownloadQuality = preferredDownloadQuality,
+
+                        SceneId = scene.Id,
+                        Scene = scene,
+                    });
+                    await _repository._sqliteContext.SaveChangesAsync();
                     await Task.Delay(3000);
 
                     break;

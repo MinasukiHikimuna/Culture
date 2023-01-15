@@ -59,11 +59,11 @@ public record DateRange(
     DateOnly Start,
     DateOnly End);
 
-public record AvailableDownload(
-    IElementHandle ElementHandle,
+public record DownloadDetails(
     string Description,
     int ResolutionWidth,
     double? FileSize,
+    double? Fps,
     string? Url);
 
 public enum PreferredDownloadQuality

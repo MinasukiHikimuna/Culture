@@ -4,5 +4,5 @@ namespace CultureExtractor.Interfaces;
 
 public interface ISceneDownloader : ISiteScraper
 {
-    Task DownloadSceneAsync(SceneEntity scene, IPage page, string rippingPath, DownloadConditions downloadConditions);
+    Task<DownloadDetails> DownloadSceneAsync(SceneEntity scene, IPage page, string rippingPath, DownloadConditions downloadConditions);
 }
