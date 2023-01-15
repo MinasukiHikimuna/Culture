@@ -67,7 +67,6 @@ public class NetworkRipper
                 {
                     try
                     {
-                        
                         (string url, string sceneShortName) = await sceneScraper.GetSceneIdAsync(site, currentScene);
 
                         if (retries > 0) 
@@ -91,15 +90,14 @@ public class NetworkRipper
                             await newPage.CloseAsync();
 
                             Log.Information($"Scraped scene {savedScene.Id}: {url}");
-
                             await Task.Delay(3000);
                         }
-
                         break;
                     }
                     catch (Exception ex)
                     {
                         Log.Error(ex.ToString(), ex);
+                        await Task.Delay(3000);
                     }
                 }
             }
