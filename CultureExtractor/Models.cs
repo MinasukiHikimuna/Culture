@@ -61,10 +61,12 @@ public record DateRange(
 
 public record DownloadDetails(
     string Description,
-    int ResolutionWidth,
+    int? ResolutionHeight,
+    int? ResolutionWidth,
     double? FileSize,
     double? Fps,
-    string? Url);
+    string? Url,
+    string? Codec);
 
 public enum PreferredDownloadQuality
 {

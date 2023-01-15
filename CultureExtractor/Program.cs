@@ -11,7 +11,7 @@ class PlaywrightExample
         {
             if (System.Diagnostics.Debugger.IsAttached)
             {
-                args = new string[] { "hustler", "downloadscenes" };
+                args = new string[] { "purgatoryx", "scrape-scenes" };
             }
 
             using var log = new LoggerConfiguration()
@@ -27,11 +27,11 @@ class PlaywrightExample
 
             var jobType = args[1] switch
             {
-                "scrapescenes" => JobType.ScrapeScenes,
-                "scrapemodels" => JobType.ScrapeModels,
-                "scrapegalleries" => JobType.ScrapeGalleries,
-                "downloadscenes" => JobType.DownloadScenes,
-                "downloadgalleries" => JobType.DownloadGalleries,
+                "scrape-scenes" => JobType.ScrapeScenes,
+                "scrape-models" => JobType.ScrapeModels,
+                "scrape-galleries" => JobType.ScrapeGalleries,
+                "download-scenes" => JobType.DownloadScenes,
+                "download-galleries" => JobType.DownloadGalleries,
                 _ => throw new NotImplementedException($"Unknown job type {args[1]}")
             };
 
@@ -40,11 +40,7 @@ class PlaywrightExample
                 args[0],
                 jobType,
                 browserSettings,
-                new DownloadConditions(
-                    new DateRange(
-                        new DateOnly(2017, 01, 01), new DateOnly(2017, 10, 03)),
-                    null,
-                    PreferredDownloadQuality.Phash));
+                DownloadConditions.All(PreferredDownloadQuality.Phash));
         }
         catch (Exception ex)
         {

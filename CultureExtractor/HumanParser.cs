@@ -7,6 +7,20 @@ public static class HumanParser
 {
     public static double ParseFileSize(string sizeString)
     {
+        string purgatoryPattern = @"(?<thousands>[0-9]+),(?<wholeNumbers>[0-9]+).(?<decimalNumbers>[0-9]+)? (?<unit>GB|MB)";
+        Match purgatoryMatch = Regex.Match(sizeString, purgatoryPattern);
+        if (purgatoryMatch.Success)
+        {
+            var thousands = int.Parse(purgatoryMatch.Groups["thousands"].Value);
+            var wholeNumbers = int.Parse(purgatoryMatch.Groups["wholeNumbers"].Value);
+            var decimalNumbers =
+                !string.IsNullOrEmpty(purgatoryMatch.Groups["decimalNumbers"].Value)
+                    ? double.Parse("0." + purgatoryMatch.Groups["decimalNumbers"].Value, CultureInfo.InvariantCulture)
+                    : 0.0;
+            var unitFactor = GetUnitFactor(purgatoryMatch.Groups["unit"].Value);
+            return (thousands * 1000 + wholeNumbers + decimalNumbers) * unitFactor;
+        }
+
         string pattern = @"(?<wholeNumbers>[0-9]+)(?<decimalNumbers>(.|,)[0-9]+)? (?<unit>GB|MB)";
         Match match = Regex.Match(sizeString, pattern);
         if (match.Success)
@@ -25,6 +39,29 @@ public static class HumanParser
 
     public static int ParseResolutionWidth(string resolutionString)
     {
+        var trimmedResolutionString = resolutionString.Trim();
+
+        var patternExplicitResolution = @"^(?<width>[0-9]+)x(?<height>[0-9]+)$";
+        var matchExplicitResolution = Regex.Match(trimmedResolutionString, patternExplicitResolution);
+        if (matchExplicitResolution.Success)
+        {
+            return int.Parse(matchExplicitResolution.Groups["width"].Value);
+        }
+
+        return -1;
+    }
+
+    public static int ParseResolutionHeight(string resolutionString)
+    {
+        var trimmedResolutionString = resolutionString.Trim();
+
+        var patternExplicitResolution = @"^(?<width>[0-9]+)x(?<height>[0-9]+)$";
+        var matchExplicitResolution = Regex.Match(trimmedResolutionString, patternExplicitResolution);
+        if (matchExplicitResolution.Success)
+        {
+            return int.Parse(matchExplicitResolution.Groups["height"].Value);
+        }
+
         if (new List<string>() { "4K", "2160", "2160P", "UHD" }.Any(s => resolutionString.Contains(s, StringComparison.InvariantCultureIgnoreCase))) {
             return 2160;
         }
@@ -34,14 +71,50 @@ public static class HumanParser
             return 1080;
         }
 
-        string pattern = @"(?<width>[0-9]+)p";
+        string pattern = @"(?<height>[0-9]+)p";
         Match match = Regex.Match(resolutionString, pattern);
         if (match.Success)
         {
-            return int.Parse(match.Groups["width"].Value);
+            return int.Parse(match.Groups["height"].Value);
         }
 
         return -1;
+    }
+
+    public static TimeSpan ParseDuration(string durationString)
+    {
+        var trimmedDurationString = durationString.Trim();
+
+        var patternHhMmSs = @"^(?<hours>[0-9]+):(?<minutes>[0-9]+):(?<seconds>[0-9]+)$";
+        var matchHhMmSs = Regex.Match(trimmedDurationString, patternHhMmSs);
+        if (matchHhMmSs.Success)
+        {
+            return TimeSpan.Zero
+                .Add(TimeSpan.FromHours(int.Parse(matchHhMmSs.Groups["hours"].Value)))
+                .Add(TimeSpan.FromMinutes(int.Parse(matchHhMmSs.Groups["minutes"].Value)))
+                .Add(TimeSpan.FromSeconds(int.Parse(matchHhMmSs.Groups["seconds"].Value)));
+        }
+
+        var patternMmSs = @"^(?<minutes>[0-9]+):(?<seconds>[0-9]+)$";
+        var matchMmSs = Regex.Match(trimmedDurationString, patternMmSs);
+        if (matchMmSs.Success)
+        {
+            return TimeSpan.Zero
+                .Add(TimeSpan.FromMinutes(int.Parse(matchMmSs.Groups["minutes"].Value)))
+                .Add(TimeSpan.FromSeconds(int.Parse(matchMmSs.Groups["seconds"].Value)));
+        }
+
+        return TimeSpan.Zero;
+    }
+
+    public static string ParseCodec(string codecString)
+    {
+        if (codecString.Contains("h264"))
+        {
+            return "H.264";
+        }
+
+        return string.Empty;
     }
 
     private static int GetUnitFactor(string unit)

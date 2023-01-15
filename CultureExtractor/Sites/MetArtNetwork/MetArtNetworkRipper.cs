@@ -176,7 +176,7 @@ public class MetArtNetworkRipper : ISceneScraper, ISceneDownloader
 
         DownloadDetailsAndElementHandle selectedDownload = downloadConditions.PreferredDownloadQuality switch
         {
-            PreferredDownloadQuality.Phash => availableDownloads.FirstOrDefault(f => f.DownloadDetails.ResolutionWidth == 360) ?? availableDownloads.Last(),
+            PreferredDownloadQuality.Phash => availableDownloads.FirstOrDefault(f => f.DownloadDetails.ResolutionHeight == 360) ?? availableDownloads.Last(),
             PreferredDownloadQuality.Best => availableDownloads.First(),
             PreferredDownloadQuality.Worst => availableDownloads.Last(),
             _ => throw new InvalidOperationException("Could not find a download candidate!")
@@ -216,10 +216,13 @@ public class MetArtNetworkRipper : ISceneScraper, ISceneDownloader
                 new DownloadDetailsAndElementHandle(
                     new DownloadDetails(
                         description,
-                        HumanParser.ParseResolutionWidth(resolution),
+                        -1,
+                        HumanParser.ParseResolutionHeight(resolution),
                         HumanParser.ParseFileSize(size),
                         -1,
-                        url),
+                        url,
+                        // TODO: this can be parsed!
+                        string.Empty),
                     downloadLink));
         }
         return availableDownloads;

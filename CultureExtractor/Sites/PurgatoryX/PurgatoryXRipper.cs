@@ -1,0 +1,206 @@
+﻿using CultureExtractor.Interfaces;
+using Microsoft.Playwright;
+using Serilog;
+using System.Text.RegularExpressions;
+
+namespace CultureExtractor.Sites.PurgatoryX;
+
+[PornNetwork("purgatoryx")]
+[PornSite("purgatoryx")]
+public class PurgatoryXRipper : ISceneScraper, ISceneDownloader
+{
+    public async Task LoginAsync(Site site, IPage page)
+    {
+        var enterButton = page.GetByRole(AriaRole.Link, new() { NameString = "Enter" });
+        if (await enterButton.IsVisibleAsync())
+        {
+            await enterButton.ClickAsync();
+        }
+
+        var membersButton = page.Locator("#main-nav").GetByRole(AriaRole.Link, new() { NameString = "Members" });
+        if (await membersButton.IsVisibleAsync())
+        {
+            await membersButton.ClickAsync();
+        }
+
+        if (await page.GetByPlaceholder("Username").IsVisibleAsync())
+        {
+            await page.GetByPlaceholder("Username").ClickAsync();
+            await page.GetByPlaceholder("Username").FillAsync(site.Username);
+            await page.GetByPlaceholder("Password").ClickAsync();
+            await page.GetByPlaceholder("Password").FillAsync(site.Password);
+
+            await page.GetByRole(AriaRole.Button, new() { NameString = "Sign In" }).ClickAsync();
+        }
+    }
+
+    public async Task<int> NavigateToScenesAndReturnPageCountAsync(Site site, IPage page)
+    {
+        await page.Locator("#main-nav").GetByRole(AriaRole.Link, new() { NameString = "Episodes " }).ClickAsync();
+        var lastPageText = await page.Locator("ul.pagination > li").Nth(-2).TextContentAsync();
+        return int.Parse(lastPageText);
+    }
+
+    public async Task DownloadPreviewImageAsync(Scene scene, IPage page, IElementHandle currentScene)
+    {
+        // TODO: Need to find a way to download the image using this browser instance. Otherwise we get a Forbidden error.
+        return;
+    }
+
+    public async Task<IReadOnlyList<IElementHandle>> GetCurrentScenesAsync(IPage page)
+    {
+        var currentScenes = await page.Locator("div.content-item").ElementHandlesAsync();
+        return currentScenes;
+    }
+
+    public async Task<(string Url, string ShortName)> GetSceneIdAsync(Site site, IElementHandle currentScene)
+    {
+        var linkElement = await currentScene.QuerySelectorAsync("div.container > div.row > a");
+        var url = await linkElement.GetAttributeAsync("href");
+        var idWithQueryStrings = url.Substring(url.LastIndexOf("/") + 1);
+        var shortName = idWithQueryStrings.Substring(0, idWithQueryStrings.IndexOf("?"));
+
+        return (url, shortName);
+    }
+
+    public async Task GoToNextFilmsPageAsync(IPage page)
+    {
+        await page.GetByRole(AriaRole.Link, new() { NameString = "Next »" }).ClickAsync();
+    }
+
+    public async Task<Scene> ScrapeSceneAsync(Site site, string url, string sceneShortName, IPage page)
+    {
+        Thread.Sleep(5000);
+
+        var releaseDateRaw = await page.Locator("p.content-meta > span.date").TextContentAsync();
+        var releaseDate = DateOnly.Parse(releaseDateRaw);
+
+        var durationRaw = await page.Locator("p.content-meta > span.total-time").TextContentAsync();
+        var duration = HumanParser.ParseDuration(durationRaw);
+
+        var titleRaw = await page.Locator("h1.title").TextContentAsync();
+        var title = titleRaw.Replace("\n", "").Trim();
+
+        var performersRaw = await page.Locator("div.model-wrap > ul > li").ElementHandlesAsync();
+
+        var performers = new List<SitePerformer>();
+        foreach (var performerElement in performersRaw)
+        {
+            var performerLink = await performerElement.QuerySelectorAsync("a");
+            var performerUrl = await performerLink.GetAttributeAsync("href");
+            var shortName = performerUrl.Substring(performerUrl.LastIndexOf("/") + 1);
+            var performerNameElement = await performerElement.QuerySelectorAsync("h5");
+            var nameRaw = await performerNameElement.TextContentAsync();
+            var name = nameRaw.Replace("\n", "").Trim();
+            performers.Add(new SitePerformer(shortName, name, performerUrl));
+        }
+
+        var description = await page.Locator("div.description > p").TextContentAsync();
+        description = description.Replace("\n", "").Trim();
+
+        return new Scene(
+            null,
+            site,
+            releaseDate,
+            sceneShortName,
+            title,
+            url,
+            description,
+            duration.TotalSeconds,
+            performers,
+            new List<SiteTag>()
+        );
+    }
+
+    public async Task<DownloadDetails> DownloadSceneAsync(SceneEntity scene, IPage page, string rippingPath, DownloadConditions downloadConditions)
+    {
+        await page.GotoAsync(scene.Url);
+        await page.WaitForLoadStateAsync();
+
+        var performerNames = scene.Performers.Select(p => p.Name).ToList();
+        var performersStr = performerNames.Count() > 1 ? string.Join(", ", performerNames.Take(performerNames.Count() - 1)) + " & " + performerNames.Last() : performerNames.FirstOrDefault();
+
+        await page.GetByRole(AriaRole.Button).Filter(new() { HasTextString = "Download video" }).ClickAsync();
+
+        var availableDownloads = await ParseAvailableDownloads(page);
+
+        DownloadDetailsAndElementHandle selectedDownload = downloadConditions.PreferredDownloadQuality switch
+        {
+            PreferredDownloadQuality.Phash => availableDownloads.FirstOrDefault(f => f.DownloadDetails.ResolutionHeight == 360) ?? availableDownloads.Last(),
+            PreferredDownloadQuality.Best => availableDownloads.First(),
+            PreferredDownloadQuality.Worst => availableDownloads.Last(),
+            _ => throw new InvalidOperationException("Could not find a download candidate!")
+        };
+
+        var waitForDownloadTask = page.WaitForDownloadAsync();
+
+        await selectedDownload.ElementHandle.ClickAsync();
+
+        var download = await waitForDownloadTask;
+        var suggestedFilename = download.SuggestedFilename;
+
+        var suffix = Path.GetExtension(suggestedFilename);
+        var name = $"{performersStr} - {scene.Site.Name} - {scene.ReleaseDate.ToString("yyyy-MM-dd")} - {scene.Name}{suffix}";
+        name = string.Concat(name.Split(Path.GetInvalidFileNameChars()));
+
+        var path = Path.Join(rippingPath, name);
+
+
+        Log.Verbose($"Downloading\r\n    Path: {path}");
+
+        await download.SaveAsAsync(path);
+
+        return selectedDownload.DownloadDetails;
+    }
+
+    private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloads(IPage page)
+    {
+        var downloadListItems = await page.Locator("ul.dropdown-menu.show > li").ElementHandlesAsync();
+        var availableDownloads = new List<DownloadDetailsAndElementHandle>();
+
+        var firstElementText = await downloadListItems.First().TextContentAsync();
+        var expectedTitle = "Choose Download Quality";
+        if (!firstElementText.Contains(expectedTitle))
+        {
+            throw new InvalidOperationException($"First element in download list is expected to contain title {expectedTitle}.");
+        }
+
+        foreach (var downloadListItem in downloadListItems.Skip(1))
+        {
+            var titleElement = await downloadListItem.QuerySelectorAsync("span.download-title");
+            var titleRaw = await titleElement.TextContentAsync();
+            var title = titleRaw.Replace("\n", "").Trim();
+
+            var sizeElement = await downloadListItem.QuerySelectorAsync("span.download-size");
+            var sizeRaw = await sizeElement.TextContentAsync();
+            var size = HumanParser.ParseFileSize(sizeRaw.Replace("\n", "").Trim());
+
+            var resolutionElement = await downloadListItem.QuerySelectorAsync("span.download-dimension");
+            var resolutionRaw = await resolutionElement.TextContentAsync();
+            var resolutionWidth = HumanParser.ParseResolutionWidth(resolutionRaw.Replace("\n", "").Trim());
+            var resolutionHeight = HumanParser.ParseResolutionHeight(resolutionRaw.Replace("\n", "").Trim());
+
+            var codecElement = await downloadListItem.QuerySelectorAsync("span.download-codec");
+            var codecRaw = await codecElement.TextContentAsync();
+            var codec = HumanParser.ParseCodec(codecRaw.Replace("\n", "").Trim());
+
+            var linkElement = await downloadListItem.QuerySelectorAsync("a");
+            var url = await linkElement.GetAttributeAsync("href");
+
+            availableDownloads.Add(
+                new DownloadDetailsAndElementHandle(
+                    new DownloadDetails(
+                        title,
+                        resolutionHeight,
+                        resolutionWidth,
+                        size,
+                        -1,
+                        url,
+                        codec),
+                    downloadListItem));
+        }
+        return availableDownloads;
+    }
+
+    private record DownloadDetailsAndElementHandle(DownloadDetails DownloadDetails, IElementHandle ElementHandle);
+}
