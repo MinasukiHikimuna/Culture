@@ -153,6 +153,11 @@ public class NetworkRipper
                     // Let's try again
                     Log.Error(ex.Message, ex);
                 }
+                catch (TimeoutException ex)
+                {
+                    // Let's try again
+                    Log.Error(ex.Message, ex);
+                }
             }
         }
     }
