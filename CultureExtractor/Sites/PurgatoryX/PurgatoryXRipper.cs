@@ -114,7 +114,7 @@ public class PurgatoryXRipper : ISceneScraper, ISceneDownloader
         );
     }
 
-    public async Task<DownloadDetails> DownloadSceneAsync(SceneEntity scene, IPage page, string rippingPath, DownloadConditions downloadConditions)
+    public async Task<Download> DownloadSceneAsync(SceneEntity scene, IPage page, string rippingPath, DownloadConditions downloadConditions)
     {
         await page.GotoAsync(scene.Url);
         await page.WaitForLoadStateAsync();
@@ -152,7 +152,7 @@ public class PurgatoryXRipper : ISceneScraper, ISceneDownloader
 
         await download.SaveAsAsync(path);
 
-        return selectedDownload.DownloadDetails;
+        return new Download(suggestedFilename, name, selectedDownload.DownloadDetails);
     }
 
     private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloads(IPage page)

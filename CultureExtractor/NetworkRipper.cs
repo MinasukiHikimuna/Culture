@@ -159,13 +159,15 @@ public class NetworkRipper
                         Log.Information($"Retrying {retries + 1} attempt for {scene.Url}");
                     }
 
-                    var downloadDetails = await sceneDownloader.DownloadSceneAsync(scene, page, rippingPath, conditions);
+                    var download = await sceneDownloader.DownloadSceneAsync(scene, page, rippingPath, conditions);
 
                     _repository._sqliteContext.Downloads.Add(new DownloadEntity()
                     {
                         DownloadedAt = DateTime.Now,
-                        DownloadDetails = JsonSerializer.Serialize(downloadDetails),
+                        DownloadDetails = JsonSerializer.Serialize(download.DownloadDetails),
                         DownloadQuality = preferredDownloadQuality,
+                        OriginalFilename = download.OriginalFilename,
+                        SavedFilename = download.SavedFilename,
 
                         SceneId = scene.Id,
                         Scene = scene,

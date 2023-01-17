@@ -59,6 +59,11 @@ public record DateRange(
     DateOnly Start,
     DateOnly End);
 
+public record Download(
+    string OriginalFilename,
+    string SavedFilename,
+    DownloadDetails DownloadDetails);
+
 public record DownloadDetails(
     string Description,
     int? ResolutionHeight,

@@ -111,7 +111,10 @@ public class DownloadEntity
     public required DateTime DownloadedAt { get; set; }
     public required string DownloadQuality { get; set; }
     public required string DownloadDetails { get; set; }
+    public string? OriginalFilename { get; set; }
+    public string? SavedFilename { get; set; }
 
     public required int SceneId { get; set; }
     public required SceneEntity Scene { get; set; }
 }
+
