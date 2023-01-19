@@ -23,7 +23,7 @@ class PlaywrightExample
             Log.Information("Culture Extractor");
 
             string shortName = args[0];
-            var browserSettings = new BrowserSettings(false);
+            var browserSettings = new BrowserSettings(true);
 
             var jobType = args[1] switch
             {
