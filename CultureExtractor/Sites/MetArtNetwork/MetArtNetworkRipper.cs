@@ -236,6 +236,4 @@ public class MetArtNetworkRipper : ISceneScraper, ISceneDownloader
         }
         return availableDownloads;
     }
-
-    private record DownloadDetailsAndElementHandle(DownloadDetails DownloadDetails, IElementHandle ElementHandle);
 }

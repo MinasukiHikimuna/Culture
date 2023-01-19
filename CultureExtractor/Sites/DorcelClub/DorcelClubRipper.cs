@@ -1,4 +1,5 @@
-﻿using CultureExtractor.Interfaces;
+﻿using CultureExtractor.Exceptions;
+using CultureExtractor.Interfaces;
 using Microsoft.Playwright;
 using Serilog;
 using System.Text.RegularExpressions;
@@ -9,6 +10,8 @@ namespace CultureExtractor.Sites.DorcelClub;
 [PornSite("dorcelclub")]
 public class DorcelClubRipper : ISceneScraper, ISceneDownloader
 {
+    private static readonly Random Random = new();
+
     public async Task LoginAsync(Site site, IPage page)
     {
         var loginButton = page.Locator("a.login");
@@ -91,19 +94,7 @@ public class DorcelClubRipper : ISceneScraper, ISceneDownloader
         // - '1h 22'
         // - '1h'
         var durationRaw = await page.Locator("div.right > span.duration").TextContentAsync();
-        TimeSpan duration;
-        if (string.IsNullOrEmpty(durationRaw)) {
-            duration = TimeSpan.Zero;
-        }
-        else if (durationRaw.EndsWith("m"))
-        {
-            duration = TimeSpan.FromMinutes(int.Parse(durationRaw.Replace("m", "")));
-        }
-        else
-        {
-            var durationComponents = durationRaw.Split("m");
-            duration = TimeSpan.FromMinutes(int.Parse(durationComponents[0])).Add(TimeSpan.FromSeconds(int.Parse(durationComponents[1])));
-        }
+        var duration = HumanParser.ParseDuration(durationRaw);
 
         var titleRaw = await page.Locator("h1.title").TextContentAsync();
         var title = titleRaw.Replace("\n", "").Trim();
@@ -155,28 +146,98 @@ public class DorcelClubRipper : ISceneScraper, ISceneDownloader
         var performerNames = scene.Performers.Select(p => p.Name).ToList();
         var performersStr = performerNames.Count() > 1 ? string.Join(", ", performerNames.Take(performerNames.Count() - 1)) + " & " + performerNames.Last() : performerNames.FirstOrDefault();
 
-        await page.GetByRole(AriaRole.Link).Filter(new() { HasTextString = "Download the video" }).ClickAsync();
-        await page.Locator("#download-pop-in").GetByText("English").ClickAsync();
-        await page.Locator("div[data-quality=\"360\"][data-lang=\"en\"]").ClickAsync();
+        // await page.GetByRole(AriaRole.Link).Filter(new() { HasTextString = "Download the video" }).ClickAsync();
 
-        var waitForDownloadTask = page.WaitForDownloadAsync();
+        await Task.Delay(3000);
 
-        await page.GetByRole(AriaRole.Button, new() { NameString = "Download" }).ClickAsync();
 
-        var download = await waitForDownloadTask;
-        var suggestedFilename = download.SuggestedFilename;
+        var availableDownloads = await ParseAvailableDownloads(page);
 
-        var suffix = Path.GetExtension(suggestedFilename);
+        DownloadDetailsAndElementHandle selectedDownload = downloadConditions.PreferredDownloadQuality switch
+        {
+            PreferredDownloadQuality.Phash => availableDownloads.FirstOrDefault(f => f.DownloadDetails.ResolutionHeight == 480) ?? availableDownloads.Last(),
+            PreferredDownloadQuality.Best => availableDownloads.First(),
+            PreferredDownloadQuality.Worst => availableDownloads.Last(),
+            _ => throw new InvalidOperationException("Could not find a download candidate!")
+        };
+
+
+        if (await page.Locator("div.languages.selectors").IsVisibleAsync())
+        {
+            await page.Locator("#download-pop-in").GetByText("English").ClickAsync();
+        }
+
+        // Let's assume mp4. We could parse this from URL as well but it seems to always be mp4.
+        var suffix = ".mp4";
         var name = $"{performersStr} - {scene.Site.Name} - {scene.ReleaseDate.ToString("yyyy-MM-dd")} - {scene.Name}{suffix}";
         name = string.Concat(name.Split(Path.GetInvalidFileNameChars()));
 
         var path = Path.Join(rippingPath, name);
 
+        Log.Verbose($"Downloading\r\n    URL:  {selectedDownload.DownloadDetails.Url}\r\n    Path: {path}");
 
-        Log.Verbose($"Downloading\r\n    Path: {path}");
+        var newPage = await page.Context.NewPageAsync();
+        var waitForDownloadTask = newPage.WaitForDownloadAsync(new PageWaitForDownloadOptions { Timeout = 3 * 60000 });
 
+        try
+        {
+            await newPage.GotoAsync(selectedDownload.DownloadDetails.Url);
+
+            var blocked = await newPage.IsVisibleAsync("#blocked");
+            if (blocked)
+            {
+                // TODO: This won't work as we actually need to terminate the whole downloading and not just skip current file
+                throw new DownloadException(false, "Dorcel Club requires CAPTCHA challenge.");
+            }
+        }
+        catch (PlaywrightException ex)
+        {
+            if (ex.Message.StartsWith("net::ERR_ABORTED")) {
+                // Ok. Thrown for some reason every time a file is downloaded using browser.
+            }
+            else
+            {
+                throw;
+            }
+        }
+
+
+        var download = await waitForDownloadTask;
+        var suggestedFilename = download.SuggestedFilename;
         await download.SaveAsAsync(path);
+        await newPage.CloseAsync();
 
-        return null;
+        // Avoid bot detection
+        var waitForXSeconds = Random.Next(3, 10);
+        await Task.Delay(waitForXSeconds * 1000);
+
+        return new Download(suggestedFilename, name, selectedDownload.DownloadDetails);
+    }
+
+    private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloads(IPage page)
+    {
+        var downloadLinks = await page.Locator("div.qualities.selectors div.filter").ElementHandlesAsync();
+        var availableDownloads = new List<DownloadDetailsAndElementHandle>();
+        foreach (var downloadLink in downloadLinks)
+        {
+            var description = await downloadLink.InnerTextAsync();
+
+            var resolutionHeightRaw = await downloadLink.GetAttributeAsync("data-quality");
+            var resolutionHeight = int.Parse(resolutionHeightRaw);
+
+            var url = await downloadLink.GetAttributeAsync("data-slug");
+            availableDownloads.Add(
+                new DownloadDetailsAndElementHandle(
+                    new DownloadDetails(
+                        description,
+                        -1,
+                        resolutionHeight,
+                        HumanParser.ParseFileSize(description),
+                        -1,
+                        url,
+                        string.Empty),
+                    downloadLink));
+        }
+        return availableDownloads;
     }
 }

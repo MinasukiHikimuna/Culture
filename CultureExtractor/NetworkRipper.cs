@@ -142,9 +142,20 @@ public class NetworkRipper
         const long minimumFreeDiskSpace = 5L * 1024 * 1024 * 1024;
         DirectoryInfo targetDirectory = new DirectoryInfo(rippingPath);
 
+        var rippedScenes = 0;
         foreach (var scene in matchingScenes)
         {
-            DriveInfo drive = new DriveInfo(targetDirectory.Root.FullName);
+            if (rippedScenes >= conditions.MaxDownloads)
+            {
+                Log.Information($"Maximum scene rip limit of {conditions.MaxDownloads} reached. Stopping...");
+                break;
+            }
+            if ((matchingScenes.Count - rippedScenes) % 10 == 0)
+            {
+                Log.Information($"Remaining downloads {matchingScenes.Count - rippedScenes}/{matchingScenes.Count} scenes.");
+            }
+
+            DriveInfo drive = new(targetDirectory.Root.FullName);
             if (drive.AvailableFreeSpace < minimumFreeDiskSpace)
             {
                 throw new InvalidOperationException($"Drive {drive.Name} has less than {minimumFreeDiskSpace} bytes free.");
@@ -173,8 +184,10 @@ public class NetworkRipper
                         Scene = scene,
                     });
                     await _repository._sqliteContext.SaveChangesAsync();
+
                     await Task.Delay(3000);
 
+                    rippedScenes++;
                     break;
                 }
                 catch (PlaywrightException ex)

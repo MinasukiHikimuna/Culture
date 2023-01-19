@@ -46,6 +46,9 @@ public class HumanParserTests
 
     [TestCase("17:13", 17 * 60 + 13)]
     [TestCase("01:17:13", 1 * 3600 + 17 * 60 + 13)]
+    [TestCase("36m31", 36 * 60 + 31)]
+    [TestCase("1h", 1 * 3600)]
+    [TestCase("1h 22", 1 * 3600 + 22 * 60)]
     public void ParseDuration(string sizeString, int expectedTotalSeconds)
     {
         var timeSpan = HumanParser.ParseDuration(sizeString);

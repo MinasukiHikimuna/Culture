@@ -193,8 +193,8 @@ public class PurgatoryXRipper : ISceneScraper, ISceneDownloader
                 new DownloadDetailsAndElementHandle(
                     new DownloadDetails(
                         title,
-                        resolutionHeight,
                         resolutionWidth,
+                        resolutionHeight,
                         size,
                         -1,
                         url,
@@ -203,6 +203,4 @@ public class PurgatoryXRipper : ISceneScraper, ISceneDownloader
         }
         return availableDownloads;
     }
-
-    private record DownloadDetailsAndElementHandle(DownloadDetails DownloadDetails, IElementHandle ElementHandle);
 }

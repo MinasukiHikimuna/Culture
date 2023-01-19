@@ -85,6 +85,32 @@ public static class HumanParser
     {
         var trimmedDurationString = durationString.Trim();
 
+        var patternHhHMm = @"^(?<hours>[0-9]+)h (?<minutes>[0-9]+)";
+        var matchHhHMm = Regex.Match(trimmedDurationString, patternHhHMm);
+        if (matchHhHMm.Success)
+        {
+            return TimeSpan.Zero
+                .Add(TimeSpan.FromHours(int.Parse(matchHhHMm.Groups["hours"].Value)))
+                .Add(TimeSpan.FromMinutes(int.Parse(matchHhHMm.Groups["minutes"].Value)));
+        }
+
+        var patternHhH = @"^(?<hours>[0-9]+)h";
+        var matchHhH = Regex.Match(trimmedDurationString, patternHhH);
+        if (matchHhH.Success)
+        {
+            return TimeSpan.Zero
+                .Add(TimeSpan.FromHours(int.Parse(matchHhH.Groups["hours"].Value)));
+        }
+
+        var patternMmMSs = @"^(?<minutes>[0-9]+)m(?<seconds>[0-9]+)";
+        var matchMmMSs = Regex.Match(trimmedDurationString, patternMmMSs);
+        if (matchMmMSs.Success)
+        {
+            return TimeSpan.Zero
+                .Add(TimeSpan.FromMinutes(int.Parse(matchMmMSs.Groups["minutes"].Value)))
+                .Add(TimeSpan.FromSeconds(int.Parse(matchMmMSs.Groups["seconds"].Value)));
+        }
+
         var patternHhMmSs = @"^(?<hours>[0-9]+):(?<minutes>[0-9]+):(?<seconds>[0-9]+)$";
         var matchHhMmSs = Regex.Match(trimmedDurationString, patternHhMmSs);
         if (matchHhMmSs.Success)

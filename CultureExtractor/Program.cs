@@ -11,19 +11,19 @@ class PlaywrightExample
         {
             if (System.Diagnostics.Debugger.IsAttached)
             {
-                args = new string[] { "purgatoryx", "scrape-scenes" };
+                args = new string[] { "dorcelclub", "download-scenes" };
             }
 
             using var log = new LoggerConfiguration()
                 .WriteTo.Console()
-                .MinimumLevel.Verbose()
+                    .MinimumLevel.Verbose()
                 .CreateLogger();
             Log.Logger = log;
 
             Log.Information("Culture Extractor");
 
             string shortName = args[0];
-            var browserSettings = new BrowserSettings(true);
+            var browserSettings = new BrowserSettings(false);
 
             var jobType = args[1] switch
             {
