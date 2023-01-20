@@ -46,6 +46,23 @@ public class MetArtNetworkRipper : ISceneScraper, ISceneDownloader
             await page.Locator("button[type='submit']").ClickAsync();
             await page.WaitForLoadStateAsync();
         }
+
+        // Close the modal dialog if one is shown.
+        try
+        {
+            await page.WaitForLoadStateAsync();
+            if (await page.Locator(".close-btn").IsVisibleAsync())
+            {
+                await page.Locator(".close-btn").ClickAsync();
+            }
+            if (await page.Locator(".fa-times-circle").IsVisibleAsync())
+            {
+                await page.Locator(".fa-times-circle").ClickAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+        }
     }
 
     public async Task<int> NavigateToScenesAndReturnPageCountAsync(Site site, IPage page)
