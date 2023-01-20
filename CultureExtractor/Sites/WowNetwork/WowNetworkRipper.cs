@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Playwright;
 using Serilog;
+using System;
 using System.Text.RegularExpressions;
 
 namespace CultureExtractor.Sites.WowNetwork;
@@ -11,7 +12,7 @@ namespace CultureExtractor.Sites.WowNetwork;
 [PornSite("wowgirls")]
 [PornSite("wowporn")]
 [PornSite("ultrafilms")]
-public class WowNetworkRipper : ISiteRipper, ISceneDownloaderLegacy
+public class WowNetworkRipper : ISiteRipper, ISceneDownloader
 {
     private readonly SqliteContext _sqliteContext;
     private readonly Repository _repository;
@@ -20,6 +21,12 @@ public class WowNetworkRipper : ISiteRipper, ISceneDownloaderLegacy
     {
         _sqliteContext = new SqliteContext();
         _repository = new Repository(_sqliteContext);
+    }
+
+    public async Task LoginAsync(Site site, IPage page)
+    {
+        var loginPage = new WowLoginPage(page);
+        await loginPage.LoginIfNeededAsync(site);
     }
 
     public async Task ScrapeScenesAsync(string shortName, BrowserSettings browserSettings)
@@ -227,87 +234,79 @@ public class WowNetworkRipper : ISiteRipper, ISceneDownloaderLegacy
         }
     }
 
-    public async Task DownloadScenesAsync(string shortName, DownloadConditions conditions, BrowserSettings browserSettings)
+    public async Task<Download> DownloadSceneAsync(SceneEntity scene, IPage page, string rippingPath, DownloadConditions downloadConditions)
     {
-        var site = await _repository.GetSiteAsync(shortName);
+        await page.GotoAsync(scene.Url);
+        await page.WaitForLoadStateAsync();
 
-        var matchingScenes = await _sqliteContext.Scenes
-            .Include(s => s.Performers)
-            .Include(s => s.Tags)
-            .Include(s => s.Site)
-            .OrderBy(s => s.ReleaseDate)
-            .Where(s => s.SiteId == site.Id)
-            .Where(s => conditions.DateRange == null || (conditions.DateRange.Start <= s.ReleaseDate && s.ReleaseDate <= conditions.DateRange.End))
-            .Where(s => conditions.PerformerShortName == null || s.Performers.Any(p => p.ShortName == conditions.PerformerShortName))
-        .ToListAsync();
+        await Task.Delay(3000);
 
-        var matchingScenesStr = string.Join($"{Environment.NewLine}    ", matchingScenes.Select(s => $"{s.Site.Name} - {s.ReleaseDate.ToString("yyyy-MM-dd")} - {s.Name}"));
+        var performerNames = scene.Performers.Select(p => p.Name).ToList();
+        var performersStr = performerNames.Count() > 1 ? string.Join(", ", performerNames.Take(performerNames.Count() - 1)) + " & " + performerNames.Last() : performerNames.FirstOrDefault();
 
-        Log.Information($"Found {matchingScenes.Count()} scenes:{Environment.NewLine}    {matchingScenesStr}");
+        var availableDownloads = await ParseAvailableDownloads(page);
 
-        if (!matchingScenes.Any())
+        DownloadDetailsAndElementHandle selectedDownload = downloadConditions.PreferredDownloadQuality switch
         {
-            Log.Information("Nothing to download.");
-            return;
-        }
+            PreferredDownloadQuality.Phash => availableDownloads.Last(),
+            PreferredDownloadQuality.Best => availableDownloads.First(),
+            PreferredDownloadQuality.Worst => availableDownloads.Last(),
+            _ => throw new InvalidOperationException("Could not find a download candidate!")
+        };
 
-        IPage page = await PlaywrightFactory.CreatePageAsync(site, browserSettings);
+        var waitForDownloadTask = page.WaitForDownloadAsync();
+        await selectedDownload.ElementHandle.ClickAsync();
+        var download = await waitForDownloadTask;
+        var suggestedFilename = download.SuggestedFilename;
 
-        var loginPage = new WowLoginPage(page);
-        await loginPage.LoginIfNeededAsync(site);
+        var suffix = Path.GetExtension(suggestedFilename);
+        var name = $"{performersStr} - {scene.Site.Name} - {scene.ReleaseDate.ToString("yyyy-MM-dd")} - {scene.Name}{suffix}";
+        name = string.Concat(name.Split(Path.GetInvalidFileNameChars()));
 
-        var rippingPath = $@"I:\Ripping\{site.Name}\";
-        foreach (var scene in matchingScenes)
+        var path = Path.Join(rippingPath, name);
+
+        Log.Verbose($"Downloading\r\n    URL:  {selectedDownload.DownloadDetails.Url}\r\n    Path: {path}");
+
+        await download.SaveAsAsync(path);
+
+        return new Download(suggestedFilename, name, selectedDownload.DownloadDetails);
+    }
+
+    private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloads(IPage page)
+    {
+        var downloadItems = await page.Locator("div.ct_dl_items > ul > li").ElementHandlesAsync();
+        var availableDownloads = new List<DownloadDetailsAndElementHandle>();
+        foreach (var downloadItem in downloadItems)
         {
-            for (int retries = 0; retries < 3; retries++)
-            {
-                try
-                {
-                    await page.GotoAsync(scene.Url);
-                    await page.WaitForLoadStateAsync();
+            var downloadLinkElement = await downloadItem.QuerySelectorAsync("a");
+            var downloadUrl = await downloadLinkElement.GetAttributeAsync("href");
+            var resolutionRaw = await downloadLinkElement.TextContentAsync();
+            resolutionRaw = resolutionRaw.Replace("\n", "").Trim();
+            var resolutionWidth = HumanParser.ParseResolutionWidth(resolutionRaw);
+            var resolutionHeight = HumanParser.ParseResolutionHeight(resolutionRaw);
+            var codecElement = await downloadItem.QuerySelectorAsync("span.format");
+            var codecRaw = await codecElement.InnerTextAsync();
+            var fpsElement = await downloadItem.QuerySelectorAsync("span.fps");
+            var fpsRaw = await fpsElement.InnerTextAsync();
+            var sizeElement = await downloadItem.QuerySelectorAsync("span.size");
+            var sizeRaw = await sizeElement.InnerTextAsync();
+            var size = HumanParser.ParseFileSize(sizeRaw);
 
-                    if (retries > 0)
-                    {
-                        Log.Information($"Retrying {retries + 1} attempt for {scene.Url}");
-                    }
+            var descriptionElement = await downloadItem.QuerySelectorAsync("div.ct_dl_details");
+            var description = await descriptionElement.TextContentAsync();
 
-                    var performerNames = scene.Performers.Select(p => p.Name).ToList();
-                    var performersStr = performerNames.Count() > 1 ? string.Join(", ", performerNames.Take(performerNames.Count() - 1)) + " & " + performerNames.Last() : performerNames.FirstOrDefault();
-
-                    // All scenes do not have 60 fps alternatives. In that case 30 fps button is not shown.
-                    var fps30Locator = page.Locator("span").Filter(new() { HasTextString = "30 fps" });
-                    if (await fps30Locator.IsVisibleAsync())
-                    {
-                        await page.Locator("span").Filter(new() { HasTextString = "30 fps" }).ClickAsync();
-                        await page.WaitForLoadStateAsync();
-                    }
-
-                    var desiredQuality = "960 x 540";
-
-                    var downloadUrl = await page.GetByRole(AriaRole.Link, new() { NameString = desiredQuality }).GetAttributeAsync("href");
-
-                    var waitForDownloadTask = page.WaitForDownloadAsync();
-                    await page.GetByRole(AriaRole.Link, new() { NameString = desiredQuality }).ClickAsync();
-                    var download = await waitForDownloadTask;
-                    var suggestedFilename = download.SuggestedFilename;
-
-                    var suffix = Path.GetExtension(suggestedFilename);
-                    var name = $"{performersStr} - {scene.Site.Name} - {scene.ReleaseDate.ToString("yyyy-MM-dd")} - {scene.Name}{suffix}";
-                    name = string.Concat(name.Split(Path.GetInvalidFileNameChars()));
-
-                    var path = Path.Join(rippingPath, name);
-
-                    Log.Verbose($"Downloading\r\n    URL:  {downloadUrl}\r\n    Path: {path}");
-
-                    await download.SaveAsAsync(path);
-                    break;
-                }
-                catch (PlaywrightException ex)
-                {
-                    Log.Error(ex.Message, ex);
-                    // Let's try again
-                }
-            }
+            availableDownloads.Add(
+                new DownloadDetailsAndElementHandle(
+                    new DownloadDetails(
+                        description,
+                        resolutionWidth,
+                        resolutionHeight,
+                        size,
+                        double.Parse(fpsRaw.Replace("fps", "")),
+                        downloadUrl,
+                        codecRaw),
+                    downloadLinkElement));
         }
+        return availableDownloads.OrderByDescending(d => d.DownloadDetails.ResolutionWidth).ThenByDescending(d => d.DownloadDetails.Fps).ToList();
     }
 }
