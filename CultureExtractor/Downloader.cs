@@ -1,4 +1,7 @@
-﻿using System.Net;
+﻿using Microsoft.Playwright;
+using Serilog;
+using System.Net;
+using static System.Formats.Asn1.AsnWriter;
 
 namespace CultureExtractor;
 
@@ -34,6 +37,31 @@ public class Downloader
         Directory.CreateDirectory(rippingPath);
 
         await DownloadFileAsync(imageUrl, (int)gallery.Id, rippingPath);
+    }
+
+    public async Task<Download> DownloadSceneAsync(IPage page, DownloadDetailsAndElementHandle selectedDownload, SceneEntity scene, string rippingPath, Func<Task> func)
+    {
+        var performerNames = scene.Performers.Select(p => p.Name).ToList();
+        var performersStr = performerNames.Count() > 1
+            ? string.Join(", ", performerNames.Take(performerNames.Count() - 1)) + " & " + performerNames.Last()
+            : performerNames.FirstOrDefault();
+
+        var waitForDownloadTask = page.WaitForDownloadAsync();
+
+        await func();
+
+        var download = await waitForDownloadTask;
+        var suggestedFilename = download.SuggestedFilename;
+        var suffix = Path.GetExtension(suggestedFilename);
+        var name = $"{performersStr} - {scene.Site.Name} - {scene.ReleaseDate.ToString("yyyy-MM-dd")} - {scene.Name}{suffix}";
+        name = string.Concat(name.Split(Path.GetInvalidFileNameChars()));
+        var path = Path.Join(rippingPath, name);
+
+        Log.Verbose($"Downloading\r\n    URL:  {selectedDownload.DownloadDetails.Url}\r\n    Path: {path}");
+
+        await download.SaveAsAsync(path);
+
+        return new Download(suggestedFilename, name, selectedDownload.DownloadDetails);
     }
 
     private static async Task DownloadFileAsync(string imageUrl, int fileId, string rippingPath)

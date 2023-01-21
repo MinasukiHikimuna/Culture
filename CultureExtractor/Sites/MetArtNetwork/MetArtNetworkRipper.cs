@@ -1,8 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
-using Microsoft.Playwright;
-using Serilog;
+﻿using Microsoft.Playwright;
 using CultureExtractor.Interfaces;
-using System.Runtime.CompilerServices;
 using CultureExtractor.Exceptions;
 
 namespace CultureExtractor.Sites.MetArtNetwork;
@@ -18,15 +15,6 @@ namespace CultureExtractor.Sites.MetArtNetwork;
 [PornSite("hustler")]
 public class MetArtNetworkRipper : ISceneScraper, ISceneDownloader
 {
-    private readonly SqliteContext _sqliteContext;
-    private readonly Repository _repository;
-
-    public MetArtNetworkRipper()
-    {
-        _sqliteContext = new SqliteContext();
-        _repository = new Repository(_sqliteContext);
-    }
-
     public async Task LoginAsync(Site site, IPage page)
     {
         await Task.Delay(5000);
@@ -180,20 +168,17 @@ public class MetArtNetworkRipper : ISceneScraper, ISceneDownloader
         await page.GetByRole(AriaRole.Link, new() { NameString = ">" }).ClickAsync();
     }
 
-    public async Task<Download> DownloadSceneAsync(SceneEntity scene, IPage page, string rippingPath, DownloadConditions downloadConditions)
+    public async Task<Download> DownloadSceneAsync(SceneEntity sceneEntity, IPage page, string rippingPath, DownloadConditions downloadConditions)
     {
-        await page.GotoAsync(scene.Url);
+        await page.GotoAsync(sceneEntity.Url);
         await page.WaitForLoadStateAsync();
 
         await Task.Delay(3000);
 
-        var performerNames = scene.Performers.Select(p => p.Name).ToList();
-        var performersStr = performerNames.Count() > 1 ? string.Join(", ", performerNames.Take(performerNames.Count() - 1)) + " & " + performerNames.Last() : performerNames.FirstOrDefault();
-
         var downloadMenuLocator = page.Locator("div svg.fa-film");
         if (!await downloadMenuLocator.IsVisibleAsync())
         {
-            throw new DownloadException(false, $"Could not find download menu for {scene.Url}. Skipping...");
+            throw new DownloadException(false, $"Could not find download menu for {sceneEntity.Url}. Skipping...");
         }
 
         await downloadMenuLocator.ClickAsync();
@@ -207,24 +192,11 @@ public class MetArtNetworkRipper : ISceneScraper, ISceneDownloader
             PreferredDownloadQuality.Worst => availableDownloads.Last(),
             _ => throw new InvalidOperationException("Could not find a download candidate!")
         };
-            
 
-        var waitForDownloadTask = page.WaitForDownloadAsync();
-        await selectedDownload.ElementHandle.ClickAsync();
-        var download = await waitForDownloadTask;
-        var suggestedFilename = download.SuggestedFilename;
-
-        var suffix = Path.GetExtension(suggestedFilename);
-        var name = $"{performersStr} - {scene.Site.Name} - {scene.ReleaseDate.ToString("yyyy-MM-dd")} - {scene.Name}{suffix}";
-        name = string.Concat(name.Split(Path.GetInvalidFileNameChars()));
-
-        var path = Path.Join(rippingPath, name);
-
-        Log.Verbose($"Downloading\r\n    URL:  {selectedDownload.DownloadDetails.Url}\r\n    Path: {path}");
-
-        await download.SaveAsAsync(path);
-
-        return new Download(suggestedFilename, name, selectedDownload.DownloadDetails);
+        return await new Downloader().DownloadSceneAsync(page, selectedDownload, sceneEntity, rippingPath, async () =>
+        {
+            await selectedDownload.ElementHandle.ClickAsync();
+        });
     }
 
     private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloads(IPage page)
