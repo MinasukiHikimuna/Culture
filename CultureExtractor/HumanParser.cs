@@ -7,7 +7,9 @@ public static class HumanParser
 {
     public static double ParseFileSize(string sizeString)
     {
-        string purgatoryPattern = @"(?<thousands>[0-9]+),(?<wholeNumbers>[0-9]+).(?<decimalNumbers>[0-9]+)? (?<unit>GB|MB)";
+        sizeString = sizeString.Replace(" ", "");
+
+        string purgatoryPattern = @"(?<thousands>[0-9]+),(?<wholeNumbers>[0-9]+).(?<decimalNumbers>[0-9]+)?(?<unit>GB|MB)";
         Match purgatoryMatch = Regex.Match(sizeString, purgatoryPattern);
         if (purgatoryMatch.Success)
         {
@@ -21,7 +23,7 @@ public static class HumanParser
             return (thousands * 1000 + wholeNumbers + decimalNumbers) * unitFactor;
         }
 
-        string pattern = @"(?<wholeNumbers>[0-9]+)(?<decimalNumbers>(.|,)[0-9]+)? (?<unit>GB|MB)";
+        string pattern = @"(?<wholeNumbers>[0-9]+)(?<decimalNumbers>(.|,)[0-9]+)?(?<unit>GB|MB)";
         Match match = Regex.Match(sizeString, pattern);
         if (match.Success)
         {
@@ -39,7 +41,7 @@ public static class HumanParser
 
     public static int ParseResolutionWidth(string resolutionString)
     {
-        var trimmedResolutionString = resolutionString.Trim();
+        var trimmedResolutionString = resolutionString.Trim().Replace(" ", "");
 
         var patternExplicitResolution = @"^(?<width>[0-9]+)x(?<height>[0-9]+)$";
         var matchExplicitResolution = Regex.Match(trimmedResolutionString, patternExplicitResolution);
