@@ -124,7 +124,14 @@ public class CzechVRNetworkRipper : ISceneScraper, ISceneDownloader
 
         return await new Downloader().DownloadSceneAsync(page, selectedDownload.DownloadDetails, sceneEntity, rippingPath, async () =>
         {
-            await page.GotoAsync(selectedDownload.DownloadDetails.Url);
+            await page.EvaluateAsync(
+                $"document.querySelector('a[href=\"{selectedDownload.DownloadDetails.Url}\"')" +
+                $".parentElement" +
+                $".parentElement" +
+                $".parentElement" +
+                $".previousElementSibling" +
+                $".click()");
+            await page.Locator($"a[href=\"{selectedDownload.DownloadDetails.Url}\"]").ClickAsync();
         });
     }
 
