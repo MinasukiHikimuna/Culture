@@ -12,20 +12,20 @@ public class Downloader
     public bool SceneImageExists(Scene scene)
     {
         // TODO: extension might not be jpg
-        var path = $@"I:\Ripping\{scene.Site.Name}\Metadata\SceneImages\{scene.Id}.jpg";
+        var path = $@"B:\Ripping\{scene.Site.Name}\Metadata\SceneImages\{scene.Id}.jpg";
         return File.Exists(path);
     }
 
     public bool GalleryImageExists(Gallery gallery)
     {
         // TODO: extension might not be jpg
-        var path = $@"I:\Ripping\{gallery.Site.Name}\Metadata\GalleryImages\{gallery.Id}.jpg";
+        var path = $@"B:\Ripping\{gallery.Site.Name}\Metadata\GalleryImages\{gallery.Id}.jpg";
         return File.Exists(path);
     }
 
     public async Task DownloadSceneImageAsync(Scene scene, string imageUrl)
     {
-        var rippingPath = $@"I:\Ripping\{scene.Site.Name}\Metadata\SceneImages\";
+        var rippingPath = $@"B:\Ripping\{scene.Site.Name}\Metadata\SceneImages\";
         Directory.CreateDirectory(rippingPath);
 
         await DownloadFileAsync(imageUrl, (int)scene.Id, rippingPath);
@@ -33,13 +33,13 @@ public class Downloader
 
     public async Task DownloadGalleryImageasync(Gallery gallery, string imageUrl)
     {
-        var rippingPath = $@"I:\Ripping\{gallery.Site.Name}\Metadata\GalleryImages\";
+        var rippingPath = $@"B:\Ripping\{gallery.Site.Name}\Metadata\GalleryImages\";
         Directory.CreateDirectory(rippingPath);
 
         await DownloadFileAsync(imageUrl, (int)gallery.Id, rippingPath);
     }
 
-    public async Task<Download> DownloadSceneAsync(IPage page, DownloadDetailsAndElementHandle selectedDownload, SceneEntity scene, string rippingPath, Func<Task> func)
+    public async Task<Download> DownloadSceneAsync(IPage page, DownloadDetails downloadDetails, SceneEntity scene, string rippingPath, Func<Task> func)
     {
         var performerNames = scene.Performers.Select(p => p.Name).ToList();
         var performersStr = performerNames.Count() > 1
@@ -62,11 +62,11 @@ public class Downloader
         name = string.Concat(name.Split(Path.GetInvalidFileNameChars()));
         var path = Path.Join(rippingPath, name);
 
-        Log.Verbose($"Downloading\r\n    URL:  {selectedDownload.DownloadDetails.Url}\r\n    Path: {path}");
+        Log.Verbose($"Downloading\r\n    URL:  {downloadDetails.Url}\r\n    Path: {path}");
 
         await download.SaveAsAsync(path);
 
-        return new Download(suggestedFilename, name, selectedDownload.DownloadDetails);
+        return new Download(suggestedFilename, name, downloadDetails);
     }
 
     private static async Task DownloadFileAsync(string imageUrl, int fileId, string rippingPath)

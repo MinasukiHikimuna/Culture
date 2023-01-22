@@ -41,7 +41,7 @@ public class PurgatoryXRipper : ISceneScraper, ISceneDownloader
         return int.Parse(lastPageText);
     }
 
-    public async Task DownloadPreviewImageAsync(Scene scene, IPage page, IElementHandle currentScene)
+    public async Task DownloadPreviewImageAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene)
     {
         // TODO: Need to find a way to download the image using this browser instance. Otherwise we get a Forbidden error.
         return;
@@ -197,8 +197,8 @@ public class PurgatoryXRipper : ISceneScraper, ISceneDownloader
                         resolutionHeight,
                         size,
                         -1,
-                        url,
-                        codec),
+                        codec,
+                        url),
                     downloadListItem));
         }
         return availableDownloads;

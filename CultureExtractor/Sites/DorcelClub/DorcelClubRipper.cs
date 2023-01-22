@@ -53,7 +53,7 @@ public class DorcelClubRipper : ISceneScraper, ISceneDownloader
         return int.MaxValue;
     }
 
-    public async Task DownloadPreviewImageAsync(Scene scene, IPage page, IElementHandle currentScene)
+    public async Task DownloadPreviewImageAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene)
     {
         return;
     }
@@ -90,9 +90,6 @@ public class DorcelClubRipper : ISceneScraper, ISceneDownloader
         var releaseDateRaw = await page.Locator("div.right > span.publish_date").TextContentAsync();
         var releaseDate = DateOnly.Parse(releaseDateRaw);
 
-        // TODO: These should be parsed correctly
-        // - '1h 22'
-        // - '1h'
         var durationRaw = await page.Locator("div.right > span.duration").TextContentAsync();
         var duration = HumanParser.ParseDuration(durationRaw);
 
@@ -234,8 +231,8 @@ public class DorcelClubRipper : ISceneScraper, ISceneDownloader
                         resolutionHeight,
                         HumanParser.ParseFileSize(description),
                         -1,
-                        url,
-                        string.Empty),
+                        string.Empty,
+                        url),
                     downloadLink));
         }
         return availableDownloads;

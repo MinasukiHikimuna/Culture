@@ -16,7 +16,7 @@ public class SqliteContext : DbContext
 
     public SqliteContext()
     {
-        DbPath = @"G:\ripping.db";
+        DbPath = @"B:\Ripping\ripping.db";
     }
 
     // The following configures EF to create a Sqlite database file in the

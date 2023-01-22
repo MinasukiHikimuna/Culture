@@ -11,7 +11,7 @@ class PlaywrightExample
         {
             if (System.Diagnostics.Debugger.IsAttached)
             {
-                args = new string[] { "dorcelclub", "download-scenes" };
+                args = new string[] { "czechvr", "download-scenes" };
             }
 
             using var log = new LoggerConfiguration()
@@ -23,15 +23,13 @@ class PlaywrightExample
             Log.Information("Culture Extractor");
 
             string shortName = args[0];
-            var browserSettings = new BrowserSettings(true);
+            var browserSettings = new BrowserSettings(false);
 
             var jobType = args[1] switch
             {
                 "scrape-scenes" => JobType.ScrapeScenes,
-                "scrape-models" => JobType.ScrapeModels,
-                "scrape-galleries" => JobType.ScrapeGalleries,
                 "download-scenes" => JobType.DownloadScenes,
-                "download-galleries" => JobType.DownloadGalleries,
+                "upsize-scenes" => JobType.UpsizeDownloadedScenes,
                 _ => throw new NotImplementedException($"Unknown job type {args[1]}")
             };
 
@@ -41,6 +39,8 @@ class PlaywrightExample
                 jobType,
                 browserSettings,
                 DownloadConditions.All(PreferredDownloadQuality.Phash));
+                // DownloadConditions.All(PreferredDownloadQuality.Best) with { PerformerShortName = "d3e8c73e/nancy-a" });
+                // DownloadConditions.All(PreferredDownloadQuality.Best));
         }
         catch (Exception ex)
         {

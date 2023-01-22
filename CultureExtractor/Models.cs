@@ -71,8 +71,8 @@ public record DownloadDetails(
     int? ResolutionHeight,
     double? FileSize,
     double? Fps,
-    string? Url,
-    string? Codec);
+    string? Codec,
+    string? Url);
 
 public record DownloadDetailsAndElementHandle(
     DownloadDetails DownloadDetails,

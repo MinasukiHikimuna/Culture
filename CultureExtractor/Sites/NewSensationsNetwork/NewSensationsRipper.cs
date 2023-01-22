@@ -39,9 +39,9 @@ public class NewSensationsRipper : ISceneScraper, ISceneDownloader
         return int.Parse(lastPage);
     }
 
-    public async Task DownloadPreviewImageAsync(Scene scene, IPage page, IElementHandle currentScene)
+    public async Task DownloadPreviewImageAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene)
     {
-        var url = await page.GetAttributeAsync("img#default_poster", "src");
+        var url = await scenePage.GetAttributeAsync("img#default_poster", "src");
         await new Downloader().DownloadSceneImageAsync(scene, url);
     }
 
@@ -148,7 +148,7 @@ public class NewSensationsRipper : ISceneScraper, ISceneDownloader
             _ => throw new InvalidOperationException("Could not find a download candidate!")
         };
 
-        return await new Downloader().DownloadSceneAsync(page, selectedDownload, scene, rippingPath, async () =>
+        return await new Downloader().DownloadSceneAsync(page, selectedDownload.DownloadDetails, scene, rippingPath, async () =>
         {
             await page.Locator("div#download_select > a").ClickAsync();
             await selectedDownload.ElementHandle.ClickAsync();
@@ -176,8 +176,8 @@ public class NewSensationsRipper : ISceneScraper, ISceneDownloader
                         resolutionHeight,
                         HumanParser.ParseFileSize(description),
                         -1,
-                        url,
-                        string.Empty),
+                        string.Empty,
+                        url),
                     downloadLink));
         }
         return availableDownloads.OrderByDescending(d => d.DownloadDetails.FileSize).ToList();

@@ -98,6 +98,6 @@ public class CzechVRScenePage
     public async Task<string> ScrapeDescriptionAsync()
     {
         var content = await _page.Locator("div.post > div.left > div.text").TextContentAsync();
-        return content.Replace("\n\t", "");
+        return content.Replace("\n", "").Replace("\t", "").Trim();
     }
 }

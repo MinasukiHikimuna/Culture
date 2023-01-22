@@ -54,4 +54,12 @@ public class HumanParserTests
         var timeSpan = HumanParser.ParseDuration(sizeString);
         timeSpan.TotalSeconds.Should().Be(expectedTotalSeconds);
     }
+
+    [TestCase("60fps", 60.0)]
+    public void ParseDuration(string sizeString, double expectedFps)
+    {
+        HumanParser
+            .ParseFps(sizeString)
+            .Should().Be(expectedFps);
+    }
 }

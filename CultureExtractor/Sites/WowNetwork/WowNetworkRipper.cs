@@ -1,8 +1,6 @@
 ﻿using CultureExtractor.Interfaces;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Playwright;
 using Serilog;
-using System;
 using System.Text.RegularExpressions;
 
 namespace CultureExtractor.Sites.WowNetwork;
@@ -12,7 +10,7 @@ namespace CultureExtractor.Sites.WowNetwork;
 [PornSite("wowgirls")]
 [PornSite("wowporn")]
 [PornSite("ultrafilms")]
-public class WowNetworkRipper : ISiteRipper, ISceneDownloader
+public class WowNetworkRipper : ISceneScraper, ISceneDownloader
 {
     private readonly SqliteContext _sqliteContext;
     private readonly Repository _repository;
@@ -29,209 +27,71 @@ public class WowNetworkRipper : ISiteRipper, ISceneDownloader
         await loginPage.LoginIfNeededAsync(site);
     }
 
-    public async Task ScrapeScenesAsync(string shortName, BrowserSettings browserSettings)
+    public async Task<int> NavigateToScenesAndReturnPageCountAsync(Site site, IPage page)
     {
-        var site = await _repository.GetSiteAsync(shortName);
-        IPage page = await PlaywrightFactory.CreatePageAsync(site, browserSettings);
-
-        var loginPage = new WowLoginPage(page);
-        await loginPage.LoginIfNeededAsync(site);
-
-        await _repository.UpdateStorageStateAsync(site, await page.Context.StorageStateAsync());
-
         var filmsPage = new WowFilmsPage(page);
-        await filmsPage.OpenFilmsPageAsync(shortName);
+        await filmsPage.OpenFilmsPageAsync(site.ShortName);
 
-        var totalPages = await filmsPage.GetFilmsPagesAsync();
-
-        for (int currentPage = 1; currentPage <= totalPages; currentPage++)
-        {
-            await Task.Delay(10000);
-            var currentScenes = await filmsPage.GetCurrentScenesAsync();
-            Log.Information($"Page {currentPage}/{totalPages} contains {currentScenes.Count} scenes");
-
-            foreach (var currentScene in currentScenes)
-            {
-                for (int retries = 0; retries < 3; retries++)
-                {
-                    try
-                    {
-                        var relativeUrl = await currentScene.GetAttributeAsync("href");
-                        var url = site.Url + relativeUrl;
-
-                        string pattern = @"/film/(?<id>\w+)/.*";
-                        Match match = Regex.Match(relativeUrl, pattern);
-                        if (!match.Success)
-                        {
-                            Log.Information($@"Could not determine ID from ""{relativeUrl}"" using pattern {pattern}. Skipping...");
-                            continue;
-                        }
-
-                        if (retries > 0)
-                        {
-                            Log.Information($"Retrying {retries + 1} attempt for {relativeUrl}");
-                        }
-
-                        var sceneShortName = match.Groups["id"].Value;
-                        var existingScene = await _repository.GetSceneAsync(shortName, sceneShortName);
-                        if (existingScene == null)
-                        {
-                            var newPage = await page.Context.RunAndWaitForPageAsync(async () =>
-                            {
-                                await currentScene.ClickAsync(new ElementHandleClickOptions() { Button = MouseButton.Middle });
-                            });
-
-                            await newPage.WaitForLoadStateAsync();
-
-                            var wowScenePage = new WowScenePage(newPage);
-                            var releaseDate = await wowScenePage.ScrapeReleaseDateAsync();
-                            var duration = await wowScenePage.ScrapeDurationAsync();
-                            var description = await wowScenePage.ScrapeDescriptionAsync();
-                            var title = await wowScenePage.ScrapeTitleAsync();
-                            var performers = await wowScenePage.ScrapePerformersAsync();
-                            var tags = await wowScenePage.ScrapeTagsAsync();
-
-                            var scene = new Scene(
-                                null,
-                                site,
-                                releaseDate,
-                                sceneShortName,
-                                title,
-                                url,
-                                description,
-                                duration.TotalSeconds,
-                                performers,
-                                tags
-                            );
-                            existingScene = await _repository.SaveSceneAsync(scene);
-
-                            await filmsPage.DownloadPreviewImageAsync(currentScene, existingScene);
-                            Log.Information($"Scraped scene {existingScene.Id}: {url}");
-
-                            await newPage.CloseAsync();
-
-                            await Task.Delay(3000);
-                        }
-
-                        break;
-                    }
-                    catch (Exception ex)
-                    {
-                        Log.Error(ex.ToString(), ex);
-                    }
-                }
-            }
-
-            if (currentPage != totalPages)
-            {
-                await filmsPage.GoToNextFilmsPageAsync();
-            }
-        }
+        return await filmsPage.GetFilmsPagesAsync();
     }
 
-    public async Task ScrapeGalleriesAsync(string shortName, BrowserSettings browserSettings)
+    public Task<IReadOnlyList<IElementHandle>> GetCurrentScenesAsync(IPage page)
     {
-        var site = await _repository.GetSiteAsync(shortName);
-        IPage page = await PlaywrightFactory.CreatePageAsync(site, browserSettings);
+        var filmsPage = new WowFilmsPage(page);
+        return filmsPage.GetCurrentScenesAsync();
+    }
 
-        var loginPage = new WowLoginPage(page);
-        await loginPage.LoginIfNeededAsync(site);
+    public async Task<(string Url, string ShortName)> GetSceneIdAsync(Site site, IElementHandle currentScene)
+    {
+        var relativeUrl = await currentScene.GetAttributeAsync("href");
+        var url = site.Url + relativeUrl;
 
-        await _repository.UpdateStorageStateAsync(site, await page.Context.StorageStateAsync());
-
-        var galleriesPage = new WowGalleriesPage(page);
-        await galleriesPage.OpenGalleriesPageAsync(shortName);
-
-        var totalPages = await galleriesPage.GetGalleriesPagesAsync();
-
-        for (int currentPage = 1; currentPage <= totalPages; currentPage++)
+        string pattern = @"/film/(?<id>\w+)/.*";
+        Match match = Regex.Match(relativeUrl, pattern);
+        if (!match.Success)
         {
-            await Task.Delay(10000);
-            var currentGalleries = await galleriesPage.GetCurrentGalleriesAsync();
-            Log.Information($"Page {currentPage}/{totalPages} contains {currentGalleries.Count} scenes");
-
-            foreach (var currentGallery in currentGalleries)
-            {
-                for (int retries = 0; retries < 3; retries++)
-                {
-                    try
-                    {
-                        var relativeUrl = await currentGallery.GetAttributeAsync("href");
-                        var url = site.Url + relativeUrl;
-
-                        string pattern = @"/gallery/(?<id>\w+)/.*";
-                        Match match = Regex.Match(relativeUrl, pattern);
-                        if (!match.Success)
-                        {
-                            Log.Information($@"Could not determine ID from ""{relativeUrl}"" using pattern {pattern}. Skipping...");
-                            continue;
-                        }
-
-                        if (retries > 0)
-                        {
-                            Log.Information($"Retrying {retries + 1} attempt for {relativeUrl}");
-                        }
-
-                        var galleryShortName = match.Groups["id"].Value;
-                        var existingGallery = await _repository.GetGalleryAsync(shortName, galleryShortName);
-                        if (existingGallery == null)
-                        {
-                            var newPage = await page.Context.RunAndWaitForPageAsync(async () =>
-                            {
-                                await currentGallery.ClickAsync(new ElementHandleClickOptions() { Button = MouseButton.Middle });
-                            });
-
-                            await newPage.WaitForLoadStateAsync();
-
-                            var galleryPage = new WowGalleryPage(newPage);
-                            var releaseDate = await galleryPage.ScrapeReleaseDateAsync();
-                            var title = await galleryPage.ScrapeTitleAsync();
-                            var performers = await galleryPage.ScrapePerformersAsync();
-                            var tags = await galleryPage.ScrapeTagsAsync();
-                            var pictures = await galleryPage.ScrapePicturesAsync();
-
-                            var gallery = new Gallery(
-                                null,
-                                site,
-                                releaseDate,
-                                galleryShortName,
-                                title,
-                                url,
-                                string.Empty,
-                                pictures,
-                                performers,
-                                tags
-                            );
-                            existingGallery = await _repository.SaveGalleryAsync(gallery);
-
-                            await newPage.CloseAsync();
-                        }
-
-                        if (existingGallery.Id == null)
-                        {
-                            throw new Exception($"Gallery ID was null for {existingGallery.ShortName}");
-                        }
-
-                        await galleriesPage.DownloadPreviewImageAsync(currentGallery, existingGallery);
-
-                        Log.Information($"Scraped gallery {existingGallery.Id}: {url}");
-
-                        await Task.Delay(3000);
-
-                        break;
-                    }
-                    catch (Exception ex)
-                    {
-                        Log.Error(ex.ToString(), ex);
-                    }
-                }
-            }
-
-            if (currentPage != totalPages)
-            {
-                await galleriesPage.GoToNextPageAsync();
-            }
+            throw new InvalidOperationException($"Could not parse ID from {url} using pattern {pattern}.");
         }
+
+        return (url, match.Groups["id"].Value);
+    }
+
+    public async Task<Scene> ScrapeSceneAsync(Site site, string url, string sceneShortName, IPage page)
+    {
+        await page.WaitForLoadStateAsync();
+
+        var wowScenePage = new WowScenePage(page);
+        var releaseDate = await wowScenePage.ScrapeReleaseDateAsync();
+        var duration = await wowScenePage.ScrapeDurationAsync();
+        var description = await wowScenePage.ScrapeDescriptionAsync();
+        var title = await wowScenePage.ScrapeTitleAsync();
+        var performers = await wowScenePage.ScrapePerformersAsync();
+        var tags = await wowScenePage.ScrapeTagsAsync();
+
+        return new Scene(
+            null,
+            site,
+            releaseDate,
+            sceneShortName,
+            title,
+            url,
+            description,
+            duration.TotalSeconds,
+            performers,
+            tags
+        );
+    }
+
+    public async Task DownloadPreviewImageAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene)
+    {
+        var filmsPage = new WowFilmsPage(scenePage);
+        await filmsPage.DownloadPreviewImageAsync(currentScene, scene);
+    }
+
+    public async Task GoToNextFilmsPageAsync(IPage page)
+    {
+        var filmsPage = new WowFilmsPage(page);
+        await filmsPage.GoToNextFilmsPageAsync();
     }
 
     public async Task<Download> DownloadSceneAsync(SceneEntity scene, IPage page, string rippingPath, DownloadConditions downloadConditions)
@@ -303,8 +163,8 @@ public class WowNetworkRipper : ISiteRipper, ISceneDownloader
                         resolutionHeight,
                         size,
                         double.Parse(fpsRaw.Replace("fps", "")),
-                        downloadUrl,
-                        codecRaw),
+                        codecRaw,
+                        downloadUrl),
                     downloadLinkElement));
         }
         return availableDownloads.OrderByDescending(d => d.DownloadDetails.ResolutionWidth).ThenByDescending(d => d.DownloadDetails.Fps).ToList();

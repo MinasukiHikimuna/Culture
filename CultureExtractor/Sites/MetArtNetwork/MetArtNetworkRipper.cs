@@ -155,9 +155,9 @@ public class MetArtNetworkRipper : ISceneScraper, ISceneDownloader
         return scene;
     }
 
-    public async Task DownloadPreviewImageAsync(Scene scene, IPage page, IElementHandle currentScene)
+    public async Task DownloadPreviewImageAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene)
     {
-        var previewElement = await page.Locator(".jw-preview").ElementHandleAsync();
+        var previewElement = await scenePage.Locator(".jw-preview").ElementHandleAsync();
         var style = await previewElement.GetAttributeAsync("style");
         var backgroundImageUrl = style.Replace("background-image: url(\"", "").Replace("\");", "");
         await new Downloader().DownloadSceneImageAsync(scene, backgroundImageUrl);
@@ -193,7 +193,7 @@ public class MetArtNetworkRipper : ISceneScraper, ISceneDownloader
             _ => throw new InvalidOperationException("Could not find a download candidate!")
         };
 
-        return await new Downloader().DownloadSceneAsync(page, selectedDownload, sceneEntity, rippingPath, async () =>
+        return await new Downloader().DownloadSceneAsync(page, selectedDownload.DownloadDetails, sceneEntity, rippingPath, async () =>
         {
             await selectedDownload.ElementHandle.ClickAsync();
         });
@@ -218,9 +218,9 @@ public class MetArtNetworkRipper : ISceneScraper, ISceneDownloader
                         HumanParser.ParseResolutionHeight(resolution),
                         HumanParser.ParseFileSize(size),
                         -1,
-                        url,
                         // TODO: this can be parsed!
-                        string.Empty),
+                        string.Empty,
+                        url),
                     downloadLink));
         }
         return availableDownloads;

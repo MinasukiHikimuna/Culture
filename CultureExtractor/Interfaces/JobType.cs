@@ -3,8 +3,6 @@
 public enum JobType
 {
     ScrapeScenes,
-    ScrapeGalleries,
-    ScrapeModels,
     DownloadScenes,
-    DownloadGalleries
+    UpsizeDownloadedScenes
 }

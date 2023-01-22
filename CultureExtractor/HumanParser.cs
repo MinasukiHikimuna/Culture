@@ -43,11 +43,11 @@ public static class HumanParser
     {
         var trimmedResolutionString = resolutionString.Trim().Replace(" ", "");
 
-        var patternExplicitResolution = @"^(?<width>[0-9]+)x(?<height>[0-9]+)$";
-        var matchExplicitResolution = Regex.Match(trimmedResolutionString, patternExplicitResolution);
-        if (matchExplicitResolution.Success)
+        var patternWithinOtherTextResolution = @"^(?<width>[0-9]+)x(?<height>[0-9]+)$";
+        var matchWithinOtherTextResolution = Regex.Match(trimmedResolutionString, patternWithinOtherTextResolution);
+        if (matchWithinOtherTextResolution.Success)
         {
-            return int.Parse(matchExplicitResolution.Groups["width"].Value);
+            return int.Parse(matchWithinOtherTextResolution.Groups["width"].Value);
         }
 
         return -1;
@@ -57,11 +57,11 @@ public static class HumanParser
     {
         var trimmedResolutionString = resolutionString.Trim();
 
-        var patternExplicitResolution = @"^(?<width>[0-9]+)x(?<height>[0-9]+)$";
-        var matchExplicitResolution = Regex.Match(trimmedResolutionString, patternExplicitResolution);
-        if (matchExplicitResolution.Success)
+        var patternWithinOtherTextResolution = @"(?<width>[0-9]+)x(?<height>[0-9]+)";
+        var matchWithinOtherTextResolution = Regex.Match(trimmedResolutionString, patternWithinOtherTextResolution);
+        if (matchWithinOtherTextResolution.Success)
         {
-            return int.Parse(matchExplicitResolution.Groups["height"].Value);
+            return int.Parse(matchWithinOtherTextResolution.Groups["height"].Value);
         }
 
         if (new List<string>() { "4K", "2160", "2160P", "UHD" }.Any(s => resolutionString.Contains(s, StringComparison.InvariantCultureIgnoreCase))) {
@@ -137,12 +137,31 @@ public static class HumanParser
 
     public static string ParseCodec(string codecString)
     {
-        if (codecString.Contains("h264"))
+        var upperCodecString = codecString.ToUpper();
+
+        if (upperCodecString.ToUpper().Contains("H264") || upperCodecString.Contains("H.264"))
         {
             return "H.264";
         }
 
+        if (upperCodecString.ToUpper().Contains("H265") || upperCodecString.Contains("H.265") || upperCodecString.Contains("HEVC"))
+        {
+            return "H.265";
+        }
+
         return string.Empty;
+    }
+
+    public static double ParseFps(string inputString)
+    {
+        var pattern = @"(?<fps>[0-9]+)fps";
+        var match = Regex.Match(inputString, pattern);
+        if (match.Success)
+        {
+            return double.Parse(match.Groups["fps"].Value);
+        }
+
+        return -1;
     }
 
     private static int GetUnitFactor(string unit)
