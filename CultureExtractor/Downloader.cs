@@ -1,7 +1,7 @@
 ﻿using Microsoft.Playwright;
 using Serilog;
 using System.Net;
-using static System.Formats.Asn1.AsnWriter;
+using System.Text.RegularExpressions;
 
 namespace CultureExtractor;
 
@@ -43,7 +43,7 @@ public class Downloader
     {
         var performerNames = scene.Performers.Select(p => p.Name).ToList();
         var performersStr = performerNames.Count() > 1
-            ? string.Join(", ", performerNames.Take(performerNames.Count() - 1)) + " & " + performerNames.Last()
+            ? string.Join(", ", performerNames.SkipLast(1)) + " & " + performerNames.Last()
             : performerNames.FirstOrDefault();
 
         var waitForDownloadTask = page.WaitForDownloadAsync();
@@ -53,7 +53,12 @@ public class Downloader
         var download = await waitForDownloadTask;
         var suggestedFilename = download.SuggestedFilename;
         var suffix = Path.GetExtension(suggestedFilename);
-        var name = $"{performersStr} - {scene.Site.Name} - {scene.ReleaseDate.ToString("yyyy-MM-dd")} - {scene.Name}{suffix}";
+        var nameWithoutSuffix = Regex.Replace($"{performersStr} - {scene.Site.Name} - {scene.ReleaseDate.ToString("yyyy-MM-dd")} - {scene.Name}", @"\s+", " ");
+
+        var name = (nameWithoutSuffix + suffix).Length > 260 
+            ? nameWithoutSuffix[..(260 - suffix.Length - 3)] + "..." + suffix
+            : nameWithoutSuffix + suffix;
+
         name = string.Concat(name.Split(Path.GetInvalidFileNameChars()));
         var path = Path.Join(rippingPath, name);
 
