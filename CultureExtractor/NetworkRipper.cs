@@ -165,6 +165,11 @@ public class NetworkRipper
                             Log.Information($"Scraped scene {savedScene.Id}: {url}");
                             await Task.Delay(3000);
                         }
+                        else
+                        {
+                            Log.Information($"An existing scene {existingScene.ReleaseDate} {existingScene.Name} found. Assuming older scenes have already been scraped.");
+                            return;
+                        }
                         break;
                     }
                     catch (Exception ex)
