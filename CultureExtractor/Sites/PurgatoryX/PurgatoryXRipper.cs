@@ -47,7 +47,7 @@ public class PurgatoryXRipper : ISceneScraper, ISceneDownloader
         return;
     }
 
-    public async Task<IReadOnlyList<IElementHandle>> GetCurrentScenesAsync(IPage page)
+    public async Task<IReadOnlyList<IElementHandle>> GetCurrentScenesAsync(Site site, IPage page)
     {
         var currentScenes = await page.Locator("div.content-item").ElementHandlesAsync();
         return currentScenes;

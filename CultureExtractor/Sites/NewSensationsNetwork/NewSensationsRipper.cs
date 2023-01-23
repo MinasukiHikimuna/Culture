@@ -45,7 +45,7 @@ public class NewSensationsRipper : ISceneScraper, ISceneDownloader
         await new Downloader().DownloadSceneImageAsync(scene, url);
     }
 
-    public async Task<IReadOnlyList<IElementHandle>> GetCurrentScenesAsync(IPage page)
+    public async Task<IReadOnlyList<IElementHandle>> GetCurrentScenesAsync(Site site, IPage page)
     {
         var currentScenes = await page.Locator("div.videoArea > div.videoBlock").ElementHandlesAsync();
         return currentScenes;

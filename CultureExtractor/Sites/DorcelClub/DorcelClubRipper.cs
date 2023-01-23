@@ -58,7 +58,7 @@ public class DorcelClubRipper : ISceneScraper, ISceneDownloader
         return;
     }
 
-    public async Task<IReadOnlyList<IElementHandle>> GetCurrentScenesAsync(IPage page)
+    public async Task<IReadOnlyList<IElementHandle>> GetCurrentScenesAsync(Site site, IPage page)
     {
         var currentScenes = await page.Locator("div.items > div.scene").ElementHandlesAsync();
         return currentScenes;

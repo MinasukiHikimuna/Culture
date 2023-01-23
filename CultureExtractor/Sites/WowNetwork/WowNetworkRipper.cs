@@ -35,7 +35,7 @@ public class WowNetworkRipper : ISceneScraper, ISceneDownloader
         return await filmsPage.GetFilmsPagesAsync();
     }
 
-    public Task<IReadOnlyList<IElementHandle>> GetCurrentScenesAsync(IPage page)
+    public Task<IReadOnlyList<IElementHandle>> GetCurrentScenesAsync(Site site, IPage page)
     {
         var filmsPage = new WowFilmsPage(page);
         return filmsPage.GetCurrentScenesAsync();

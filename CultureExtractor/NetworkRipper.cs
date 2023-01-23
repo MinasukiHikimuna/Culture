@@ -28,7 +28,7 @@ public class NetworkRipper
         for (int currentPage = 1; currentPage <= totalPages; currentPage++)
         {
             await Task.Delay(5000);
-            var currentScenes = await sceneScraper.GetCurrentScenesAsync(page);
+            var currentScenes = await sceneScraper.GetCurrentScenesAsync(site, page);
 
             Log.Information(totalPages == int.MaxValue
                 ? $"Batch {currentPage} of infinite page contains {currentScenes.Count} scenes"

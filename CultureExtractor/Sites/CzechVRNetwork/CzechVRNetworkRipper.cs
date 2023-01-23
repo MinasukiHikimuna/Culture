@@ -39,7 +39,7 @@ public class CzechVRNetworkRipper : ISceneScraper, ISceneDownloader
         return totalPages;
     }
 
-    public Task<IReadOnlyList<IElementHandle>> GetCurrentScenesAsync(IPage page)
+    public Task<IReadOnlyList<IElementHandle>> GetCurrentScenesAsync(Site site, IPage page)
     {
         var videosPage = new CzechVRVideosPage(page);
         return videosPage.GetCurrentScenesAsync();

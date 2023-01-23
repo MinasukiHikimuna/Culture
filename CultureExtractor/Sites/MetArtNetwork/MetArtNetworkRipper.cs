@@ -98,14 +98,14 @@ public class MetArtNetworkRipper : ISceneScraper, ISceneDownloader
         return totalPages;
     }
 
-    public async Task<IReadOnlyList<IElementHandle>> GetCurrentScenesAsync(IPage page)
+    public async Task<IReadOnlyList<IElementHandle>> GetCurrentScenesAsync(Site site, IPage page)
     {
         var currentPage = await page.Locator("nav.pagination > a.active").TextContentAsync();
-        var isFirstPage = currentPage == "1";
+        var skipAdScene = currentPage == "1" && site.ShortName != "hustler";
 
         var currentScenes = await page.Locator("div.card-media a").ElementHandlesAsync();
 
-        return isFirstPage
+        return skipAdScene
             ? currentScenes.Skip(1).ToList().AsReadOnly()
             : currentScenes;
     }
@@ -125,9 +125,6 @@ public class MetArtNetworkRipper : ISceneScraper, ISceneDownloader
         var description = await metArtScenePage.ScrapeDescriptionAsync();
         var name = await metArtScenePage.ScrapeTitleAsync();
         var performers = await metArtScenePage.ScrapePerformersAsync(site.Url);
-
-        var wholeDetails = await page.Locator("div.movie-details > div > div > div > ul").TextContentAsync();
-
 
         var tagElements = await page.Locator("div.tags-wrapper > div > a").ElementHandlesAsync();
         var tags = new List<SiteTag>();
