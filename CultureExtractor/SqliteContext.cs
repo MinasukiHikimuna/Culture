@@ -11,7 +11,6 @@ public class SqliteContext : DbContext
     public DbSet<SiteTagEntity> Tags { get; set; }
     public DbSet<StorageStateEntity> StorageStates { get; set; }
     public DbSet<DownloadEntity> Downloads { get; set; }
-    public DbSet<DownloadOptionEntity> DownloadOptions { get; set; }
 
     public string DbPath { get; }
 
@@ -84,7 +83,7 @@ public class SceneEntity
     public required DateTime LastUpdated { get; set; }
     public required ICollection<SitePerformerEntity> Performers { get; set; }
     public required ICollection<SiteTagEntity> Tags { get; set; }
-    public required ICollection<DownloadOptionEntity> DownloadOptions { get; set; }
+    public required string DownloadOptions { get; set; }
 
     public required int SiteId { get; set; }
     public required SiteEntity Site { get; set; }
@@ -119,16 +118,4 @@ public class DownloadEntity
 
     public required int SceneId { get; set; }
     public required SceneEntity Scene { get; set; }
-}
-
-public class DownloadOptionEntity
-{
-    public int Id { get; set; }
-    public required string Description { get; set; }
-    public required string Url { get; set; }
-    public int? ResolutionWidth { get; set; }
-    public int? ResolutionHeight { get; set; }
-    public double? FileSize { get; set; }
-    public double? Fps { get; set; }
-    public string? Codec { get; set; }
 }

@@ -17,7 +17,7 @@ public class NetworkRipper
         _repository = repository;
     }
 
-    public async Task ScrapeScenesAsync(Site site, BrowserSettings browserSettings)
+    public async Task ScrapeScenesAsync(Site site, BrowserSettings browserSettings, bool fullScrape)
     {
         ISceneScraper? sceneScraper = GetRipper<ISceneScraper>(site.ShortName);
         Log.Information($"Culture Extractor, using {sceneScraper.GetType()}");
@@ -48,7 +48,7 @@ public class NetworkRipper
                         }
 
                         var existingScene = await _repository.GetSceneAsync(site.ShortName, sceneShortName);
-                        if (existingScene == null)
+                        if (existingScene == null || fullScrape)
                         {
                             var scenePage = await page.Context.RunAndWaitForPageAsync(async () =>
                             {
@@ -57,7 +57,12 @@ public class NetworkRipper
                             await scenePage.WaitForLoadStateAsync();
 
                             var scene = await sceneScraper.ScrapeSceneAsync(site, url, sceneShortName, scenePage);
-                            var savedScene = await _repository.SaveSceneAsync(scene);
+                            if (existingScene != null)
+                            {
+                                scene = scene with { Id = existingScene.Id };
+                            }
+
+                            var savedScene = await _repository.UpsertScene(scene);
                             await sceneScraper.DownloadPreviewImageAsync(savedScene, scenePage, page, currentScene);
 
                             await scenePage.CloseAsync();

@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Serilog;
+using System.Text.Json;
 
 namespace CultureExtractor;
 
@@ -70,37 +71,60 @@ public class Repository
             : null;
     }
 
-    public async Task<Scene> SaveSceneAsync(Scene scene)
+    public async Task<Scene> UpsertScene(Scene scene)
     {
         var siteEntity = await _sqliteContext.Sites.FirstAsync(s => s.Id == scene.Site.Id);
 
         List<SitePerformerEntity> performerEntities = await GetOrCreatePerformersAsync(scene.Performers, siteEntity);
         List<SiteTagEntity> tagEntities = await GetOrCreateTagsAsync(scene.Tags, siteEntity);
 
-        var sceneEntity = new SceneEntity()
+        if (!scene.Id.HasValue)
         {
-            ReleaseDate = scene.ReleaseDate,
-            ShortName = scene.ShortName,
-            Name = scene.Name,
-            Url = scene.Url,
-            Description = scene.Description,
-            Duration = scene.Duration,
-            Performers = performerEntities,
-            Tags = tagEntities,
-            Created = DateTime.Now,
-            LastUpdated = DateTime.Now,
+            var sceneEntity = new SceneEntity()
+            {
+                ReleaseDate = scene.ReleaseDate,
+                ShortName = scene.ShortName,
+                Name = scene.Name,
+                Url = scene.Url,
+                Description = scene.Description,
+                Duration = scene.Duration,
+                Performers = performerEntities,
+                Tags = tagEntities,
+                Created = DateTime.Now,
+                LastUpdated = DateTime.Now,
 
-            SiteId = siteEntity.Id,
-            Site = siteEntity,
+                SiteId = siteEntity.Id,
+                Site = siteEntity,
 
-            Downloads = new List<DownloadEntity>(),
-            DownloadOptions = new List<DownloadOptionEntity>()
-        };
+                Downloads = new List<DownloadEntity>(),
+                DownloadOptions = JsonSerializer.Serialize(scene.DownloadOptions)
+            };
+            await _sqliteContext.Scenes.AddAsync(sceneEntity);
+            await _sqliteContext.SaveChangesAsync();
 
-        await _sqliteContext.Scenes.AddAsync(sceneEntity);
+            return Convert(sceneEntity);
+        }
+
+        var existingSceneEntity = await _sqliteContext.Scenes.FirstAsync(s => s.Id == scene.Id);
+
+        existingSceneEntity.ReleaseDate = scene.ReleaseDate;
+        existingSceneEntity.ShortName = scene.ShortName;
+        existingSceneEntity.Name = scene.Name;
+        existingSceneEntity.Url = scene.Url;
+        existingSceneEntity.Description = scene.Description;
+        existingSceneEntity.Duration = scene.Duration;
+        existingSceneEntity.Performers = performerEntities;
+        existingSceneEntity.Tags = tagEntities;
+        existingSceneEntity.LastUpdated = DateTime.Now;
+
+        existingSceneEntity.SiteId = siteEntity.Id;
+        existingSceneEntity.Site = siteEntity;
+
+        existingSceneEntity.DownloadOptions = JsonSerializer.Serialize(scene.DownloadOptions);
+
         await _sqliteContext.SaveChangesAsync();
 
-        return Convert(sceneEntity);
+        return Convert(existingSceneEntity);
     }
 
     public async Task<Gallery> SaveGalleryAsync(Gallery gallery)
@@ -200,6 +224,10 @@ public class Repository
 
     private static Scene Convert(SceneEntity sceneEntity)
     {
+        var downloadOptions = string.IsNullOrEmpty(sceneEntity.DownloadOptions)
+            ? "[]"
+            : sceneEntity.DownloadOptions;
+
         return new Scene(
             sceneEntity.Id,
             Convert(sceneEntity.Site),
@@ -211,7 +239,7 @@ public class Repository
             sceneEntity.Duration,
             sceneEntity.Performers.Select(Convert),
             sceneEntity.Tags.Select(Convert),
-            sceneEntity.DownloadOptions.Select(Convert));
+            JsonSerializer.Deserialize<IEnumerable<DownloadOption>>(downloadOptions));
     }
 
     private static Gallery Convert(GalleryEntity galleryEntity)
@@ -243,17 +271,5 @@ public class Repository
             siteTagEntity.ShortName ?? siteTagEntity.Name,
             siteTagEntity.Name,
             siteTagEntity.Url ?? string.Empty);
-    }
-
-    private static DownloadOption Convert(DownloadOptionEntity downloadOptionEntity)
-    {
-        return new DownloadOption(
-            downloadOptionEntity.Description,
-            downloadOptionEntity.ResolutionWidth,
-            downloadOptionEntity.ResolutionHeight,
-            downloadOptionEntity.FileSize,
-            downloadOptionEntity.Fps,
-            downloadOptionEntity.Codec,
-            downloadOptionEntity.Url);
     }
 }
