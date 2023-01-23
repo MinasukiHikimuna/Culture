@@ -23,12 +23,12 @@ public class Downloader
         return File.Exists(path);
     }
 
-    public async Task DownloadSceneImageAsync(Scene scene, string imageUrl)
+    public async Task DownloadSceneImageAsync(Scene scene, string imageUrl, string referer = "")
     {
         var rippingPath = $@"B:\Ripping\{scene.Site.Name}\Metadata\SceneImages\";
         Directory.CreateDirectory(rippingPath);
 
-        await DownloadFileAsync(imageUrl, (int)scene.Id, rippingPath);
+        await DownloadFileAsync(imageUrl, (int)scene.Id, rippingPath, referer);
     }
 
     public async Task DownloadGalleryImageasync(Gallery gallery, string imageUrl)
@@ -69,13 +69,17 @@ public class Downloader
         return new Download(suggestedFilename, name, downloadDetails);
     }
 
-    private static async Task DownloadFileAsync(string imageUrl, int fileId, string rippingPath)
+    private static async Task DownloadFileAsync(string imageUrl, int fileId, string rippingPath, string referer = "")
     {
         string? tempPath = null;
         try
         {
             tempPath = Path.Combine(rippingPath, $"{Guid.NewGuid()}.jpg");
             var finalPath = Path.Combine(rippingPath, $"{fileId}.jpg");
+
+            WebClient.Headers.Clear();
+            WebClient.Headers["Referer"] = referer;
+
             await WebClient.DownloadFileTaskAsync(new Uri(imageUrl), tempPath);
             File.Move(tempPath, finalPath, true);
         }

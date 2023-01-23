@@ -42,8 +42,10 @@ public class PurgatoryXRipper : ISceneScraper, ISceneDownloader
 
     public async Task DownloadPreviewImageAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene)
     {
-        // TODO: Need to find a way to download the image using this browser instance. Otherwise we get a Forbidden error.
-        return;
+        var previewElement = await scenePage.Locator(".jw-preview").ElementHandleAsync();
+        var style = await previewElement.GetAttributeAsync("style");
+        var backgroundImageUrl = style.Replace("background-image: url(\"", "").Replace("\");", "").Replace(" background-size: cover;", "");
+        await new Downloader().DownloadSceneImageAsync(scene, backgroundImageUrl, "https://members.purgatoryx.com");
     }
 
     public async Task<IReadOnlyList<IElementHandle>> GetCurrentScenesAsync(Site site, IPage page)
@@ -159,7 +161,7 @@ public class PurgatoryXRipper : ISceneScraper, ISceneDownloader
 
     private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloadsAsync(IPage page)
     {
-        var downloadListItems = await page.Locator("ul.dropdown-menu.show > li").ElementHandlesAsync();
+        var downloadListItems = await page.Locator("div.download-video > ul.dropdown-menu > li").ElementHandlesAsync();
         var availableDownloads = new List<DownloadDetailsAndElementHandle>();
 
         var firstElementText = await downloadListItems.First().TextContentAsync();
