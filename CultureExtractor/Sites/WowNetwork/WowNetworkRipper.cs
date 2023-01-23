@@ -154,8 +154,8 @@ public class WowNetworkRipper : ISceneScraper, ISceneDownloader
             var sizeRaw = await sizeElement.InnerTextAsync();
             var size = HumanParser.ParseFileSize(sizeRaw);
 
-            var descriptionElement = await downloadItem.QuerySelectorAsync("div.ct_dl_details");
-            var description = await descriptionElement.TextContentAsync();
+            var descriptionRaw = await downloadItem.TextContentAsync();
+            var description = descriptionRaw.Replace("\n", "").Trim();
 
             availableDownloads.Add(
                 new DownloadDetailsAndElementHandle(
