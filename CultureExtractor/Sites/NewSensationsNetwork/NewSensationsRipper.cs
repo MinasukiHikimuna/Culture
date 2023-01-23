@@ -116,6 +116,8 @@ public class NewSensationsRipper : ISceneScraper, ISceneDownloader
             ? descriptionRaw.Substring("Description: ".Length)
             : descriptionRaw;
 
+        var downloadOptionsAndHandles = await ParseAvailableDownloadsAsync(page);
+
         return new Scene(
             null,
             site,
@@ -126,7 +128,8 @@ public class NewSensationsRipper : ISceneScraper, ISceneDownloader
             description,
             duration.TotalSeconds,
             performers,
-            new List<SiteTag>()
+            new List<SiteTag>(),
+            downloadOptionsAndHandles.Select(f => f.DownloadOption).ToList()
         );
     }
 
@@ -138,7 +141,7 @@ public class NewSensationsRipper : ISceneScraper, ISceneDownloader
         await Task.Delay(3000);
 
 
-        var availableDownloads = await ParseAvailableDownloads(page);
+        var availableDownloads = await ParseAvailableDownloadsAsync(page);
 
         DownloadDetailsAndElementHandle selectedDownload = downloadConditions.PreferredDownloadQuality switch
         {
@@ -148,14 +151,14 @@ public class NewSensationsRipper : ISceneScraper, ISceneDownloader
             _ => throw new InvalidOperationException("Could not find a download candidate!")
         };
 
-        return await new Downloader().DownloadSceneAsync(page, selectedDownload.DownloadDetails, scene, rippingPath, async () =>
+        return await new Downloader().DownloadSceneAsync(page, selectedDownload.DownloadOption, scene, rippingPath, async () =>
         {
             await page.Locator("div#download_select > a").ClickAsync();
             await selectedDownload.ElementHandle.ClickAsync();
         });
     }
 
-    private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloads(IPage page)
+    private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloadsAsync(IPage page)
     {
         var downloadLinks = await page.Locator("div#download_select > ul > li").ElementHandlesAsync();
         var availableDownloads = new List<DownloadDetailsAndElementHandle>();
@@ -170,7 +173,7 @@ public class NewSensationsRipper : ISceneScraper, ISceneDownloader
 
             availableDownloads.Add(
                 new DownloadDetailsAndElementHandle(
-                    new DownloadDetails(
+                    new DownloadOption(
                         description,
                         -1,
                         resolutionHeight,
@@ -180,6 +183,6 @@ public class NewSensationsRipper : ISceneScraper, ISceneDownloader
                         url),
                     downloadLink));
         }
-        return availableDownloads.OrderByDescending(d => d.DownloadDetails.FileSize).ToList();
+        return availableDownloads.OrderByDescending(d => d.DownloadOption.FileSize).ToList();
     }
 }

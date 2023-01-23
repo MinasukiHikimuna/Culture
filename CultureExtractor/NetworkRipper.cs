@@ -185,7 +185,7 @@ public class NetworkRipper
                     _repository._sqliteContext.Downloads.Add(new DownloadEntity()
                     {
                         DownloadedAt = DateTime.Now,
-                        DownloadDetails = JsonSerializer.Serialize(download.DownloadDetails),
+                        DownloadOptions = JsonSerializer.Serialize(download.DownloadOption),
                         DownloadQuality = Enum.GetName(downloadConditions.PreferredDownloadQuality),
                         OriginalFilename = download.OriginalFilename,
                         SavedFilename = download.SavedFilename,

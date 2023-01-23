@@ -121,6 +121,8 @@ public class DorcelClubRipper : ISceneScraper, ISceneDownloader
         }
         description = description.Replace("\n", "").Trim();
 
+        var downloadOptionsAndHandles = await ParseAvailableDownloadsAsync(page);
+
         return new Scene(
             null,
             site,
@@ -131,7 +133,8 @@ public class DorcelClubRipper : ISceneScraper, ISceneDownloader
             description,
             duration.TotalSeconds,
             performers,
-            new List<SiteTag>()
+            new List<SiteTag>(),
+            downloadOptionsAndHandles.Select(f => f.DownloadOption).ToList()
         );
     }
 
@@ -148,11 +151,11 @@ public class DorcelClubRipper : ISceneScraper, ISceneDownloader
         await Task.Delay(3000);
 
 
-        var availableDownloads = await ParseAvailableDownloads(page);
+        var availableDownloads = await ParseAvailableDownloadsAsync(page);
 
         DownloadDetailsAndElementHandle selectedDownload = downloadConditions.PreferredDownloadQuality switch
         {
-            PreferredDownloadQuality.Phash => availableDownloads.FirstOrDefault(f => f.DownloadDetails.ResolutionHeight == 480) ?? availableDownloads.Last(),
+            PreferredDownloadQuality.Phash => availableDownloads.FirstOrDefault(f => f.DownloadOption.ResolutionHeight == 480) ?? availableDownloads.Last(),
             PreferredDownloadQuality.Best => availableDownloads.First(),
             PreferredDownloadQuality.Worst => availableDownloads.Last(),
             _ => throw new InvalidOperationException("Could not find a download candidate!")
@@ -171,14 +174,14 @@ public class DorcelClubRipper : ISceneScraper, ISceneDownloader
 
         var path = Path.Join(rippingPath, name);
 
-        Log.Verbose($"Downloading\r\n    URL:  {selectedDownload.DownloadDetails.Url}\r\n    Path: {path}");
+        Log.Verbose($"Downloading\r\n    URL:  {selectedDownload.DownloadOption.Url}\r\n    Path: {path}");
 
         var newPage = await page.Context.NewPageAsync();
         var waitForDownloadTask = newPage.WaitForDownloadAsync(new PageWaitForDownloadOptions { Timeout = 3 * 60000 });
 
         try
         {
-            await newPage.GotoAsync(selectedDownload.DownloadDetails.Url);
+            await newPage.GotoAsync(selectedDownload.DownloadOption.Url);
 
             var blocked = await newPage.IsVisibleAsync("#blocked");
             if (blocked)
@@ -208,10 +211,10 @@ public class DorcelClubRipper : ISceneScraper, ISceneDownloader
         var waitForXSeconds = Random.Next(3, 10);
         await Task.Delay(waitForXSeconds * 1000);
 
-        return new Download(suggestedFilename, name, selectedDownload.DownloadDetails);
+        return new Download(suggestedFilename, name, selectedDownload.DownloadOption);
     }
 
-    private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloads(IPage page)
+    private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloadsAsync(IPage page)
     {
         var downloadLinks = await page.Locator("div.qualities.selectors div.filter").ElementHandlesAsync();
         var availableDownloads = new List<DownloadDetailsAndElementHandle>();
@@ -225,7 +228,7 @@ public class DorcelClubRipper : ISceneScraper, ISceneDownloader
             var url = await downloadLink.GetAttributeAsync("data-slug");
             availableDownloads.Add(
                 new DownloadDetailsAndElementHandle(
-                    new DownloadDetails(
+                    new DownloadOption(
                         description,
                         -1,
                         resolutionHeight,

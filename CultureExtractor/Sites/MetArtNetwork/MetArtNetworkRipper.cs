@@ -136,6 +136,8 @@ public class MetArtNetworkRipper : ISceneScraper, ISceneDownloader
             tags.Add(new SiteTag(tagShortName, tagName, tagUrl));
         }
 
+        var downloadOptionsAndHandles = await ParseAvailableDownloadsAsync(page);
+
         var scene = new Scene(
             null,
             site,
@@ -146,7 +148,8 @@ public class MetArtNetworkRipper : ISceneScraper, ISceneDownloader
             description,
             duration.TotalSeconds,
             performers,
-            tags
+            tags,
+            downloadOptionsAndHandles.Select(f => f.DownloadOption).ToList()
         );
 
         return scene;
@@ -180,23 +183,23 @@ public class MetArtNetworkRipper : ISceneScraper, ISceneDownloader
 
         await downloadMenuLocator.ClickAsync();
 
-        var availableDownloads = await ParseAvailableDownloads(page);
+        var availableDownloads = await ParseAvailableDownloadsAsync(page);
 
         DownloadDetailsAndElementHandle selectedDownload = downloadConditions.PreferredDownloadQuality switch
         {
-            PreferredDownloadQuality.Phash => availableDownloads.FirstOrDefault(f => f.DownloadDetails.ResolutionHeight == 360) ?? availableDownloads.Last(),
+            PreferredDownloadQuality.Phash => availableDownloads.FirstOrDefault(f => f.DownloadOption.ResolutionHeight == 360) ?? availableDownloads.Last(),
             PreferredDownloadQuality.Best => availableDownloads.First(),
             PreferredDownloadQuality.Worst => availableDownloads.Last(),
             _ => throw new InvalidOperationException("Could not find a download candidate!")
         };
 
-        return await new Downloader().DownloadSceneAsync(page, selectedDownload.DownloadDetails, sceneEntity, rippingPath, async () =>
+        return await new Downloader().DownloadSceneAsync(page, selectedDownload.DownloadOption, sceneEntity, rippingPath, async () =>
         {
             await selectedDownload.ElementHandle.ClickAsync();
         });
     }
 
-    private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloads(IPage page)
+    private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloadsAsync(IPage page)
     {
         var downloadLinks = await page.Locator("div.dropdown-menu a").ElementHandlesAsync();
         var availableDownloads = new List<DownloadDetailsAndElementHandle>();
@@ -209,7 +212,7 @@ public class MetArtNetworkRipper : ISceneScraper, ISceneDownloader
             var url = await downloadLink.GetAttributeAsync("href");
             availableDownloads.Add(
                 new DownloadDetailsAndElementHandle(
-                    new DownloadDetails(
+                    new DownloadOption(
                         description,
                         -1,
                         HumanParser.ParseResolutionHeight(resolution),

@@ -11,6 +11,7 @@ public class SqliteContext : DbContext
     public DbSet<SiteTagEntity> Tags { get; set; }
     public DbSet<StorageStateEntity> StorageStates { get; set; }
     public DbSet<DownloadEntity> Downloads { get; set; }
+    public DbSet<DownloadOptionEntity> DownloadOptions { get; set; }
 
     public string DbPath { get; }
 
@@ -64,7 +65,6 @@ public class SitePerformerEntity
     public string? ShortName { get; set; }
     public required string Name { get; set; }
     public string? Url { get; set; }
-
     public required int SiteId { get; set; }
     public required SiteEntity Site { get; set; }
 
@@ -80,8 +80,11 @@ public class SceneEntity
     public required string Url { get; set; }
     public required string Description { get; set; }
     public required double Duration { get; set; }
+    public required DateTime Created { get; set; }
+    public required DateTime LastUpdated { get; set; }
     public required ICollection<SitePerformerEntity> Performers { get; set; }
     public required ICollection<SiteTagEntity> Tags { get; set; }
+    public required ICollection<DownloadOptionEntity> DownloadOptions { get; set; }
 
     public required int SiteId { get; set; }
     public required SiteEntity Site { get; set; }
@@ -110,7 +113,7 @@ public class DownloadEntity
     public int Id { get; set; }
     public required DateTime DownloadedAt { get; set; }
     public required string DownloadQuality { get; set; }
-    public required string DownloadDetails { get; set; }
+    public required string DownloadOptions { get; set; }
     public string? OriginalFilename { get; set; }
     public string? SavedFilename { get; set; }
 
@@ -118,3 +121,14 @@ public class DownloadEntity
     public required SceneEntity Scene { get; set; }
 }
 
+public class DownloadOptionEntity
+{
+    public int Id { get; set; }
+    public required string Description { get; set; }
+    public required string Url { get; set; }
+    public int? ResolutionWidth { get; set; }
+    public int? ResolutionHeight { get; set; }
+    public double? FileSize { get; set; }
+    public double? Fps { get; set; }
+    public string? Codec { get; set; }
+}

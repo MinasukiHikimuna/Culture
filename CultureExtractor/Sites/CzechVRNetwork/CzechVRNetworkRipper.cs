@@ -77,6 +77,7 @@ public class CzechVRNetworkRipper : ISceneScraper, ISceneDownloader
         var title = await scenePage.ScrapeTitleAsync();
         var performers = await scenePage.ScrapePerformersAsync();
         var tags = await scenePage.ScrapeTagsAsync();
+        var downloadOptionsAndHandles = await ParseAvailableDownloadsAsync(page);
 
         var scene = new Scene(
             null,
@@ -88,7 +89,8 @@ public class CzechVRNetworkRipper : ISceneScraper, ISceneDownloader
             description,
             duration.TotalSeconds,
             performers,
-            tags
+            tags,
+            downloadOptionsAndHandles.Select(f => f.DownloadOption).ToList()
         );
         return scene;
     }
@@ -112,7 +114,7 @@ public class CzechVRNetworkRipper : ISceneScraper, ISceneDownloader
 
         await Task.Delay(3000);
 
-        var availableDownloads = await ParseAvailableDownloads(page);
+        var availableDownloads = await ParseAvailableDownloadsAsync(page);
 
         DownloadDetailsAndElementHandle selectedDownload = downloadConditions.PreferredDownloadQuality switch
         {
@@ -122,20 +124,20 @@ public class CzechVRNetworkRipper : ISceneScraper, ISceneDownloader
             _ => throw new InvalidOperationException("Could not find a download candidate!")
         };
 
-        return await new Downloader().DownloadSceneAsync(page, selectedDownload.DownloadDetails, sceneEntity, rippingPath, async () =>
+        return await new Downloader().DownloadSceneAsync(page, selectedDownload.DownloadOption, sceneEntity, rippingPath, async () =>
         {
             await page.EvaluateAsync(
-                $"document.querySelector('a[href=\"{selectedDownload.DownloadDetails.Url}\"')" +
+                $"document.querySelector('a[href=\"{selectedDownload.DownloadOption.Url}\"')" +
                 $".parentElement" +
                 $".parentElement" +
                 $".parentElement" +
                 $".previousElementSibling" +
                 $".click()");
-            await page.Locator($"a[href=\"{selectedDownload.DownloadDetails.Url}\"]").ClickAsync();
+            await page.Locator($"a[href=\"{selectedDownload.DownloadOption.Url}\"]").ClickAsync();
         });
     }
 
-    private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloads(IPage page)
+    private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloadsAsync(IPage page)
     {
         var downloadOptions = new List<DownloadOptionElements>();
         var deviceElements = await page.Locator("ul.zalozky > li:not(.download)").ElementHandlesAsync();
@@ -163,7 +165,7 @@ public class CzechVRNetworkRipper : ISceneScraper, ISceneDownloader
             var url = await downloadOption.Link.GetAttributeAsync("href");
             availableDownloads.Add(
                 new DownloadDetailsAndElementHandle(
-                    new DownloadDetails(
+                    new DownloadOption(
                         description,
                         HumanParser.ParseResolutionWidth(description),
                         HumanParser.ParseResolutionHeight(description),
@@ -173,7 +175,7 @@ public class CzechVRNetworkRipper : ISceneScraper, ISceneDownloader
                         url),
                     null));
         }
-        return availableDownloads.OrderByDescending(d => d.DownloadDetails.FileSize).ToList();
+        return availableDownloads.OrderByDescending(d => d.DownloadOption.FileSize).ToList();
     }
 
     private record DownloadOptionElements(IElementHandle Device, IElementHandle Details, IElementHandle Link);

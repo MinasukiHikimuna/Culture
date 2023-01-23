@@ -67,6 +67,7 @@ public class WowNetworkRipper : ISceneScraper, ISceneDownloader
         var title = await wowScenePage.ScrapeTitleAsync();
         var performers = await wowScenePage.ScrapePerformersAsync();
         var tags = await wowScenePage.ScrapeTagsAsync();
+        var downloadOptionsAndHandles = await ParseAvailableDownloadsAsync(page);
 
         return new Scene(
             null,
@@ -78,7 +79,8 @@ public class WowNetworkRipper : ISceneScraper, ISceneDownloader
             description,
             duration.TotalSeconds,
             performers,
-            tags
+            tags,
+            downloadOptionsAndHandles.Select(f => f.DownloadOption).ToList()
         );
     }
 
@@ -104,7 +106,7 @@ public class WowNetworkRipper : ISceneScraper, ISceneDownloader
         var performerNames = scene.Performers.Select(p => p.Name).ToList();
         var performersStr = performerNames.Count() > 1 ? string.Join(", ", performerNames.Take(performerNames.Count() - 1)) + " & " + performerNames.Last() : performerNames.FirstOrDefault();
 
-        var availableDownloads = await ParseAvailableDownloads(page);
+        var availableDownloads = await ParseAvailableDownloadsAsync(page);
 
         DownloadDetailsAndElementHandle selectedDownload = downloadConditions.PreferredDownloadQuality switch
         {
@@ -125,14 +127,14 @@ public class WowNetworkRipper : ISceneScraper, ISceneDownloader
 
         var path = Path.Join(rippingPath, name);
 
-        Log.Verbose($"Downloading\r\n    URL:  {selectedDownload.DownloadDetails.Url}\r\n    Path: {path}");
+        Log.Verbose($"Downloading\r\n    URL:  {selectedDownload.DownloadOption.Url}\r\n    Path: {path}");
 
         await download.SaveAsAsync(path);
 
-        return new Download(suggestedFilename, name, selectedDownload.DownloadDetails);
+        return new Download(suggestedFilename, name, selectedDownload.DownloadOption);
     }
 
-    private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloads(IPage page)
+    private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloadsAsync(IPage page)
     {
         var downloadItems = await page.Locator("div.ct_dl_items > ul > li").ElementHandlesAsync();
         var availableDownloads = new List<DownloadDetailsAndElementHandle>();
@@ -157,7 +159,7 @@ public class WowNetworkRipper : ISceneScraper, ISceneDownloader
 
             availableDownloads.Add(
                 new DownloadDetailsAndElementHandle(
-                    new DownloadDetails(
+                    new DownloadOption(
                         description,
                         resolutionWidth,
                         resolutionHeight,
@@ -167,6 +169,6 @@ public class WowNetworkRipper : ISceneScraper, ISceneDownloader
                         downloadUrl),
                     downloadLinkElement));
         }
-        return availableDownloads.OrderByDescending(d => d.DownloadDetails.ResolutionWidth).ThenByDescending(d => d.DownloadDetails.Fps).ToList();
+        return availableDownloads.OrderByDescending(d => d.DownloadOption.ResolutionWidth).ThenByDescending(d => d.DownloadOption.Fps).ToList();
     }
 }

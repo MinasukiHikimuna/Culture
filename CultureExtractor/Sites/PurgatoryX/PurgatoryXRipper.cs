@@ -1,7 +1,6 @@
 ﻿using CultureExtractor.Interfaces;
 using Microsoft.Playwright;
 using Serilog;
-using System.Text.RegularExpressions;
 
 namespace CultureExtractor.Sites.PurgatoryX;
 
@@ -100,6 +99,8 @@ public class PurgatoryXRipper : ISceneScraper, ISceneDownloader
         var description = await page.Locator("div.description > p").TextContentAsync();
         description = description.Replace("\n", "").Trim();
 
+        var downloadOptionsAndHandles = await ParseAvailableDownloadsAsync(page);
+
         return new Scene(
             null,
             site,
@@ -110,7 +111,8 @@ public class PurgatoryXRipper : ISceneScraper, ISceneDownloader
             description,
             duration.TotalSeconds,
             performers,
-            new List<SiteTag>()
+            new List<SiteTag>(),
+            downloadOptionsAndHandles.Select(f => f.DownloadOption).ToList()
         );
     }
 
@@ -124,11 +126,11 @@ public class PurgatoryXRipper : ISceneScraper, ISceneDownloader
 
         await page.GetByRole(AriaRole.Button).Filter(new() { HasTextString = "Download video" }).ClickAsync();
 
-        var availableDownloads = await ParseAvailableDownloads(page);
+        var availableDownloads = await ParseAvailableDownloadsAsync(page);
 
         DownloadDetailsAndElementHandle selectedDownload = downloadConditions.PreferredDownloadQuality switch
         {
-            PreferredDownloadQuality.Phash => availableDownloads.FirstOrDefault(f => f.DownloadDetails.ResolutionHeight == 360) ?? availableDownloads.Last(),
+            PreferredDownloadQuality.Phash => availableDownloads.FirstOrDefault(f => f.DownloadOption.ResolutionHeight == 360) ?? availableDownloads.Last(),
             PreferredDownloadQuality.Best => availableDownloads.First(),
             PreferredDownloadQuality.Worst => availableDownloads.Last(),
             _ => throw new InvalidOperationException("Could not find a download candidate!")
@@ -152,10 +154,10 @@ public class PurgatoryXRipper : ISceneScraper, ISceneDownloader
 
         await download.SaveAsAsync(path);
 
-        return new Download(suggestedFilename, name, selectedDownload.DownloadDetails);
+        return new Download(suggestedFilename, name, selectedDownload.DownloadOption);
     }
 
-    private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloads(IPage page)
+    private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloadsAsync(IPage page)
     {
         var downloadListItems = await page.Locator("ul.dropdown-menu.show > li").ElementHandlesAsync();
         var availableDownloads = new List<DownloadDetailsAndElementHandle>();
@@ -191,7 +193,7 @@ public class PurgatoryXRipper : ISceneScraper, ISceneDownloader
 
             availableDownloads.Add(
                 new DownloadDetailsAndElementHandle(
-                    new DownloadDetails(
+                    new DownloadOption(
                         title,
                         resolutionWidth,
                         resolutionHeight,

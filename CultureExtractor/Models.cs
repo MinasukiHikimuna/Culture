@@ -31,7 +31,8 @@ public record Scene(
     string Description,
     double Duration,
     IEnumerable<SitePerformer> Performers,
-    IEnumerable<SiteTag> Tags);
+    IEnumerable<SiteTag> Tags,
+    IEnumerable<DownloadOption> DownloadOptions);
 
 public record Gallery(
     int? Id,
@@ -63,9 +64,9 @@ public record DateRange(
 public record Download(
     string OriginalFilename,
     string SavedFilename,
-    DownloadDetails DownloadDetails);
+    DownloadOption DownloadOption);
 
-public record DownloadDetails(
+public record DownloadOption(
     string Description,
     int? ResolutionWidth,
     int? ResolutionHeight,
@@ -75,7 +76,7 @@ public record DownloadDetails(
     string? Url);
 
 public record DownloadDetailsAndElementHandle(
-    DownloadDetails DownloadDetails,
+    DownloadOption DownloadOption,
     IElementHandle ElementHandle);
 
 public enum PreferredDownloadQuality

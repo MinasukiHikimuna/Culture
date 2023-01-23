@@ -87,11 +87,14 @@ public class Repository
             Duration = scene.Duration,
             Performers = performerEntities,
             Tags = tagEntities,
+            Created = DateTime.Now,
+            LastUpdated = DateTime.Now,
 
             SiteId = siteEntity.Id,
             Site = siteEntity,
 
-            Downloads = new List<DownloadEntity>()
+            Downloads = new List<DownloadEntity>(),
+            DownloadOptions = new List<DownloadOptionEntity>()
         };
 
         await _sqliteContext.Scenes.AddAsync(sceneEntity);
@@ -207,7 +210,8 @@ public class Repository
             sceneEntity.Description,
             sceneEntity.Duration,
             sceneEntity.Performers.Select(Convert),
-            sceneEntity.Tags.Select(Convert));
+            sceneEntity.Tags.Select(Convert),
+            sceneEntity.DownloadOptions.Select(Convert));
     }
 
     private static Gallery Convert(GalleryEntity galleryEntity)
@@ -239,5 +243,17 @@ public class Repository
             siteTagEntity.ShortName ?? siteTagEntity.Name,
             siteTagEntity.Name,
             siteTagEntity.Url ?? string.Empty);
+    }
+
+    private static DownloadOption Convert(DownloadOptionEntity downloadOptionEntity)
+    {
+        return new DownloadOption(
+            downloadOptionEntity.Description,
+            downloadOptionEntity.ResolutionWidth,
+            downloadOptionEntity.ResolutionHeight,
+            downloadOptionEntity.FileSize,
+            downloadOptionEntity.Fps,
+            downloadOptionEntity.Codec,
+            downloadOptionEntity.Url);
     }
 }
