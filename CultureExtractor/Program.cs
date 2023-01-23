@@ -9,56 +9,46 @@ class PlaywrightExample
     class BaseOptions
     {
         [Option("site-short-name", Required = true, HelpText = "Site short name")]
-        public string SiteShortName { get; }
+        public string SiteShortName { get; set; }
 
         [Option("visible-browser",
           Default = false,
           HelpText = "Visible browser")]
-        public bool VisibleBrowser { get; }
+        public bool VisibleBrowser { get; set; }
 
-        // Omitting long name, defaults to name of property, ie "--verbose"
         [Option(
           Default = false,
           HelpText = "Prints all messages to standard output.")]
-        public bool Verbose { get; }
-
-        public BaseOptions(string siteShortName, bool visibleBrowser, bool verbose)
-        {
-            SiteShortName = siteShortName;
-            VisibleBrowser = visibleBrowser;
-            Verbose = verbose;
-        }
+        public bool Verbose { get; set; }
     }
 
     [Verb("scrape", HelpText = "Scrape")]
     class ScrapeOptions : BaseOptions
     {
-        public ScrapeOptions(string siteShortName, bool visibleBrowser, bool verbose) : base(siteShortName, visibleBrowser, verbose)
-        {
-        }
+        [Option(
+          "full",
+          Default = false,
+          HelpText = "Full scrape including update existing scenes")]
+        public bool FullScrape { get; set; }
     }
 
     [Verb("download", HelpText = "Download")]
     class DownloadOptions : BaseOptions
     {
-        public DownloadOptions(string siteShortName, bool visibleBrowser, bool verbose) : base(siteShortName, visibleBrowser, verbose)
-        {
-        }
+        //commit options here
     }
 
     [Verb("upsize", HelpText = "Upsize")]
     class UpsizeOptions : BaseOptions
     {
-        public UpsizeOptions(string siteShortName, bool visibleBrowser, bool verbose) : base(siteShortName, visibleBrowser, verbose)
-        {
-        }
+        //clone options here
     }
 
     public static int Main(string[] args)
     {
         if (System.Diagnostics.Debugger.IsAttached)
         {
-            args = new string[] { "scrape", "--site-short-name", "czechvrintimacy", "--visible-browser" };
+            args = new string[] { "scrape", "--site-short-name", "purgatoryx", "--visible-browser", "--full" };
         }
 
         return Parser.Default.ParseArguments<ScrapeOptions, DownloadOptions, UpsizeOptions>(args)
@@ -75,13 +65,15 @@ class PlaywrightExample
         {
             InitializeLogger(opts);
 
+            Log.Information("Culture Extractor");
+
             string shortName = opts.SiteShortName;
             var browserSettings = new BrowserSettings(!opts.VisibleBrowser);
 
             var repository = new Repository(new SqliteContext());
             var site = await repository.GetSiteAsync(shortName);
             var networkRipper = new NetworkRipper(repository);
-            await networkRipper.ScrapeScenesAsync(site, browserSettings);
+            await networkRipper.ScrapeScenesAsync(site, browserSettings, opts.FullScrape);
 
             return 0;
         }
@@ -97,6 +89,8 @@ class PlaywrightExample
         try
         {
             InitializeLogger(opts);
+
+            Log.Information("Culture Extractor");
 
             string shortName = opts.SiteShortName;
             var browserSettings = new BrowserSettings(!opts.VisibleBrowser);
@@ -124,6 +118,8 @@ class PlaywrightExample
         try
         {
             InitializeLogger(opts);
+
+            Log.Information("Culture Extractor");
 
             string shortName = opts.SiteShortName;
             var browserSettings = new BrowserSettings(!opts.VisibleBrowser);
