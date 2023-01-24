@@ -168,9 +168,9 @@ public class MetArtNetworkRipper : ISceneScraper, ISceneDownloader
         await page.GetByRole(AriaRole.Link, new() { NameString = ">" }).ClickAsync();
     }
 
-    public async Task<Download> DownloadSceneAsync(SceneEntity sceneEntity, IPage page, string rippingPath, DownloadConditions downloadConditions)
+    public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, string rippingPath, DownloadConditions downloadConditions)
     {
-        await page.GotoAsync(sceneEntity.Url);
+        await page.GotoAsync(scene.Url);
         await page.WaitForLoadStateAsync();
 
         await Task.Delay(3000);
@@ -178,7 +178,7 @@ public class MetArtNetworkRipper : ISceneScraper, ISceneDownloader
         var downloadMenuLocator = page.Locator("div svg.fa-film");
         if (!await downloadMenuLocator.IsVisibleAsync())
         {
-            throw new DownloadException(false, $"Could not find download menu for {sceneEntity.Url}. Skipping...");
+            throw new DownloadException(false, $"Could not find download menu for {scene.Url}. Skipping...");
         }
 
         await downloadMenuLocator.ClickAsync();
@@ -193,7 +193,7 @@ public class MetArtNetworkRipper : ISceneScraper, ISceneDownloader
             _ => throw new InvalidOperationException("Could not find a download candidate!")
         };
 
-        return await new Downloader().DownloadSceneAsync(page, selectedDownload.DownloadOption, sceneEntity, rippingPath, async () =>
+        return await new Downloader().DownloadSceneAsync(page, selectedDownload.DownloadOption, scene, rippingPath, async () =>
         {
             await selectedDownload.ElementHandle.ClickAsync();
         });

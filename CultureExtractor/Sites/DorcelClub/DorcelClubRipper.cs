@@ -138,7 +138,7 @@ public class DorcelClubRipper : ISceneScraper, ISceneDownloader
         );
     }
 
-    public async Task<Download> DownloadSceneAsync(SceneEntity scene, IPage page, string rippingPath, DownloadConditions downloadConditions)
+    public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, string rippingPath, DownloadConditions downloadConditions)
     {
         await page.GotoAsync(scene.Url);
         await page.WaitForLoadStateAsync();
@@ -211,7 +211,7 @@ public class DorcelClubRipper : ISceneScraper, ISceneDownloader
         var waitForXSeconds = Random.Next(3, 10);
         await Task.Delay(waitForXSeconds * 1000);
 
-        return new Download(suggestedFilename, name, selectedDownload.DownloadOption);
+        return new Download(scene, suggestedFilename, name, selectedDownload.DownloadOption);
     }
 
     private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloadsAsync(IPage page)

@@ -94,31 +94,22 @@ public class NetworkRipper
 
     public async Task DownloadScenesAsync(Site site, BrowserSettings browserSettings, DownloadConditions downloadConditions)
     {
-        var preferredDownloadQuality = Enum.GetName(downloadConditions.PreferredDownloadQuality);
-
-        var matchingScenes = await _repository._sqliteContext.Scenes
-            .Include(s => s.Performers)
-            .Include(s => s.Tags)
-            .Include(s => s.Site)
-            .Include(s => s.Downloads)
-            .OrderBy(s => s.ReleaseDate)
-            .Where(s => s.SiteId == site.Id)
-            .Where(s => downloadConditions.DateRange == null || (downloadConditions.DateRange.Start <= s.ReleaseDate && s.ReleaseDate <= downloadConditions.DateRange.End))
-            .Where(s => downloadConditions.PerformerShortName == null || s.Performers.Any(p => p.ShortName == downloadConditions.PerformerShortName))
-            .Where(s => !s.Downloads.Any(d => d.DownloadQuality == preferredDownloadQuality))
-        .ToListAsync();
+        var matchingScenes = await _repository.QueryScenesAsync(site, downloadConditions.PreferredDownloadQuality);
 
         await DownloadGivenScenesAsync(
             site,
             browserSettings,
             downloadConditions,
-            matchingScenes);
+            matchingScenes.ToList());
     }
 
     public async Task UpsizeScenesAsync(Site site, BrowserSettings browserSettings, DownloadConditions downloadConditions, IList<string> fileNames)
     {
-        var preferredDownloadQuality = Enum.GetName(downloadConditions.PreferredDownloadQuality);
+        throw new NotImplementedException("Upsizing is not yet supported!");
 
+        /*var preferredDownloadQuality = Enum.GetName(downloadConditions.PreferredDownloadQuality);
+
+        var matchingScenes = await _repository.QueryScenesAsync(site, downloadConditions.PreferredDownloadQuality);
         var matchingScenes = await _repository._sqliteContext.Scenes
             .Include(s => s.Performers)
             .Include(s => s.Tags)
@@ -127,16 +118,16 @@ public class NetworkRipper
             .OrderBy(s => s.ReleaseDate)
             .Where(s => s.Downloads.Any(d => fileNames.Contains(d.SavedFilename)))
             .Where(s => !s.Downloads.Any(d => d.DownloadQuality == preferredDownloadQuality))
-        .ToListAsync();
+        .ToListAsync();*/
 
-        await DownloadGivenScenesAsync(
+        /*await DownloadGivenScenesAsync(
             site,
             browserSettings,
             downloadConditions,
-            matchingScenes);
+            matchingScenes);*/
     }
 
-    private async Task DownloadGivenScenesAsync(Site site, BrowserSettings browserSettings, DownloadConditions downloadConditions, IList<SceneEntity> matchingScenes)
+    private async Task DownloadGivenScenesAsync(Site site, BrowserSettings browserSettings, DownloadConditions downloadConditions, IList<Scene> matchingScenes)
     {
         var matchingScenesStr = string.Join($"{Environment.NewLine}    ", matchingScenes.Select(s => $"{s.Site.Name} - {s.ReleaseDate.ToString("yyyy-MM-dd")} - {s.Name}"));
 
@@ -186,19 +177,7 @@ public class NetworkRipper
                     }
 
                     var download = await sceneDownloader.DownloadSceneAsync(scene, page, rippingPath, downloadConditions);
-
-                    _repository._sqliteContext.Downloads.Add(new DownloadEntity()
-                    {
-                        DownloadedAt = DateTime.Now,
-                        DownloadOptions = JsonSerializer.Serialize(download.DownloadOption),
-                        DownloadQuality = Enum.GetName(downloadConditions.PreferredDownloadQuality),
-                        OriginalFilename = download.OriginalFilename,
-                        SavedFilename = download.SavedFilename,
-
-                        SceneId = scene.Id,
-                        Scene = scene,
-                    });
-                    await _repository._sqliteContext.SaveChangesAsync();
+                    await _repository.SaveDownloadAsync(download, downloadConditions.PreferredDownloadQuality);
 
                     await Task.Delay(3000);
 

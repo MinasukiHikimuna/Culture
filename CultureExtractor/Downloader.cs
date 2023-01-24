@@ -39,7 +39,7 @@ public class Downloader
         await DownloadFileAsync(imageUrl, (int)gallery.Id, rippingPath);
     }
 
-    public async Task<Download> DownloadSceneAsync(IPage page, DownloadOption downloadDetails, SceneEntity scene, string rippingPath, Func<Task> func)
+    public async Task<Download> DownloadSceneAsync(IPage page, DownloadOption downloadDetails, Scene scene, string rippingPath, Func<Task> func)
     {
         var performerNames = scene.Performers.Select(p => p.Name).ToList();
         var performersStr = performerNames.Count() > 1
@@ -66,7 +66,7 @@ public class Downloader
 
         await download.SaveAsAsync(path);
 
-        return new Download(suggestedFilename, name, downloadDetails);
+        return new Download(scene, suggestedFilename, name, downloadDetails);
     }
 
     private static async Task DownloadFileAsync(string imageUrl, int fileId, string rippingPath, string referer = "")

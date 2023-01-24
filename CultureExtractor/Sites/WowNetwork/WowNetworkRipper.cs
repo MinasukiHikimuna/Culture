@@ -96,7 +96,7 @@ public class WowNetworkRipper : ISceneScraper, ISceneDownloader
         await filmsPage.GoToNextFilmsPageAsync();
     }
 
-    public async Task<Download> DownloadSceneAsync(SceneEntity scene, IPage page, string rippingPath, DownloadConditions downloadConditions)
+    public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, string rippingPath, DownloadConditions downloadConditions)
     {
         await page.GotoAsync(scene.Url);
         await page.WaitForLoadStateAsync();
@@ -131,7 +131,7 @@ public class WowNetworkRipper : ISceneScraper, ISceneDownloader
 
         await download.SaveAsAsync(path);
 
-        return new Download(suggestedFilename, name, selectedDownload.DownloadOption);
+        return new Download(scene, suggestedFilename, name, selectedDownload.DownloadOption);
     }
 
     private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloadsAsync(IPage page)

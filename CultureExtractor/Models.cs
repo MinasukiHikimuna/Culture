@@ -62,6 +62,7 @@ public record DateRange(
     DateOnly End);
 
 public record Download(
+    Scene Scene,
     string OriginalFilename,
     string SavedFilename,
     DownloadOption DownloadOption);

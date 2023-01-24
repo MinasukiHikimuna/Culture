@@ -133,7 +133,7 @@ public class NewSensationsRipper : ISceneScraper, ISceneDownloader
         );
     }
 
-    public async Task<Download> DownloadSceneAsync(SceneEntity scene, IPage page, string rippingPath, DownloadConditions downloadConditions)
+    public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, string rippingPath, DownloadConditions downloadConditions)
     {
         await page.GotoAsync(scene.Url);
         await page.WaitForLoadStateAsync();

@@ -48,7 +48,7 @@ class PlaywrightExample
     {
         if (System.Diagnostics.Debugger.IsAttached)
         {
-            args = new string[] { "scrape", "--site-short-name", "purgatoryx", "--visible-browser", "--full" };
+            args = new string[] { "download", "--site-short-name", "allfinegirls", "--visible-browser" };
         }
 
         return Parser.Default.ParseArguments<ScrapeOptions, DownloadOptions, UpsizeOptions>(args)
@@ -95,7 +95,8 @@ class PlaywrightExample
             string shortName = opts.SiteShortName;
             var browserSettings = new BrowserSettings(!opts.VisibleBrowser);
 
-            var downloadOptions = DownloadConditions.All(PreferredDownloadQuality.Phash);
+            var downloadOptions = DownloadConditions.All(PreferredDownloadQuality.Best);
+            // var downloadOptions = DownloadConditions.All(PreferredDownloadQuality.Phash);
             // var downloadOptions = DownloadConditions.All(PreferredDownloadQuality.Best) with { PerformerShortName = "401-alexis-crystal" };
 
             var repository = new Repository(new SqliteContext());

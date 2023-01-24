@@ -6,7 +6,7 @@ namespace CultureExtractor;
 
 public class Repository
 {
-    public readonly SqliteContext _sqliteContext;
+    private readonly SqliteContext _sqliteContext;
 
     public Repository(SqliteContext sqliteContext)
     {
@@ -38,6 +38,21 @@ public class Repository
             .Include(s => s.Site)
             .Include(s => s.Performers)
             .Include(s => s.Tags)
+            .OrderBy(s => s.Site.Name)
+            .ThenByDescending(s => s.ReleaseDate)
+            .ToListAsync();
+
+        return siteEntities.Select(Convert).AsEnumerable();
+    }
+
+    public async Task<IEnumerable<Scene>> QueryScenesAsync(Site site, PreferredDownloadQuality preferredDownloadQuality)
+    {
+        var siteEntities = await _sqliteContext.Scenes
+            .Include(s => s.Site)
+            .Include(s => s.Performers)
+            .Include(s => s.Tags)
+            .Where(s => s.SiteId == site.Id)
+            .Where(s => !s.Downloads.Any(d => d.DownloadQuality == Enum.GetName(preferredDownloadQuality)))
             .OrderBy(s => s.Site.Name)
             .ThenByDescending(s => s.ReleaseDate)
             .ToListAsync();
@@ -115,6 +130,11 @@ public class Repository
         existingSceneEntity.Duration = scene.Duration;
         existingSceneEntity.Performers = performerEntities;
         existingSceneEntity.Tags = tagEntities;
+
+        if (existingSceneEntity.Created == DateTime.MinValue)
+        {
+            existingSceneEntity.Created = DateTime.Now;
+        }
         existingSceneEntity.LastUpdated = DateTime.Now;
 
         existingSceneEntity.SiteId = siteEntity.Id;
@@ -271,5 +291,23 @@ public class Repository
             siteTagEntity.ShortName ?? siteTagEntity.Name,
             siteTagEntity.Name,
             siteTagEntity.Url ?? string.Empty);
+    }
+
+    public async Task SaveDownloadAsync(Download download, PreferredDownloadQuality preferredDownloadQuality)
+    {
+        var sceneEntity = await _sqliteContext.Scenes.FirstAsync(s => s.Id == download.Scene.Id);
+
+        _sqliteContext.Downloads.Add(new DownloadEntity()
+        {
+            DownloadedAt = DateTime.Now,
+            DownloadOptions = JsonSerializer.Serialize(download.DownloadOption),
+            DownloadQuality = Enum.GetName(preferredDownloadQuality),
+            OriginalFilename = download.OriginalFilename,
+            SavedFilename = download.SavedFilename,
+
+            SceneId = sceneEntity.Id,
+            Scene = sceneEntity,
+        });
+        await _sqliteContext.SaveChangesAsync();
     }
 }
