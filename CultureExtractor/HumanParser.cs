@@ -9,7 +9,7 @@ public static class HumanParser
     {
         sizeString = sizeString.Replace(" ", "");
 
-        string purgatoryPattern = @"(?<thousands>[0-9]+),(?<wholeNumbers>[0-9]+).(?<decimalNumbers>[0-9]+)?(?<unit>GB|MB)";
+        string purgatoryPattern = @"(?<thousands>[0-9]+),(?<wholeNumbers>[0-9]+).(?<decimalNumbers>[0-9]+)?(?<unit>GB|MB|Gb|Mb)";
         Match purgatoryMatch = Regex.Match(sizeString, purgatoryPattern);
         if (purgatoryMatch.Success)
         {
@@ -23,7 +23,7 @@ public static class HumanParser
             return (thousands * 1000 + wholeNumbers + decimalNumbers) * unitFactor;
         }
 
-        string pattern = @"(?<wholeNumbers>[0-9]+)(?<decimalNumbers>(.|,)[0-9]+)?(?<unit>GB|MB)";
+        string pattern = @"(?<wholeNumbers>[0-9]+)(?<decimalNumbers>(.|,)[0-9]+)?(?<unit>GB|MB|Gb|Mb)";
         Match match = Regex.Match(sizeString, pattern);
         if (match.Success)
         {
@@ -166,7 +166,7 @@ public static class HumanParser
 
     private static int GetUnitFactor(string unit)
     {
-        return unit switch
+        return unit.ToUpperInvariant() switch
         {
             "GB" => 1024 * 1024 * 1024,
             "MB" => 1024 * 1024,
