@@ -1,17 +1,13 @@
-﻿using CultureExtractor.Exceptions;
-using CultureExtractor.Interfaces;
+﻿using CultureExtractor.Interfaces;
 using Microsoft.Playwright;
-using Serilog;
 using System.Text.RegularExpressions;
 
-namespace CultureExtractor.Sites.DorcelClub;
+namespace CultureExtractor.Sites.NewSensations;
 
 [PornNetwork("newsensations")]
 [PornSite("newsensations")]
 public class NewSensationsRipper : ISceneScraper, ISceneDownloader
 {
-    private static readonly Random Random = new();
-
     public async Task LoginAsync(Site site, IPage page)
     {
         var usernameInput = page.GetByPlaceholder("Username");
