@@ -55,7 +55,7 @@ public static class HumanParser
 
     public static int ParseResolutionHeight(string resolutionString)
     {
-        var trimmedResolutionString = resolutionString.Trim();
+        var trimmedResolutionString = resolutionString.Trim().Replace(" ", "");
 
         var patternWithinOtherTextResolution = @"(?<width>[0-9]+)x(?<height>[0-9]+)";
         var matchWithinOtherTextResolution = Regex.Match(trimmedResolutionString, patternWithinOtherTextResolution);
