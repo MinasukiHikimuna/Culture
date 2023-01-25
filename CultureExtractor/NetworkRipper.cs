@@ -96,11 +96,15 @@ public class NetworkRipper
     {
         var matchingScenes = await _repository.QueryScenesAsync(site, downloadConditions.PreferredDownloadQuality);
 
+        var furtherFilteredScenes = matchingScenes.Where(s =>
+            downloadConditions.DateRange.Start <= s.ReleaseDate &&
+            s.ReleaseDate <= downloadConditions.DateRange.End).ToList();
+
         await DownloadGivenScenesAsync(
             site,
             browserSettings,
             downloadConditions,
-            matchingScenes.ToList());
+            furtherFilteredScenes.ToList());
     }
 
     public async Task UpsizeScenesAsync(Site site, BrowserSettings browserSettings, DownloadConditions downloadConditions, IList<string> fileNames)

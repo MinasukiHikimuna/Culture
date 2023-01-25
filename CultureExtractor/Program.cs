@@ -35,7 +35,14 @@ class PlaywrightExample
     [Verb("download", HelpText = "Download")]
     class DownloadOptions : BaseOptions
     {
-        //commit options here
+        [Option("from", Required = false, HelpText = "From date")]
+        public string FromDate { get; set; }
+
+        [Option("to", Required = false, HelpText = "To date")]
+        public string ToDate { get; set; }
+
+        [Option("best", Required = false, HelpText = "Use best quality")]
+        public bool BestQuality { get; set; }
     }
 
     [Verb("upsize", HelpText = "Upsize")]
@@ -95,7 +102,15 @@ class PlaywrightExample
             string shortName = opts.SiteShortName;
             var browserSettings = new BrowserSettings(!opts.VisibleBrowser);
 
-            var downloadOptions = DownloadConditions.All(PreferredDownloadQuality.Best);
+            var dateRange = new DateRange(
+                string.IsNullOrEmpty(opts.FromDate) ? DateOnly.MinValue : DateOnly.Parse(opts.FromDate),
+                string.IsNullOrEmpty(opts.ToDate) ? DateOnly.MaxValue : DateOnly.Parse(opts.ToDate));
+
+            var downloadQuality = opts.BestQuality ? PreferredDownloadQuality.Best : PreferredDownloadQuality.Phash;
+
+            var downloadOptions = DownloadConditions.All(downloadQuality) with {
+                DateRange = dateRange
+            };
             // var downloadOptions = DownloadConditions.All(PreferredDownloadQuality.Phash);
             // var downloadOptions = DownloadConditions.All(PreferredDownloadQuality.Best) with { PerformerShortName = "401-alexis-crystal" };
 
