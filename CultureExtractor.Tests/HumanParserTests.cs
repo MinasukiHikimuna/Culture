@@ -7,9 +7,15 @@ public class HumanParserTests
     [TestCase("13 GB", 13.0 * 1024 * 1024 * 1024)]
     [TestCase("13,1 GB", 13.1 * 1024 * 1024 * 1024)]
     [TestCase("13.1 GB", 13.1 * 1024 * 1024 * 1024)]
+    [TestCase("13 Gb", 13.0 * 1024 * 1024 * 1024)]
+    [TestCase("13,1 Gb", 13.1 * 1024 * 1024 * 1024)]
+    [TestCase("13.1 Gb", 13.1 * 1024 * 1024 * 1024)]
     [TestCase("205 MB", 205.0 * 1024 * 1024)]
     [TestCase("1,087.81 MB", 1087.81 * 1024 * 1024)]
     [TestCase("681.21 MB", 681.21 * 1024 * 1024)]
+    [TestCase("205 Mb", 205.0 * 1024 * 1024)]
+    [TestCase("1,087.81 Mb", 1087.81 * 1024 * 1024)]
+    [TestCase("681.21 Mb", 681.21 * 1024 * 1024)]
     public void ParseFileSizeTests(string sizeString, double expectedSize)
     {
         HumanParser
@@ -18,6 +24,7 @@ public class HumanParserTests
     }
 
     [TestCase("3840x2160", 3840)]
+    [TestCase("3840 x 2160", 3840)]
     [TestCase("640x360", 640)]
     public void ParseResolutionWidthTests(string resolutionString, int expectedWidth)
     {
@@ -56,10 +63,27 @@ public class HumanParserTests
     }
 
     [TestCase("60fps", 60.0)]
-    public void ParseDuration(string sizeString, double expectedFps)
+    [TestCase("30fps", 30.0)]
+    [TestCase("24fps", 24.0)]
+    public void ParseFps(string sizeString, double expectedFps)
     {
         HumanParser
             .ParseFps(sizeString)
             .Should().Be(expectedFps);
+    }
+
+    [TestCase("h264", "H.264")]
+    [TestCase("H264", "H.264")]
+    [TestCase("H.264", "H.264")]
+    [TestCase("h265", "H.265")]
+    [TestCase("H265", "H.265")]
+    [TestCase("H.265", "H.265")]
+    [TestCase("hevc", "H.265")]
+    [TestCase("HEVC", "H.265")]
+    public void ParseCodec(string sizeString, string expectedCodec)
+    {
+        HumanParser
+            .ParseCodec(sizeString)
+            .Should().Be(expectedCodec);
     }
 }
