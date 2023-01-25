@@ -1,6 +1,8 @@
 ﻿using Microsoft.Playwright;
 using CultureExtractor.Interfaces;
 using CultureExtractor.Exceptions;
+using Serilog;
+using static System.Formats.Asn1.AsnWriter;
 
 namespace CultureExtractor.Sites.MetArtNetwork;
 
@@ -201,6 +203,14 @@ public class MetArtNetworkRipper : ISceneScraper, ISceneDownloader
 
     private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloadsAsync(IPage page)
     {
+        var downloadMenuLocator = page.Locator("div svg.fa-film");
+        if (!await downloadMenuLocator.IsVisibleAsync())
+        {
+            throw new DownloadException(false, $"Could not find download menu for {page.Url}. Skipping...");
+        }
+
+        await downloadMenuLocator.ClickAsync();
+
         var downloadLinks = await page.Locator("div.dropdown-menu a").ElementHandlesAsync();
         var availableDownloads = new List<DownloadDetailsAndElementHandle>();
         foreach (var downloadLink in downloadLinks)
@@ -218,7 +228,6 @@ public class MetArtNetworkRipper : ISceneScraper, ISceneDownloader
                         HumanParser.ParseResolutionHeight(resolution),
                         HumanParser.ParseFileSize(size),
                         -1,
-                        // TODO: this can be parsed!
                         string.Empty,
                         url),
                     downloadLink));
