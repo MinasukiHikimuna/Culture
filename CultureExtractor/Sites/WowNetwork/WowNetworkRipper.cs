@@ -125,7 +125,7 @@ public class WowNetworkRipper : ISceneScraper, ISceneDownloader
         var name = $"{performersStr} - {scene.Site.Name} - {scene.ReleaseDate.ToString("yyyy-MM-dd")} - {scene.Name}{suffix}";
         name = string.Concat(name.Split(Path.GetInvalidFileNameChars()));
 
-        var path = Path.Join(rippingPath, name);
+        var path = Path.Join(@"F:\", name);
 
         Log.Verbose($"Downloading\r\n    URL:  {selectedDownload.DownloadOption.Url}\r\n    Path: {path}");
 
@@ -148,6 +148,7 @@ public class WowNetworkRipper : ISceneScraper, ISceneDownloader
             var resolutionHeight = HumanParser.ParseResolutionHeight(resolutionRaw);
             var codecElement = await downloadItem.QuerySelectorAsync("span.format");
             var codecRaw = await codecElement.InnerTextAsync();
+            var codec = HumanParser.ParseCodec(codecRaw);
             var fpsElement = await downloadItem.QuerySelectorAsync("span.fps");
             var fpsRaw = await fpsElement.InnerTextAsync();
             var sizeElement = await downloadItem.QuerySelectorAsync("span.size");
@@ -165,7 +166,7 @@ public class WowNetworkRipper : ISceneScraper, ISceneDownloader
                         resolutionHeight,
                         size,
                         double.Parse(fpsRaw.Replace("fps", "")),
-                        codecRaw,
+                        codec,
                         downloadUrl),
                     downloadLinkElement));
         }
