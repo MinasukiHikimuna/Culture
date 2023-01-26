@@ -7,6 +7,19 @@ public static class HumanParser
 {
     public static double ParseFileSize(string sizeString)
     {
+        string newSensationsPattern = @"\((?<wholeNumbers>[0-9]+)(?<decimalNumbers>.[0-9]+)? (?<unit>GB|MB|Gb|Mb)\)";
+        Match newSensationsMatch = Regex.Match(sizeString, newSensationsPattern);
+        if (newSensationsMatch.Success)
+        {
+            var wholeNumbers = int.Parse(newSensationsMatch.Groups["wholeNumbers"].Value);
+            var decimalNumbers =
+                !string.IsNullOrEmpty(newSensationsMatch.Groups["decimalNumbers"].Value)
+                    ? double.Parse("0." + newSensationsMatch.Groups["decimalNumbers"].Value[1..], CultureInfo.InvariantCulture)
+                    : 0.0;
+            var unitFactor = GetUnitFactor(newSensationsMatch.Groups["unit"].Value);
+            return (wholeNumbers + decimalNumbers) * unitFactor;
+        }
+
         sizeString = sizeString.Replace(" ", "");
 
         string purgatoryPattern = @"(?<thousands>[0-9]+),(?<wholeNumbers>[0-9]+).(?<decimalNumbers>[0-9]+)?(?<unit>GB|MB|Gb|Mb)";
@@ -41,6 +54,13 @@ public static class HumanParser
 
     public static int ParseResolutionWidth(string resolutionString)
     {
+        var patternExact = @"(?<width>[0-9]+)x(?<height>[0-9]+)";
+        var exactMatch = Regex.Match(resolutionString, patternExact);
+        if (exactMatch.Success)
+        {
+            return int.Parse(exactMatch.Groups["width"].Value);
+        }
+
         var trimmedResolutionString = resolutionString.Trim().Replace(" ", "");
 
         var patternWithinOtherTextResolution = @"^(?<width>[0-9]+)x(?<height>[0-9]+)$";
@@ -55,6 +75,13 @@ public static class HumanParser
 
     public static int ParseResolutionHeight(string resolutionString)
     {
+        var patternExact = @"(?<width>[0-9]+)x(?<height>[0-9]+)";
+        var exactMatch = Regex.Match(resolutionString, patternExact);
+        if (exactMatch.Success)
+        {
+            return int.Parse(exactMatch.Groups["height"].Value);
+        }
+
         var trimmedResolutionString = resolutionString.Trim().Replace(" ", "");
 
         var patternWithinOtherTextResolution = @"(?<width>[0-9]+)x(?<height>[0-9]+)";

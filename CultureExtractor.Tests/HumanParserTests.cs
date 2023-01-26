@@ -16,6 +16,8 @@ public class HumanParserTests
     [TestCase("205 Mb", 205.0 * 1024 * 1024)]
     [TestCase("1,087.81 Mb", 1087.81 * 1024 * 1024)]
     [TestCase("681.21 Mb", 681.21 * 1024 * 1024)]
+    [TestCase("MP4 - 4K - 25Mpbs (5393.2 MB)", 5393.2 * 1024 * 1024)]
+    [TestCase("MP4 - 720p - 3Mbps (672.2 MB)", 672.2 * 1024 * 1024)]
     public void ParseFileSizeTests(string sizeString, double expectedSize)
     {
         HumanParser
@@ -26,6 +28,7 @@ public class HumanParserTests
     [TestCase("3840x2160", 3840)]
     [TestCase("3840 x 2160", 3840)]
     [TestCase("640x360", 640)]
+    [TestCase("Oculus Quest 2 7680x4320", 7680)]
     public void ParseResolutionWidthTests(string resolutionString, int expectedWidth)
     {
         HumanParser
@@ -44,6 +47,7 @@ public class HumanParserTests
     [TestCase("720p", 720)]
     [TestCase("360p", 360)]
     [TestCase("270p", 270)]
+    [TestCase("Oculus Quest 2 7680x4320", 4320)]
     public void ParseResolutionHeightTests(string resolutionString, int expectedWidth)
     {
         HumanParser
