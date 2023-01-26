@@ -58,7 +58,7 @@ public class CzechVRVideosPage
 
     public Task<IReadOnlyList<IElementHandle>> GetCurrentScenesAsync()
     {
-        return _page.Locator("div.foto > div > a").ElementHandlesAsync();
+        return _page.Locator("div.tagyCenter > div.postTag").ElementHandlesAsync();
     }
 
     public async Task GoToNextFilmsPageAsync()

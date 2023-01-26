@@ -47,23 +47,24 @@ public class CzechVRNetworkRipper : ISceneScraper, ISceneDownloader
 
     public async Task<(string Url, string ShortName)> GetSceneIdAsync(Site site, IElementHandle currentScene)
     {
-        var relativeUrl = await currentScene.GetAttributeAsync("href");
+        var linkElement = await currentScene.QuerySelectorAsync("div.nazev > h2 > a");
+        var relativeUrl = await linkElement.GetAttributeAsync("href");
         if (relativeUrl.StartsWith("./"))
         {
             relativeUrl = relativeUrl.Substring(2);
         }
 
-        var imagehandle = await currentScene.QuerySelectorAsync("img");
-        var imageUrl = await imagehandle.GetAttributeAsync("src");
+        var titleElement = await currentScene.QuerySelectorAsync("div.nazev > h2");
+        var title = await titleElement.TextContentAsync();
 
-        string pattern = @"(\d+)-\w+-big.jpg";
-        Match match = Regex.Match(imageUrl, pattern);
+        string pattern = @" (?<id>\d+) - ";
+        Match match = Regex.Match(title, pattern);
         if (!match.Success)
         {
-            throw new InvalidOperationException($@"Could not determine ID from ""{relativeUrl}"" using pattern {pattern}. Skipping...");
+            throw new InvalidOperationException($@"Could not determine ID from ""{title}"" using pattern {pattern}. Skipping...");
         }
 
-        var sceneShortName = match.Groups[1].Value;
+        var sceneShortName = match.Groups["id"].Value;
 
         return (relativeUrl, sceneShortName);
     }
@@ -162,13 +163,17 @@ public class CzechVRNetworkRipper : ISceneScraper, ISceneDownloader
         {
             var descriptionRaw = await downloadOption.Details.TextContentAsync();
             var description = descriptionRaw.Replace("\t", "").Replace("\n", "").Trim();
+
+            var resolutionWidth = HumanParser.ParseResolutionWidth(descriptionRaw);
+            var resolutionHeight = HumanParser.ParseResolutionHeight(descriptionRaw);
+
             var url = await downloadOption.Link.GetAttributeAsync("href");
             availableDownloads.Add(
                 new DownloadDetailsAndElementHandle(
                     new DownloadOption(
                         description,
-                        HumanParser.ParseResolutionWidth(description),
-                        HumanParser.ParseResolutionHeight(description),
+                        resolutionWidth,
+                        resolutionHeight,
                         HumanParser.ParseFileSize(description),
                         HumanParser.ParseFps(description),
                         HumanParser.ParseCodec(description),
