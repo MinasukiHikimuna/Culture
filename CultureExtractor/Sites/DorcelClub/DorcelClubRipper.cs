@@ -152,12 +152,13 @@ public class DorcelClubRipper : ISceneScraper, ISceneDownloader
 
 
         var availableDownloads = await ParseAvailableDownloadsAsync(page);
+        var languageFilteredDownloads = availableDownloads.Where(f => f.DownloadOption.Url.Contains("lang=ov") || f.DownloadOption.Url.Contains("lang=en"));
 
         DownloadDetailsAndElementHandle selectedDownload = downloadConditions.PreferredDownloadQuality switch
         {
-            PreferredDownloadQuality.Phash => availableDownloads.FirstOrDefault(f => f.DownloadOption.ResolutionHeight == 480) ?? availableDownloads.Last(),
-            PreferredDownloadQuality.Best => availableDownloads.First(),
-            PreferredDownloadQuality.Worst => availableDownloads.Last(),
+            PreferredDownloadQuality.Phash => languageFilteredDownloads.FirstOrDefault(f =>f.DownloadOption.ResolutionHeight == 480) ?? availableDownloads.Last(),
+            PreferredDownloadQuality.Best => languageFilteredDownloads.First(),
+            PreferredDownloadQuality.Worst => languageFilteredDownloads.Last(),
             _ => throw new InvalidOperationException("Could not find a download candidate!")
         };
 
@@ -220,7 +221,10 @@ public class DorcelClubRipper : ISceneScraper, ISceneDownloader
         var availableDownloads = new List<DownloadDetailsAndElementHandle>();
         foreach (var downloadLink in downloadLinks)
         {
-            var description = await downloadLink.InnerTextAsync();
+            var language = await downloadLink.GetAttributeAsync("data-lang");
+
+            var descriptionRaw = await downloadLink.InnerTextAsync();
+            var description = descriptionRaw.Replace("\n", "").Trim() + $" (Language: {language})";
 
             var resolutionHeightRaw = await downloadLink.GetAttributeAsync("data-quality");
             var resolutionHeight = int.Parse(resolutionHeightRaw);
