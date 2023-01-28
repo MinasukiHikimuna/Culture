@@ -96,9 +96,17 @@ public class NetworkRipper
     {
         var matchingScenes = await _repository.QueryScenesAsync(site, downloadConditions.PreferredDownloadQuality);
 
-        var furtherFilteredScenes = matchingScenes.Where(s =>
+        var furtherFilteredScenes = matchingScenes
+            .Where(s =>
             downloadConditions.DateRange.Start <= s.ReleaseDate &&
-            s.ReleaseDate <= downloadConditions.DateRange.End).ToList();
+                s.ReleaseDate <= downloadConditions.DateRange.End)
+            .Where(s =>
+                !downloadConditions.PerformerShortNames.Any() ||
+                s.Performers.Any(p => downloadConditions.PerformerShortNames.Contains(p.ShortName)))
+            .Where(s =>
+                !downloadConditions.SceneIds.Any() ||
+                downloadConditions.SceneIds.Contains(s.ShortName))
+            .ToList();
 
         await DownloadGivenScenesAsync(
             site,

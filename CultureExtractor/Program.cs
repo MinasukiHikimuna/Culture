@@ -1,6 +1,5 @@
 ﻿using CommandLine;
 using Serilog;
-using Serilog.Core;
 
 namespace CultureExtractor;
 
@@ -43,6 +42,12 @@ class PlaywrightExample
 
         [Option("best", Required = false, HelpText = "Use best quality")]
         public bool BestQuality { get; set; }
+
+        [Option("scenes", Required = false, HelpText = "One or more scene IDs to download")]
+        public IEnumerable<string> SceneIds { get; set; }
+
+        [Option("performers", Required = false, HelpText = "One or more performers to download")]
+        public IEnumerable<string> Performers { get; set; }
     }
 
     [Verb("upsize", HelpText = "Upsize")]
@@ -55,7 +60,24 @@ class PlaywrightExample
     {
         if (System.Diagnostics.Debugger.IsAttached)
         {
-            args = new string[] { "download", "--site-short-name", "allfinegirls", "--visible-browser" };
+            var siteShortName = "dorcelclub";
+
+            /*args = new string[] {
+                "scrape",
+                "--site-short-name", siteShortName,
+                "--visible-browser",
+                "--full"
+            };*/
+            args = new string[] {
+                "download",
+                "--site-short-name", siteShortName,
+                /*"--scenes",
+                    "464", "462", "530", "557", "555", "554", "551", "549", "548", "541", "531",
+                    "533", "532", "482", "484", "490", "495", "503", "506", "457", "474", "475",
+                    "477", "458",*/
+                "--best",
+                "--verbose"
+            };
         }
 
         return Parser.Default.ParseArguments<ScrapeOptions, DownloadOptions, UpsizeOptions>(args)
@@ -109,10 +131,10 @@ class PlaywrightExample
             var downloadQuality = opts.BestQuality ? PreferredDownloadQuality.Best : PreferredDownloadQuality.Phash;
 
             var downloadOptions = DownloadConditions.All(downloadQuality) with {
-                DateRange = dateRange
+                DateRange = dateRange,
+                SceneIds = opts.SceneIds.ToList() ?? new List<string>(),
+                PerformerShortNames = opts.Performers.ToList() ?? new List<string>() 
             };
-            // var downloadOptions = DownloadConditions.All(PreferredDownloadQuality.Phash);
-            // var downloadOptions = DownloadConditions.All(PreferredDownloadQuality.Best) with { PerformerShortName = "401-alexis-crystal" };
 
             var repository = new Repository(new SqliteContext());
             var site = await repository.GetSiteAsync(shortName);

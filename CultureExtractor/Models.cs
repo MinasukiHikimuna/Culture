@@ -12,7 +12,7 @@ public record Site(
     string StorageState);
 
 public record SitePerformer(
-    string Id,
+    string ShortName,
     string Name,
     string Url);
 
@@ -48,13 +48,13 @@ public record Gallery(
 
 public record DownloadConditions(
     DateRange? DateRange,
-    string? PerformerShortName,
     PreferredDownloadQuality PreferredDownloadQuality,
-    int? MaxDownloads
+    int? MaxDownloads,
+    IList<string>? PerformerShortNames,
+    IList<string>? SceneIds
 )
 {
-    public static DownloadConditions All(PreferredDownloadQuality preferredDownloadQuality) => new(null, null, preferredDownloadQuality, null);
-    public static DownloadConditions Performer(string performerShortName, PreferredDownloadQuality preferredDownloadQuality) => new(null, performerShortName, preferredDownloadQuality, null);
+    public static DownloadConditions All(PreferredDownloadQuality preferredDownloadQuality) => new(null, preferredDownloadQuality, null, null, null);
 }
 
 public record DateRange(
