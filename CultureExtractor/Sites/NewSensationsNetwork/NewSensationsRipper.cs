@@ -160,7 +160,8 @@ public class NewSensationsRipper : ISceneScraper, ISceneDownloader
         var availableDownloads = new List<DownloadDetailsAndElementHandle>();
         foreach (var downloadLink in downloadLinks)
         {
-            var description = await downloadLink.InnerTextAsync();
+            var descriptionRaw = await downloadLink.InnerTextAsync();
+            var description = descriptionRaw.Replace("\n", "").Trim();
 
             var resolutionHeight = HumanParser.ParseResolutionHeight(description);
 
