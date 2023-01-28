@@ -8,11 +8,11 @@ using System.Text.Json;
 
 namespace CultureExtractor;
 
-public class NetworkRipper
+public class NetworkRipper : INetworkRipper
 {
-    private readonly Repository _repository;
+    private readonly IRepository _repository;
 
-    public NetworkRipper(Repository repository)
+    public NetworkRipper(IRepository repository)
     {
         _repository = repository;
     }

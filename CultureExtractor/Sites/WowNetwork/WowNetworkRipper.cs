@@ -12,15 +12,6 @@ namespace CultureExtractor.Sites.WowNetwork;
 [PornSite("ultrafilms")]
 public class WowNetworkRipper : ISceneScraper, ISceneDownloader
 {
-    private readonly SqliteContext _sqliteContext;
-    private readonly Repository _repository;
-
-    public WowNetworkRipper()
-    {
-        _sqliteContext = new SqliteContext();
-        _repository = new Repository(_sqliteContext);
-    }
-
     public async Task LoginAsync(Site site, IPage page)
     {
         var loginPage = new WowLoginPage(page);

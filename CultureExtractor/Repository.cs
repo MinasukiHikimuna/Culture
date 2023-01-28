@@ -4,11 +4,11 @@ using System.Text.Json;
 
 namespace CultureExtractor;
 
-public class Repository
+public class Repository : IRepository
 {
-    private readonly SqliteContext _sqliteContext;
+    private readonly ISqliteContext _sqliteContext;
 
-    public Repository(SqliteContext sqliteContext)
+    public Repository(ISqliteContext sqliteContext)
     {
         _sqliteContext = sqliteContext;
     }
@@ -225,7 +225,7 @@ public class Repository
                 Site = siteEntity
             });
         }
-        
+
         await _sqliteContext.SaveChangesAsync();
         Log.Information($"Updated storage state for {site.Name}.");
     }

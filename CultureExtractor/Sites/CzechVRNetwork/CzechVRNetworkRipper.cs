@@ -14,15 +14,6 @@ namespace CultureExtractor.Sites.CzechVRNetwork;
 [PornSite("czechvrintimacy")]
 public class CzechVRNetworkRipper : ISceneScraper, ISceneDownloader
 {
-    private readonly SqliteContext _sqliteContext;
-    private readonly Repository _repository;
-
-    public CzechVRNetworkRipper()
-    {
-        _sqliteContext = new SqliteContext();
-        _repository = new Repository(_sqliteContext);
-    }
-
     public async Task LoginAsync(Site site, IPage page)
     {
         var loginPage = new CzechVRLoginPage(page);

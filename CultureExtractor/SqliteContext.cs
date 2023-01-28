@@ -2,7 +2,7 @@
 
 namespace CultureExtractor;
 
-public class SqliteContext : DbContext
+public class SqliteContext : DbContext, ISqliteContext
 {
     public DbSet<SiteEntity> Sites { get; set; }
     public DbSet<SceneEntity> Scenes { get; set; }
@@ -14,7 +14,7 @@ public class SqliteContext : DbContext
 
     public string DbPath { get; }
 
-    public SqliteContext()
+    public SqliteContext(DbContextOptions<SqliteContext> dbContextOptions)
     {
         DbPath = @"B:\Ripping\ripping.db";
     }
