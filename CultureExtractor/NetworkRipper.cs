@@ -115,30 +115,6 @@ public class NetworkRipper
             furtherFilteredScenes.ToList());
     }
 
-    public async Task UpsizeScenesAsync(Site site, BrowserSettings browserSettings, DownloadConditions downloadConditions, IList<string> fileNames)
-    {
-        throw new NotImplementedException("Upsizing is not yet supported!");
-
-        /*var preferredDownloadQuality = Enum.GetName(downloadConditions.PreferredDownloadQuality);
-
-        var matchingScenes = await _repository.QueryScenesAsync(site, downloadConditions.PreferredDownloadQuality);
-        var matchingScenes = await _repository._sqliteContext.Scenes
-            .Include(s => s.Performers)
-            .Include(s => s.Tags)
-            .Include(s => s.Site)
-            .Include(s => s.Downloads)
-            .OrderBy(s => s.ReleaseDate)
-            .Where(s => s.Downloads.Any(d => fileNames.Contains(d.SavedFilename)))
-            .Where(s => !s.Downloads.Any(d => d.DownloadQuality == preferredDownloadQuality))
-        .ToListAsync();*/
-
-        /*await DownloadGivenScenesAsync(
-            site,
-            browserSettings,
-            downloadConditions,
-            matchingScenes);*/
-    }
-
     private async Task DownloadGivenScenesAsync(Site site, BrowserSettings browserSettings, DownloadConditions downloadConditions, IList<Scene> matchingScenes)
     {
         var matchingScenesStr = string.Join($"{Environment.NewLine}    ", matchingScenes.Select(s => $"{s.Site.Name} - {s.ReleaseDate.ToString("yyyy-MM-dd")} - {s.Name}"));
