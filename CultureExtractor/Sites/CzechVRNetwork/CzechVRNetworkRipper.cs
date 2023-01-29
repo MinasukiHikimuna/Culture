@@ -1,11 +1,7 @@
-﻿using CultureExtractor.Exceptions;
-using CultureExtractor.Interfaces;
-using Microsoft.EntityFrameworkCore;
+﻿using CultureExtractor.Interfaces;
 using Microsoft.Playwright;
 using Serilog;
-using System.Security.Cryptography.X509Certificates;
 using System.Text.RegularExpressions;
-using static System.Net.Mime.MediaTypeNames;
 
 namespace CultureExtractor.Sites.CzechVRNetwork;
 
