@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Playwright;
 using Serilog;
 using System.Text.RegularExpressions;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace CultureExtractor.Sites.CzechVRNetwork;
 
@@ -16,8 +17,34 @@ public class CzechVRNetworkRipper : ISceneScraper, ISceneDownloader
 {
     public async Task LoginAsync(Site site, IPage page)
     {
-        var loginPage = new CzechVRLoginPage(page);
-        await loginPage.LoginIfNeededAsync(site);
+        var memberLoginHeader = page.GetByRole(AriaRole.Heading, new() { NameString = "Member login" });
+
+        // TODO: sometimes this requires captcha, how to handle reliably?
+        if (await memberLoginHeader.IsVisibleAsync())
+        {
+            // Login requires CAPTCHA so we need to create a headful browser
+            /*IPage loginPage = await PlaywrightFactory.CreatePageAsync(site, new BrowserSettings(false));
+            await loginPage.WaitForLoadStateAsync();*/
+
+            var loginPage = page;
+
+            await loginPage.GetByPlaceholder("Username").TypeAsync(site.Username);
+            await loginPage.GetByPlaceholder("Password").TypeAsync(site.Password);
+            await loginPage.GetByRole(AriaRole.Button, new() { NameString = "CLICK HERE TO LOGIN" }).ClickAsync();
+            await loginPage.GetByRole(AriaRole.Button, new() { NameString = "CLICK HERE TO LOGIN" }).WaitForAsync(new LocatorWaitForOptions()
+            {
+                State = WaitForSelectorState.Detached
+            });
+            await loginPage.WaitForLoadStateAsync();
+
+            await Task.Delay(1000);
+
+            Log.Information($"Logged in as {site.Username}.");
+        }
+        else
+        {
+            Log.Verbose("Login was not necessary.");
+        }
     }
 
     public async Task<int> NavigateToScenesAndReturnPageCountAsync(Site site, IPage page)
