@@ -89,13 +89,12 @@ public class CzechVRNetworkRipper : ISceneScraper, ISceneDownloader
 
     public async Task<Scene> ScrapeSceneAsync(Site site, string url, string sceneShortName, IPage page)
     {
-        var scenePage = new CzechVRScenePage(page);
-        var releaseDate = await scenePage.ScrapeReleaseDateAsync();
-        var duration = await scenePage.ScrapeDurationAsync();
-        var description = await scenePage.ScrapeDescriptionAsync();
-        var title = await scenePage.ScrapeTitleAsync();
-        var performers = await scenePage.ScrapePerformersAsync();
-        var tags = await scenePage.ScrapeTagsAsync();
+        var releaseDate = await ScrapeReleaseDateAsync(page);
+        var duration = await ScrapeDurationAsync(page);
+        var description = await ScrapeDescriptionAsync(page);
+        var title = await ScrapeTitleAsync(page);
+        var performers = await ScrapePerformersAsync(page);
+        var tags = await ScrapeTagsAsync(page);
         var downloadOptionsAndHandles = await ParseAvailableDownloadsAsync(page);
 
         var scene = new Scene(
@@ -202,4 +201,76 @@ public class CzechVRNetworkRipper : ISceneScraper, ISceneDownloader
     }
 
     private record DownloadOptionElements(IElementHandle Device, IElementHandle Details, IElementHandle Link);
+
+    private async Task<DateOnly> ScrapeReleaseDateAsync(IPage page)
+    {
+        var releaseDateRaw = await page.Locator("div.nazev > div.desktop > div.datum").TextContentAsync();
+        return DateOnly.Parse(releaseDateRaw);
+    }
+
+    private async Task<string> ScrapeTitleAsync(IPage page)
+    {
+        var title = await page.Locator("div.post > div.left > div.nazev > h2").TextContentAsync();
+        string pattern = @"\w+ \d+ - (.*)";
+        Match match = Regex.Match(title, pattern);
+        if (!match.Success)
+        {
+            Log.Warning($@"Could not determine title from ""{title}"" using pattern {pattern}. Skipping...");
+            throw new Exception();
+        }
+
+        return match.Groups[1].Value;
+    }
+
+    private async Task<IList<SitePerformer>> ScrapePerformersAsync(IPage page)
+    {
+        var castElements = await page.Locator("div.post > div.left > div.nazev > div.desktop > div.featuring > a").ElementHandlesAsync();
+        var performers = new List<SitePerformer>();
+        foreach (var castElement in castElements)
+        {
+            var castUrl = await castElement.GetAttributeAsync("href");
+            if (castUrl.StartsWith("./"))
+            {
+                castUrl = castUrl.Substring(2);
+            }
+
+            var castId = castUrl.Replace("model-", "");
+            var castName = await castElement.TextContentAsync();
+            performers.Add(new SitePerformer(castId, castName, castUrl));
+        }
+        return performers.AsReadOnly();
+    }
+
+    private async Task<IList<SiteTag>> ScrapeTagsAsync(IPage page)
+    {
+        var tagElements = await page.Locator("div.post > div.left > div.tagy > div.tag > a").ElementHandlesAsync();
+        var tags = new List<SiteTag>();
+        foreach (var tagElement in tagElements)
+        {
+            var tagUrl = await tagElement.GetAttributeAsync("href");
+            if (tagUrl.StartsWith("./"))
+            {
+                tagUrl = tagUrl.Substring(2);
+            }
+
+            var tagId = tagUrl.Replace("tag-", "");
+            var tagName = await tagElement.TextContentAsync();
+            tags.Add(new SiteTag(tagId, tagName, tagUrl));
+        }
+        return tags;
+    }
+
+    private async Task<TimeSpan> ScrapeDurationAsync(IPage page)
+    {
+        var duration = await page.Locator("div.nazev > div.desktop > div.cas > span.desktop").TextContentAsync();
+        var components = duration.Split(":");
+        return TimeSpan.FromMinutes(int.Parse(components[0])).Add(TimeSpan.FromSeconds(int.Parse(components[1])));
+    }
+
+    private async Task<string> ScrapeDescriptionAsync(IPage page)
+    {
+        var content = await page.Locator("div.post > div.left > div.text").TextContentAsync();
+        return content.Replace("\n", "").Replace("\t", "").Trim();
+    }
+
 }
