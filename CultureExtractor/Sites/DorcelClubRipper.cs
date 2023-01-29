@@ -1,5 +1,6 @@
 ﻿using CultureExtractor.Exceptions;
 using CultureExtractor.Interfaces;
+using CultureExtractor.CaptchaBuster;
 using Microsoft.Playwright;
 using Serilog;
 using System.Text.RegularExpressions;
@@ -13,10 +14,12 @@ public class DorcelClubRipper : ISceneScraper, ISceneDownloader
     private static readonly Random Random = new();
 
     private readonly IDownloader _downloader;
+    private readonly ICaptchaSolver _captchaSolver;
 
-    public DorcelClubRipper(IDownloader downloader)
+    public DorcelClubRipper(IDownloader downloader, ICaptchaSolver captchaSolver)
     {
         _downloader = downloader;
+        _captchaSolver = captchaSolver;
     }
 
     public async Task LoginAsync(Site site, IPage page)
@@ -25,6 +28,8 @@ public class DorcelClubRipper : ISceneScraper, ISceneDownloader
         if (await loginButton.IsVisibleAsync())
         {
             await loginButton.ClickAsync();
+
+            await _captchaSolver.SolveCaptchaIfNeededAsync(page);
 
             await Task.Delay(5000);
 
@@ -150,6 +155,7 @@ public class DorcelClubRipper : ISceneScraper, ISceneDownloader
         var availableDownloads = await ParseAvailableDownloadsAsync(page);
         var languageFilteredDownloads = availableDownloads.Where(f => f.DownloadOption.Url.Contains("lang=ov") || f.DownloadOption.Url.Contains("lang=en"));
 
+        // some scenes do not have ov or en, we would need to default some other language track in that case, how can we prioritize these?
         DownloadDetailsAndElementHandle selectedDownload = downloadConditions.PreferredDownloadQuality switch
         {
             PreferredDownloadQuality.Phash => languageFilteredDownloads.FirstOrDefault(f => f.DownloadOption.ResolutionHeight == 480) ?? availableDownloads.Last(),
@@ -165,15 +171,7 @@ public class DorcelClubRipper : ISceneScraper, ISceneDownloader
             try
             {
                 await newPage.GotoAsync(selectedDownload.DownloadOption.Url);
-
-                var blocked = await newPage.IsVisibleAsync("#blocked");
-                if (blocked)
-                {
-                    // TODO: This won't work as we actually need to terminate the whole downloading and not just skip current file
-                    // throw new DownloadException(false, "Dorcel Club requires CAPTCHA challenge.");
-                    Log.Warning("Dorcel Club requires CAPTCHA challenge. Enter manually.");
-                    Console.ReadLine();
-                }
+                await _captchaSolver.SolveCaptchaIfNeededAsync(newPage);
             }
             catch (PlaywrightException ex)
             {

@@ -99,4 +99,11 @@ public class Downloader : IDownloader
             throw;
         }
     }
+
+    public async Task<string> DownloadCaptchaAudioAsync(string captchaUrl, string rippingPath)
+    {
+        var tempPath = Path.Combine(rippingPath, $"{Guid.NewGuid()}.mp3");
+        await WebClient.DownloadFileTaskAsync(new Uri(captchaUrl), tempPath);
+        return tempPath;
+    }
 }

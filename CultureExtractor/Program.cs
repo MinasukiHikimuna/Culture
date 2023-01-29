@@ -28,9 +28,10 @@ class Program
                     "464", "462", "530", "557", "555", "554", "551", "549", "548", "541", "531",
                     "533", "532", "482", "484", "490", "495", "503", "506", "457", "474", "475",
                     "477", "458",*/
-                "--best",
                 "--verbose",
                 "--visible-browser",
+                "--from", "2020-01-01",
+                "--to", "2020-12-31",
             };
         }
 
@@ -40,6 +41,7 @@ class Program
             .ConfigureServices(services => {
                 services.AddDbContext<ISqliteContext, SqliteContext>(options => options.UseSqlite());
 
+                services.AddScoped<ICaptchaSolver, CaptchaSolver>();
                 services.AddScoped<IRepository, Repository>();
                 services.AddScoped<IDownloader, Downloader>();
                 services.AddTransient<INetworkRipper, NetworkRipper>();

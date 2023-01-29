@@ -135,8 +135,9 @@ public class NetworkRipper : INetworkRipper
 
         IPage page = await CreatePageAndLoginAsync(sceneDownloader, site, browserSettings);
 
-        page.Request += (_, request) => Console.WriteLine(">> " + request.Method + " " + request.Url);
-        page.Response += (_, response) => Console.WriteLine("<< " + response.Status + " " + response.Url);
+        // TODO: investigate later how we could utilize these for example to download images
+        // page.Request += (_, request) => Console.WriteLine(">> " + request.Method + " " + request.Url);
+        // page.Response += (_, response) => Console.WriteLine("<< " + response.Status + " " + response.Url);
 
         var rippingPath = $@"B:\Ripping\{site.Name}\";
         const long minimumFreeDiskSpace = 5L * 1024 * 1024 * 1024;
