@@ -3,6 +3,7 @@ using CultureExtractor.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Playwright;
 using Serilog;
+using System.Security.Cryptography.X509Certificates;
 using System.Text.RegularExpressions;
 using static System.Net.Mime.MediaTypeNames;
 
@@ -49,18 +50,43 @@ public class CzechVRNetworkRipper : ISceneScraper, ISceneDownloader
 
     public async Task<int> NavigateToScenesAndReturnPageCountAsync(Site site, IPage page)
     {
-        var videosPage = new CzechVRVideosPage(page);
-        await videosPage.OpenVideosPageAsync(site.ShortName);
+        await page.GetByRole(AriaRole.Link, new() { NameString = "VIDEOS" }).ClickAsync();
+        await page.WaitForLoadStateAsync();
 
-        var totalPages = await videosPage.GetVideosPagesAsync();
+        var siteName = site.ShortName switch
+        {
+            "czechvr" => "Czech VR",
+            "czechvrfetish" => "CVR Fetish",
+            "czechvrcasting" => "CVR Casting",
+            "czechvrintimacy" => "VR Intimacy",
+            _ => string.Empty
+        };
 
-        return totalPages;
+        await page.Locator("#Filtrace").GetByRole(AriaRole.Link, new() { NameString = siteName }).ClickAsync();
+        await page.WaitForLoadStateAsync();
+        await Task.Delay(5000);
+
+        var lastPageButton = await page.QuerySelectorAsync("div.strankovani > span:last-child > a.last");
+        var lastPageUrl = await lastPageButton.GetAttributeAsync("href");
+
+        string linkPattern = @"next=(\d+)";
+        Match linkMatch = Regex.Match(lastPageUrl, linkPattern);
+        if (!linkMatch.Success)
+        {
+            Log.Error($"Could not parse last page URL video count from URL {lastPageUrl} using pattern {linkPattern}.");
+            return 0;
+        }
+
+        var totalVideoCount = int.Parse(linkMatch.Groups[1].Value);
+
+        var videosOnCurrentPage = await page.Locator("div.foto").ElementHandlesAsync();
+
+        return (int)Math.Ceiling((double)totalVideoCount / videosOnCurrentPage.Count());
     }
 
     public Task<IReadOnlyList<IElementHandle>> GetCurrentScenesAsync(Site site, IPage page)
     {
-        var videosPage = new CzechVRVideosPage(page);
-        return videosPage.GetCurrentScenesAsync();
+        return page.Locator("div.tagyCenter > div.postTag").ElementHandlesAsync();
     }
 
     public async Task<(string Url, string ShortName)> GetSceneIdAsync(Site site, IElementHandle currentScene)
@@ -115,14 +141,19 @@ public class CzechVRNetworkRipper : ISceneScraper, ISceneDownloader
 
     public async Task DownloadPreviewImageAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene)
     {
-        var videosPage = new CzechVRVideosPage(scenesPage);
-        await videosPage.DownloadPreviewImageAsync(currentScene, scene);
+        var downloader = new Downloader();
+
+        if (!downloader.SceneImageExists(scene))
+        {
+            var previewElement = await currentScene.QuerySelectorAsync("img");
+            var originalUrl = await previewElement.GetAttributeAsync("src");
+            await downloader.DownloadSceneImageAsync(scene, originalUrl);
+        }
     }
 
     public async Task GoToNextFilmsPageAsync(IPage page)
     {
-        var videosPage = new CzechVRVideosPage(page);
-        await videosPage.GoToNextFilmsPageAsync();
+        await page.Locator("div.strankovani > span > a.next").ClickAsync();
     }
 
     public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, string rippingPath, DownloadConditions downloadConditions)
@@ -272,5 +303,4 @@ public class CzechVRNetworkRipper : ISceneScraper, ISceneDownloader
         var content = await page.Locator("div.post > div.left > div.text").TextContentAsync();
         return content.Replace("\n", "").Replace("\t", "").Trim();
     }
-
 }
