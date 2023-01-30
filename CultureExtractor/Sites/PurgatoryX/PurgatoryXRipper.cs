@@ -8,6 +8,13 @@ namespace CultureExtractor.Sites.PurgatoryX;
 [PornSite("purgatoryx")]
 public class PurgatoryXRipper : ISceneScraper, ISceneDownloader
 {
+    private readonly IDownloader _downloader;
+
+    public PurgatoryXRipper(IDownloader downloader)
+    {
+        _downloader = downloader;
+    }
+
     public async Task LoginAsync(Site site, IPage page)
     {
         var enterButton = page.GetByRole(AriaRole.Link, new() { NameString = "Enter" });
@@ -45,7 +52,7 @@ public class PurgatoryXRipper : ISceneScraper, ISceneDownloader
         var previewElement = await scenePage.Locator(".jw-preview").ElementHandleAsync();
         var style = await previewElement.GetAttributeAsync("style");
         var backgroundImageUrl = style.Replace("background-image: url(\"", "").Replace("\");", "").Replace(" background-size: cover;", "");
-        await new Downloader().DownloadSceneImageAsync(scene, backgroundImageUrl, "https://members.purgatoryx.com");
+        await _downloader.DownloadSceneImageAsync(scene, backgroundImageUrl, "https://members.purgatoryx.com");
     }
 
     public async Task<IReadOnlyList<IElementHandle>> GetCurrentScenesAsync(Site site, IPage page)

@@ -2,7 +2,6 @@
 using CultureExtractor.Interfaces;
 using CultureExtractor.Exceptions;
 using Serilog;
-using static System.Formats.Asn1.AsnWriter;
 
 namespace CultureExtractor.Sites.MetArtNetwork;
 
@@ -17,6 +16,13 @@ namespace CultureExtractor.Sites.MetArtNetwork;
 [PornSite("hustler")]
 public class MetArtNetworkRipper : ISceneScraper, ISceneDownloader
 {
+    private readonly IDownloader _downloader;
+
+    public MetArtNetworkRipper(IDownloader downloader)
+    {
+        _downloader = downloader;
+    }
+
     public async Task LoginAsync(Site site, IPage page)
     {
         await Task.Delay(5000);
@@ -162,7 +168,7 @@ public class MetArtNetworkRipper : ISceneScraper, ISceneDownloader
         var previewElement = await scenePage.Locator(".jw-preview").ElementHandleAsync();
         var style = await previewElement.GetAttributeAsync("style");
         var backgroundImageUrl = style.Replace("background-image: url(\"", "").Replace("\");", "");
-        await new Downloader().DownloadSceneImageAsync(scene, backgroundImageUrl);
+        await _downloader.DownloadSceneImageAsync(scene, backgroundImageUrl);
     }
 
     public async Task GoToNextFilmsPageAsync(IPage page)
@@ -195,7 +201,7 @@ public class MetArtNetworkRipper : ISceneScraper, ISceneDownloader
             _ => throw new InvalidOperationException("Could not find a download candidate!")
         };
 
-        return await new Downloader().DownloadSceneAsync(page, selectedDownload.DownloadOption, scene, rippingPath, async () =>
+        return await _downloader.DownloadSceneAsync(page, selectedDownload.DownloadOption, scene, rippingPath, async () =>
         {
             await selectedDownload.ElementHandle.ClickAsync();
         });

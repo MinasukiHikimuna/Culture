@@ -1,13 +1,19 @@
-﻿using Microsoft.Playwright;
+﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Playwright;
 using Serilog;
 using System.Net;
 using System.Text.RegularExpressions;
 
 namespace CultureExtractor;
 
-public class Downloader
+public class Downloader : IDownloader
 {
     private static readonly WebClient WebClient = new();
+
+    public Downloader(IConfiguration configuration)
+    {
+
+    }
 
     public bool SceneImageExists(Scene scene)
     {
@@ -55,12 +61,12 @@ public class Downloader
         var suffix = Path.GetExtension(suggestedFilename);
         var nameWithoutSuffix = Regex.Replace($"{performersStr} - {scene.Site.Name} - {scene.ReleaseDate.ToString("yyyy-MM-dd")} - {scene.Name}", @"\s+", " ");
 
-        var name = (nameWithoutSuffix + suffix).Length > 260 
+        var name = (nameWithoutSuffix + suffix).Length > 260
             ? nameWithoutSuffix[..(260 - suffix.Length - 3)] + "..." + suffix
             : nameWithoutSuffix + suffix;
 
         name = string.Concat(name.Split(Path.GetInvalidFileNameChars()));
-        var path = Path.Join(rippingPath, name);
+        var path = Path.Join(@"F:\", name);
 
         Log.Verbose($"Downloading\r\n    URL:  {downloadDetails.Url}\r\n    Path: {path}");
 
@@ -83,7 +89,7 @@ public class Downloader
             await WebClient.DownloadFileTaskAsync(new Uri(imageUrl), tempPath);
             File.Move(tempPath, finalPath, true);
         }
-        catch 
+        catch
         {
             if (!string.IsNullOrWhiteSpace(tempPath))
             {

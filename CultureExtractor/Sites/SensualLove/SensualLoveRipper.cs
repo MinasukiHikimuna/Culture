@@ -9,6 +9,13 @@ namespace CultureExtractor.Sites.SensualLove;
 [PornSite("sensuallove")]
 public class SensualLoveRipper : ISceneScraper, ISceneDownloader
 {
+    private readonly IDownloader _downloader;
+
+    public SensualLoveRipper(IDownloader downloader)
+    {
+        _downloader = downloader;
+    }
+
     public async Task LoginAsync(Site site, IPage page)
     {
         await page.GetByRole(AriaRole.Link, new() { NameString = "Members" }).First.ClickAsync();
@@ -104,7 +111,7 @@ public class SensualLoveRipper : ISceneScraper, ISceneDownloader
         var previewElement = await scenePage.Locator(".jw-preview").ElementHandleAsync();
         var style = await previewElement.GetAttributeAsync("style");
         var backgroundImageUrl = style.Replace("background-image: url(\"", "").Replace("\");", "").Replace(" background-size: cover;", "");
-        await new Downloader().DownloadSceneImageAsync(scene, backgroundImageUrl, scene.Site.Url);
+        await _downloader.DownloadSceneImageAsync(scene, backgroundImageUrl, scene.Site.Url);
     }
 
     public async Task GoToNextFilmsPageAsync(IPage page)

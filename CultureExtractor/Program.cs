@@ -44,6 +44,7 @@ class Program
                 services.AddDbContext<ISqliteContext, SqliteContext>(options => options.UseSqlite());
 
                 services.AddScoped<IRepository, Repository>();
+                services.AddScoped<IDownloader, Downloader>();
                 services.AddTransient<INetworkRipper, NetworkRipper>();
                 services.AddTransient<CultureExtractorConsoleApp>();
 

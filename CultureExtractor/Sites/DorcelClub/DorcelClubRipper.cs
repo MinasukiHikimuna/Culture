@@ -12,6 +12,13 @@ public class DorcelClubRipper : ISceneScraper, ISceneDownloader
 {
     private static readonly Random Random = new();
 
+    private readonly IDownloader _downloader;
+
+    public DorcelClubRipper(IDownloader downloader)
+    {
+        _downloader = downloader;
+    }
+
     public async Task LoginAsync(Site site, IPage page)
     {
         var loginButton = page.Locator("a.login");
@@ -140,17 +147,6 @@ public class DorcelClubRipper : ISceneScraper, ISceneDownloader
 
     public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, string rippingPath, DownloadConditions downloadConditions)
     {
-        await page.GotoAsync(scene.Url);
-        await page.WaitForLoadStateAsync();
-
-        var performerNames = scene.Performers.Select(p => p.Name).ToList();
-        var performersStr = performerNames.Count() > 1 ? string.Join(", ", performerNames.Take(performerNames.Count() - 1)) + " & " + performerNames.Last() : performerNames.FirstOrDefault();
-
-        // await page.GetByRole(AriaRole.Link).Filter(new() { HasTextString = "Download the video" }).ClickAsync();
-
-        await Task.Delay(3000);
-
-
         var availableDownloads = await ParseAvailableDownloadsAsync(page);
         var languageFilteredDownloads = availableDownloads.Where(f => f.DownloadOption.Url.Contains("lang=ov") || f.DownloadOption.Url.Contains("lang=en"));
 
@@ -162,57 +158,42 @@ public class DorcelClubRipper : ISceneScraper, ISceneDownloader
             _ => throw new InvalidOperationException("Could not find a download candidate!")
         };
 
-
-        if (await page.Locator("div.languages.selectors").IsVisibleAsync())
+        return await _downloader.DownloadSceneAsync(page, selectedDownload.DownloadOption, scene, rippingPath, async () =>
         {
-            await page.Locator("#download-pop-in").GetByText("English").ClickAsync();
-        }
-
-        // Let's assume mp4. We could parse this from URL as well but it seems to always be mp4.
-        var suffix = ".mp4";
-        var name = $"{performersStr} - {scene.Site.Name} - {scene.ReleaseDate.ToString("yyyy-MM-dd")} - {scene.Name}{suffix}";
-        name = string.Concat(name.Split(Path.GetInvalidFileNameChars()));
-
-        var path = Path.Join(rippingPath, name);
-
-        Log.Verbose($"Downloading\r\n    URL:  {selectedDownload.DownloadOption.Url}\r\n    Path: {path}");
-
-        var newPage = await page.Context.NewPageAsync();
-        var waitForDownloadTask = newPage.WaitForDownloadAsync(new PageWaitForDownloadOptions { Timeout = 3 * 60000 });
-
-        try
-        {
-            await newPage.GotoAsync(selectedDownload.DownloadOption.Url);
-
-            var blocked = await newPage.IsVisibleAsync("#blocked");
-            if (blocked)
+            IPage? newPage = null;
+            try
             {
-                // TODO: This won't work as we actually need to terminate the whole downloading and not just skip current file
-                throw new DownloadException(false, "Dorcel Club requires CAPTCHA challenge.");
+                newPage = await page.Context.NewPageAsync();
+                await newPage.GotoAsync(selectedDownload.DownloadOption.Url);
+
+                var blocked = await newPage.IsVisibleAsync("#blocked");
+                if (blocked)
+                {
+                    // TODO: This won't work as we actually need to terminate the whole downloading and not just skip current file
+                    // throw new DownloadException(false, "Dorcel Club requires CAPTCHA challenge.");
+                    Log.Warning("Dorcel Club requires CAPTCHA challenge. Enter manually.");
+                    Console.ReadLine();
+                }
             }
-        }
-        catch (PlaywrightException ex)
-        {
-            if (ex.Message.StartsWith("net::ERR_ABORTED")) {
-                // Ok. Thrown for some reason every time a file is downloaded using browser.
-            }
-            else
+            catch (PlaywrightException ex)
             {
-                throw;
+                if (ex.Message.StartsWith("net::ERR_ABORTED"))
+                {
+                    // Ok. Thrown for some reason every time a file is downloaded using browser.
+                }
+                else
+                {
+                    throw;
+                }
             }
-        }
-
-
-        var download = await waitForDownloadTask;
-        var suggestedFilename = download.SuggestedFilename;
-        await download.SaveAsAsync(path);
-        await newPage.CloseAsync();
-
-        // Avoid bot detection
-        var waitForXSeconds = Random.Next(3, 10);
-        await Task.Delay(waitForXSeconds * 1000);
-
-        return new Download(scene, suggestedFilename, name, selectedDownload.DownloadOption);
+            finally
+            {
+                if (newPage != null)
+                {
+                    await newPage.CloseAsync();
+                }
+            }
+        });
     }
 
     private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloadsAsync(IPage page)

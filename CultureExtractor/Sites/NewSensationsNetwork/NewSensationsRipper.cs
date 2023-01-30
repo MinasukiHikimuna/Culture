@@ -8,6 +8,13 @@ namespace CultureExtractor.Sites.NewSensations;
 [PornSite("newsensations")]
 public class NewSensationsRipper : ISceneScraper, ISceneDownloader
 {
+    private readonly IDownloader _downloader;
+
+    public NewSensationsRipper(IDownloader downloader)
+    {
+        _downloader = downloader;
+    }
+
     public async Task LoginAsync(Site site, IPage page)
     {
         var usernameInput = page.GetByPlaceholder("Username");
@@ -38,7 +45,7 @@ public class NewSensationsRipper : ISceneScraper, ISceneDownloader
     public async Task DownloadPreviewImageAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene)
     {
         var url = await scenePage.GetAttributeAsync("img#default_poster", "src");
-        await new Downloader().DownloadSceneImageAsync(scene, url);
+        await _downloader.DownloadSceneImageAsync(scene, url);
     }
 
     public async Task<IReadOnlyList<IElementHandle>> GetCurrentScenesAsync(Site site, IPage page)
@@ -147,7 +154,7 @@ public class NewSensationsRipper : ISceneScraper, ISceneDownloader
             _ => throw new InvalidOperationException("Could not find a download candidate!")
         };
 
-        return await new Downloader().DownloadSceneAsync(page, selectedDownload.DownloadOption, scene, rippingPath, async () =>
+        return await _downloader.DownloadSceneAsync(page, selectedDownload.DownloadOption, scene, rippingPath, async () =>
         {
             await page.Locator("div#download_select > a").ClickAsync();
             await selectedDownload.ElementHandle.ClickAsync();

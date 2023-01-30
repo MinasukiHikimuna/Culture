@@ -68,7 +68,7 @@ public class WowFilmsPage
 
     public async Task DownloadPreviewImageAsync(IElementHandle sceneHandle, Scene scene)
     {
-        var downloader = new Downloader();
+        var downloader = new Downloader(null /*TODO*/);
 
         if (downloader.SceneImageExists(scene))
         {
@@ -95,7 +95,7 @@ public class WowFilmsPage
             try
             {
 
-                await new Downloader().DownloadSceneImageAsync(scene, candidate);
+                await new Downloader(null /*TODO*/).DownloadSceneImageAsync(scene, candidate);
                 Log.Verbose($"Successfully downloaded preview from {candidate}.");
                 break;
             }

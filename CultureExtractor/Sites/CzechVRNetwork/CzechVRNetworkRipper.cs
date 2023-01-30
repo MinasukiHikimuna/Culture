@@ -12,6 +12,13 @@ namespace CultureExtractor.Sites.CzechVRNetwork;
 [PornSite("czechvrintimacy")]
 public class CzechVRNetworkRipper : ISceneScraper, ISceneDownloader
 {
+    private readonly IDownloader _downloader;
+
+    public CzechVRNetworkRipper(IDownloader downloader)
+    {
+        _downloader = downloader;
+    }
+
     public async Task LoginAsync(Site site, IPage page)
     {
         var memberLoginHeader = page.GetByRole(AriaRole.Heading, new() { NameString = "Member login" });
@@ -137,13 +144,11 @@ public class CzechVRNetworkRipper : ISceneScraper, ISceneDownloader
 
     public async Task DownloadPreviewImageAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene)
     {
-        var downloader = new Downloader();
-
-        if (!downloader.SceneImageExists(scene))
+        if (!_downloader.SceneImageExists(scene))
         {
             var previewElement = await currentScene.QuerySelectorAsync("img");
             var originalUrl = await previewElement.GetAttributeAsync("src");
-            await downloader.DownloadSceneImageAsync(scene, originalUrl);
+            await _downloader.DownloadSceneImageAsync(scene, originalUrl);
         }
     }
 
@@ -169,7 +174,7 @@ public class CzechVRNetworkRipper : ISceneScraper, ISceneDownloader
             _ => throw new InvalidOperationException("Could not find a download candidate!")
         };
 
-        return await new Downloader().DownloadSceneAsync(page, selectedDownload.DownloadOption, scene, rippingPath, async () =>
+        return await _downloader.DownloadSceneAsync(page, selectedDownload.DownloadOption, scene, rippingPath, async () =>
         {
             await page.EvaluateAsync(
                 $"document.querySelector('a[href=\"{selectedDownload.DownloadOption.Url}\"')" +
