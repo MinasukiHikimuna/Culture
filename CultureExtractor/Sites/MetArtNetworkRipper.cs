@@ -4,7 +4,7 @@ using CultureExtractor.Exceptions;
 using Serilog;
 using static System.Net.Mime.MediaTypeNames;
 
-namespace CultureExtractor.Sites.MetArtNetwork;
+namespace CultureExtractor.Sites;
 
 [PornNetwork("metart")]
 [PornSite("metart")]
