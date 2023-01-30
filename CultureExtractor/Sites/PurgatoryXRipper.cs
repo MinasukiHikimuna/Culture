@@ -2,7 +2,7 @@
 using Microsoft.Playwright;
 using Serilog;
 
-namespace CultureExtractor.Sites.PurgatoryX;
+namespace CultureExtractor.Sites;
 
 [PornNetwork("purgatoryx")]
 [PornSite("purgatoryx")]

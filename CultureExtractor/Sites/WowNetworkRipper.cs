@@ -6,7 +6,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text.RegularExpressions;
 using static System.Net.Mime.MediaTypeNames;
 
-namespace CultureExtractor.Sites.WowNetwork;
+namespace CultureExtractor.Sites;
 
 [PornNetwork("wow")]
 [PornSite("allfinegirls")]

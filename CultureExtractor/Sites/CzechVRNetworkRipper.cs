@@ -3,7 +3,7 @@ using Microsoft.Playwright;
 using Serilog;
 using System.Text.RegularExpressions;
 
-namespace CultureExtractor.Sites.CzechVRNetwork;
+namespace CultureExtractor.Sites;
 
 [PornNetwork("czechvr")]
 [PornSite("czechvr")]

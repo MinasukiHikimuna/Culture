@@ -4,7 +4,7 @@ using Microsoft.Playwright;
 using Serilog;
 using System.Text.RegularExpressions;
 
-namespace CultureExtractor.Sites.DorcelClub;
+namespace CultureExtractor.Sites;
 
 [PornNetwork("dorcelclub")]
 [PornSite("dorcelclub")]
@@ -152,7 +152,7 @@ public class DorcelClubRipper : ISceneScraper, ISceneDownloader
 
         DownloadDetailsAndElementHandle selectedDownload = downloadConditions.PreferredDownloadQuality switch
         {
-            PreferredDownloadQuality.Phash => languageFilteredDownloads.FirstOrDefault(f =>f.DownloadOption.ResolutionHeight == 480) ?? availableDownloads.Last(),
+            PreferredDownloadQuality.Phash => languageFilteredDownloads.FirstOrDefault(f => f.DownloadOption.ResolutionHeight == 480) ?? availableDownloads.Last(),
             PreferredDownloadQuality.Best => languageFilteredDownloads.First(),
             PreferredDownloadQuality.Worst => languageFilteredDownloads.Last(),
             _ => throw new InvalidOperationException("Could not find a download candidate!")

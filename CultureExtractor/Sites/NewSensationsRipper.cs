@@ -2,7 +2,7 @@
 using Microsoft.Playwright;
 using System.Text.RegularExpressions;
 
-namespace CultureExtractor.Sites.NewSensations;
+namespace CultureExtractor.Sites;
 
 [PornNetwork("newsensations")]
 [PornSite("newsensations")]

@@ -1,12 +1,9 @@
 ﻿using CommandLine;
 using CultureExtractor.Interfaces;
-using CultureExtractor.Sites.WowNetwork;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System.Reflection;
-using System;
-using System.Net.WebSockets;
 
 namespace CultureExtractor;
 
