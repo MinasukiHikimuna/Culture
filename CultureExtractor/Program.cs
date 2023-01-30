@@ -1,8 +1,12 @@
 ﻿using CommandLine;
+using CultureExtractor.Interfaces;
+using CultureExtractor.Sites.WowNetwork;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Serilog;
+using System.Reflection;
+using System;
+using System.Net.WebSockets;
 
 namespace CultureExtractor;
 
@@ -12,7 +16,7 @@ class Program
     {
         if (System.Diagnostics.Debugger.IsAttached)
         {
-            var siteShortName = "wowgirls";
+            var siteShortName = "dorcelclub";
 
             /*args = new string[] {
                 "scrape",
@@ -28,117 +32,61 @@ class Program
                     "533", "532", "482", "484", "490", "495", "503", "506", "457", "474", "475",
                     "477", "458",*/
                 "--best",
-                "--verbose"
+                "--verbose",
+                "--visible-browser",
             };
         }
+
+        var options = (BaseOptions) Parser.Default.ParseArguments<ScrapeOptions, DownloadOptions>(args).Value;
 
         var host = Host.CreateDefaultBuilder(args)
             .ConfigureServices(services => {
                 services.AddDbContext<ISqliteContext, SqliteContext>(options => options.UseSqlite());
 
                 services.AddScoped<IRepository, Repository>();
-
                 services.AddTransient<INetworkRipper, NetworkRipper>();
-
                 services.AddTransient<CultureExtractorConsoleApp>();
+
+                Type siteScraper = Program.GetSiteScraperType<ISiteScraper>(options.SiteShortName);
+                IList<Type> types = new List<Type>() { typeof(ISceneScraper), typeof(ISceneDownloader) };
+                foreach (var type in types)
+                {
+                    if (siteScraper.IsAssignableTo(type))
+                    {
+                        services.AddTransient(type, siteScraper);
+                    }
+                }
             })
             .Build();
         
         var cultureExtractor = host.Services.GetRequiredService<CultureExtractorConsoleApp>();
         cultureExtractor.ExecuteConsoleApp(args);
     }
-}
 
-class CultureExtractorConsoleApp
-{
-    private readonly INetworkRipper _networkRipper;
-    private readonly IRepository _repository;
-
-    public CultureExtractorConsoleApp(IRepository repository, INetworkRipper networkRipper)
+    private static Type GetSiteScraperType<T>(string shortName) where T : ISiteScraper
     {
-        _networkRipper = networkRipper;
-        _repository = repository;
-    }
+        Type attributeType = typeof(PornSiteAttribute);
 
-    public void ExecuteConsoleApp(string[] args)
-    {
-        Parser.Default.ParseArguments<ScrapeOptions, DownloadOptions>(args)
-          .MapResult(
-            (ScrapeOptions opts) => RunScrapeAndReturnExitCode(opts).GetAwaiter().GetResult(),
-            (DownloadOptions opts) => RunDownloadAndReturnExitCode(opts).GetAwaiter().GetResult(),
-            errs => 1);
-    }
-
-    private async Task<int> RunScrapeAndReturnExitCode(ScrapeOptions opts)
-    {
-        try
-        {
-            InitializeLogger(opts);
-
-            Log.Information("Culture Extractor");
-
-            string shortName = opts.SiteShortName;
-            var browserSettings = new BrowserSettings(!opts.VisibleBrowser);
-
-            var site = await _repository.GetSiteAsync(shortName);
-            await _networkRipper.ScrapeScenesAsync(site, browserSettings, opts.FullScrape);
-
-            return 0;
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex.ToString(), ex);
-            return -1;
-        }
-    }
-
-    private async Task<int> RunDownloadAndReturnExitCode(DownloadOptions opts)
-    {
-        try
-        {
-            InitializeLogger(opts);
-
-            Log.Information("Culture Extractor");
-
-            string shortName = opts.SiteShortName;
-            var browserSettings = new BrowserSettings(!opts.VisibleBrowser);
-
-            var dateRange = new DateRange(
-                string.IsNullOrEmpty(opts.FromDate) ? DateOnly.MinValue : DateOnly.Parse(opts.FromDate),
-                string.IsNullOrEmpty(opts.ToDate) ? DateOnly.MaxValue : DateOnly.Parse(opts.ToDate));
-
-            var downloadQuality = opts.BestQuality ? PreferredDownloadQuality.Best : PreferredDownloadQuality.Phash;
-
-            var downloadOptions = DownloadConditions.All(downloadQuality) with
+        var siteRipperTypes = Assembly
+            .GetExecutingAssembly()
+            .GetTypes()
+            .Where(type => typeof(T).IsAssignableFrom(type))
+            .Where(type =>
             {
-                DateRange = dateRange,
-                SceneIds = opts.SceneIds.ToList() ?? new List<string>(),
-                PerformerShortNames = opts.Performers.ToList() ?? new List<string>()
-            };
+                object[] attributes = type.GetCustomAttributes(attributeType, true);
+                return attributes.Length > 0 && attributes.Any(attribute => (attribute as PornSiteAttribute)?.ShortName == shortName);
+            });
 
-            var site = await _repository.GetSiteAsync(shortName);
-            await _networkRipper.DownloadScenesAsync(site, browserSettings, downloadOptions);
-
-            return 0;
-        }
-        catch (Exception ex)
+        if (!siteRipperTypes.Any())
         {
-            Log.Error(ex.ToString(), ex);
-
-            return -1;
+            throw new ArgumentException($"Could not find any class with short name {shortName} with type {typeof(T)}");
         }
-    }
+        if (siteRipperTypes.Count() > 2)
+        {
+            throw new ArgumentException($"Found more than one classes with short name {shortName} with type {typeof(T)}");
+        }
 
-    private static void InitializeLogger(BaseOptions opts)
-    {
-        var minimumLogLevel = opts.Verbose
-            ? Serilog.Events.LogEventLevel.Verbose
-            : Serilog.Events.LogEventLevel.Information;
-
-        var log = new LoggerConfiguration()
-                        .WriteTo.Console().MinimumLevel.Is(minimumLogLevel)
-                        .CreateLogger();
-        Log.Logger = log;
+        return siteRipperTypes.Single();
     }
 }
 

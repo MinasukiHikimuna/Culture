@@ -1,25 +1,26 @@
 ﻿using CultureExtractor.Exceptions;
 using CultureExtractor.Interfaces;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Playwright;
 using Serilog;
 using System.Reflection;
-using System.Text.Json;
+using System.Runtime.CompilerServices;
 
 namespace CultureExtractor;
 
 public class NetworkRipper : INetworkRipper
 {
     private readonly IRepository _repository;
+    private readonly IServiceProvider _serviceProvider;
 
-    public NetworkRipper(IRepository repository)
+    public NetworkRipper(IRepository repository, IServiceProvider serviceProvider)
     {
         _repository = repository;
+        _serviceProvider = serviceProvider;
     }
 
     public async Task ScrapeScenesAsync(Site site, BrowserSettings browserSettings, bool fullScrape)
     {
-        ISceneScraper? sceneScraper = GetRipper<ISceneScraper>(site.ShortName);
+        ISceneScraper sceneScraper = (ISceneScraper) _serviceProvider.GetService(typeof(ISceneScraper));
         Log.Information($"Culture Extractor, using {sceneScraper.GetType()}");
 
         IPage page = await CreatePageAndLoginAsync(sceneScraper, site, browserSettings);
@@ -33,7 +34,7 @@ public class NetworkRipper : INetworkRipper
             Log.Information(totalPages == int.MaxValue
                 ? $"Batch {currentPage} of infinite page contains {currentScenes.Count} scenes"
                 : $"Page {currentPage}/{totalPages} contains {currentScenes.Count} scenes");
-            
+
             foreach (var currentScene in currentScenes)
             {
                 for (int retries = 0; retries < 3; retries++)
@@ -42,7 +43,7 @@ public class NetworkRipper : INetworkRipper
                     {
                         (string url, string sceneShortName) = await sceneScraper.GetSceneIdAsync(site, currentScene);
 
-                        if (retries > 0) 
+                        if (retries > 0)
                         {
                             Log.Information($"Retrying {retries + 1} attempt for {url}");
                         }
@@ -70,11 +71,12 @@ public class NetworkRipper : INetworkRipper
                             Log.Information($"Scraped scene {savedScene.Id}: {url}");
                             await Task.Delay(3000);
                         }
-                        else
+                        // TODO: need to figure out how we can do initial scraping, this is used for new sensations and its 323 pages
+                        /*else
                         {
                             Log.Information($"An existing scene {existingScene.ReleaseDate} {existingScene.Name} found. Assuming older scenes have already been scraped.");
                             return;
-                        }
+                        }*/
                         break;
                     }
                     catch (Exception ex)
@@ -98,7 +100,7 @@ public class NetworkRipper : INetworkRipper
 
         var furtherFilteredScenes = matchingScenes
             .Where(s =>
-            downloadConditions.DateRange.Start <= s.ReleaseDate &&
+                downloadConditions.DateRange.Start <= s.ReleaseDate &&
                 s.ReleaseDate <= downloadConditions.DateRange.End)
             .Where(s =>
                 !downloadConditions.PerformerShortNames.Any() ||
@@ -133,6 +135,9 @@ public class NetworkRipper : INetworkRipper
 
         IPage page = await CreatePageAndLoginAsync(sceneDownloader, site, browserSettings);
 
+        page.Request += (_, request) => Console.WriteLine(">> " + request.Method + " " + request.Url);
+        page.Response += (_, response) => Console.WriteLine("<< " + response.Status + " " + response.Url);
+
         var rippingPath = $@"B:\Ripping\{site.Name}\";
         const long minimumFreeDiskSpace = 5L * 1024 * 1024 * 1024;
         DirectoryInfo targetDirectory = new DirectoryInfo(rippingPath);
@@ -150,33 +155,33 @@ public class NetworkRipper : INetworkRipper
                 : $"Page {currentPage}/{totalPages} contains {currentScenes.Count} scenes");
 
             foreach (var currentScene in currentScenes)
-        {
-            if (rippedScenes >= downloadConditions.MaxDownloads)
             {
-                Log.Information($"Maximum scene rip limit of {downloadConditions.MaxDownloads} reached. Stopping...");
-                break;
-            }
-            if ((matchingScenes.Count - rippedScenes) % 10 == 0)
-            {
-                Log.Information($"Remaining downloads {matchingScenes.Count - rippedScenes}/{matchingScenes.Count} scenes.");
-            }
-
-            DriveInfo drive = new(targetDirectory.Root.FullName);
-            if (drive.AvailableFreeSpace < minimumFreeDiskSpace)
-            {
-                throw new InvalidOperationException($"Drive {drive.Name} has less than {minimumFreeDiskSpace} bytes free.");
-            }
-
-            for (int retries = 0; retries < 3; retries++)
-            {
-                try
+                if (rippedScenes >= downloadConditions.MaxDownloads)
                 {
+                    Log.Information($"Maximum scene rip limit of {downloadConditions.MaxDownloads} reached. Stopping...");
+                    break;
+                }
+                if ((matchingScenes.Count - rippedScenes) % 10 == 0)
+                {
+                    Log.Information($"Remaining downloads {matchingScenes.Count - rippedScenes}/{matchingScenes.Count} scenes.");
+                }
+
+                DriveInfo drive = new(targetDirectory.Root.FullName);
+                if (drive.AvailableFreeSpace < minimumFreeDiskSpace)
+                {
+                    throw new InvalidOperationException($"Drive {drive.Name} has less than {minimumFreeDiskSpace} bytes free.");
+                }
+
+                for (int retries = 0; retries < 3; retries++)
+                {
+                    try
+                    {
                         (string url, string sceneShortName) = await sceneScraper.GetSceneIdAsync(site, currentScene);
 
-                    if (retries > 0)
-                    {
+                        if (retries > 0)
+                        {
                             Log.Information($"Retrying {retries + 1} attempt for {url}");
-                    }
+                        }
 
                         if (matchingScenes.Any(s => s.ShortName == sceneShortName))
                         {
@@ -199,51 +204,51 @@ public class NetworkRipper : INetworkRipper
                             await sceneScraper.DownloadPreviewImageAsync(savedScene, scenePage, page, currentScene);
 
                             var download = await sceneDownloader.DownloadSceneAsync(scene, scenePage, rippingPath, downloadConditions);
-                    await _repository.SaveDownloadAsync(download, downloadConditions.PreferredDownloadQuality);
+                            await _repository.SaveDownloadAsync(download, downloadConditions.PreferredDownloadQuality);
 
                             rippedScenes++;
 
                             await scenePage.CloseAsync();
 
                             Log.Information($"Downloaded scene {savedScene.Id}: {download.DownloadOption.Url}");
-                    await Task.Delay(3000);
+                            await Task.Delay(3000);
                         }
-                    break;
-                }
-                catch (PlaywrightException ex)
-                {
-                    // Let's try again
-                    Log.Error(ex.Message, ex);
-                }
-                catch (TimeoutException ex)
-                {
-                    // Let's try again
-                    Log.Error(ex.Message, ex);
-                }
-                catch (DownloadException ex)
-                {
-                    Log.Error(ex.Message, ex);
-                    if (ex.ShouldRetry)
-                    {
-                        continue;
-                    }
-                    else
-                    {
                         break;
                     }
-                }
+                    catch (PlaywrightException ex)
+                    {
+                        // Let's try again
+                        Log.Error(ex.Message, ex);
+                    }
+                    catch (TimeoutException ex)
+                    {
+                        // Let's try again
+                        Log.Error(ex.Message, ex);
+                    }
+                    catch (DownloadException ex)
+                    {
+                        Log.Error(ex.Message, ex);
+                        if (ex.ShouldRetry)
+                        {
+                            continue;
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
                     catch (Exception ex)
                     {
                         Log.Error(ex.ToString(), ex);
                         await Task.Delay(3000);
-            }
-        }
+                    }
+                }
             }
 
             if (currentPage != totalPages)
             {
                 await sceneScraper.GoToNextFilmsPageAsync(page);
-    }
+            }
         }
     }
 
@@ -254,37 +259,5 @@ public class NetworkRipper : INetworkRipper
 
         await _repository.UpdateStorageStateAsync(site, await page.Context.StorageStateAsync());
         return page;
-    }
-
-    private static T GetRipper<T>(string shortName) where T : class
-    {
-        Type attributeType = typeof(PornSiteAttribute);
-
-        var siteRipperTypes = Assembly
-            .GetExecutingAssembly()
-            .GetTypes()
-            .Where(type => typeof(T).IsAssignableFrom(type))
-            .Where(type =>
-            {
-                object[] attributes = type.GetCustomAttributes(attributeType, true);
-                return attributes.Length > 0 && attributes.Any(attribute => (attribute as PornSiteAttribute)?.ShortName == shortName);
-            });
-
-        if (!siteRipperTypes.Any())
-        {
-            throw new ArgumentException($"Could not find any class with short name {shortName} with type {typeof(T)}");
-        }
-        if (siteRipperTypes.Count() > 2)
-        {
-            throw new ArgumentException($"Found more than one classes with short name {shortName} with type {typeof(T)}");
-        }
-
-        var siteRipperType = siteRipperTypes.First();
-        if (Activator.CreateInstance(siteRipperType) is not T siteRipper)
-        {
-            throw new ArgumentException($"Could not instantiate a class with type {siteRipperType}");
-        }
-
-        return siteRipper;
     }
 }
