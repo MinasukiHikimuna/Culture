@@ -2,6 +2,7 @@
 using CultureExtractor.Interfaces;
 using CultureExtractor.Exceptions;
 using Serilog;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace CultureExtractor.Sites.MetArtNetwork;
 
@@ -127,12 +128,11 @@ public class MetArtNetworkRipper : ISceneScraper, ISceneDownloader
 
     public async Task<Scene> ScrapeSceneAsync(Site site, string url, string sceneShortName, IPage page)
     {
-        var metArtScenePage = new MetArtScenePage(page);
-        var releaseDate = await metArtScenePage.ScrapeReleaseDateAsync();
-        var duration = await metArtScenePage.ScrapeDurationAsync();
-        var description = await metArtScenePage.ScrapeDescriptionAsync();
-        var name = await metArtScenePage.ScrapeTitleAsync();
-        var performers = await metArtScenePage.ScrapePerformersAsync(site.Url);
+        var releaseDate = await ScrapeReleaseDateAsync(page);
+        var duration = await ScrapeDurationAsync(page);
+        var description = await ScrapeDescriptionAsync(page);
+        var name = await ScrapeTitleAsync(page);
+        var performers = await ScrapePerformersAsync(page, site.Url);
 
         var tagElements = await page.Locator("div.tags-wrapper > div > a").ElementHandlesAsync();
         var tags = new List<SiteTag>();
@@ -161,6 +161,65 @@ public class MetArtNetworkRipper : ISceneScraper, ISceneDownloader
         );
 
         return scene;
+    }
+
+    private async Task<DateOnly> ScrapeReleaseDateAsync(IPage page)
+    {
+        var releaseDateRaw = await page.Locator("div.movie-details > div > div > div > ul > li:nth-child(3) > span:nth-child(2)").TextContentAsync();
+        return DateOnly.Parse(releaseDateRaw);
+    }
+
+    private async Task<string> ScrapeTitleAsync(IPage page)
+    {
+        var title = await page.Locator("div.movie-details h3.headline").TextContentAsync();
+        title = title.Substring(0, title.LastIndexOf("(") - 1);
+        return title;
+    }
+
+    private async Task<IList<SitePerformer>> ScrapePerformersAsync(IPage page, string baseUrl)
+    {
+        var castElements = await page.Locator("div.movie-details > div > div > div > ul > li:nth-child(1) > span:nth-child(2) > a").ElementHandlesAsync();
+        var performers = new List<SitePerformer>();
+        foreach (var castElement in castElements)
+        {
+            var castUrl = await castElement.GetAttributeAsync("href");
+            var castId = castUrl.Substring(castUrl.LastIndexOf("/") + 1);
+            var castName = await castElement.TextContentAsync();
+            performers.Add(new SitePerformer(castId, castName, castUrl));
+        }
+        return performers.AsReadOnly();
+    }
+
+    private async Task<TimeSpan> ScrapeDurationAsync(IPage page)
+    {
+        var duration = await page.Locator("div.movie-details > div > div > div > ul > li:nth-child(4) > span:nth-child(2)").TextContentAsync();
+        if (TimeSpan.TryParse(duration, out TimeSpan timespan))
+        {
+            return timespan;
+        }
+
+        return TimeSpan.FromSeconds(0);
+    }
+
+    private async Task<string> ScrapeDescriptionAsync(IPage page)
+    {
+        if (!await page.Locator("div.movie-details a").Filter(new() { HasTextString = "Read More" }).IsVisibleAsync())
+        {
+            return string.Empty;
+        }
+
+        await page.Locator("div.movie-details a").Filter(new() { HasTextString = "Read More" }).ClickAsync();
+        var elementHandles = await page.Locator("div.movie-details div.info-container div p").ElementHandlesAsync();
+        var descriptionParagraphs = new List<string>();
+        foreach (var elementHandle in elementHandles)
+        {
+            var descriptionParagraph = await elementHandle.TextContentAsync();
+            if (!string.IsNullOrWhiteSpace(descriptionParagraph))
+            {
+                descriptionParagraphs.Add(descriptionParagraph);
+            }
+        }
+        return string.Join("\r\n\r\n", descriptionParagraphs);
     }
 
     public async Task DownloadPreviewImageAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene)
