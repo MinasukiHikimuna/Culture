@@ -119,7 +119,8 @@ public class NetworkRipper : INetworkRipper
     {
         var matchingScenesStr = string.Join($"{Environment.NewLine}    ", matchingScenes.Select(s => $"{s.Site.Name} - {s.ReleaseDate.ToString("yyyy-MM-dd")} - {s.Name}"));
 
-        ISceneDownloader? sceneDownloader = GetRipper<ISceneDownloader>(site.ShortName);
+        ISceneDownloader sceneDownloader = (ISceneDownloader)_serviceProvider.GetService(typeof(ISceneDownloader));
+        ISceneScraper sceneScraper = (ISceneScraper) sceneDownloader;
         Log.Information($"Culture Extractor, using {sceneDownloader.GetType()}");
 
         Log.Information($"Found {matchingScenes.Count} scenes:{Environment.NewLine}    {matchingScenesStr}");
@@ -137,7 +138,18 @@ public class NetworkRipper : INetworkRipper
         DirectoryInfo targetDirectory = new DirectoryInfo(rippingPath);
 
         var rippedScenes = 0;
-        foreach (var scene in matchingScenes)
+        var totalPages = await sceneScraper.NavigateToScenesAndReturnPageCountAsync(site, page);
+
+        for (int currentPage = 1; currentPage <= totalPages; currentPage++)
+        {
+            await Task.Delay(5000);
+            var currentScenes = await sceneScraper.GetCurrentScenesAsync(site, page);
+
+            Log.Information(totalPages == int.MaxValue
+                ? $"Batch {currentPage} of infinite page contains {currentScenes.Count} scenes"
+                : $"Page {currentPage}/{totalPages} contains {currentScenes.Count} scenes");
+
+            foreach (var currentScene in currentScenes)
         {
             if (rippedScenes >= downloadConditions.MaxDownloads)
             {
@@ -159,17 +171,43 @@ public class NetworkRipper : INetworkRipper
             {
                 try
                 {
+                        (string url, string sceneShortName) = await sceneScraper.GetSceneIdAsync(site, currentScene);
+
                     if (retries > 0)
                     {
-                        Log.Information($"Retrying {retries + 1} attempt for {scene.Url}");
+                            Log.Information($"Retrying {retries + 1} attempt for {url}");
                     }
 
-                    var download = await sceneDownloader.DownloadSceneAsync(scene, page, rippingPath, downloadConditions);
+                        if (matchingScenes.Any(s => s.ShortName == sceneShortName))
+                        {
+                            var existingScene = await _repository.GetSceneAsync(site.ShortName, sceneShortName);
+                            await currentScene.ScrollIntoViewIfNeededAsync();
+
+                            var scenePage = await page.Context.RunAndWaitForPageAsync(async () =>
+                            {
+                                await currentScene.ClickAsync(new ElementHandleClickOptions() { Button = MouseButton.Middle });
+                            });
+                            await scenePage.WaitForLoadStateAsync();
+
+                            var scene = await sceneScraper.ScrapeSceneAsync(site, url, sceneShortName, scenePage);
+                            if (existingScene != null)
+                            {
+                                scene = scene with { Id = existingScene.Id };
+                            }
+
+                            var savedScene = await _repository.UpsertScene(scene);
+                            await sceneScraper.DownloadPreviewImageAsync(savedScene, scenePage, page, currentScene);
+
+                            var download = await sceneDownloader.DownloadSceneAsync(scene, scenePage, rippingPath, downloadConditions);
                     await _repository.SaveDownloadAsync(download, downloadConditions.PreferredDownloadQuality);
 
-                    await Task.Delay(3000);
+                            rippedScenes++;
 
-                    rippedScenes++;
+                            await scenePage.CloseAsync();
+
+                            Log.Information($"Downloaded scene {savedScene.Id}: {download.DownloadOption.Url}");
+                    await Task.Delay(3000);
+                        }
                     break;
                 }
                 catch (PlaywrightException ex)
@@ -194,9 +232,19 @@ public class NetworkRipper : INetworkRipper
                         break;
                     }
                 }
+                    catch (Exception ex)
+                    {
+                        Log.Error(ex.ToString(), ex);
+                        await Task.Delay(3000);
             }
         }
+            }
 
+            if (currentPage != totalPages)
+            {
+                await sceneScraper.GoToNextFilmsPageAsync(page);
+    }
+        }
     }
 
     private async Task<IPage> CreatePageAndLoginAsync(ISiteScraper siteScraper, Site site, BrowserSettings browserSettings)
