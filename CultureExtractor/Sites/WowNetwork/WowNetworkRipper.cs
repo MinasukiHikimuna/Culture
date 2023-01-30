@@ -1,7 +1,10 @@
 ﻿using CultureExtractor.Interfaces;
 using Microsoft.Playwright;
 using Serilog;
+using System.Net;
+using System.Security.Cryptography.X509Certificates;
 using System.Text.RegularExpressions;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace CultureExtractor.Sites.WowNetwork;
 
@@ -12,24 +15,74 @@ namespace CultureExtractor.Sites.WowNetwork;
 [PornSite("ultrafilms")]
 public class WowNetworkRipper : ISceneScraper, ISceneDownloader
 {
+    private readonly IDownloader _downloader;
+
+    public WowNetworkRipper(IDownloader downloader)
+    {
+        _downloader = downloader;
+    }
+
     public async Task LoginAsync(Site site, IPage page)
     {
-        var loginPage = new WowLoginPage(page);
-        await loginPage.LoginIfNeededAsync(site);
+        var signInButton = page.GetByRole(AriaRole.Link, new() { NameString = "Sign in" });
+        var emailInput = page.GetByPlaceholder("E-Mail");
+        var passwordInput = page.GetByPlaceholder("Password");
+        var getInsideButton = page.GetByText("Get Inside");
+
+        if (await signInButton.IsVisibleAsync())
+        {
+            await signInButton.ClickAsync();
+            await page.WaitForLoadStateAsync();
+        }
+
+        if (await getInsideButton.IsVisibleAsync())
+        {
+            await emailInput.TypeAsync(site.Username);
+            await passwordInput.TypeAsync(site.Password);
+            await getInsideButton.ClickAsync();
+            await page.WaitForLoadStateAsync();
+        }
     }
 
     public async Task<int> NavigateToScenesAndReturnPageCountAsync(Site site, IPage page)
     {
-        var filmsPage = new WowFilmsPage(page);
-        await filmsPage.OpenFilmsPageAsync(site.ShortName);
+        await page.GetByRole(AriaRole.Link, new() { NameString = "Films" }).Nth(1).ClickAsync();
+        await page.WaitForLoadStateAsync();
 
-        return await filmsPage.GetFilmsPagesAsync();
+        while ((await page.Locator(".cf_s_site").ElementHandlesAsync()).Count() > 0)
+        {
+            var elementHandles = await page.Locator(".cf_s_site").ElementHandlesAsync();
+            var elementHandle = elementHandles[0];
+
+            await elementHandle.ClickAsync();
+            await elementHandle.IsHiddenAsync();
+            await page.WaitForLoadStateAsync();
+            await Task.Delay(5000);
+        }
+
+        var siteName = site.ShortName switch
+        {
+            "allfinegirls" => "All Fine Girls",
+            "wowgirls" => "Wow Girls",
+            "wowporn" => "Wow Porn",
+            _ => string.Empty
+        };
+
+        if (!string.IsNullOrWhiteSpace(siteName))
+        {
+            await page.GetByRole(AriaRole.Complementary).GetByText(siteName).ClickAsync();
+            await page.WaitForSelectorAsync(".cf_s_site");
+            await page.WaitForLoadStateAsync();
+        }
+
+        var totalPagesStr = await page.Locator("div.pages > span").Last.TextContentAsync();
+        var totalPages = int.Parse(totalPagesStr);
+        return totalPages;
     }
 
     public Task<IReadOnlyList<IElementHandle>> GetCurrentScenesAsync(Site site, IPage page)
     {
-        var filmsPage = new WowFilmsPage(page);
-        return filmsPage.GetCurrentScenesAsync();
+        return page.Locator("section.cf_content > ul > li > div.content_item > a.icon").ElementHandlesAsync();
     }
 
     public async Task<(string Url, string ShortName)> GetSceneIdAsync(Site site, IElementHandle currentScene)
@@ -51,13 +104,12 @@ public class WowNetworkRipper : ISceneScraper, ISceneDownloader
     {
         await page.WaitForLoadStateAsync();
 
-        var wowScenePage = new WowScenePage(page);
-        var releaseDate = await wowScenePage.ScrapeReleaseDateAsync();
-        var duration = await wowScenePage.ScrapeDurationAsync();
-        var description = await wowScenePage.ScrapeDescriptionAsync();
-        var title = await wowScenePage.ScrapeTitleAsync();
-        var performers = await wowScenePage.ScrapePerformersAsync();
-        var tags = await wowScenePage.ScrapeTagsAsync();
+        var releaseDate = await ScrapeReleaseDateAsync(page);
+        var duration = await ScrapeDurationAsync(page);
+        var description = await ScrapeDescriptionAsync(page);
+        var title = await ScrapeTitleAsync(page);
+        var performers = await ScrapePerformersAsync(page);
+        var tags = await ScrapeTagsAsync(page);
         var downloadOptionsAndHandles = await ParseAvailableDownloadsAsync(page);
 
         return new Scene(
@@ -75,16 +127,126 @@ public class WowNetworkRipper : ISceneScraper, ISceneDownloader
         );
     }
 
+    private async Task<DateOnly> ScrapeReleaseDateAsync(IPage page)
+    {
+        var releaseDateRaw = await page.Locator("ul.details > li.date").TextContentAsync();
+        return DateOnly.Parse(releaseDateRaw);
+    }
+
+    private async Task<string> ScrapeTitleAsync(IPage page)
+    {
+        var title = await page.Locator("section.content_header > div.content_info > div.title").TextContentAsync();
+        return title;
+    }
+
+    private async Task<IList<SitePerformer>> ScrapePerformersAsync(IPage page)
+    {
+        var castElements = await page.Locator("section.content_header > div.content_info > ul.details > li.models > a").ElementHandlesAsync();
+        var performers = new List<SitePerformer>();
+        foreach (var castElement in castElements)
+        {
+            var castUrl = await castElement.GetAttributeAsync("href");
+            var castId = castUrl.Substring(castUrl.LastIndexOf("/girl/") + "/girl/".Length);
+            var castName = await castElement.TextContentAsync();
+            performers.Add(new SitePerformer(castId, castName, castUrl));
+        }
+        return performers.AsReadOnly();
+    }
+
+    private async Task<IList<SiteTag>> ScrapeTagsAsync(IPage page)
+    {
+        var tagElements = await page.Locator("section.content_header > div.content_info > ul.genres > li > a").ElementHandlesAsync();
+        var tags = new List<SiteTag>();
+        foreach (var tagElement in tagElements)
+        {
+            var tagUrl = await tagElement.GetAttributeAsync("href");
+            var tagId = await tagElement.TextContentAsync();
+            var tagName = await tagElement.TextContentAsync();
+            tags.Add(new SiteTag(tagId, tagName, tagUrl));
+        }
+        return tags;
+    }
+
+    private async Task<TimeSpan> ScrapeDurationAsync(IPage page)
+    {
+        var duration = await page.Locator("ul.details > li.duration").TextContentAsync();
+        if (TimeSpan.TryParse(duration, out TimeSpan timespan))
+        {
+            return timespan;
+        }
+
+        return TimeSpan.FromSeconds(0);
+    }
+
+    private async Task<string> ScrapeDescriptionAsync(IPage page)
+    {
+        if (!await page.Locator("div.movie-details a").Filter(new() { HasTextString = "Read More" }).IsVisibleAsync())
+        {
+            return string.Empty;
+        }
+
+        await page.Locator("div.movie-details a").Filter(new() { HasTextString = "Read More" }).ClickAsync();
+        var elementHandles = await page.Locator("div.movie-details div.info-container div p").ElementHandlesAsync();
+        var descriptionParagraphs = new List<string>();
+        foreach (var elementHandle in elementHandles)
+        {
+            var descriptionParagraph = await elementHandle.TextContentAsync();
+            if (!string.IsNullOrWhiteSpace(descriptionParagraph))
+            {
+                descriptionParagraphs.Add(descriptionParagraph);
+            }
+        }
+        return string.Join("\r\n\r\n", descriptionParagraphs);
+    }
+
+
     public async Task DownloadPreviewImageAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene)
     {
-        var filmsPage = new WowFilmsPage(scenePage);
-        await filmsPage.DownloadPreviewImageAsync(currentScene, scene);
+        if (_downloader.SceneImageExists(scene))
+        {
+            return;
+        }
+
+        var previewElement = await currentScene.QuerySelectorAsync("span > img");
+        var originalUrl = await previewElement.GetAttributeAsync("src");
+
+        string regexPattern = "icon_\\d+x\\d+.jpg";
+
+        // We can't be sure which are found so we need to cycle through them.
+        var candidates = new List<string>()
+        {
+            "icon_3840x2160.jpg",
+            "icon_1920x1080.jpg",
+            "icon_1280x720.jpg",
+        }
+            .Select(fileName => Regex.Replace(originalUrl, regexPattern, fileName))
+            .Concat(new List<string> { originalUrl });
+
+        foreach (var candidate in candidates)
+        {
+            try
+            {
+
+                await _downloader.DownloadSceneImageAsync(scene, candidate);
+                Log.Verbose($"Successfully downloaded preview from {candidate}.");
+                break;
+            }
+            catch (WebException ex)
+            {
+                if (ex.Status == WebExceptionStatus.ProtocolError && (ex.Response as HttpWebResponse)?.StatusCode == HttpStatusCode.NotFound)
+                {
+                    Log.Verbose($"Got 404 for preview from {candidate}.");
+                    continue;
+                }
+
+                throw;
+            }
+        }
     }
 
     public async Task GoToNextFilmsPageAsync(IPage page)
     {
-        var filmsPage = new WowFilmsPage(page);
-        await filmsPage.GoToNextFilmsPageAsync();
+        await page.Locator("div.nav.next").ClickAsync();
     }
 
     public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, string rippingPath, DownloadConditions downloadConditions)
