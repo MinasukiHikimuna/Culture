@@ -10,6 +10,7 @@ public static class PlaywrightFactory
         var browser = await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
         {
             Headless = browserSettings.Headless,
+            Channel = "msedge-beta"
         });
         var context = await browser.NewContextAsync(new BrowserNewContextOptions()
         {
