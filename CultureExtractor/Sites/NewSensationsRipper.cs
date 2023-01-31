@@ -34,9 +34,13 @@ public class NewSensationsRipper : ISceneScraper, ISceneDownloader
 
     public async Task<int> NavigateToScenesAndReturnPageCountAsync(Site site, IPage page)
     {
+        await page.WaitForLoadStateAsync();
+
         await page.GetByRole(AriaRole.Navigation).GetByRole(AriaRole.Link, new() { NameString = "Network" }).ClickAsync();
         await page.Locator(".videothumb > a").First.ClickAsync();
         await page.GetByRole(AriaRole.Link, new() { NameString = "view all >" }).First.ClickAsync();
+
+        await page.WaitForLoadStateAsync();
 
         var lastPage = await page.Locator("div.pagination > ul > li:not(.pagination_jump) > a").Last.TextContentAsync();
         return int.Parse(lastPage);
@@ -82,7 +86,7 @@ public class NewSensationsRipper : ISceneScraper, ISceneDownloader
     public async Task GoToNextFilmsPageAsync(IPage page)
     {
         var url = await page.Locator("div.pagination > ul > li:last-child > a").GetAttributeAsync("href");
-        await page.GotoAsync(url);
+        await page.GotoAsync(url, new() { Timeout = 120 * 1000 });
     }
 
     public async Task<Scene> ScrapeSceneAsync(Site site, string url, string sceneShortName, IPage page)
