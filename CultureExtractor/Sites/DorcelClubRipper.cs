@@ -158,12 +158,12 @@ public class DorcelClubRipper : ISceneScraper, ISceneDownloader
             _ => throw new InvalidOperationException("Could not find a download candidate!")
         };
 
-        return await _downloader.DownloadSceneAsync(page, selectedDownload.DownloadOption, scene, rippingPath, async () =>
+        IPage newPage = await page.Context.NewPageAsync();
+
+        var download = await _downloader.DownloadSceneAsync(newPage, selectedDownload.DownloadOption, scene, rippingPath, async () =>
         {
-            IPage? newPage = null;
             try
             {
-                newPage = await page.Context.NewPageAsync();
                 await newPage.GotoAsync(selectedDownload.DownloadOption.Url);
 
                 var blocked = await newPage.IsVisibleAsync("#blocked");
@@ -186,14 +186,10 @@ public class DorcelClubRipper : ISceneScraper, ISceneDownloader
                     throw;
                 }
             }
-            finally
-            {
-                if (newPage != null)
-                {
-                    await newPage.CloseAsync();
-                }
-            }
         });
+
+        await newPage.CloseAsync();
+        return download;
     }
 
     private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloadsAsync(IPage page)
