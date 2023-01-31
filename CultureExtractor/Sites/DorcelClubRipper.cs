@@ -190,7 +190,7 @@ public class DorcelClubRipper : ISceneScraper, ISceneDownloader
                     throw;
                 }
             }
-        });
+        }, downloadConditions.PreferredDownloadQuality);
 
         await newPage.CloseAsync();
         return download;

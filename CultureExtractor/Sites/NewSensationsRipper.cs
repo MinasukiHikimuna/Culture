@@ -158,7 +158,7 @@ public class NewSensationsRipper : ISceneScraper, ISceneDownloader
         {
             await page.Locator("div#download_select > a").ClickAsync();
             await selectedDownload.ElementHandle.ClickAsync();
-        });
+        }, downloadConditions.PreferredDownloadQuality);
     }
 
     private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloadsAsync(IPage page)

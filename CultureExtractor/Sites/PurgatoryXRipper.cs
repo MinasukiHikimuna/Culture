@@ -147,7 +147,7 @@ public class PurgatoryXRipper : ISceneScraper, ISceneDownloader
 
         return await _downloader.DownloadSceneAsync(page, selectedDownload.DownloadOption, scene, async () =>
             await selectedDownload.ElementHandle.ClickAsync()
-        );
+        , downloadConditions.PreferredDownloadQuality);
     }
 
     private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloadsAsync(IPage page)

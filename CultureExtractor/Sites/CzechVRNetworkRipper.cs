@@ -184,7 +184,7 @@ public class CzechVRNetworkRipper : ISceneScraper, ISceneDownloader
                 $".previousElementSibling" +
                 $".click()");
             await page.Locator($"a[href=\"{selectedDownload.DownloadOption.Url}\"]").ClickAsync();
-        });
+        }, downloadConditions.PreferredDownloadQuality);
     }
 
     private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloadsAsync(IPage page)

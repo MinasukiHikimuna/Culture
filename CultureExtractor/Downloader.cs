@@ -63,7 +63,7 @@ public class Downloader : IDownloader
         await DownloadFileAsync(imageUrl, (int)gallery.Id, rippingPath);
     }
 
-    public async Task<Download> DownloadSceneAsync(IPage page, DownloadOption downloadDetails, Scene scene, Func<Task> func)
+    public async Task<Download> DownloadSceneAsync(IPage page, DownloadOption downloadDetails, Scene scene, Func<Task> func, PreferredDownloadQuality downloadQuality)
     {
         var performerNames = scene.Performers.Select(p => p.Name).ToList();
         var performersStr = performerNames.Count() > 1
@@ -84,7 +84,9 @@ public class Downloader : IDownloader
             : nameWithoutSuffix + suffix;
 
         name = string.Concat(name.Split(Path.GetInvalidFileNameChars()));
-        var path = Path.Join(_downloadPath, name);
+
+        var downloadQualityDirectory = Path.Join(_downloadPath, Enum.GetName(downloadQuality));
+        var path = Path.Join(downloadQualityDirectory, name);
 
         Log.Verbose($"Downloading\r\n    URL:  {downloadDetails.Url}\r\n    Path: {path}");
 
