@@ -1,5 +1,6 @@
 ﻿using CultureExtractor.Interfaces;
 using Microsoft.Playwright;
+using Serilog;
 using System.Text.RegularExpressions;
 
 namespace CultureExtractor.Sites;
@@ -86,7 +87,18 @@ public class NewSensationsRipper : ISceneScraper, ISceneDownloader
     public async Task GoToNextFilmsPageAsync(IPage page)
     {
         var url = await page.Locator("div.pagination > ul > li:last-child > a").GetAttributeAsync("href");
-        await page.GotoAsync(url, new() { Timeout = 120 * 1000 });
+
+        for (int i = 0; i < 3;  i++)
+        {
+            try
+            {
+                await page.GotoAsync(url);
+            }
+            catch (TimeoutException)
+            {
+                // Let's try again. This happens so often with New Sensations that no sense to spam log with it.
+            }
+        }
     }
 
     public async Task<Scene> ScrapeSceneAsync(Site site, string url, string sceneShortName, IPage page)
