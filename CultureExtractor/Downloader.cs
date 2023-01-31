@@ -85,7 +85,7 @@ public class Downloader : IDownloader
 
         name = string.Concat(name.Split(Path.GetInvalidFileNameChars()));
 
-        var downloadQualityDirectory = Path.Join(_downloadPath, Enum.GetName(downloadQuality));
+        var downloadQualityDirectory = Path.Join(_downloadPath, Path.Join(scene.Site.Name, Enum.GetName(downloadQuality)));
         var path = Path.Join(downloadQualityDirectory, name);
 
         Log.Verbose($"Downloading\r\n    URL:  {downloadDetails.Url}\r\n    Path: {path}");
