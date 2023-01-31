@@ -157,7 +157,7 @@ public class CzechVRNetworkRipper : ISceneScraper, ISceneDownloader
         await page.Locator("div.strankovani > span > a.next").ClickAsync();
     }
 
-    public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, string rippingPath, DownloadConditions downloadConditions)
+    public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions)
     {
         await page.GotoAsync(scene.Url);
         await page.WaitForLoadStateAsync();
@@ -174,7 +174,7 @@ public class CzechVRNetworkRipper : ISceneScraper, ISceneDownloader
             _ => throw new InvalidOperationException("Could not find a download candidate!")
         };
 
-        return await _downloader.DownloadSceneAsync(page, selectedDownload.DownloadOption, scene, rippingPath, async () =>
+        return await _downloader.DownloadSceneAsync(page, selectedDownload.DownloadOption, scene, async () =>
         {
             await page.EvaluateAsync(
                 $"document.querySelector('a[href=\"{selectedDownload.DownloadOption.Url}\"')" +

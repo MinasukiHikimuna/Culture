@@ -119,7 +119,7 @@ public class SensualLoveRipper : ISceneScraper, ISceneDownloader
         // noop for now as there is no pagination.
     }
 
-    public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, string rippingPath, DownloadConditions downloadConditions)
+    public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions)
     {
         await page.GotoAsync(scene.Url);
         await page.WaitForLoadStateAsync();
@@ -139,7 +139,7 @@ public class SensualLoveRipper : ISceneScraper, ISceneDownloader
             _ => throw new InvalidOperationException("Could not find a download candidate!")
         };
 
-        return await _downloader.DownloadSceneAsync(page, selectedDownload.DownloadOption, scene, rippingPath, async () =>
+        return await _downloader.DownloadSceneAsync(page, selectedDownload.DownloadOption, scene, async () =>
             await selectedDownload.ElementHandle.ClickAsync()
         );
     }

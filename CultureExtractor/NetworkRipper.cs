@@ -11,11 +11,13 @@ public class NetworkRipper : INetworkRipper
 {
     private readonly IRepository _repository;
     private readonly IServiceProvider _serviceProvider;
+    private readonly IDownloader _downloader;
 
-    public NetworkRipper(IRepository repository, IServiceProvider serviceProvider)
+    public NetworkRipper(IRepository repository, IServiceProvider serviceProvider, IDownloader downloader)
     {
         _repository = repository;
         _serviceProvider = serviceProvider;
+        _downloader = downloader;
     }
 
     public async Task ScrapeScenesAsync(Site site, BrowserSettings browserSettings, bool fullScrape)
@@ -139,10 +141,6 @@ public class NetworkRipper : INetworkRipper
         // page.Request += (_, request) => Console.WriteLine(">> " + request.Method + " " + request.Url);
         // page.Response += (_, response) => Console.WriteLine("<< " + response.Status + " " + response.Url);
 
-        var rippingPath = $@"B:\Ripping\{site.Name}\";
-        const long minimumFreeDiskSpace = 5L * 1024 * 1024 * 1024;
-        DirectoryInfo targetDirectory = new DirectoryInfo(rippingPath);
-
         var rippedScenes = 0;
         var totalPages = await sceneScraper.NavigateToScenesAndReturnPageCountAsync(site, page);
 
@@ -167,11 +165,8 @@ public class NetworkRipper : INetworkRipper
                     Log.Information($"Remaining downloads {matchingScenes.Count - rippedScenes}/{matchingScenes.Count} scenes.");
                 }
 
-                DriveInfo drive = new(targetDirectory.Root.FullName);
-                if (drive.AvailableFreeSpace < minimumFreeDiskSpace)
-                {
-                    throw new InvalidOperationException($"Drive {drive.Name} has less than {minimumFreeDiskSpace} bytes free.");
-                }
+                // Ungh, throws exception
+                _downloader.CheckFreeSpace();
 
                 for (int retries = 0; retries < 3; retries++)
                 {
@@ -204,7 +199,7 @@ public class NetworkRipper : INetworkRipper
                             var savedScene = await _repository.UpsertScene(scene);
                             await sceneScraper.DownloadPreviewImageAsync(savedScene, scenePage, page, currentScene);
 
-                            var download = await sceneDownloader.DownloadSceneAsync(scene, scenePage, rippingPath, downloadConditions);
+                            var download = await sceneDownloader.DownloadSceneAsync(scene, scenePage, downloadConditions);
                             await _repository.SaveDownloadAsync(download, downloadConditions.PreferredDownloadQuality);
 
                             rippedScenes++;

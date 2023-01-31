@@ -150,7 +150,7 @@ public class DorcelClubRipper : ISceneScraper, ISceneDownloader
         );
     }
 
-    public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, string rippingPath, DownloadConditions downloadConditions)
+    public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions)
     {
         var availableDownloads = await ParseAvailableDownloadsAsync(page);
         
@@ -172,7 +172,7 @@ public class DorcelClubRipper : ISceneScraper, ISceneDownloader
 
         IPage newPage = await page.Context.NewPageAsync();
 
-        var download = await _downloader.DownloadSceneAsync(newPage, selectedDownload.DownloadOption, scene, rippingPath, async () =>
+        var download = await _downloader.DownloadSceneAsync(newPage, selectedDownload.DownloadOption, scene, async () =>
         {
             try
             {
