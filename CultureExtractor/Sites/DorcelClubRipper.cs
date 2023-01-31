@@ -153,14 +153,20 @@ public class DorcelClubRipper : ISceneScraper, ISceneDownloader
     public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, string rippingPath, DownloadConditions downloadConditions)
     {
         var availableDownloads = await ParseAvailableDownloadsAsync(page);
-        var languageFilteredDownloads = availableDownloads.Where(f => f.DownloadOption.Url.Contains("lang=ov") || f.DownloadOption.Url.Contains("lang=en"));
+        
+        // Prefer ov (original voice) or en language tracks.
+        var filteredDownloads = availableDownloads
+            .Where(f => f.DownloadOption.Url.Contains("lang=ov") || f.DownloadOption.Url.Contains("lang=en"));
+        if (!filteredDownloads.Any())
+        {
+            filteredDownloads = availableDownloads;
+        }
 
-        // some scenes do not have ov or en, we would need to default some other language track in that case, how can we prioritize these?
         DownloadDetailsAndElementHandle selectedDownload = downloadConditions.PreferredDownloadQuality switch
         {
-            PreferredDownloadQuality.Phash => languageFilteredDownloads.FirstOrDefault(f => f.DownloadOption.ResolutionHeight == 480) ?? availableDownloads.Last(),
-            PreferredDownloadQuality.Best => languageFilteredDownloads.First(),
-            PreferredDownloadQuality.Worst => languageFilteredDownloads.Last(),
+            PreferredDownloadQuality.Phash => filteredDownloads.FirstOrDefault(f => f.DownloadOption.ResolutionHeight == 480) ?? availableDownloads.Last(),
+            PreferredDownloadQuality.Best => filteredDownloads.First(),
+            PreferredDownloadQuality.Worst => filteredDownloads.Last(),
             _ => throw new InvalidOperationException("Could not find a download candidate!")
         };
 
