@@ -74,7 +74,7 @@ public record DownloadOption(
     double? FileSize,
     double? Fps,
     string? Codec,
-    string? Url);
+    string Url);
 
 public record DownloadDetailsAndElementHandle(
     DownloadOption DownloadOption,
