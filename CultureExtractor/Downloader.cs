@@ -25,7 +25,7 @@ public class Downloader : IDownloader
     public void CheckFreeSpace()
     {
         const long minimumFreeDiskSpace = 5L * 1024 * 1024 * 1024;
-        DirectoryInfo targetDirectory = new DirectoryInfo(_downloadPath);
+        DirectoryInfo targetDirectory = new(_downloadPath);
         DriveInfo drive = new(targetDirectory.Root.FullName);
         if (drive.AvailableFreeSpace < minimumFreeDiskSpace)
         {
@@ -63,7 +63,7 @@ public class Downloader : IDownloader
         await DownloadFileAsync(imageUrl, (int)gallery.Id, rippingPath);
     }
 
-    public async Task<Download> DownloadSceneAsync(IPage page, DownloadOption downloadDetails, Scene scene, Func<Task> func, PreferredDownloadQuality downloadQuality)
+    public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadOption downloadDetails, PreferredDownloadQuality downloadQuality, Func<Task> func)
     {
         var performerNames = scene.Performers.Select(p => p.Name).ToList();
         var performersStr = performerNames.Count() > 1

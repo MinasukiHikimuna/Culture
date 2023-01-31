@@ -172,7 +172,7 @@ public class DorcelClubRipper : ISceneScraper, ISceneDownloader
 
         IPage newPage = await page.Context.NewPageAsync();
 
-        var download = await _downloader.DownloadSceneAsync(newPage, selectedDownload.DownloadOption, scene, async () =>
+        var download = await _downloader.DownloadSceneAsync(scene, newPage, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, async () =>
         {
             try
             {
@@ -184,13 +184,15 @@ public class DorcelClubRipper : ISceneScraper, ISceneDownloader
                 if (ex.Message.StartsWith("net::ERR_ABORTED"))
                 {
                     // Ok. Thrown for some reason every time a file is downloaded using browser.
+
+
                 }
                 else
                 {
                     throw;
                 }
             }
-        }, downloadConditions.PreferredDownloadQuality);
+        });
 
         await newPage.CloseAsync();
         return download;

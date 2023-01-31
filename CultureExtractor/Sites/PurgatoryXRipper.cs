@@ -145,9 +145,9 @@ public class PurgatoryXRipper : ISceneScraper, ISceneDownloader
             _ => throw new InvalidOperationException("Could not find a download candidate!")
         };
 
-        return await _downloader.DownloadSceneAsync(page, selectedDownload.DownloadOption, scene, async () =>
+        return await _downloader.DownloadSceneAsync(scene, page, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, async () =>
             await selectedDownload.ElementHandle.ClickAsync()
-        , downloadConditions.PreferredDownloadQuality);
+);
     }
 
     private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloadsAsync(IPage page)
