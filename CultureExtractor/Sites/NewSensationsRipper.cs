@@ -1,6 +1,5 @@
 ﻿using CultureExtractor.Interfaces;
 using Microsoft.Playwright;
-using Serilog;
 using System.Text.RegularExpressions;
 
 namespace CultureExtractor.Sites;
