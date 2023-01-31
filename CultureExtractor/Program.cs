@@ -47,7 +47,7 @@ class Program
                 services.AddTransient<INetworkRipper, NetworkRipper>();
                 services.AddTransient<CultureExtractorConsoleApp>();
 
-                Type siteScraper = Program.GetSiteScraperType<ISiteScraper>(options.SiteShortName);
+                Type siteScraper = GetSiteScraperType<ISiteScraper>(options.SiteShortName);
                 IList<Type> types = new List<Type>() { typeof(ISceneScraper), typeof(ISceneDownloader) };
                 foreach (var type in types)
                 {
