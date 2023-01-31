@@ -52,7 +52,7 @@ public class Downloader : IDownloader
             ? string.Join(", ", performerNames.SkipLast(1)) + " & " + performerNames.Last()
             : performerNames.FirstOrDefault();
 
-        var waitForDownloadTask = page.WaitForDownloadAsync();
+        var waitForDownloadTask = page.WaitForDownloadAsync(new() { Timeout = (float) TimeSpan.FromHours(1).TotalMilliseconds });
 
         await func();
 
