@@ -10,28 +10,35 @@ public class Downloader : IDownloader
 {
     private static readonly WebClient WebClient = new();
 
+    private readonly string _metadataPath;
+    private readonly string _downloadPath;
+
     public Downloader(IConfiguration configuration)
     {
+        var pathsOptions = new PathsOptions();
+        configuration.GetSection(PathsOptions.Paths).Bind(pathsOptions);
 
+        _metadataPath = pathsOptions.MetadataPath;
+        _downloadPath = pathsOptions.DownloadPath;
     }
 
     public bool SceneImageExists(Scene scene)
     {
         // TODO: extension might not be jpg
-        var path = $@"B:\Ripping\{scene.Site.Name}\Metadata\SceneImages\{scene.Id}.jpg";
+        var path = Path.Combine(_metadataPath, $@"{scene.Site.Name}\Metadata\SceneImages\{scene.Id}.jpg");
         return File.Exists(path);
     }
 
     public bool GalleryImageExists(Gallery gallery)
     {
         // TODO: extension might not be jpg
-        var path = $@"B:\Ripping\{gallery.Site.Name}\Metadata\GalleryImages\{gallery.Id}.jpg";
+        var path = Path.Combine(_metadataPath, $@"{gallery.Site.Name}\Metadata\GalleryImages\{gallery.Id}.jpg");
         return File.Exists(path);
     }
 
     public async Task DownloadSceneImageAsync(Scene scene, string imageUrl, string referer = "")
     {
-        var rippingPath = $@"B:\Ripping\{scene.Site.Name}\Metadata\SceneImages\";
+        var rippingPath = Path.Combine(_metadataPath, $@"{scene.Site.Name}\Metadata\SceneImages\");
         Directory.CreateDirectory(rippingPath);
 
         await DownloadFileAsync(imageUrl, (int)scene.Id, rippingPath, referer);
@@ -39,7 +46,7 @@ public class Downloader : IDownloader
 
     public async Task DownloadGalleryImageasync(Gallery gallery, string imageUrl)
     {
-        var rippingPath = $@"B:\Ripping\{gallery.Site.Name}\Metadata\GalleryImages\";
+        var rippingPath = Path.Combine(_metadataPath, $@"{gallery.Site.Name}\Metadata\GalleryImages\");
         Directory.CreateDirectory(rippingPath);
 
         await DownloadFileAsync(imageUrl, (int)gallery.Id, rippingPath);
@@ -66,7 +73,7 @@ public class Downloader : IDownloader
             : nameWithoutSuffix + suffix;
 
         name = string.Concat(name.Split(Path.GetInvalidFileNameChars()));
-        var path = Path.Join(@"F:\", name);
+        var path = Path.Join(_downloadPath, name);
 
         Log.Verbose($"Downloading\r\n    URL:  {downloadDetails.Url}\r\n    Path: {path}");
 
@@ -100,9 +107,10 @@ public class Downloader : IDownloader
         }
     }
 
-    public async Task<string> DownloadCaptchaAudioAsync(string captchaUrl, string rippingPath)
+    public async Task<string> DownloadCaptchaAudioAsync(string captchaUrl)
     {
-        var tempPath = Path.Combine(rippingPath, $"{Guid.NewGuid()}.mp3");
+        var captchaDirPath = Path.Combine(_metadataPath, "CaptchaAudios");
+        var tempPath = Path.Combine(captchaDirPath, $"CAPTCHA_{DateTime.Now.ToString("yyyyMMddHHmmssfff")}.mp3");
         await WebClient.DownloadFileTaskAsync(new Uri(captchaUrl), tempPath);
         return tempPath;
     }

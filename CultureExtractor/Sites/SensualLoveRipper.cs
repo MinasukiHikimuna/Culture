@@ -139,22 +139,9 @@ public class SensualLoveRipper : ISceneScraper, ISceneDownloader
             _ => throw new InvalidOperationException("Could not find a download candidate!")
         };
 
-        var waitForDownloadTask = page.WaitForDownloadAsync();
-        await selectedDownload.ElementHandle.ClickAsync();
-        var download = await waitForDownloadTask;
-        var suggestedFilename = download.SuggestedFilename;
-
-        var suffix = Path.GetExtension(suggestedFilename);
-        var name = $"{performersStr} - {scene.Site.Name} - {scene.ReleaseDate.ToString("yyyy-MM-dd")} - {scene.Name}{suffix}";
-        name = string.Concat(name.Split(Path.GetInvalidFileNameChars()));
-
-        var path = Path.Join(@"F:\", name);
-
-        Log.Verbose($"Downloading\r\n    URL:  {selectedDownload.DownloadOption.Url}\r\n    Path: {path}");
-
-        await download.SaveAsAsync(path);
-
-        return new Download(scene, suggestedFilename, name, selectedDownload.DownloadOption);
+        return await _downloader.DownloadSceneAsync(page, selectedDownload.DownloadOption, scene, rippingPath, async () =>
+            await selectedDownload.ElementHandle.ClickAsync()
+        );
     }
 
     private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloadsAsync(IPage page)

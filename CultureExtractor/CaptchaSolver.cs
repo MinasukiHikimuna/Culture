@@ -41,7 +41,7 @@ namespace CultureExtractor
             await page.FrameLocator($"iframe[name=\"{innerIframeName}\"]").Locator("button#recaptcha-audio-button").ClickAsync();
             var audioUrl = await page.FrameLocator($"iframe[name=\"{innerIframeName}\"]").Locator("a.rc-audiochallenge-tdownload-link").GetAttributeAsync("href");
 
-            var audioPath = await _downloader.DownloadCaptchaAudioAsync(audioUrl, @"F:\");
+            var audioPath = await _downloader.DownloadCaptchaAudioAsync(audioUrl);
 
             var captchaBuster = new CaptchaBusterImplementation();
             var result = await captchaBuster.SolveCaptchaAsync(audioPath);

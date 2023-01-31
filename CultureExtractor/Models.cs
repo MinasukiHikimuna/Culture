@@ -86,3 +86,11 @@ public enum PreferredDownloadQuality
     Worst,
     Phash
 }
+
+public class PathsOptions
+{
+    public const string Paths = "Paths";
+
+    public string MetadataPath { get; set; } = String.Empty;
+    public string DownloadPath { get; set; } = String.Empty;
+}
