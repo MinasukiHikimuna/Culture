@@ -38,7 +38,7 @@ public class NewSensationsRipper : ISceneScraper, ISceneDownloader
         await page.Locator(".videothumb > a").First.ClickAsync();
         await page.GetByRole(AriaRole.Link, new() { NameString = "view all >" }).First.ClickAsync();
 
-        var lastPage = await page.Locator("div.pagination > ul > li > a").Nth(-2).TextContentAsync();
+        var lastPage = await page.Locator("div.pagination > ul > li:not(.pagination_jump) > a").Last.TextContentAsync();
         return int.Parse(lastPage);
     }
 
