@@ -2,8 +2,7 @@
 using CultureExtractor.Interfaces;
 using Microsoft.Playwright;
 using Serilog;
-using System.Reflection;
-using System.Runtime.CompilerServices;
+using System.IO;
 
 namespace CultureExtractor;
 
@@ -70,7 +69,8 @@ public class NetworkRipper : INetworkRipper
 
                             await scenePage.CloseAsync();
 
-                            Log.Information($"Scraped scene {savedScene.Id}: {url}");
+                            var sceneDescription = new { Site = scene.Site.Name, ReleaseDate = scene.ReleaseDate, Name = scene.Name, Url = site.Url + url };
+                            Log.Information("Scraped scene: {@Scene}", sceneDescription);
                             await Task.Delay(3000);
                         }
                         // TODO: need to figure out how we can do initial scraping, this is used for new sensations and its 323 pages
@@ -199,6 +199,9 @@ public class NetworkRipper : INetworkRipper
                             var savedScene = await _repository.UpsertScene(scene);
                             await sceneScraper.DownloadPreviewImageAsync(savedScene, scenePage, page, currentScene);
 
+                            var sceneDescription = new { Site = scene.Site.Name, ReleaseDate = scene.ReleaseDate, Name = scene.Name, Url = site.Url + url, Quality = downloadConditions.PreferredDownloadQuality };
+                            Log.Verbose("Downloading: {@Scene}", sceneDescription);
+
                             var download = await sceneDownloader.DownloadSceneAsync(scene, scenePage, downloadConditions);
                             await _repository.SaveDownloadAsync(download, downloadConditions.PreferredDownloadQuality);
 
@@ -206,7 +209,7 @@ public class NetworkRipper : INetworkRipper
 
                             await scenePage.CloseAsync();
 
-                            Log.Information($"Downloaded scene {savedScene.Id}: {download.DownloadOption.Url}");
+                            Log.Information("Downloaded:  {@Scene}", sceneDescription);
                             await Task.Delay(3000);
                         }
                         break;

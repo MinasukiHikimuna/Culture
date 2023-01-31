@@ -88,8 +88,6 @@ public class Downloader : IDownloader
         var downloadQualityDirectory = Path.Join(_downloadPath, Path.Join(scene.Site.Name, Enum.GetName(downloadQuality)));
         var path = Path.Join(downloadQualityDirectory, name);
 
-        Log.Verbose($"Downloading\r\n    URL:  {downloadDetails.Url}\r\n    Path: {path}");
-
         await download.SaveAsAsync(path);
 
         return new Download(scene, suggestedFilename, name, downloadDetails);
