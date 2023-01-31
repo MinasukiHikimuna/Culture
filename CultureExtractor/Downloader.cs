@@ -123,6 +123,8 @@ public class Downloader : IDownloader
     public async Task<string> DownloadCaptchaAudioAsync(string captchaUrl)
     {
         var captchaDirPath = Path.Combine(_metadataPath, "CaptchaAudios");
+        Directory.CreateDirectory(captchaDirPath);
+
         var tempPath = Path.Combine(captchaDirPath, $"CAPTCHA_{DateTime.Now.ToString("yyyyMMddHHmmssfff")}.mp3");
         await WebClient.DownloadFileTaskAsync(new Uri(captchaUrl), tempPath);
         return tempPath;
