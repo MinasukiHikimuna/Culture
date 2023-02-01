@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 
 namespace CultureExtractor;
 
@@ -14,9 +15,12 @@ public class SqliteContext : DbContext, ISqliteContext
 
     public string DbPath { get; }
 
-    public SqliteContext(DbContextOptions<SqliteContext> dbContextOptions)
+    public SqliteContext(IConfiguration configuration)
     {
-        DbPath = @"B:\Ripping\ripping.db";
+        var pathsOptions = new PathsOptions();
+        configuration.GetSection(PathsOptions.Paths).Bind(pathsOptions);
+
+        DbPath = pathsOptions.DatabasePath;
     }
 
     // The following configures EF to create a Sqlite database file in the
