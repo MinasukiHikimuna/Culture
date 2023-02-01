@@ -2,6 +2,7 @@
 using CultureExtractor.Interfaces;
 using Microsoft.Playwright;
 using Serilog;
+using System;
 using System.IO;
 
 namespace CultureExtractor;
@@ -124,7 +125,6 @@ public class NetworkRipper : INetworkRipper
         var matchingScenesStr = string.Join($"{Environment.NewLine}    ", matchingScenes.Select(s => $"{s.Site.Name} - {s.ReleaseDate.ToString("yyyy-MM-dd")} - {s.Name}"));
 
         ISceneDownloader sceneDownloader = (ISceneDownloader)_serviceProvider.GetService(typeof(ISceneDownloader));
-        ISceneScraper sceneScraper = (ISceneScraper) sceneDownloader;
         Log.Information($"Culture Extractor, using {sceneDownloader.GetType()}");
 
         Log.Information($"Found {matchingScenes.Count} scenes:{Environment.NewLine}    {matchingScenesStr}");
@@ -142,111 +142,94 @@ public class NetworkRipper : INetworkRipper
         // page.Response += (_, response) => Console.WriteLine("<< " + response.Status + " " + response.Url);
 
         var rippedScenes = 0;
-        var totalPages = await sceneScraper.NavigateToScenesAndReturnPageCountAsync(site, page);
 
-        for (int currentPage = 1; currentPage <= totalPages; currentPage++)
+        foreach (var matchingScene in matchingScenes)
         {
-            await Task.Delay(5000);
-            var currentScenes = await sceneScraper.GetCurrentScenesAsync(site, page);
-
-            Log.Information(totalPages == int.MaxValue
-                ? $"Batch {currentPage} of infinite page contains {currentScenes.Count} scenes"
-                : $"Page {currentPage}/{totalPages} contains {currentScenes.Count} scenes");
-
-            foreach (var currentScene in currentScenes)
+            if (rippedScenes >= downloadConditions.MaxDownloads)
             {
-                if (rippedScenes >= downloadConditions.MaxDownloads)
-                {
-                    Log.Information($"Maximum scene rip limit of {downloadConditions.MaxDownloads} reached. Stopping...");
-                    break;
-                }
-                if ((matchingScenes.Count - rippedScenes) % 10 == 0)
-                {
-                    Log.Information($"Remaining downloads {matchingScenes.Count - rippedScenes}/{matchingScenes.Count} scenes.");
-                }
-
-                // Ungh, throws exception
-                _downloader.CheckFreeSpace();
-
-                for (int retries = 0; retries < 3; retries++)
-                {
-                    try
-                    {
-                        (string url, string sceneShortName) = await sceneScraper.GetSceneIdAsync(site, currentScene);
-
-                        if (retries > 0)
-                        {
-                            Log.Information($"Retrying {retries + 1} attempt for {url}");
-                        }
-
-                        if (matchingScenes.Any(s => s.ShortName == sceneShortName))
-                        {
-                            var existingScene = await _repository.GetSceneAsync(site.ShortName, sceneShortName);
-                            await currentScene.ScrollIntoViewIfNeededAsync();
-
-                            var scenePage = await page.Context.RunAndWaitForPageAsync(async () =>
-                            {
-                                await currentScene.ClickAsync(new ElementHandleClickOptions() { Button = MouseButton.Middle });
-                            });
-                            await scenePage.WaitForLoadStateAsync();
-
-                            var scene = await sceneScraper.ScrapeSceneAsync(site, url, sceneShortName, scenePage);
-                            if (existingScene != null)
-                            {
-                                scene = scene with { Id = existingScene.Id };
-                            }
-
-                            var savedScene = await _repository.UpsertScene(scene);
-                            await sceneScraper.DownloadPreviewImageAsync(savedScene, scenePage, page, currentScene);
-
-                            var sceneDescription = new { Site = scene.Site.Name, ReleaseDate = scene.ReleaseDate, Name = scene.Name, Url = site.Url + url, Quality = downloadConditions.PreferredDownloadQuality };
-                            Log.Verbose("Downloading: {@Scene}", sceneDescription);
-
-                            var download = await sceneDownloader.DownloadSceneAsync(scene, scenePage, downloadConditions);
-                            await _repository.SaveDownloadAsync(download, downloadConditions.PreferredDownloadQuality);
-
-                            rippedScenes++;
-
-                            await scenePage.CloseAsync();
-
-                            Log.Information("Downloaded:  {@Scene}", sceneDescription);
-                            await Task.Delay(3000);
-                        }
-                        break;
-                    }
-                    catch (PlaywrightException ex)
-                    {
-                        // Let's try again
-                        Log.Error(ex.Message, ex);
-                    }
-                    catch (TimeoutException ex)
-                    {
-                        // Let's try again
-                        Log.Error(ex.Message, ex);
-                    }
-                    catch (DownloadException ex)
-                    {
-                        Log.Error(ex.Message, ex);
-                        if (ex.ShouldRetry)
-                        {
-                            continue;
-                        }
-                        else
-                        {
-                            break;
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Log.Error(ex.ToString(), ex);
-                        await Task.Delay(3000);
-                    }
-                }
+                Log.Information($"Maximum scene rip limit of {downloadConditions.MaxDownloads} reached. Stopping...");
+                break;
+            }
+            if ((matchingScenes.Count - rippedScenes) % 10 == 0)
+            {
+                Log.Information($"Remaining downloads {matchingScenes.Count - rippedScenes}/{matchingScenes.Count} scenes.");
             }
 
-            if (currentPage != totalPages)
+            // Ungh, throws exception
+            _downloader.CheckFreeSpace();
+
+            for (int retries = 0; retries < 3; retries++)
             {
-                await sceneScraper.GoToNextFilmsPageAsync(page);
+                try
+                {
+                    if (retries > 0)
+                    {
+                        Log.Information($"Retrying {retries + 1} attempt for {matchingScene.Url}");
+                    }
+
+                    var existingScene = await _repository.GetSceneAsync(site.ShortName, matchingScene.ShortName);
+
+                    var scenePage = await page.Context.NewPageAsync();
+                    await scenePage.GotoAsync(matchingScene.Url);
+                    await scenePage.WaitForLoadStateAsync();
+
+                    if (sceneDownloader is ISceneScraper sceneScraper)
+                    {
+                        var scene = await sceneScraper.ScrapeSceneAsync(site, matchingScene.Url, matchingScene.ShortName, scenePage);
+                        if (existingScene != null)
+                        {
+                            scene = scene with { Id = existingScene.Id };
+                        }
+
+                        existingScene = await _repository.UpsertScene(scene);
+                    }
+
+                    var sceneDescription = new {
+                        Site = existingScene.Site.Name,
+                        ReleaseDate = existingScene.ReleaseDate,
+                        Name = existingScene.Name,
+                        Url = site.Url + existingScene.Url,
+                        Quality = downloadConditions.PreferredDownloadQuality };
+                    Log.Verbose("Downloading: {@Scene}", sceneDescription);
+
+                    var download = await sceneDownloader.DownloadSceneAsync(existingScene, scenePage, downloadConditions);
+                    await _repository.SaveDownloadAsync(download, downloadConditions.PreferredDownloadQuality);
+
+                    rippedScenes++;
+
+                    await scenePage.CloseAsync();
+
+                    Log.Information("Downloaded:  {@Scene}", sceneDescription);
+                    await Task.Delay(3000);
+                    break;
+                }
+                catch (PlaywrightException ex)
+                {
+                    // Let's try again
+                    Log.Error(ex.Message, ex);
+                }
+                catch (TimeoutException ex)
+                {
+                    // Let's try again
+                    Log.Error(ex.Message, ex);
+                }
+                catch (DownloadException ex)
+                {
+                    Log.Error(ex.Message, ex);
+                    if (ex.ShouldRetry)
+                    {
+                        continue;
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log.Error(ex.ToString(), ex);
+                    await Task.Delay(3000);
+                }
             }
         }
     }
