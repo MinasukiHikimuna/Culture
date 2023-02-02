@@ -74,7 +74,7 @@ public class Downloader : IDownloader
 
         await func();
 
-        var download = await waitForDownloadTask;
+        IDownload download = await waitForDownloadTask;
         var suggestedFilename = download.SuggestedFilename;
         var suffix = Path.GetExtension(suggestedFilename);
         var nameWithoutSuffix = Regex.Replace($"{performersStr} - {scene.Site.Name} - {scene.ReleaseDate.ToString("yyyy-MM-dd")} - {scene.Name}", @"\s+", " ");
@@ -89,6 +89,7 @@ public class Downloader : IDownloader
         var path = Path.Join(downloadQualityDirectory, name);
 
         await download.SaveAsAsync(path);
+        await download.DeleteAsync();
 
         return new Download(scene, suggestedFilename, name, downloadDetails);
     }
