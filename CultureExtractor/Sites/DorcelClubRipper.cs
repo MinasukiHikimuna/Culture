@@ -1,6 +1,4 @@
-﻿using CultureExtractor.Exceptions;
-using CultureExtractor.Interfaces;
-using CultureExtractor.CaptchaBuster;
+﻿using CultureExtractor.Interfaces;
 using Microsoft.Playwright;
 using Serilog;
 using System.Text.RegularExpressions;
@@ -11,8 +9,6 @@ namespace CultureExtractor.Sites;
 [PornSite("dorcelclub")]
 public class DorcelClubRipper : ISceneScraper, ISceneDownloader
 {
-    private static readonly Random Random = new();
-
     private readonly IDownloader _downloader;
     private readonly ICaptchaSolver _captchaSolver;
 
