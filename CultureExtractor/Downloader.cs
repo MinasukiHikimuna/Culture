@@ -1,6 +1,5 @@
 ﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Playwright;
-using Serilog;
 using System.Net;
 using System.Text.RegularExpressions;
 
@@ -77,13 +76,17 @@ public class Downloader : IDownloader
         IDownload download = await waitForDownloadTask;
         var suggestedFilename = download.SuggestedFilename;
         var suffix = Path.GetExtension(suggestedFilename);
-        var nameWithoutSuffix = Regex.Replace($"{performersStr} - {scene.Site.Name} - {scene.ReleaseDate.ToString("yyyy-MM-dd")} - {scene.Name}", @"\s+", " ");
+        var nameWithoutSuffix =
+            string.Concat(
+                Regex.Replace(
+                    $"{performersStr} - {scene.Site.Name} - {scene.ReleaseDate.ToString("yyyy-MM-dd")} - {scene.Name}",
+                    @"\s+",
+                    " "
+                ).Split(Path.GetInvalidFileNameChars()));
 
-        var name = (nameWithoutSuffix + suffix).Length > 260
-            ? nameWithoutSuffix[..(260 - suffix.Length - 3)] + "..." + suffix
+        var name = (nameWithoutSuffix + suffix).Length > 244
+            ? nameWithoutSuffix[..(244 - suffix.Length - "...".Length)] + "..." + suffix
             : nameWithoutSuffix + suffix;
-
-        name = string.Concat(name.Split(Path.GetInvalidFileNameChars()));
 
         var downloadQualityDirectory = Path.Join(_downloadPath, Path.Join(scene.Site.Name, Enum.GetName(downloadQuality)));
         var path = Path.Join(downloadQualityDirectory, name);
