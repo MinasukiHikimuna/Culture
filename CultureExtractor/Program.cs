@@ -104,6 +104,9 @@ class BaseOptions
       Default = false,
       HelpText = "Prints all messages to standard output.")]
     public bool Verbose { get; set; }
+
+    [Option("browser-channel", Required = false, HelpText = "Browser channel")]
+    public string? BrowserChannel { get; set; }
 }
 
 [Verb("scrape", HelpText = "Scrape")]

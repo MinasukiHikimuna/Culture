@@ -32,7 +32,7 @@ class CultureExtractorConsoleApp
             Log.Information("Culture Extractor");
 
             string shortName = opts.SiteShortName;
-            var browserSettings = new BrowserSettings(!opts.VisibleBrowser);
+            var browserSettings = new BrowserSettings(!opts.VisibleBrowser, opts.BrowserChannel);
 
             var site = await _repository.GetSiteAsync(shortName);
             await _networkRipper.ScrapeScenesAsync(site, browserSettings, opts.FullScrape);
@@ -55,7 +55,7 @@ class CultureExtractorConsoleApp
             Log.Information("Culture Extractor");
 
             string shortName = opts.SiteShortName;
-            var browserSettings = new BrowserSettings(!opts.VisibleBrowser);
+            var browserSettings = new BrowserSettings(!opts.VisibleBrowser, opts.BrowserChannel);
 
             var dateRange = new DateRange(
                 string.IsNullOrEmpty(opts.FromDate) ? DateOnly.MinValue : DateOnly.Parse(opts.FromDate),

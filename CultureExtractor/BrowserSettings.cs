@@ -1,3 +1,3 @@
 ﻿namespace CultureExtractor;
 
-public record BrowserSettings(bool Headless);
+public record BrowserSettings(bool Headless, string BrowserChannel);
