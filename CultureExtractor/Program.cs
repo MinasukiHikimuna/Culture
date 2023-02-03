@@ -39,7 +39,7 @@ class Program
 
         var host = Host.CreateDefaultBuilder(args)
             .ConfigureServices(services => {
-                services.AddDbContext<ISqliteContext, SqliteContext>(options => options.UseSqlite());
+                services.AddDbContext<ISqliteContext, SqliteContext>(options => options.UseSqlite(@"Data Source=B:\Ripping\ripping.db"));
 
                 services.AddScoped<ICaptchaSolver, CaptchaSolver>();
                 services.AddScoped<IRepository, Repository>();
