@@ -50,7 +50,7 @@ public record DownloadConditions(
     DateRange? DateRange,
     PreferredDownloadQuality PreferredDownloadQuality,
     int? MaxDownloads,
-    IList<string>? PerformerShortNames,
+    IList<string>? PerformerNames,
     IList<string>? SceneIds
 )
 {

@@ -1,8 +1,10 @@
 ﻿using CultureExtractor.Exceptions;
 using CultureExtractor.Interfaces;
 using Microsoft.Playwright;
+using Newtonsoft.Json;
 using Serilog;
 using System;
+using System.Collections;
 using System.IO;
 
 namespace CultureExtractor;
@@ -53,10 +55,38 @@ public class NetworkRipper : INetworkRipper
                         var existingScene = await _repository.GetSceneAsync(site.ShortName, sceneShortName);
                         if (existingScene == null || fullScrape)
                         {
-                            var scenePage = await page.Context.RunAndWaitForPageAsync(async () =>
+                            var scenePage = await page.Context.NewPageAsync();
+
+                            /*var requests = new List<IRequest>();
+                            scenePage.Request += (_, request) =>
                             {
-                                await currentScene.ClickAsync(new ElementHandleClickOptions() { Button = MouseButton.Middle });
-                            });
+                                Console.WriteLine(">> " + request.Method + " " + request.Url);
+                                requests.Add(request);
+                            };*/
+
+                            var responses = new List<IResponse>();
+                            scenePage.Response += async (_, response) =>
+                            {
+                                if (response.Url.Contains("algolia.net"))
+                                {
+                                    var body = await response.BodyAsync();
+                                    var foo = System.Text.Encoding.UTF8.GetString(body);
+
+                                    try
+                                    {
+                                        var dynamicObject = JsonConvert.DeserializeObject<dynamic>(foo)!;
+                                    }
+                                    catch (Exception ex)
+                                    {
+
+                                    }
+
+                                    Console.WriteLine("<< " + response.Status + " " + response.Url);
+                                    responses.Add(response);
+                                }
+                            };
+
+                            await scenePage.GotoAsync(url);
                             await scenePage.WaitForLoadStateAsync();
 
                             var scene = await sceneScraper.ScrapeSceneAsync(site, url, sceneShortName, scenePage);
@@ -106,8 +136,8 @@ public class NetworkRipper : INetworkRipper
                 downloadConditions.DateRange.Start <= s.ReleaseDate &&
                 s.ReleaseDate <= downloadConditions.DateRange.End)
             .Where(s =>
-                !downloadConditions.PerformerShortNames.Any() ||
-                s.Performers.Any(p => downloadConditions.PerformerShortNames.Contains(p.ShortName)))
+                !downloadConditions.PerformerNames.Any() ||
+                s.Performers.Any(p => downloadConditions.PerformerNames.Contains(p.Name)))
             .Where(s =>
                 !downloadConditions.SceneIds.Any() ||
                 downloadConditions.SceneIds.Contains(s.ShortName))
@@ -139,7 +169,8 @@ public class NetworkRipper : INetworkRipper
 
         // TODO: investigate later how we could utilize these for example to download images
         // page.Request += (_, request) => Console.WriteLine(">> " + request.Method + " " + request.Url);
-        // page.Response += (_, response) => Console.WriteLine("<< " + response.Status + " " + response.Url);
+        // page.Response += (_, response) =>
+        //    Console.WriteLine("<< " + response.Status + " " + response.Url);
 
         var rippedScenes = 0;
 
