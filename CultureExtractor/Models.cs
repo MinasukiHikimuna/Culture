@@ -95,3 +95,5 @@ public class PathsOptions
     public string MetadataPath { get; set; } = String.Empty;
     public string DownloadPath { get; set; } = String.Empty;
 }
+
+public record CapturedResponse(string Name, IResponse Response);

@@ -93,7 +93,7 @@ public class DorcelClubRipper : ISceneScraper, ISceneDownloader
         await page.GetByRole(AriaRole.Button).Filter(new() { HasTextString = "See more" }).ClickAsync();
     }
 
-    public async Task<Scene> ScrapeSceneAsync(Site site, string url, string sceneShortName, IPage page)
+    public async Task<Scene> ScrapeSceneAsync(Site site, string url, string sceneShortName, IPage page, IList<CapturedResponse> responses)
     {
         var releaseDateRaw = await page.Locator("div.right > span.publish_date").TextContentAsync();
         var releaseDate = DateOnly.Parse(releaseDateRaw);

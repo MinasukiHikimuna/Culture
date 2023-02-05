@@ -2,9 +2,7 @@
 using Microsoft.Playwright;
 using Serilog;
 using System.Net;
-using System.Security.Cryptography.X509Certificates;
 using System.Text.RegularExpressions;
-using static System.Net.Mime.MediaTypeNames;
 
 namespace CultureExtractor.Sites;
 
@@ -100,7 +98,7 @@ public class WowNetworkRipper : ISceneScraper, ISceneDownloader
         return (url, match.Groups["id"].Value);
     }
 
-    public async Task<Scene> ScrapeSceneAsync(Site site, string url, string sceneShortName, IPage page)
+    public async Task<Scene> ScrapeSceneAsync(Site site, string url, string sceneShortName, IPage page, IList<CapturedResponse> responses)
     {
         await page.WaitForLoadStateAsync();
 

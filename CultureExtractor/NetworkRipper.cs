@@ -1,11 +1,7 @@
 ﻿using CultureExtractor.Exceptions;
 using CultureExtractor.Interfaces;
 using Microsoft.Playwright;
-using Newtonsoft.Json;
 using Serilog;
-using System;
-using System.Collections;
-using System.IO;
 
 namespace CultureExtractor;
 
@@ -57,39 +53,20 @@ public class NetworkRipper : INetworkRipper
                         {
                             var scenePage = await page.Context.NewPageAsync();
 
-                            /*var requests = new List<IRequest>();
-                            scenePage.Request += (_, request) =>
-                            {
-                                Console.WriteLine(">> " + request.Method + " " + request.Url);
-                                requests.Add(request);
-                            };*/
-
-                            var responses = new List<IResponse>();
+                            var responses = new List<CapturedResponse>();
                             scenePage.Response += async (_, response) =>
                             {
-                                if (response.Url.Contains("algolia.net"))
+                                var capturedResponse = await sceneScraper.FilterResponsesAsync(sceneShortName, response);
+                                if (capturedResponse != null)
                                 {
-                                    var body = await response.BodyAsync();
-                                    var foo = System.Text.Encoding.UTF8.GetString(body);
-
-                                    try
-                                    {
-                                        var dynamicObject = JsonConvert.DeserializeObject<dynamic>(foo)!;
-                                    }
-                                    catch (Exception ex)
-                                    {
-
-                                    }
-
-                                    Console.WriteLine("<< " + response.Status + " " + response.Url);
-                                    responses.Add(response);
+                                    responses.Add(capturedResponse);
                                 }
                             };
 
                             await scenePage.GotoAsync(url);
                             await scenePage.WaitForLoadStateAsync();
 
-                            var scene = await sceneScraper.ScrapeSceneAsync(site, url, sceneShortName, scenePage);
+                            var scene = await sceneScraper.ScrapeSceneAsync(site, url, sceneShortName, scenePage, responses);
                             if (existingScene != null)
                             {
                                 scene = scene with { Id = existingScene.Id };
@@ -206,7 +183,7 @@ public class NetworkRipper : INetworkRipper
 
                     if (sceneDownloader is ISceneScraper sceneScraper)
                     {
-                        var scene = await sceneScraper.ScrapeSceneAsync(site, matchingScene.Url, matchingScene.ShortName, scenePage);
+                        var scene = await sceneScraper.ScrapeSceneAsync(site, matchingScene.Url, matchingScene.ShortName, scenePage, new List<CapturedResponse>());
                         if (existingScene != null)
                         {
                             scene = scene with { Id = existingScene.Id };

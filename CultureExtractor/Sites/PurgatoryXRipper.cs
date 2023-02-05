@@ -78,7 +78,7 @@ public class PurgatoryXRipper : ISceneScraper, ISceneDownloader
         await page.GetByRole(AriaRole.Link, new() { NameString = "Next »" }).ClickAsync();
     }
 
-    public async Task<Scene> ScrapeSceneAsync(Site site, string url, string sceneShortName, IPage page)
+    public async Task<Scene> ScrapeSceneAsync(Site site, string url, string sceneShortName, IPage page, IList<CapturedResponse> responses)
     {
         Thread.Sleep(5000);
 

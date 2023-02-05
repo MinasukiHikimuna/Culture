@@ -124,7 +124,7 @@ public class MetArtNetworkRipper : ISceneScraper, ISceneDownloader
         return (url, sceneShortName);
     }
 
-    public async Task<Scene> ScrapeSceneAsync(Site site, string url, string sceneShortName, IPage page)
+    public async Task<Scene> ScrapeSceneAsync(Site site, string url, string sceneShortName, IPage page, IList<CapturedResponse> responses)
     {
         var releaseDate = await ScrapeReleaseDateAsync(page);
         var duration = await ScrapeDurationAsync(page);

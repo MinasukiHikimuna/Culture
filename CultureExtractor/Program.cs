@@ -13,7 +13,7 @@ class Program
     {
         if (System.Diagnostics.Debugger.IsAttached)
         {
-            var siteShortName = "dorcelclub";
+            var siteShortName = "adulttime";
 
             /*args = new string[] {
                 "scrape",
@@ -22,7 +22,7 @@ class Program
                 "--full"
             };*/
             args = new string[] {
-                "download",
+                "scrape",
                 "--site-short-name", siteShortName,
                 /*"--scenes",
                     "464", "462", "530", "557", "555", "554", "551", "549", "548", "541", "531",
@@ -30,6 +30,7 @@ class Program
                     "477", "458",*/
                 "--verbose",
                 "--visible-browser",
+                // "--best",
                 // "--from", "2020-01-01",
                 // "--to", "2020-12-31",
             };
