@@ -67,7 +67,7 @@ class CultureExtractorConsoleApp
             {
                 DateRange = dateRange,
                 SceneIds = opts.SceneIds.ToList() ?? new List<string>(),
-                PerformerShortNames = opts.Performers.ToList() ?? new List<string>()
+                PerformerNames = opts.Performers.ToList() ?? new List<string>()
             };
 
             var site = await _repository.GetSiteAsync(shortName);
