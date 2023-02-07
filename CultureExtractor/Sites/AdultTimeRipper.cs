@@ -718,7 +718,7 @@ public class AdultTimeRipper : ISceneScraper, ISceneDownloader
             JsonSerializer.Serialize(sceneDocument)
         );
 
-        if (sceneData.subtitles != null)
+        if (sceneData.subtitles?.full?.en != null)
         {
             var subtitleFilename = SceneNamer.Name(scene, ".vtt");
             await _downloader.DownloadSceneSubtitlesAsync(scene, subtitleFilename, "https://subtitles.gammacdn.com/" + sceneData.subtitles.full.en, page.Url);
