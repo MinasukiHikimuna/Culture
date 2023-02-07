@@ -41,6 +41,7 @@ public class NetworkRipper : INetworkRipper
                 {
                     try
                     {
+                        await currentScene.ScrollIntoViewIfNeededAsync();
                         (string url, string sceneShortName) = await sceneScraper.GetSceneIdAsync(site, currentScene);
 
                         if (retries > 0)
