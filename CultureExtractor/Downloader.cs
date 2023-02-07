@@ -69,7 +69,7 @@ public class Downloader : IDownloader
         await DownloadFileAsync(subtitleUrl, fileName, rippingPath, referer);
     }
 
-    public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadOption downloadDetails, PreferredDownloadQuality downloadQuality, Func<Task> func)
+    public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadOption downloadDetails, PreferredDownloadQuality downloadQuality, Func<Task> func, string? filename = null)
     {
         var waitForDownloadTask = page.WaitForDownloadAsync(new() { Timeout = (float) TimeSpan.FromHours(1).TotalMilliseconds });
 
@@ -79,7 +79,9 @@ public class Downloader : IDownloader
         var suggestedFilename = download.SuggestedFilename;
         var suffix = Path.GetExtension(suggestedFilename);
 
-        var name = SceneNamer.Name(scene, suffix);
+        var name = string.IsNullOrWhiteSpace(filename)
+            ? SceneNamer.Name(scene, suffix)
+            : $"{filename}";
 
         var downloadQualityDirectory = Path.Join(_downloadPath, Path.Join(scene.Site.Name, Enum.GetName(downloadQuality)));
         var path = Path.Join(downloadQualityDirectory, name);

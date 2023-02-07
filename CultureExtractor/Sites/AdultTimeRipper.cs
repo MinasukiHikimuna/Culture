@@ -739,7 +739,7 @@ public class AdultTimeRipper : ISceneScraper, ISceneDownloader
         var body = await sceneMetadataResponse.Response.BodyAsync();
         var foo = System.Text.Encoding.UTF8.GetString(body);
 
-        var data = System.Text.Json.JsonSerializer.Deserialize<Rootobject>(foo)!;
+        var data = JsonSerializer.Deserialize<Rootobject>(foo)!;
 
 
         var sceneData = data.results[0].hits[0];
@@ -755,6 +755,23 @@ public class AdultTimeRipper : ISceneScraper, ISceneDownloader
         };
 
         IPage newPage = await page.Context.NewPageAsync();
+
+        var performerNames = scene.Performers.Select(p => p.Name).ToList();
+        var performersStr = performerNames.Count() > 1
+            ? string.Join(", ", performerNames.SkipLast(1)) + " & " + performerNames.Last()
+            : performerNames.FirstOrDefault();
+        var nameWithoutSuffix =
+            string.Concat(
+                Regex.Replace(
+                    $"{performersStr} - Adult Time - {sceneData.mainChannel.name} - {scene.ReleaseDate.ToString("yyyy-MM-dd")} - {scene.Name}",
+                    @"\s+",
+                    " "
+                ).Split(Path.GetInvalidFileNameChars()));
+
+        var suffix = ".mp4";
+        var name = (nameWithoutSuffix + suffix).Length > 244
+            ? nameWithoutSuffix[..(244 - suffix.Length - "...".Length)] + "..." + suffix
+            : nameWithoutSuffix + suffix;
 
         // TODO: does download but Playwright won't detect when it finishes
         var download = await _downloader.DownloadSceneAsync(scene, newPage, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, async () =>
@@ -774,7 +791,7 @@ public class AdultTimeRipper : ISceneScraper, ISceneDownloader
                     throw;
                 }
             }
-        });
+        }, name);
 
         await newPage.CloseAsync();
 
