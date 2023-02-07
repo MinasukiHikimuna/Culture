@@ -591,6 +591,8 @@ public class AdultTimeRipper : ISceneScraper, ISceneDownloader
         await page.WaitForLoadStateAsync();
 
         await page.Locator("div.FilterPanelItem-Categories a").Filter(new() { HasTextString = "Adult Time Original" }).ClickAsync();
+        await page.WaitForLoadStateAsync();
+
         var totalCount = await page.Locator("span.SearchListing-ResultCount-Text").TextContentAsync();
         Log.Information(totalCount);
 
