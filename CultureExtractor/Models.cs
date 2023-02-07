@@ -32,7 +32,8 @@ public record Scene(
     double Duration,
     IEnumerable<SitePerformer> Performers,
     IEnumerable<SiteTag> Tags,
-    IEnumerable<DownloadOption> DownloadOptions);
+    IEnumerable<DownloadOption> DownloadOptions,
+    string JsonDocument);
 
 public record Gallery(
     int? Id,

@@ -121,7 +121,8 @@ public class WowNetworkRipper : ISceneScraper, ISceneDownloader
             duration.TotalSeconds,
             performers,
             tags,
-            downloadOptionsAndHandles.Select(f => f.DownloadOption).ToList()
+            downloadOptionsAndHandles.Select(f => f.DownloadOption).ToList(),
+            "{}"
         );
     }
 

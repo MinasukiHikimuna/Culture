@@ -15,6 +15,11 @@ public class SqliteContext : DbContext, ISqliteContext
 
     public string DbPath { get; }
 
+    public SqliteContext()
+    {
+        DbPath = @"B:\Ripping\ripping.db";
+    }
+
     public SqliteContext(IConfiguration configuration)
     {
         var pathsOptions = new PathsOptions();
@@ -88,6 +93,7 @@ public class SceneEntity
     public required ICollection<SitePerformerEntity> Performers { get; set; }
     public required ICollection<SiteTagEntity> Tags { get; set; }
     public required string DownloadOptions { get; set; }
+    public required string JsonDocument { get; set; }
 
     public required int SiteId { get; set; }
     public required SiteEntity Site { get; set; }

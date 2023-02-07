@@ -672,7 +672,8 @@ public class AdultTimeRipper : ISceneScraper, ISceneDownloader
             duration.TotalSeconds,
             performers,
             tags,
-            downloadOptionsAndHandles.Select(f => f.DownloadOption).ToList()
+            downloadOptionsAndHandles.Select(f => f.DownloadOption).ToList(),
+            "{}"
         );
 
         if (sceneData.subtitles != null)

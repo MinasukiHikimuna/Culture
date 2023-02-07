@@ -111,6 +111,8 @@ public class Repository : IRepository
                 SiteId = siteEntity.Id,
                 Site = siteEntity,
 
+                JsonDocument = scene.JsonDocument,
+
                 Downloads = new List<DownloadEntity>(),
                 DownloadOptions = JsonSerializer.Serialize(scene.DownloadOptions)
             };
@@ -259,7 +261,8 @@ public class Repository : IRepository
             sceneEntity.Duration,
             sceneEntity.Performers.Select(Convert),
             sceneEntity.Tags.Select(Convert),
-            JsonSerializer.Deserialize<IEnumerable<DownloadOption>>(downloadOptions));
+            JsonSerializer.Deserialize<IEnumerable<DownloadOption>>(downloadOptions),
+            sceneEntity.JsonDocument);
     }
 
     private static Gallery Convert(GalleryEntity galleryEntity)
