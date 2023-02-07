@@ -45,14 +45,15 @@ public class Repository : IRepository
         return siteEntities.Select(Convert).AsEnumerable();
     }
 
-    public async Task<IEnumerable<Scene>> QueryScenesAsync(Site site, PreferredDownloadQuality preferredDownloadQuality)
+    public async Task<IEnumerable<Scene>> QueryScenesAsync(Site site, DownloadConditions downloadConditions)
     {
         var siteEntities = await _sqliteContext.Scenes
             .Include(s => s.Site)
             .Include(s => s.Performers)
             .Include(s => s.Tags)
             .Where(s => s.SiteId == site.Id)
-            .Where(s => !s.Downloads.Any(d => d.DownloadQuality == Enum.GetName(preferredDownloadQuality)))
+            .Where(s => !downloadConditions.DownloadedFileNames.Any() || s.Downloads.Any(d => downloadConditions.DownloadedFileNames.Contains(d.SavedFilename)))
+            .Where(s => !s.Downloads.Any(d => d.DownloadQuality == Enum.GetName(downloadConditions.PreferredDownloadQuality)))
             .OrderBy(s => s.Site.Name)
             .ThenByDescending(s => s.ReleaseDate)
             .ToListAsync();

@@ -7,7 +7,7 @@
         Task<IEnumerable<Scene>> GetScenesAsync();
         Task<Site> GetSiteAsync(string shortName);
         Task<IEnumerable<Site>> GetSitesAsync();
-        Task<IEnumerable<Scene>> QueryScenesAsync(Site site, PreferredDownloadQuality preferredDownloadQuality);
+        Task<IEnumerable<Scene>> QueryScenesAsync(Site site, DownloadConditions downloadConditions);
         Task SaveDownloadAsync(Download download, PreferredDownloadQuality preferredDownloadQuality);
         Task<Gallery> SaveGalleryAsync(Gallery gallery);
         Task UpdateStorageStateAsync(Site site, string storageState);

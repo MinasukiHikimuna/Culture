@@ -137,4 +137,7 @@ class DownloadOptions : BaseOptions
 
     [Option("performers", Required = false, HelpText = "One or more performers to download")]
     public IEnumerable<string> Performers { get; set; }
+
+    [Option("downloaded-file-names", Required = false, HelpText = "Downloaded file names which should be re-downloaded with best quality")]
+    public IEnumerable<string> DownloadedFileNames { get; set; }
 }
