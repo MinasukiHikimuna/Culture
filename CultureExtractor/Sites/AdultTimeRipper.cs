@@ -1,11 +1,27 @@
 ﻿using CultureExtractor.Interfaces;
 using Microsoft.Playwright;
 using Serilog;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 
 namespace CultureExtractor.Sites;
 
+public record AdultTimeSceneDocument(
+    Guid Id,
+    string Network,
+    string Site,
+    DateOnly ReleaseDate,
+    string ShortName,
+    string Name,
+    string Url,
+    string Description,
+    TimeSpan Duration,
+    IEnumerable<SitePerformer> Performers,
+    IEnumerable<Director> Directors,
+    IEnumerable<SiteTag> Tags,
+    IEnumerable<DownloadOption> DownloadOptions,
+    IEnumerable<ActionTag> Markers);
 
 public class Rootobject
 {
@@ -14,7 +30,7 @@ public class Rootobject
 
 public class Result
 {
-    public Hit[] hits { get; set; }
+    public AdultTimeScene[] hits { get; set; }
     public int nbHits { get; set; }
     public int page { get; set; }
     public int nbPages { get; set; }
@@ -198,8 +214,21 @@ public class Clip_Id1
     public long sum { get; set; }
 }
 
-public class Hit
+public class AdultTimeScene
 {
+    // Selected properties
+    [JsonPropertyName("action_tags")]
+    public ActionTag[] ActionTags { get; set; }
+    [JsonPropertyName("directors")]
+    public Director[] Directors { get; set; }
+    [JsonPropertyName("trailers")]
+    public Dictionary<string, string> Trailers { get; set; }
+    [JsonPropertyName("download_file_sizes")]
+    public Dictionary<string, long> DownloadFileSizes { get; set; }
+    [JsonPropertyName("actors")]
+    public Actor[] Actors { get; set; }
+
+    // Generated properties
     public object subtitle_id { get; set; }
     public int clip_id { get; set; }
     public string title { get; set; }
@@ -225,13 +254,10 @@ public class Hit
     public int studio_id { get; set; }
     public string studio_name { get; set; }
     public string category_ids { get; set; }
-    public Director[] directors { get; set; }
     public string network_name { get; set; }
     public string network_id { get; set; }
     public string original { get; set; }
     public string segment_site_id { get; set; }
-    [JsonPropertyName("trailers")]
-    public Dictionary<string, string> Trailers { get; set; }
     public string url_title { get; set; }
     public string url_movie_title { get; set; }
     public string length_range_15min { get; set; }
@@ -240,7 +266,6 @@ public class Hit
     public string photoset_url_name { get; set; }
     public Network network { get; set; }
     public int date { get; set; }
-    public Actor1[] actors { get; set; }
     public Female_Actors[] female_actors { get; set; }
     public Category1[] categories { get; set; }
     public string[] master_categories { get; set; }
@@ -250,9 +275,6 @@ public class Hit
     public int shemale { get; set; }
     public string[] pictures_qualifier { get; set; }
     public Pictures pictures { get; set; }
-
-    [JsonPropertyName("download_file_sizes")]
-    public Dictionary<string, long> DownloadFileSizes { get; set; }
     public string[] download_sizes { get; set; }
     public string[] availableOnSite { get; set; }
     public string[] content_tags { get; set; }
@@ -275,7 +297,6 @@ public class Hit
     public Subtitles subtitles { get; set; }
     public int views { get; set; }
     public int single_site_views { get; set; }
-    public Action_Tags[] action_tags { get; set; }
     public string objectID { get; set; }
     public _Highlightresult _highlightResult { get; set; }
 }
@@ -391,7 +412,7 @@ public class _Highlightresult
     public Description description { get; set; }
     public Movie_Title movie_title { get; set; }
     public Sitename sitename { get; set; }
-    public Actor[] actors { get; set; }
+    public ActorHiglight[] actors { get; set; }
     public Category[] categories { get; set; }
     public Availableonsite[] availableOnSite { get; set; }
     public Content_Tags[] content_tags { get; set; }
@@ -433,7 +454,7 @@ public class Sitename
     public object[] matchedWords { get; set; }
 }
 
-public class Actor
+public class ActorHiglight
 {
     public Name name { get; set; }
 }
@@ -489,7 +510,7 @@ public class Director
     public string url_name { get; set; }
 }
 
-public class Actor1
+public class Actor
 {
     public string actor_id { get; set; }
     public string name { get; set; }
@@ -519,10 +540,12 @@ public class Channel1
     public string type { get; set; }
 }
 
-public class Action_Tags
+public class ActionTag
 {
-    public string name { get; set; }
-    public string timecode { get; set; }
+    [JsonPropertyName("name")]
+    public string Name { get; set; }
+    [JsonPropertyName("timecode")]
+    public string Timecode { get; set; }
 }
 
 public enum AdultTimeRequestType {
@@ -642,7 +665,7 @@ public class AdultTimeRipper : ISceneScraper, ISceneDownloader
         var title = sceneData.title;
 
         var performers = new List<SitePerformer>();
-        foreach (var performer in sceneData.actors)
+        foreach (var performer in sceneData.Actors)
         {
             var shortName = $"{performer.url_name}/{performer.actor_id}";
             var performerUrl = $"/en/pornstar/view/{shortName}";
@@ -661,6 +684,22 @@ public class AdultTimeRipper : ISceneScraper, ISceneDownloader
         string description = sceneData.description.Replace("</br>", Environment.NewLine);
         var downloadOptionsAndHandles = await ParseAvailableDownloadsAsync(sceneData);
 
+        var sceneDocument = new AdultTimeSceneDocument(
+            Guid.NewGuid(),
+            site.Name,
+            sceneData.mainChannel.name,
+            releaseDate,
+            sceneShortName,
+            title,
+            url,
+            description,
+            duration,
+            performers,
+            sceneData.Directors,
+            tags,
+            downloadOptionsAndHandles.Select(f => f.DownloadOption).ToList(),
+            sceneData.ActionTags != null ? sceneData.ActionTags : new List<ActionTag>());
+
         Scene scene = new Scene(
             null,
             site,
@@ -673,7 +712,7 @@ public class AdultTimeRipper : ISceneScraper, ISceneDownloader
             performers,
             tags,
             downloadOptionsAndHandles.Select(f => f.DownloadOption).ToList(),
-            "{}"
+            JsonSerializer.Serialize(sceneDocument)
         );
 
         if (sceneData.subtitles != null)
@@ -739,7 +778,7 @@ public class AdultTimeRipper : ISceneScraper, ISceneDownloader
         return download;
     }
 
-    private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloadsAsync(Hit sceneData)
+    private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloadsAsync(AdultTimeScene sceneData)
     {
         var availableDownloads = new List<DownloadDetailsAndElementHandle>();
 
