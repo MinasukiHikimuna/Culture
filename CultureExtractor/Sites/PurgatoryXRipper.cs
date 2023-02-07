@@ -121,7 +121,8 @@ public class PurgatoryXRipper : ISceneScraper, ISceneDownloader
             duration.TotalSeconds,
             performers,
             new List<SiteTag>(),
-            downloadOptionsAndHandles.Select(f => f.DownloadOption).ToList()
+            downloadOptionsAndHandles.Select(f => f.DownloadOption).ToList(),
+            "{}"
         );
     }
 
