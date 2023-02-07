@@ -157,7 +157,7 @@ public class CzechVRNetworkRipper : ISceneScraper, ISceneDownloader
         await page.Locator("div.strankovani > span > a.next").ClickAsync();
     }
 
-    public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions)
+    public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions, IList<CapturedResponse> responses)
     {
         await page.GotoAsync(scene.Url);
         await page.WaitForLoadStateAsync();

@@ -233,7 +233,7 @@ public class MetArtNetworkRipper : ISceneScraper, ISceneDownloader
         await page.GetByRole(AriaRole.Link, new() { NameString = ">" }).ClickAsync();
     }
 
-    public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions)
+    public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions, IList<CapturedResponse> responses)
     {
         await page.GotoAsync(scene.Url);
         await page.WaitForLoadStateAsync();

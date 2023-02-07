@@ -146,7 +146,7 @@ public class DorcelClubRipper : ISceneScraper, ISceneDownloader
         );
     }
 
-    public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions)
+    public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions, IList<CapturedResponse> responses)
     {
         var availableDownloads = await ParseAvailableDownloadsAsync(page);
         

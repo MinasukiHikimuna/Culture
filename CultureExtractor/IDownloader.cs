@@ -11,5 +11,6 @@ namespace CultureExtractor
         bool GalleryImageExists(Gallery gallery);
         bool SceneImageExists(Scene scene);
         Task<string> DownloadCaptchaAudioAsync(string captchaUrl);
+        Task DownloadSceneSubtitlesAsync(Scene scene, string fileName, string subtitleUrl, string referer = "");
     }
 }

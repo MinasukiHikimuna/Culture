@@ -1,7 +1,6 @@
 ﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Playwright;
 using System.Net;
-using System.Text.RegularExpressions;
 
 namespace CultureExtractor;
 
@@ -51,7 +50,7 @@ public class Downloader : IDownloader
         var rippingPath = Path.Combine(_metadataPath, $@"{scene.Site.Name}\Metadata\SceneImages\");
         Directory.CreateDirectory(rippingPath);
 
-        await DownloadFileAsync(imageUrl, (int)scene.Id, rippingPath, referer);
+        await DownloadFileAsync(imageUrl, $"{scene.Id}.jpg", rippingPath, referer);
     }
 
     public async Task DownloadGalleryImageasync(Gallery gallery, string imageUrl)
@@ -59,16 +58,19 @@ public class Downloader : IDownloader
         var rippingPath = Path.Combine(_metadataPath, $@"{gallery.Site.Name}\Metadata\GalleryImages\");
         Directory.CreateDirectory(rippingPath);
 
-        await DownloadFileAsync(imageUrl, (int)gallery.Id, rippingPath);
+        await DownloadFileAsync(imageUrl, $"{gallery.Id}.jpg", rippingPath);
+    }
+
+    public async Task DownloadSceneSubtitlesAsync(Scene scene, string fileName, string subtitleUrl, string referer = "")
+    {
+        var rippingPath = Path.Combine(_metadataPath, $@"{scene.Site.Name}\Metadata\Subtitles\");
+        Directory.CreateDirectory(rippingPath);
+
+        await DownloadFileAsync(subtitleUrl, fileName, rippingPath, referer);
     }
 
     public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadOption downloadDetails, PreferredDownloadQuality downloadQuality, Func<Task> func)
     {
-        var performerNames = scene.Performers.Select(p => p.Name).ToList();
-        var performersStr = performerNames.Count() > 1
-            ? string.Join(", ", performerNames.SkipLast(1)) + " & " + performerNames.Last()
-            : performerNames.FirstOrDefault();
-
         var waitForDownloadTask = page.WaitForDownloadAsync(new() { Timeout = (float) TimeSpan.FromHours(1).TotalMilliseconds });
 
         await func();
@@ -76,17 +78,8 @@ public class Downloader : IDownloader
         IDownload download = await waitForDownloadTask;
         var suggestedFilename = download.SuggestedFilename;
         var suffix = Path.GetExtension(suggestedFilename);
-        var nameWithoutSuffix =
-            string.Concat(
-                Regex.Replace(
-                    $"{performersStr} - {scene.Site.Name} - {scene.ReleaseDate.ToString("yyyy-MM-dd")} - {scene.Name}",
-                    @"\s+",
-                    " "
-                ).Split(Path.GetInvalidFileNameChars()));
 
-        var name = (nameWithoutSuffix + suffix).Length > 244
-            ? nameWithoutSuffix[..(244 - suffix.Length - "...".Length)] + "..." + suffix
-            : nameWithoutSuffix + suffix;
+        var name = SceneNamer.Name(scene, suffix);
 
         var downloadQualityDirectory = Path.Join(_downloadPath, Path.Join(scene.Site.Name, Enum.GetName(downloadQuality)));
         var path = Path.Join(downloadQualityDirectory, name);
@@ -97,18 +90,18 @@ public class Downloader : IDownloader
         return new Download(scene, suggestedFilename, name, downloadDetails);
     }
 
-    private static async Task DownloadFileAsync(string imageUrl, int fileId, string rippingPath, string referer = "")
+    private static async Task DownloadFileAsync(string url, string fileName, string rippingPath, string referer = "")
     {
         string? tempPath = null;
         try
         {
-            tempPath = Path.Combine(rippingPath, $"{Guid.NewGuid()}.jpg");
-            var finalPath = Path.Combine(rippingPath, $"{fileId}.jpg");
+            tempPath = Path.Combine(rippingPath, $"{Guid.NewGuid()}");
+            var finalPath = Path.Combine(rippingPath, fileName);
 
             WebClient.Headers.Clear();
             WebClient.Headers["Referer"] = referer;
 
-            await WebClient.DownloadFileTaskAsync(new Uri(imageUrl), tempPath);
+            await WebClient.DownloadFileTaskAsync(new Uri(url), tempPath);
             File.Move(tempPath, finalPath, true);
         }
         catch

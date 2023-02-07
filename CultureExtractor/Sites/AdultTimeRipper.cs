@@ -2,6 +2,7 @@
 using Microsoft.Playwright;
 using Serilog;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 
 namespace CultureExtractor.Sites;
 
@@ -575,8 +576,17 @@ public class AdultTimeRipper : ISceneScraper, ISceneDownloader
 
     public async Task DownloadPreviewImageAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene)
     {
-        var url = await scenePage.GetAttributeAsync("img#default_poster", "src");
-        await _downloader.DownloadSceneImageAsync(scene, url);
+        var url = await scenePage.GetAttributeAsync("img.ScenePlayerHeaderPlus-PosterImage", "src");
+
+        string pattern = @"(width=)\d+";
+        string replacement = "${1}1920";
+        string output = Regex.Replace(url, pattern, replacement);
+
+        pattern = @"(format=)\w+";
+        replacement = "${1}jpg";
+        output = Regex.Replace(output, pattern, replacement);
+
+        await _downloader.DownloadSceneImageAsync(scene, output, scene.Url);
     }
 
     public async Task<IReadOnlyList<IElementHandle>> GetCurrentScenesAsync(Site site, IPage page)
@@ -651,7 +661,7 @@ public class AdultTimeRipper : ISceneScraper, ISceneDownloader
         string description = sceneData.description.Replace("</br>", Environment.NewLine);
         var downloadOptionsAndHandles = await ParseAvailableDownloadsAsync(sceneData);
 
-        return new Scene(
+        Scene scene = new Scene(
             null,
             site,
             releaseDate,
@@ -664,17 +674,34 @@ public class AdultTimeRipper : ISceneScraper, ISceneDownloader
             tags,
             downloadOptionsAndHandles.Select(f => f.DownloadOption).ToList()
         );
+
+        if (sceneData.subtitles != null)
+        {
+            var subtitleFilename = SceneNamer.Name(scene, ".vtt");
+            await _downloader.DownloadSceneSubtitlesAsync(scene, subtitleFilename, "https://subtitles.gammacdn.com/" + sceneData.subtitles.full.en, page.Url);
+        }
+
+        return scene;
     }
 
-    public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions)
+    public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions, IList<CapturedResponse> responses)
     {
         await page.GotoAsync(scene.Url);
         await page.WaitForLoadStateAsync();
 
         await Task.Delay(3000);
 
+        var sceneMetadataResponse = responses.First(r => r.Name == Enum.GetName(AdultTimeRequestType.SceneMetadata));
 
-        var availableDownloads = await ParseAvailableDownloadsAsync(null /*TODO*/);
+        var body = await sceneMetadataResponse.Response.BodyAsync();
+        var foo = System.Text.Encoding.UTF8.GetString(body);
+
+        var data = System.Text.Json.JsonSerializer.Deserialize<Rootobject>(foo)!;
+
+
+        var sceneData = data.results[0].hits[0];
+
+        var availableDownloads = await ParseAvailableDownloadsAsync(sceneData);
 
         DownloadDetailsAndElementHandle selectedDownload = downloadConditions.PreferredDownloadQuality switch
         {
@@ -684,11 +711,31 @@ public class AdultTimeRipper : ISceneScraper, ISceneDownloader
             _ => throw new InvalidOperationException("Could not find a download candidate!")
         };
 
-        return await _downloader.DownloadSceneAsync(scene, page, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, async () =>
+        IPage newPage = await page.Context.NewPageAsync();
+
+        // TODO: does download but Playwright won't detect when it finishes
+        var download = await _downloader.DownloadSceneAsync(scene, newPage, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, async () =>
         {
-            await page.Locator("div#download_select > a").ClickAsync();
-            await selectedDownload.ElementHandle.ClickAsync();
+            try
+            {
+                await newPage.GotoAsync(selectedDownload.DownloadOption.Url);
+            }
+            catch (PlaywrightException ex)
+            {
+                if (ex.Message.StartsWith("net::ERR_ABORTED"))
+                {
+                    // Ok. Thrown for some reason every time a file is downloaded using browser.
+                }
+                else
+                {
+                    throw;
+                }
+            }
         });
+
+        await newPage.CloseAsync();
+
+        return download;
     }
 
     private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloadsAsync(Hit sceneData)
