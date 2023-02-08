@@ -10,6 +10,12 @@ namespace CultureExtractor
             var performersStr = performerNames.Count() > 1
                 ? string.Join(", ", performerNames.SkipLast(1)) + " & " + performerNames.Last()
                 : performerNames.FirstOrDefault();
+
+            if (string.IsNullOrWhiteSpace(performersStr))
+            {
+                performersStr = "Unknown";
+            }
+
             var nameWithoutSuffix =
                 string.Concat(
                     Regex.Replace(
