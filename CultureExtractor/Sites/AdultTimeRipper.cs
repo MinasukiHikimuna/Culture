@@ -641,7 +641,7 @@ public class AdultTimeRipper : ISceneScraper, ISceneDownloader
             var bodyBuffer = await response.BodyAsync();
             var body = System.Text.Encoding.UTF8.GetString(bodyBuffer);
 
-            if (body.Contains("facets=clip_id") && body.Contains("clip_id%3A" + sceneShortName))
+            if (body.Contains("clip_id%3A" + sceneShortName))
             {
                 return new CapturedResponse(Enum.GetName(AdultTimeRequestType.SceneMetadata)!, response);
             }
@@ -657,7 +657,7 @@ public class AdultTimeRipper : ISceneScraper, ISceneDownloader
         var body = await sceneMetadataResponse.Response.BodyAsync();
         var foo = System.Text.Encoding.UTF8.GetString(body);
 
-        var data = System.Text.Json.JsonSerializer.Deserialize<Rootobject>(foo)!;
+        var data = JsonSerializer.Deserialize<Rootobject>(foo)!;
 
 
         var sceneData = data.results[0].hits[0];
