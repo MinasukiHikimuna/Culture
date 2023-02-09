@@ -18,7 +18,7 @@ public class NetworkRipper : INetworkRipper
         _downloader = downloader;
     }
 
-    public async Task ScrapeScenesAsync(Site site, BrowserSettings browserSettings, bool fullScrape)
+    public async Task ScrapeScenesAsync(Site site, BrowserSettings browserSettings, ScrapeOptions scrapeOptions)
     {
         ISceneScraper sceneScraper = (ISceneScraper) _serviceProvider.GetService(typeof(ISceneScraper));
         Log.Information($"Culture Extractor, using {sceneScraper.GetType()}");
@@ -26,6 +26,7 @@ public class NetworkRipper : INetworkRipper
         IPage page = await CreatePageAndLoginAsync(sceneScraper, site, browserSettings);
         var totalPages = await sceneScraper.NavigateToScenesAndReturnPageCountAsync(site, page);
 
+        var scrapedScenes = 0;
         for (int currentPage = 1; currentPage <= totalPages; currentPage++)
         {
             await Task.Delay(5000);
@@ -37,6 +38,12 @@ public class NetworkRipper : INetworkRipper
 
             foreach (var currentScene in currentScenes)
             {
+                if (scrapedScenes >= scrapeOptions.MaxScenes)
+                {
+                    Log.Information($"Scraped {scrapedScenes} scenes, exiting");
+                    return;
+                }
+
                 for (int retries = 0; retries < 3; retries++)
                 {
                     try
@@ -50,7 +57,7 @@ public class NetworkRipper : INetworkRipper
                         }
 
                         var existingScene = await _repository.GetSceneAsync(site.ShortName, sceneShortName);
-                        if (existingScene == null || fullScrape)
+                        if (existingScene == null || scrapeOptions.FullScrape)
                         {
                             var scenePage = await page.Context.NewPageAsync();
 
@@ -85,6 +92,7 @@ public class NetworkRipper : INetworkRipper
 
                             var sceneDescription = new { Site = scene.Site.Name, ReleaseDate = scene.ReleaseDate, Name = scene.Name, Url = site.Url + url };
                             Log.Information("Scraped scene: {@Scene}", sceneDescription);
+                            scrapedScenes++;
                             await Task.Delay(3000);
                         }
                         // TODO: need to figure out how we can do initial scraping, this is used for new sensations and its 323 pages
@@ -110,7 +118,7 @@ public class NetworkRipper : INetworkRipper
         }
     }
 
-    public async Task DownloadScenesAsync(Site site, BrowserSettings browserSettings, DownloadConditions downloadConditions)
+    public async Task DownloadScenesAsync(Site site, BrowserSettings browserSettings, DownloadConditions downloadConditions, DownloadOptions downloadOptions)
     {
         var matchingScenes = await _repository.QueryScenesAsync(site, downloadConditions);
 
@@ -125,6 +133,11 @@ public class NetworkRipper : INetworkRipper
                 !downloadConditions.SceneIds.Any() ||
                 downloadConditions.SceneIds.Contains(s.ShortName))
             .ToList();
+
+        if (downloadOptions.MaxScenes != int.MaxValue)
+        {
+            furtherFilteredScenes = furtherFilteredScenes.Take(downloadOptions.MaxScenes).ToList();
+        }
 
         await DownloadGivenScenesAsync(
             site,

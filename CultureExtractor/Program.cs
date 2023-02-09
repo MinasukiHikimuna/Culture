@@ -13,7 +13,7 @@ class Program
     {
         if (System.Diagnostics.Debugger.IsAttached)
         {
-            var siteShortName = "adulttime";
+            var siteShortName = "brazzers";
 
             /*args = new string[] {
                 "scrape",
@@ -22,13 +22,14 @@ class Program
                 "--full"
             };*/
             args = new string[] {
-                "scrape",
+                "download",
                 "--site-short-name", siteShortName,
                 /*"--scenes",
                     "464", "462", "530", "557", "555", "554", "551", "549", "548", "541", "531",
                     "533", "532", "482", "484", "490", "495", "503", "506", "457", "474", "475",
                     "477", "458",*/
                 "--verbose",
+                // "--full",
                 "--visible-browser",
                 // "--best",
                 // "--from", "2020-01-01",
@@ -91,7 +92,7 @@ class Program
     }
 }
 
-class BaseOptions
+public class BaseOptions
 {
     [Option("site-short-name", Required = true, HelpText = "Site short name")]
     public string SiteShortName { get; set; }
@@ -108,10 +109,13 @@ class BaseOptions
 
     [Option("browser-channel", Required = false, HelpText = "Browser channel")]
     public string? BrowserChannel { get; set; }
+
+    [Option("max-scenes", Default = int.MaxValue, HelpText = "How many scenes to process")]
+    public int MaxScenes { get; set; }
 }
 
 [Verb("scrape", HelpText = "Scrape")]
-class ScrapeOptions : BaseOptions
+public class ScrapeOptions : BaseOptions
 {
     [Option(
       "full",
@@ -121,7 +125,7 @@ class ScrapeOptions : BaseOptions
 }
 
 [Verb("download", HelpText = "Download")]
-class DownloadOptions : BaseOptions
+public class DownloadOptions : BaseOptions
 {
     [Option("from", Required = false, HelpText = "From date")]
     public string FromDate { get; set; }

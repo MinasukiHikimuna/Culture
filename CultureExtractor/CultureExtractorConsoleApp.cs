@@ -35,7 +35,7 @@ class CultureExtractorConsoleApp
             var browserSettings = new BrowserSettings(!opts.VisibleBrowser, opts.BrowserChannel);
 
             var site = await _repository.GetSiteAsync(shortName);
-            await _networkRipper.ScrapeScenesAsync(site, browserSettings, opts.FullScrape);
+            await _networkRipper.ScrapeScenesAsync(site, browserSettings, opts);
 
             return 0;
         }
@@ -63,7 +63,7 @@ class CultureExtractorConsoleApp
 
             var downloadQuality = opts.BestQuality ? PreferredDownloadQuality.Best : PreferredDownloadQuality.Phash;
 
-            var downloadOptions = DownloadConditions.All(downloadQuality) with
+            var downloadConditions = DownloadConditions.All(downloadQuality) with
             {
                 DateRange = dateRange,
                 SceneIds = opts.SceneIds.ToList() ?? new List<string>(),
@@ -72,7 +72,7 @@ class CultureExtractorConsoleApp
             };
 
             var site = await _repository.GetSiteAsync(shortName);
-            await _networkRipper.DownloadScenesAsync(site, browserSettings, downloadOptions);
+            await _networkRipper.DownloadScenesAsync(site, browserSettings, downloadConditions, opts);
 
             return 0;
         }
