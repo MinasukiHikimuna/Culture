@@ -301,10 +301,12 @@ public class Repository : IRepository
     {
         var sceneEntity = await _sqliteContext.Scenes.FirstAsync(s => s.Id == download.Scene.Id);
 
+        var json = JsonSerializer.Serialize(new JsonSummary(download.DownloadOption, download.VideoHashes));
+
         _sqliteContext.Downloads.Add(new DownloadEntity()
         {
             DownloadedAt = DateTime.Now,
-            DownloadOptions = JsonSerializer.Serialize(download.DownloadOption),
+            DownloadOptions = json,
             DownloadQuality = Enum.GetName(preferredDownloadQuality),
             OriginalFilename = download.OriginalFilename,
             SavedFilename = download.SavedFilename,
@@ -313,5 +315,17 @@ public class Repository : IRepository
             Scene = sceneEntity,
         });
         await _sqliteContext.SaveChangesAsync();
+    }
+
+    private class JsonSummary
+    {
+        public JsonSummary(DownloadOption downloadOption, VideoHashes videoHashes)
+        {
+            DownloadOption = downloadOption;
+            VideoHashes = videoHashes;
+        }
+
+        public DownloadOption DownloadOption { get; }
+        public VideoHashes VideoHashes { get; }
     }
 }

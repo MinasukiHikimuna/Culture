@@ -89,7 +89,9 @@ public class Downloader : IDownloader
         await download.SaveAsAsync(path);
         await download.DeleteAsync();
 
-        return new Download(scene, suggestedFilename, name, downloadDetails);
+        var videoHashes = Hasher.Phash(@"""" + path + @"""");
+
+        return new Download(scene, suggestedFilename, name, downloadDetails, videoHashes);
     }
 
     private static async Task DownloadFileAsync(string url, string fileName, string rippingPath, string referer = "")

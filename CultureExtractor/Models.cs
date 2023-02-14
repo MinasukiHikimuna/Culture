@@ -67,7 +67,8 @@ public record Download(
     Scene Scene,
     string OriginalFilename,
     string SavedFilename,
-    DownloadOption DownloadOption);
+    DownloadOption DownloadOption,
+    VideoHashes VideoHashes);
 
 public record DownloadOption(
     string Description,
