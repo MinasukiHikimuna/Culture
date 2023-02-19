@@ -225,6 +225,8 @@ public class AdultTimeScene
     public Dictionary<string, string> Trailers { get; set; }
     [JsonPropertyName("download_file_sizes")]
     public Dictionary<string, long> DownloadFileSizes { get; set; }
+    [JsonPropertyName("download_sizes")]
+    public List<string> DownloadSizes { get; set; }
     [JsonPropertyName("actors")]
     public Actor[] Actors { get; set; }
 
@@ -275,7 +277,6 @@ public class AdultTimeScene
     public int shemale { get; set; }
     public string[] pictures_qualifier { get; set; }
     public Pictures pictures { get; set; }
-    public string[] download_sizes { get; set; }
     public string[] availableOnSite { get; set; }
     public string[] content_tags { get; set; }
     public int lesbian { get; set; }
@@ -808,6 +809,29 @@ public class AdultTimeRipper : ISceneScraper, ISceneDownloader
     private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloadsAsync(AdultTimeScene sceneData)
     {
         var availableDownloads = new List<DownloadDetailsAndElementHandle>();
+
+        if (sceneData.DownloadFileSizes == null)
+        {
+            foreach (var downloadSize in sceneData.DownloadSizes)
+            {
+                var description = downloadSize;
+                var resolutionHeight = HumanParser.ParseResolutionHeight(downloadSize);
+
+                availableDownloads.Add(
+                    new DownloadDetailsAndElementHandle(
+                    new DownloadOption(
+                        description,
+                        -1,
+                        HumanParser.ParseResolutionHeight(downloadSize),
+                        -1,
+                        -1,
+                        HumanParser.ParseCodec("H.264"),
+                        $"/movieaction/download/{sceneData.clip_id}/{downloadSize}/mp4"),
+                    null));
+            }
+
+            return availableDownloads.OrderByDescending(d => d.DownloadOption.ResolutionHeight).ToList();
+        }
 
         foreach (var downloadFileSize in sceneData.DownloadFileSizes.Keys)
         {
