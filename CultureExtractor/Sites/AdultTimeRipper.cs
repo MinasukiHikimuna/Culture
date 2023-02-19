@@ -545,6 +545,7 @@ public class ActionTag
     [JsonPropertyName("name")]
     public string Name { get; set; }
     [JsonPropertyName("timecode")]
+    [JsonConverter(typeof(StringOrNumberConverter))]
     public string Timecode { get; set; }
 }
 
@@ -655,9 +656,9 @@ public class AdultTimeRipper : ISceneScraper, ISceneDownloader
         var sceneMetadataResponse = responses.First(r => r.Name == Enum.GetName(AdultTimeRequestType.SceneMetadata));
 
         var body = await sceneMetadataResponse.Response.BodyAsync();
-        var foo = System.Text.Encoding.UTF8.GetString(body);
+        var jsonContent = System.Text.Encoding.UTF8.GetString(body);
 
-        var data = JsonSerializer.Deserialize<Rootobject>(foo)!;
+        var data = JsonSerializer.Deserialize<Rootobject>(jsonContent)!;
 
 
         var sceneData = data.results[0].hits[0];
@@ -827,5 +828,33 @@ public class AdultTimeRipper : ISceneScraper, ISceneDownloader
         }
 
         return availableDownloads.OrderByDescending(d => d.DownloadOption.FileSize).ToList();
+    }
+}
+
+public class StringOrNumberConverter : JsonConverter<string>
+{
+    public override string Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType == JsonTokenType.String)
+        {
+            return reader.GetString();
+        }
+        else if (reader.TryGetInt64(out long value))
+        {
+            return value.ToString();
+        }
+        else if (reader.TryGetDouble(out double doubleValue))
+        {
+            return doubleValue.ToString();
+        }
+        else
+        {
+            throw new JsonException($"Unable to parse string or number from {reader.TokenType}");
+        }
+    }
+
+    public override void Write(Utf8JsonWriter writer, string value, JsonSerializerOptions options)
+    {
+        writer.WriteStringValue(value);
     }
 }
