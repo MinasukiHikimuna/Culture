@@ -17,7 +17,7 @@ namespace CultureExtractor
         {
             Thread.Sleep(3000);
 
-            var blocked = await page.IsVisibleAsync("#blocked");
+            var blocked = await page.IsVisibleAsync("div#g-recaptcha");
             if (!blocked)
             {
                 Log.Verbose("No CAPTCHA found.");
@@ -64,9 +64,9 @@ namespace CultureExtractor
 
             Thread.Sleep(3000);
 
-            await page
+            /*await page
                 .Locator($"div#blocked input[type=\"submit\"]")
-                .ClickAsync();
+                .ClickAsync();*/
 
             Thread.Sleep(5000);
 

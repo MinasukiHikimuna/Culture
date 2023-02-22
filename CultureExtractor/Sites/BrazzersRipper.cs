@@ -10,10 +10,12 @@ namespace CultureExtractor.Sites;
 public class BrazzersRipper : ISceneScraper, ISceneDownloader
 {
     private readonly IDownloader _downloader;
+    private readonly ICaptchaSolver _captchaSolver;
 
-    public BrazzersRipper(IDownloader downloader)
+    public BrazzersRipper(IDownloader downloader, ICaptchaSolver captchaSolver)
     {
         _downloader = downloader;
+        _captchaSolver = captchaSolver;
     }
 
     public async Task LoginAsync(Site site, IPage page)
@@ -33,8 +35,17 @@ public class BrazzersRipper : ISceneScraper, ISceneDownloader
             // await page.GetByText("Remember me").ClickAsync();
 
             await page.GetByRole(AriaRole.Button, new() { NameString = "Login" }).ClickAsync();
-
             await page.WaitForLoadStateAsync();
+
+            await Task.Delay(5000);
+
+            await _captchaSolver.SolveCaptchaIfNeededAsync(page);
+
+            if (await page.GetByRole(AriaRole.Button, new() { NameString = "Login" }).IsVisibleAsync())
+            {
+                await page.GetByRole(AriaRole.Button, new() { NameString = "Login" }).ClickAsync();
+                await page.WaitForLoadStateAsync();
+            }
         }
 
         await Task.Delay(5000);
