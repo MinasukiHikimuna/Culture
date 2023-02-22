@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Serilog;
 
 namespace CultureExtractor;
 
@@ -30,6 +31,8 @@ public class SqliteContext : DbContext, ISqliteContext
 
     // The following configures EF to create a Sqlite database file in the
     // special "local" folder for your platform.
+    //
+    // Add .LogTo(Log.Debug) to function chain to enable query logging.
     protected override void OnConfiguring(DbContextOptionsBuilder options)
         => options.UseSqlite($"Data Source={DbPath}");
 }
