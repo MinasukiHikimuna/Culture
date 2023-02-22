@@ -13,7 +13,10 @@ public static class PlaywrightFactory
             Channel = !string.IsNullOrEmpty(browserSettings.BrowserChannel)
                 ? browserSettings.BrowserChannel
                 : "chrome",
-            SlowMo = 1000
+            SlowMo = 1000,
+            Args = browserSettings.Headless
+                ? new[] { "--headless=new" }
+                : Array.Empty<string>()
         });
         var context = await browser.NewContextAsync(new BrowserNewContextOptions()
         {
