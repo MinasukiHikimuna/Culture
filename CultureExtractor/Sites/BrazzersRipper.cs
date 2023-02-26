@@ -177,11 +177,6 @@ public class BrazzersRipper : ISceneScraper, ISceneDownloader
 
     public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions, IList<CapturedResponse> responses)
     {
-        await page.GotoAsync(scene.Url);
-        await page.WaitForLoadStateAsync();
-
-        await Task.Delay(3000);
-
         var sceneMetadataResponse = responses.First(r => r.Name == Enum.GetName(AdultTimeRequestType.SceneMetadata));
 
         var body = await sceneMetadataResponse.Response.BodyAsync();
