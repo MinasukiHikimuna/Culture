@@ -1,5 +1,6 @@
 ﻿using CultureExtractor.Interfaces;
 using Microsoft.Playwright;
+using Serilog;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -198,8 +199,6 @@ public class BrazzersRipper : ISceneScraper, ISceneDownloader
             _ => throw new InvalidOperationException("Could not find a download candidate!")
         };
 
-        IPage newPage = await page.Context.NewPageAsync();
-
         var performerNames = scene.Performers.Select(p => p.Name).ToList();
         var performersStr = performerNames.Count() > 1
             ? string.Join(", ", performerNames.SkipLast(1)) + " & " + performerNames.Last()
@@ -223,27 +222,24 @@ public class BrazzersRipper : ISceneScraper, ISceneDownloader
             ? nameWithoutSuffix[..(244 - suffix.Length - "...".Length)] + "..." + suffix
             : nameWithoutSuffix + suffix;
 
-        // TODO: does download but Playwright won't detect when it finishes
-        var download = await _downloader.DownloadSceneAsync(scene, newPage, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, async () =>
+        var download = await _downloader.DownloadSceneAsync(scene, page, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, async () =>
         {
             try
             {
-                await newPage.GotoAsync(selectedDownload.DownloadOption.Url);
+                await page.GotoAsync(selectedDownload.DownloadOption.Url);
+
+                throw new InvalidOperationException("Should have failed with PlaywrightException and message net::ERR_ABORTED");
             }
             catch (PlaywrightException ex)
             {
                 if (ex.Message.StartsWith("net::ERR_ABORTED"))
                 {
-                    // Ok. Thrown for some reason every time a file is downloaded using browser.
+                    return;
                 }
-                else
-                {
-                    throw;
-                }
+
+                throw;
             }
         }, name);
-
-        await newPage.CloseAsync();
 
         return download;
     }
