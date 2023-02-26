@@ -50,7 +50,9 @@ public class BrazzersRipper : ISceneScraper, ISceneDownloader
 
         await Task.Delay(5000);
 
-        await page.GotoAsync("https://site-ma.brazzers.com/");
+        await page.GotoAsync(site.Url);
+
+        Log.Information($"Logged into {site.Name}.");
     }
 
     public async Task<int> NavigateToScenesAndReturnPageCountAsync(Site site, IPage page)
