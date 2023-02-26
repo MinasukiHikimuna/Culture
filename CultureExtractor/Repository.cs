@@ -87,9 +87,60 @@ public class Repository : IRepository
             : null;
     }
 
+    public async Task<SubSite> UpsertSubSite(SubSite subSite)
+    {
+        var existingSubSiteEntity = await _sqliteContext.SubSites
+            .Include(s => s.Site)
+            .FirstOrDefaultAsync(s =>
+                s.Site.ShortName == subSite.Site.ShortName &&
+                s.ShortName == subSite.ShortName);
+
+        if (existingSubSiteEntity != null)
+        {
+            if (existingSubSiteEntity.Name != subSite.Name)
+            {
+                existingSubSiteEntity.Name = subSite.Name;
+                await _sqliteContext.SaveChangesAsync();
+            }
+
+            return Convert(existingSubSiteEntity);
+        }
+
+        var siteEntity = await _sqliteContext.Sites.FirstAsync(s => s.Id == subSite.Site.Id);
+        var subSiteEntity = new SubSiteEntity()
+        {
+            ShortName = subSite.ShortName,
+            Name = subSite.Name,
+            SiteId = siteEntity.Id,
+            Site = siteEntity
+        };
+
+        await _sqliteContext.SubSites.AddAsync(subSiteEntity);
+        await _sqliteContext.SaveChangesAsync();
+
+        return Convert(subSiteEntity);
+    }
+
     public async Task<Scene> UpsertScene(Scene scene)
     {
         var siteEntity = await _sqliteContext.Sites.FirstAsync(s => s.Id == scene.Site.Id);
+        SubSiteEntity subSiteEntity = null;
+        if (scene.SubSite != null)
+        {
+            subSiteEntity = await _sqliteContext.SubSites.FirstOrDefaultAsync(s => s.SiteId == scene.Site.Id && s.ShortName == scene.SubSite.ShortName);
+            if (subSiteEntity == null)
+            {
+                subSiteEntity = new SubSiteEntity()
+                {
+                    ShortName = scene.SubSite.ShortName,
+                    Name = scene.SubSite.Name,
+                    SiteId = siteEntity.Id,
+                    Site = siteEntity
+                };
+                _sqliteContext.SubSites.Add(subSiteEntity);
+                await _sqliteContext.SaveChangesAsync();
+            }
+        }
 
         List<SitePerformerEntity> performerEntities = await GetOrCreatePerformersAsync(scene.Performers, siteEntity);
         List<SiteTagEntity> tagEntities = await GetOrCreateTagsAsync(scene.Tags, siteEntity);
@@ -111,6 +162,8 @@ public class Repository : IRepository
 
                 SiteId = siteEntity.Id,
                 Site = siteEntity,
+                SubSiteId = subSiteEntity?.Id,
+                SubSite = subSiteEntity,
 
                 JsonDocument = scene.JsonDocument,
 
@@ -245,6 +298,18 @@ public class Repository : IRepository
             siteEntity.StorageState?.StorageState ?? string.Empty);
     }
 
+    private static SubSite? Convert(SubSiteEntity? subSiteEntity)
+    {
+        return subSiteEntity != null
+            ? new SubSite(
+                subSiteEntity.Id,
+                subSiteEntity.ShortName,
+                subSiteEntity.Name,
+                Convert(subSiteEntity.Site)
+              )
+            : null;
+    }
+
     private static Scene Convert(SceneEntity sceneEntity)
     {
         var downloadOptions = string.IsNullOrEmpty(sceneEntity.DownloadOptions)
@@ -254,6 +319,7 @@ public class Repository : IRepository
         return new Scene(
             sceneEntity.Id,
             Convert(sceneEntity.Site),
+            Convert(sceneEntity.SubSite),
             sceneEntity.ReleaseDate,
             sceneEntity.ShortName,
             sceneEntity.Name,

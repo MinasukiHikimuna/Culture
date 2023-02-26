@@ -147,6 +147,7 @@ public class MetArtNetworkRipper : ISceneScraper, ISceneDownloader
         var scene = new Scene(
             null,
             site,
+            null,
             releaseDate,
             sceneShortName,
             name,

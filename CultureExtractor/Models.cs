@@ -11,6 +11,12 @@ public record Site(
     string Password,
     string StorageState);
 
+public record SubSite(
+    int? Id,
+    string ShortName,
+    string Name,
+    Site Site);
+
 public record SitePerformer(
     string ShortName,
     string Name,
@@ -24,6 +30,7 @@ public record SiteTag(
 public record Scene(
     int? Id,
     Site Site,
+    SubSite? SubSite,
     DateOnly ReleaseDate,
     string ShortName,
     string Name,

@@ -134,6 +134,7 @@ public class DorcelClubRipper : ISceneScraper, ISceneDownloader
         return new Scene(
             null,
             site,
+            null,
             releaseDate,
             sceneShortName,
             title,

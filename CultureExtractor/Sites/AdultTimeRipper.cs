@@ -708,6 +708,7 @@ public class AdultTimeRipper : ISceneScraper, ISceneDownloader
         Scene scene = new Scene(
             null,
             site,
+            null,
             releaseDate,
             sceneShortName,
             title,

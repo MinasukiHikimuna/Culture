@@ -12,5 +12,6 @@
         Task<Gallery> SaveGalleryAsync(Gallery gallery);
         Task UpdateStorageStateAsync(Site site, string storageState);
         Task<Scene> UpsertScene(Scene scene);
+        Task<SubSite> UpsertSubSite(SubSite subSite);
     }
 }

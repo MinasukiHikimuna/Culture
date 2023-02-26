@@ -1,33 +1,32 @@
 ﻿using CultureExtractor.Interfaces;
 using Microsoft.Playwright;
 using Serilog;
-using System.Text.Json;
+using System.Net;
 using System.Text.RegularExpressions;
 
 namespace CultureExtractor.Sites;
 
-[PornNetwork("brazzers")]
-[PornSite("brazzers")]
-public class BrazzersRipper : ISceneScraper, ISceneDownloader
+[PornNetwork("nubilesporn")]
+[PornSite("nubilesporn")]
+public class NubilesPornRipper : ISceneScraper, ISceneDownloader
 {
     private readonly IDownloader _downloader;
-    private readonly ICaptchaSolver _captchaSolver;
+    private readonly IRepository _repository;
 
-    public BrazzersRipper(IDownloader downloader, ICaptchaSolver captchaSolver)
+    public NubilesPornRipper(IDownloader downloader)
     {
         _downloader = downloader;
-        _captchaSolver = captchaSolver;
     }
 
     public async Task LoginAsync(Site site, IPage page)
     {
         await Task.Delay(5000);
 
-        var usernameInput = page.GetByPlaceholder("Username or Email");
+        var usernameInput = page.GetByPlaceholder("Email or Username");
         if (await usernameInput.IsVisibleAsync())
         {
-            await page.GetByPlaceholder("Username or Email").ClickAsync();
-            await page.GetByPlaceholder("Username or Email").FillAsync(site.Username);
+            await page.GetByPlaceholder("Email or Username").ClickAsync();
+            await page.GetByPlaceholder("Email or Username").FillAsync(site.Username);
 
             await page.GetByPlaceholder("Password").ClickAsync();
             await page.GetByPlaceholder("Password").FillAsync(site.Password);
@@ -35,16 +34,14 @@ public class BrazzersRipper : ISceneScraper, ISceneDownloader
             // TODO: let's see if we need to manually enable this at all
             // await page.GetByText("Remember me").ClickAsync();
 
-            await page.GetByRole(AriaRole.Button, new() { NameString = "Login" }).ClickAsync();
+            await page.GetByRole(AriaRole.Button, new() { NameString = "Sign In" }).ClickAsync();
             await page.WaitForLoadStateAsync();
 
             await Task.Delay(5000);
 
-            await _captchaSolver.SolveCaptchaIfNeededAsync(page);
-
-            if (await page.GetByRole(AriaRole.Button, new() { NameString = "Login" }).IsVisibleAsync())
+            if (await page.GetByRole(AriaRole.Button, new() { NameString = "Sign In" }).IsVisibleAsync())
             {
-                await page.GetByRole(AriaRole.Button, new() { NameString = "Login" }).ClickAsync();
+                await page.GetByRole(AriaRole.Button, new() { NameString = "Sign In" }).ClickAsync();
                 await page.WaitForLoadStateAsync();
             }
         }
@@ -52,18 +49,15 @@ public class BrazzersRipper : ISceneScraper, ISceneDownloader
         await Task.Delay(5000);
 
         await page.GotoAsync(site.Url);
-
-        Log.Information($"Logged into {site.Name}.");
     }
 
     public async Task<int> NavigateToScenesAndReturnPageCountAsync(Site site, IPage page)
     {
-        await page.GetByRole(AriaRole.Link, new() { NameString = "VIDEOS" }).HoverAsync();
+        await page.Locator("ul.navbar-nav > li.nav-item > a.nav-link").Nth(0).ClickAsync();
+        await page.WaitForLoadStateAsync();
 
-        await page.GetByRole(AriaRole.Link, new() { NameString = "SEE ALL" }).ClickAsync();
-
-        var lastPageUrl = await page.Locator("a[href^='/scenes?page=']").Last.GetAttributeAsync("href");
-        var lastPage = lastPageUrl.Replace("/scenes?page=", "");
+        var lastPageElement = await page.QuerySelectorAsync("ul.pagination li.page-item div.dropdown div.dropdown-menu a:last-of-type");
+        var lastPage = await lastPageElement.TextContentAsync();
 
         return int.Parse(lastPage);
     }
@@ -74,20 +68,35 @@ public class BrazzersRipper : ISceneScraper, ISceneDownloader
         var style = await previewElement.GetAttributeAsync("style");
         var backgroundImageUrl = style.Replace("background-image: url(\"", "").Replace("\");", "");
 
-        await _downloader.DownloadSceneImageAsync(scene, backgroundImageUrl, scene.Url);
+        try
+        {
+            var candidate = backgroundImageUrl.Replace("1280", "1920");
+            await _downloader.DownloadSceneImageAsync(scene, candidate, scene.Url);
+            Log.Verbose($"Successfully downloaded preview from {candidate}.");
+        }
+        catch (WebException ex)
+        {
+            if (ex.Status == WebExceptionStatus.ProtocolError && (ex.Response as HttpWebResponse)?.StatusCode == HttpStatusCode.NotFound)
+            {
+                await _downloader.DownloadSceneImageAsync(scene, backgroundImageUrl, scene.Url);
+            }
+
+            throw;
+        }
     }
 
     public async Task<IReadOnlyList<IElementHandle>> GetCurrentScenesAsync(Site site, IPage page)
     {
-        var currentScenes = await page.Locator("span a[href^='/scene/']").ElementHandlesAsync();
+        var currentScenes = await page.Locator("div.Videoset div.content-grid-item").ElementHandlesAsync();
         return currentScenes;
     }
 
     public async Task<(string Url, string ShortName)> GetSceneIdAsync(Site site, IElementHandle currentScene)
     {
-        var url = await currentScene.GetAttributeAsync("href");
+        var linkElement = await currentScene.QuerySelectorAsync("figcaption > div.caption-header > span.title > a");
+        var url = await linkElement.GetAttributeAsync("href");
 
-        string pattern = @"/scene/(?<id>\d+)/";
+        string pattern = @"/video/watch/(?<id>\d+)/";
         Match match = Regex.Match(url, pattern);
         if (!match.Success)
         {
@@ -101,7 +110,7 @@ public class BrazzersRipper : ISceneScraper, ISceneDownloader
 
     public async Task GoToNextFilmsPageAsync(IPage page)
     {
-        await page.Locator("a[href^='/scenes?page=']").Nth(-2).ClickAsync();
+        await page.Locator("ul.pagination > li.page-item").Nth(-2).ClickAsync();
     }
 
     public async Task<CapturedResponse?> FilterResponsesAsync(string sceneShortName, IResponse response)
@@ -118,50 +127,63 @@ public class BrazzersRipper : ISceneScraper, ISceneDownloader
 
     public async Task<Scene> ScrapeSceneAsync(Site site, string url, string sceneShortName, IPage page, IList<CapturedResponse> responses)
     {
-        var sceneMetadataResponse = responses.First(r => r.Name == Enum.GetName(AdultTimeRequestType.SceneMetadata));
+        var releaseDateRaw = await page.Locator("div.content-pane-title span.date").TextContentAsync();
+        var releaseDate = DateOnly.Parse(releaseDateRaw);
 
-        var body = await sceneMetadataResponse.Response.BodyAsync();
-        var foo = System.Text.Encoding.UTF8.GetString(body);
+        var durationRaw = await page.Locator("span.vjs-remaining-time-display").TextContentAsync();
+        var duration = HumanParser.ParseDuration(durationRaw);
 
-        var data = JsonSerializer.Deserialize<BrazzersRootobject>(foo)!;
+        var titleRaw = await page.Locator("div.content-pane-title h2").TextContentAsync();
+        var title = titleRaw.Replace("\n", "").Trim();
 
-
-        var sceneData = data.result;
-
-        var releaseDate = DateOnly.FromDateTime(sceneData.dateReleased.ToUniversalTime());
-        var duration = TimeSpan.FromSeconds(sceneData.videos.full.length);
-        var title = sceneData.title;
+        var performersRaw = await page.Locator("div.content-pane-performers > a.model").ElementHandlesAsync();
 
         var performers = new List<SitePerformer>();
-        var genderSorted = sceneData.actors.Where(a => a.gender == "female").ToList().Concat(sceneData.actors.Where(a => a.gender != "female").ToList()).ToList();
-        foreach (var performer in genderSorted)
+        foreach (var performerElement in performersRaw)
         {
-            var shortName = performer.id.ToString();
-            var performerUrl = string.Empty;
-            var name = performer.name;
+            var performerUrl = await performerElement.GetAttributeAsync("href");
+            var shortName = performerUrl.Replace("/model/profile/", "");
+            var name = await performerElement.TextContentAsync();
             performers.Add(new SitePerformer(shortName, name, performerUrl));
         }
 
-        var tags = new List<SiteTag>();
-        foreach (var tag in sceneData.tags)
+        var elementHandles = await page.Locator("div.content-pane-description p").ElementHandlesAsync();
+        var descriptionParagraphs = new List<string>();
+        foreach (var elementHandle in elementHandles)
         {
-            var shortName = tag.id.ToString();
-            var name = tag.name;
-            tags.Add(new SiteTag(shortName.ToString(), name, string.Empty));
+            var descriptionParagraph = await elementHandle.TextContentAsync();
+            if (!string.IsNullOrWhiteSpace(descriptionParagraph))
+            {
+                descriptionParagraphs.Add(descriptionParagraph);
+            }
+        }
+        string description = string.Join("\r\n\r\n", descriptionParagraphs).Trim();
+
+        var tagElements = await page.Locator("div.categories > a").ElementHandlesAsync();
+        var tags = new List<SiteTag>();
+        foreach (var tagElement in tagElements)
+        {
+            var tagUrl = await tagElement.GetAttributeAsync("href");
+            var tagId = tagUrl.Replace("/video/category/", "");
+            var tagNameRaw = await tagElement.TextContentAsync();
+            var tagName = tagNameRaw.Replace("\n", "").Trim();
+            tags.Add(new SiteTag(tagId, tagName, tagUrl));
         }
 
+        var downloadOptionsAndHandles = await ParseAvailableDownloadsAsync(page);
 
-        string description = sceneData.description ?? string.Empty;
+        var subSiteElement = await page.QuerySelectorAsync("div.content-pane-title a.site-link");
+        var subSiteShortNameRaw = await subSiteElement.GetAttributeAsync("href");
+        var subSiteShortName = subSiteShortNameRaw.Replace("/video/website/", "");
+        var subSiteNameRaw = await subSiteElement.TextContentAsync();
+        var subSiteName = subSiteNameRaw.Replace("\n", "").Trim();
 
-        sceneData.videos.full.files.Remove("hls");
-        sceneData.videos.full.files.Remove("dash");
+        var subSite = new SubSite(null, subSiteShortName, subSiteName, site);
 
-        var downloadOptionsAndHandles = await ParseAvailableDownloadsAsync(sceneData);
-
-        Scene scene = new Scene(
+        return new Scene(
             null,
             site,
-            null,
+            subSite,
             releaseDate,
             sceneShortName,
             title,
@@ -169,28 +191,21 @@ public class BrazzersRipper : ISceneScraper, ISceneDownloader
             description,
             duration.TotalSeconds,
             performers,
-            tags,
+            new List<SiteTag>(),
             downloadOptionsAndHandles.Select(f => f.DownloadOption).ToList(),
-            JsonSerializer.Serialize(sceneData)
+            "{}"
         );
-
-        return scene;
     }
 
     public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions, IList<CapturedResponse> responses)
     {
-        var sceneMetadataResponse = responses.First(r => r.Name == Enum.GetName(AdultTimeRequestType.SceneMetadata));
+        await page.GotoAsync(scene.Url);
+        await page.WaitForLoadStateAsync();
 
-        var body = await sceneMetadataResponse.Response.BodyAsync();
-        var foo = System.Text.Encoding.UTF8.GetString(body);
+        await Task.Delay(3000);
 
-        var data = JsonSerializer.Deserialize<BrazzersRootobject>(foo)!;
-        var sceneData = data.result;
 
-        sceneData.videos.full.files.Remove("hls");
-        sceneData.videos.full.files.Remove("dash");
-
-        var availableDownloads = await ParseAvailableDownloadsAsync(sceneData);
+        var availableDownloads = await ParseAvailableDownloadsAsync(page);
 
         DownloadDetailsAndElementHandle selectedDownload = downloadConditions.PreferredDownloadQuality switch
         {
@@ -200,73 +215,47 @@ public class BrazzersRipper : ISceneScraper, ISceneDownloader
             _ => throw new InvalidOperationException("Could not find a download candidate!")
         };
 
-        var performerNames = scene.Performers.Select(p => p.Name).ToList();
-        var performersStr = performerNames.Count() > 1
-            ? string.Join(", ", performerNames.SkipLast(1)) + " & " + performerNames.Last()
-            : performerNames.FirstOrDefault();
-
-        if (string.IsNullOrWhiteSpace(performersStr))
+        return await _downloader.DownloadSceneAsync(scene, page, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, async () =>
         {
-            performersStr = "Unknown";
-        }
-
-        var nameWithoutSuffix =
-            string.Concat(
-                Regex.Replace(
-                    $"{performersStr} - Brazzers - {sceneData.brandMeta.displayName} - {scene.ReleaseDate.ToString("yyyy-MM-dd")} - {scene.Name}",
-                    @"\s+",
-                    " "
-                ).Split(Path.GetInvalidFileNameChars()));
-
-        var suffix = ".mp4";
-        var name = (nameWithoutSuffix + suffix).Length > 244
-            ? nameWithoutSuffix[..(244 - suffix.Length - "...".Length)] + "..." + suffix
-            : nameWithoutSuffix + suffix;
-
-        var download = await _downloader.DownloadSceneAsync(scene, page, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, async () =>
-        {
-            try
-            {
-                await page.GotoAsync(selectedDownload.DownloadOption.Url);
-
-                throw new InvalidOperationException("Should have failed with PlaywrightException and message net::ERR_ABORTED");
-            }
-            catch (PlaywrightException ex)
-            {
-                if (ex.Message.StartsWith("net::ERR_ABORTED"))
-                {
-                    return;
-                }
-
-                throw;
-            }
-        }, name);
-
-        return download;
+            await page.Locator("div#download_select > a").ClickAsync();
+            await selectedDownload.ElementHandle.ClickAsync();
+        });
     }
 
-    private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloadsAsync(BrazzersResult sceneData)
+    private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloadsAsync(IPage page)
     {
+        var downloadLinks = await page.Locator("div.content-pane-container div.edge-download-item").ElementHandlesAsync();
         var availableDownloads = new List<DownloadDetailsAndElementHandle>();
-
-        foreach (var downloadFileSize in sceneData.videos.full.files.Keys)
+        foreach (var downloadLink in downloadLinks)
         {
-            var description = downloadFileSize;
-            var videoFile = sceneData.videos.full.files[downloadFileSize];
+            var descriptionRaw = await downloadLink.InnerTextAsync();
+            var description = descriptionRaw.Replace("\n", " ").Trim();
+
+            var resolutionWidth = HumanParser.ParseResolutionWidth(description);
+            var resolutionHeight = HumanParser.ParseResolutionHeight(description);
+
+            var linkElement = await downloadLink.QuerySelectorAsync("a");
+            var url = await linkElement.GetAttributeAsync("href");
+
+            string pattern = @"\((\d+[\.\d]*)\s*(GB|MB)\)";
+            Match match = Regex.Match(description, pattern);
+            if (!match.Success)
+            {
+                throw new Exception($"Unable to parse ID from {url}");
+            }
 
             availableDownloads.Add(
                 new DownloadDetailsAndElementHandle(
-                new DownloadOption(
-                    description,
-                    -1,
-                    HumanParser.ParseResolutionHeight(downloadFileSize),
-                    videoFile.sizeBytes,
-                    -1,
-                    HumanParser.ParseCodec("H.264"),
-                    videoFile.urls.download),
-                null));
+                    new DownloadOption(
+                        description,
+                        resolutionWidth,
+                        resolutionHeight,
+                        HumanParser.ParseFileSize(match.Groups[1].Value + " " + match.Groups[2].Value),
+                        -1,
+                        string.Empty,
+                        url),
+                    downloadLink));
         }
-
         return availableDownloads.OrderByDescending(d => d.DownloadOption.FileSize).ToList();
     }
 

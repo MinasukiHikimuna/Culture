@@ -1,12 +1,12 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
-using Serilog;
 
 namespace CultureExtractor;
 
 public class SqliteContext : DbContext, ISqliteContext
 {
     public DbSet<SiteEntity> Sites { get; set; }
+    public DbSet<SubSiteEntity> SubSites { get; set; }
     public DbSet<SceneEntity> Scenes { get; set; }
     public DbSet<GalleryEntity> Galleries { get; set; }
     public DbSet<SitePerformerEntity> Performers { get; set; }
@@ -46,6 +46,16 @@ public class SiteEntity
     public required string Username { get; set; }
     public required string Password { get; set; }
     public StorageStateEntity? StorageState { get; set; }
+}
+
+public class SubSiteEntity
+{
+    public int Id { get; set; }
+    public required string ShortName { get; set; }
+    public required string Name { get; set; }
+
+    public required int SiteId { get; set; }
+    public required SiteEntity Site { get; set; }
 }
 
 public class StorageStateEntity
@@ -100,6 +110,8 @@ public class SceneEntity
 
     public required int SiteId { get; set; }
     public required SiteEntity Site { get; set; }
+    public int? SubSiteId { get; set; }
+    public SubSiteEntity? SubSite { get; set; }
 
     public required ICollection<DownloadEntity> Downloads { get; set; }
 }

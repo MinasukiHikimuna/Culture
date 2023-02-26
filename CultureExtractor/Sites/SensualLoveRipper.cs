@@ -94,6 +94,7 @@ public class SensualLoveRipper : ISceneScraper, ISceneDownloader
         return new Scene(
             null,
             site,
+            null,
             releaseDate,
             sceneShortName,
             title,
