@@ -72,7 +72,6 @@ public class NubilesPornRipper : ISceneScraper, ISceneDownloader
         {
             var candidate = backgroundImageUrl.Replace("1280", "1920");
             await _downloader.DownloadSceneImageAsync(scene, candidate, scene.Url);
-            Log.Verbose($"Successfully downloaded preview from {candidate}.");
         }
         catch (WebException ex)
         {
