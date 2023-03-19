@@ -16,10 +16,12 @@ namespace CultureExtractor
                 performersStr = "Unknown";
             }
 
+            var subSiteName = scene.SubSite != null ? " - " + scene.SubSite.Name : "";
+
             var nameWithoutSuffix =
                 string.Concat(
                     Regex.Replace(
-                        $"{performersStr} - {scene.Site.Name} - {scene.ReleaseDate.ToString("yyyy-MM-dd")} - {scene.Name}",
+                        $"{performersStr} - {scene.Site.Name}{subSiteName} - {scene.ReleaseDate.ToString("yyyy-MM-dd")} - {scene.ShortName} - {scene.Name}",
                         @"\s+",
                         " "
                     ).Split(Path.GetInvalidFileNameChars()));
