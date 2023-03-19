@@ -2,8 +2,7 @@
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using System;
-using System.Runtime.InteropServices;
+using Serilog;
 
 namespace CultureExtractor;
 
@@ -29,7 +28,7 @@ public class VideoHashes
 
 public class Hasher
 {
-    public static VideoHashes Phash(string path)
+    public static VideoHashes? Phash(string path)
     {
         string commandPath;
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
@@ -69,8 +68,15 @@ public class Hasher
         using Process process = Process.Start(startInfo);
         string output = process.StandardOutput.ReadToEnd();
 
-        VideoHashes videoHashes = JsonSerializer.Deserialize<VideoHashes>(output);
-
-        return videoHashes;
+        try
+        {
+            VideoHashes videoHashes = JsonSerializer.Deserialize<VideoHashes>(output);
+            return videoHashes;
+        }
+        catch (JsonException ex)
+        {
+            Log.Warning($"Could not hash file {path}.", ex);
+            return null;
+        }
     }
 }
