@@ -239,7 +239,8 @@ public class NetworkRipper : INetworkRipper
                         ReleaseDate = existingScene.ReleaseDate,
                         Name = existingScene.Name,
                         Url = site.Url + existingScene.Url,
-                        Quality = downloadConditions.PreferredDownloadQuality };
+                        Quality = downloadConditions.PreferredDownloadQuality
+                    };
                     Log.Verbose("Downloading: {@Scene}", sceneDescription);
 
                     var download = await sceneDownloader.DownloadSceneAsync(existingScene, scenePage, downloadConditions, responses);
@@ -249,7 +250,16 @@ public class NetworkRipper : INetworkRipper
 
                     await scenePage.CloseAsync();
 
-                    Log.Information("Downloaded:  {@Scene}", sceneDescription);
+                    var sceneDescription2 = new
+                    {
+                        Site = existingScene.Site.Name,
+                        ReleaseDate = existingScene.ReleaseDate,
+                        Name = existingScene.Name,
+                        Url = site.Url + existingScene.Url,
+                        Quality = downloadConditions.PreferredDownloadQuality,
+                        Phash = download.VideoHashes?.PHash
+                    };
+                    Log.Information("Downloaded:  {@Scene}", sceneDescription2);
                     await Task.Delay(3000);
                     break;
                 }
