@@ -23,6 +23,12 @@ public class NetworkRipper : INetworkRipper
         ISiteScraper siteScraper = (ISiteScraper) _serviceProvider.GetService(typeof(ISiteScraper));
         Log.Information($"Culture Extractor, using {siteScraper.GetType()}");
 
+        if (siteScraper is ISubSiteScraper subSiteScraper)
+        {
+            await ScrapeSubSiteScenesAsync(site, browserSettings, scrapeOptions, subSiteScraper);
+            return;
+        }
+
         IPage page = await CreatePageAndLoginAsync(siteScraper, site, browserSettings);
         var totalPages = await siteScraper.NavigateToScenesAndReturnPageCountAsync(site, page);
 
@@ -98,7 +104,7 @@ public class NetworkRipper : INetworkRipper
 
                             scenePage.Response -= responseCapturer;
 
-                            var scene = await siteScraper.ScrapeSceneAsync(site, url, sceneShortName, scenePage, responses);
+                            var scene = await siteScraper.ScrapeSceneAsync(site, null, url, sceneShortName, scenePage, responses);
                             if (existingScene != null)
                             {
                                 scene = scene with { Id = existingScene.Id };
@@ -133,6 +139,134 @@ public class NetworkRipper : INetworkRipper
             if (currentPage != totalPages)
             {
                 await siteScraper.GoToNextFilmsPageAsync(page);
+            }
+        }
+    }
+
+    private async Task ScrapeSubSiteScenesAsync(Site site, BrowserSettings browserSettings, ScrapeOptions scrapeOptions, ISubSiteScraper subSiteScraper)
+    {
+        IPage page = await CreatePageAndLoginAsync(subSiteScraper, site, browserSettings);
+
+        var startPage = 1;
+        /*
+        var startPage = 114;
+        // TODO: move to interface and nubiles porn
+        await page.Locator("div.content-grid-footer button.dropdown-toggle").ClickAsync();
+        await page.Locator($"div.content-grid-footer a.dropdown-item:has-text('{startPage}')").ClickAsync();
+        */
+
+        var subSites = await subSiteScraper.GetSubSitesAsync(site, page);
+
+        var subSiteIndex = 0;
+        foreach (var subSite in subSites)
+        {
+            subSiteIndex++;
+            Log.Information($"Subsite {subSiteIndex}/{subSites.Count}: {subSite.Name}");
+
+            var totalPages = await subSiteScraper.NavigateToSubSiteAndReturnPageCountAsync(site, subSite, page);
+
+            var scrapedScenes = 0;
+            for (int currentPage = totalPages; currentPage >= 1; currentPage--)
+            {
+                await page.GotoAsync($"/studios/videos?website={subSite.Name}&page={currentPage}");
+                await Task.Delay(5000);
+                var currentScenes = await subSiteScraper.GetCurrentScenesAsync(site, page);
+
+                Log.Information(totalPages == int.MaxValue
+                    ? $"Batch {currentPage} of infinite page contains {currentScenes.Count} scenes"
+                    : $"Page {currentPage}/{totalPages} contains {currentScenes.Count} scenes");
+
+                foreach (var currentScene in currentScenes)
+                {
+                    if (scrapedScenes >= scrapeOptions.MaxScenes)
+                    {
+                        Log.Information($"Scraped {scrapedScenes} scenes, exiting");
+                        return;
+                    }
+
+                    for (int retries = 0; retries < 3; retries++)
+                    {
+                        try
+                        {
+                            // TODO: Is this really needed for anything?
+                            // await currentScene.ScrollIntoViewIfNeededAsync();
+                            (string url, string sceneShortName) = await subSiteScraper.GetSceneIdAsync(site, currentScene);
+
+                            if (retries > 0)
+                            {
+                                Log.Information($"Retrying {retries + 1} attempt for {url}");
+
+                                await page.ReloadAsync();
+                                if (subSiteScraper != null)
+                                {
+                                    if (page.Url == "https://site-ma.brazzers.com/login")
+                                    {
+                                        await subSiteScraper.LoginAsync(site, page);
+                                    }
+
+                                    await page.GotoAsync("/scenes?page=" + currentPage);
+                                }
+                            }
+
+                            var existingScene = await _repository.GetSceneAsync(site.ShortName, sceneShortName);
+                            if (existingScene == null || scrapeOptions.FullScrape)
+                            {
+                                var scenePage = await page.Context.NewPageAsync();
+
+                                var responses = new List<CapturedResponse>();
+                                EventHandler<IResponse> responseCapturer = async (_, response) =>
+                                {
+                                    var capturedResponse = await subSiteScraper.FilterResponsesAsync(sceneShortName, response);
+                                    if (capturedResponse != null)
+                                    {
+                                        responses.Add(capturedResponse);
+                                    }
+                                };
+                                scenePage.Response += responseCapturer;
+
+                                await scenePage.GotoAsync(url);
+                                await scenePage.WaitForLoadStateAsync();
+
+                                await Task.Delay(1000);
+
+                                scenePage.Response -= responseCapturer;
+
+                                var scene = await subSiteScraper.ScrapeSceneAsync(site, subSite, url, sceneShortName, scenePage, responses);
+                                if (existingScene != null)
+                                {
+                                    scene = scene with { Id = existingScene.Id };
+                                }
+
+                                var savedScene = await _repository.UpsertScene(scene);
+                                await subSiteScraper.DownloadPreviewImageAsync(savedScene, scenePage, page, currentScene);
+
+                                await scenePage.CloseAsync();
+
+                                var sceneDescription = new { Site = scene.Site.Name, SubSite = scene.SubSite?.Name, ShortName = scene.ShortName, ReleaseDate = scene.ReleaseDate, Name = scene.Name, Url = url.StartsWith("https://") ? url : site.Url + url };
+                                Log.Information("Scraped scene: {@Scene}", sceneDescription);
+                                scrapedScenes++;
+                                await Task.Delay(3000);
+                            }
+                            // TODO: need to figure out how we can do initial scraping, this is used for new sensations and its 323 pages
+                            /*else
+                            {
+                                Log.Information($"An existing scene {existingScene.ReleaseDate} {existingScene.Name} found. Assuming older scenes have already been scraped.");
+                                return;
+                            }*/
+                            break;
+                        }
+                        catch (Exception ex)
+                        {
+                            Log.Error(ex.ToString(), ex);
+                            await Task.Delay(3000);
+                        }
+                    }
+                }
+
+                if (currentPage != 1)
+                {
+                    await page.GotoAsync($"/studios/videos?website={subSite.Name}&page={currentPage - 1}");
+                }
             }
         }
     }
@@ -242,7 +376,7 @@ public class NetworkRipper : INetworkRipper
 
                     if (siteScraper != null)
                     {
-                        var scene = await siteScraper.ScrapeSceneAsync(site, matchingScene.Url, matchingScene.ShortName, scenePage, responses);
+                        var scene = await siteScraper.ScrapeSceneAsync(site, null, matchingScene.Url, matchingScene.ShortName, scenePage, responses);
                         if (existingScene != null)
                         {
                             scene = scene with { Id = existingScene.Id };

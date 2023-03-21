@@ -13,7 +13,7 @@ class Program
     {
         if (System.Diagnostics.Debugger.IsAttached)
         {
-            var siteShortName = "brazzers";
+            var siteShortName = "adultprime";
 
             /*args = new string[] {
                 "scrape",
@@ -22,7 +22,7 @@ class Program
                 "--full"
             };*/
             args = new string[] {
-                "download",
+                "scrape",
                 "--site-short-name", siteShortName,
                 /*"--scenes",
                     "464", "462", "530", "557", "555", "554", "551", "549", "548", "541", "531",
@@ -31,7 +31,9 @@ class Program
                 "--verbose",
                 // "--full",
                 "--visible-browser",
+                // "--max-scenes", "1000"
                 // "--best",
+                // "--downloaded-file-names", "Yasmin Scott & Simony Diamond - Brazzers - Brazzers - 2019-11-17 - The Pearl Of The Sea.mp4"
                 // "--from", "2020-01-01",
                 // "--to", "2020-12-31",
             };
@@ -50,7 +52,7 @@ class Program
                 services.AddTransient<CultureExtractorConsoleApp>();
 
                 Type siteScraper = GetSiteScraperType<ISiteScraper>(options.SiteShortName);
-                IList<Type> types = new List<Type>() { typeof(ISceneScraper), typeof(ISceneDownloader) };
+                IList<Type> types = new List<Type>() { typeof(ISiteScraper) };
                 foreach (var type in types)
                 {
                     if (siteScraper.IsAssignableTo(type))

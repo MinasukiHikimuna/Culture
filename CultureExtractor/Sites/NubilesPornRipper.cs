@@ -146,7 +146,7 @@ public class NubilesPornRipper : ISiteScraper
         return null;
     }
 
-    public async Task<Scene> ScrapeSceneAsync(Site site, string url, string sceneShortName, IPage page, IList<CapturedResponse> responses)
+    public async Task<Scene> ScrapeSceneAsync(Site site, SubSite subSite, string url, string sceneShortName, IPage page, IList<CapturedResponse> responses)
     {
         var releaseDateRaw = await page.Locator("div.content-pane-title span.date").TextContentAsync();
         var releaseDate = DateOnly.Parse(releaseDateRaw);
@@ -192,14 +192,6 @@ public class NubilesPornRipper : ISiteScraper
         }
 
         var downloadOptionsAndHandles = await ParseAvailableDownloadsAsync(page);
-
-        var subSiteElement = await page.QuerySelectorAsync("div.content-pane-title a.site-link");
-        var subSiteShortNameRaw = await subSiteElement.GetAttributeAsync("href");
-        var subSiteShortName = subSiteShortNameRaw.Replace("/video/website/", "");
-        var subSiteNameRaw = await subSiteElement.TextContentAsync();
-        var subSiteName = subSiteNameRaw.Replace("\n", "").Trim();
-
-        var subSite = new SubSite(null, subSiteShortName, subSiteName, site);
 
         return new Scene(
             null,

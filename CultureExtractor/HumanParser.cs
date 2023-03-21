@@ -159,6 +159,13 @@ public static class HumanParser
                 .Add(TimeSpan.FromSeconds(int.Parse(matchMmSs.Groups["seconds"].Value)));
         }
 
+        var patternMm = @"^(?<minutes>[0-9]+) min$";
+        var matchMm = Regex.Match(trimmedDurationString, patternMm);
+        if (matchMm.Success)
+        {
+            return TimeSpan.FromMinutes(int.Parse(matchMm.Groups["minutes"].Value));
+        }
+
         return TimeSpan.Zero;
     }
 

@@ -98,7 +98,7 @@ public class WowNetworkRipper : ISiteScraper
         return (url, match.Groups["id"].Value);
     }
 
-    public async Task<Scene> ScrapeSceneAsync(Site site, string url, string sceneShortName, IPage page, IList<CapturedResponse> responses)
+    public async Task<Scene> ScrapeSceneAsync(Site site, SubSite subSite, string url, string sceneShortName, IPage page, IList<CapturedResponse> responses)
     {
         await page.WaitForLoadStateAsync();
 

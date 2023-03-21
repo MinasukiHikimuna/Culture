@@ -100,7 +100,7 @@ public class NewSensationsRipper : ISiteScraper
         }
     }
 
-    public async Task<Scene> ScrapeSceneAsync(Site site, string url, string sceneShortName, IPage page, IList<CapturedResponse> responses)
+    public async Task<Scene> ScrapeSceneAsync(Site site, SubSite subSite, string url, string sceneShortName, IPage page, IList<CapturedResponse> responses)
     {
         var releaseDateRaw = await page.Locator("div.datePhotos > span").TextContentAsync();
         var releaseDate = DateOnly.Parse(releaseDateRaw);
