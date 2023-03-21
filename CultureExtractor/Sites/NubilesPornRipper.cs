@@ -77,10 +77,26 @@ public class NubilesPornRipper : ISceneScraper, ISceneDownloader
         {
             if (ex.Status == WebExceptionStatus.ProtocolError && (ex.Response as HttpWebResponse)?.StatusCode == HttpStatusCode.NotFound)
             {
+                try
+                {
                 await _downloader.DownloadSceneImageAsync(scene, backgroundImageUrl, scene.Url);
             }
-
+                catch (WebException ex2)
+                {
+                    if (ex2.Status == WebExceptionStatus.ProtocolError && (ex2.Response as HttpWebResponse)?.StatusCode == HttpStatusCode.NotFound)
+                    {
+                        Log.Warning($"Unable to download preview image for {scene.Id} {scene.Name} from URL {backgroundImageUrl}.", ex2);
+                    }
+                    else
+                    {
             throw;
+        }
+    }
+            }
+            else
+            {
+                throw;
+            }
         }
     }
 
