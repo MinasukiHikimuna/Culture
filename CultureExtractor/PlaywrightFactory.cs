@@ -14,9 +14,10 @@ public static class PlaywrightFactory
                 ? browserSettings.BrowserChannel
                 : "chrome",
             SlowMo = 1000,
-            Args = browserSettings.Headless
+            // This should be parameterized
+            /* Args = browserSettings.Headless
                 ? new[] { "--headless=new" }
-                : Array.Empty<string>()
+                : Array.Empty<string>()*/
         });
         var context = await browser.NewContextAsync(new BrowserNewContextOptions()
         {
