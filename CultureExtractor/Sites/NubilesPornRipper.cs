@@ -79,8 +79,8 @@ public class NubilesPornRipper : ISceneScraper, ISceneDownloader
             {
                 try
                 {
-                await _downloader.DownloadSceneImageAsync(scene, backgroundImageUrl, scene.Url);
-            }
+                    await _downloader.DownloadSceneImageAsync(scene, backgroundImageUrl, scene.Url);
+                }
                 catch (WebException ex2)
                 {
                     if (ex2.Status == WebExceptionStatus.ProtocolError && (ex2.Response as HttpWebResponse)?.StatusCode == HttpStatusCode.NotFound)
@@ -89,9 +89,9 @@ public class NubilesPornRipper : ISceneScraper, ISceneDownloader
                     }
                     else
                     {
-            throw;
-        }
-    }
+                        throw;
+                    }
+                }
             }
             else
             {
@@ -221,12 +221,6 @@ public class NubilesPornRipper : ISceneScraper, ISceneDownloader
 
     public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions, IList<CapturedResponse> responses)
     {
-        await page.GotoAsync(scene.Url);
-        await page.WaitForLoadStateAsync();
-
-        await Task.Delay(3000);
-
-
         var availableDownloads = await ParseAvailableDownloadsAsync(page);
 
         DownloadDetailsAndElementHandle selectedDownload = downloadConditions.PreferredDownloadQuality switch
@@ -239,14 +233,14 @@ public class NubilesPornRipper : ISceneScraper, ISceneDownloader
 
         return await _downloader.DownloadSceneAsync(scene, page, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, async () =>
         {
-            await page.Locator("div#download_select > a").ClickAsync();
+            await page.GetByRole(AriaRole.Button).Filter(new LocatorFilterOptions() { HasText = "Downloads" }).ClickAsync();
             await selectedDownload.ElementHandle.ClickAsync();
         });
     }
 
     private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloadsAsync(IPage page)
     {
-        var downloadLinks = await page.Locator("div.content-pane-container div.edge-download-item").ElementHandlesAsync();
+        var downloadLinks = await page.Locator("div.dropdown-downloads").First.Locator("a.dropdown-downloads-link").ElementHandlesAsync();
         var availableDownloads = new List<DownloadDetailsAndElementHandle>();
         foreach (var downloadLink in downloadLinks)
         {
@@ -256,8 +250,7 @@ public class NubilesPornRipper : ISceneScraper, ISceneDownloader
             var resolutionWidth = HumanParser.ParseResolutionWidth(description);
             var resolutionHeight = HumanParser.ParseResolutionHeight(description);
 
-            var linkElement = await downloadLink.QuerySelectorAsync("a");
-            var url = await linkElement.GetAttributeAsync("href");
+            var url = await downloadLink.GetAttributeAsync("href");
 
             string pattern = @"\((\d+[\.\d]*)\s*(GB|MB|KB)\)";
             Match match = Regex.Match(description, pattern);
