@@ -259,7 +259,7 @@ public class NubilesPornRipper : ISceneScraper, ISceneDownloader
             var linkElement = await downloadLink.QuerySelectorAsync("a");
             var url = await linkElement.GetAttributeAsync("href");
 
-            string pattern = @"\((\d+[\.\d]*)\s*(GB|MB)\)";
+            string pattern = @"\((\d+[\.\d]*)\s*(GB|MB|KB)\)";
             Match match = Regex.Match(description, pattern);
             if (!match.Success)
             {
