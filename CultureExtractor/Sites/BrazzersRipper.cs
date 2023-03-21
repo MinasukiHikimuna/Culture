@@ -8,7 +8,7 @@ namespace CultureExtractor.Sites;
 
 [PornNetwork("brazzers")]
 [PornSite("brazzers")]
-public class BrazzersRipper : ISceneScraper, ISceneDownloader
+public class BrazzersRipper : ISiteScraper
 {
     private readonly IDownloader _downloader;
     private readonly ICaptchaSolver _captchaSolver;

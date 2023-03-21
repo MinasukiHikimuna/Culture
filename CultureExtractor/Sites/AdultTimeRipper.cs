@@ -556,7 +556,7 @@ public enum AdultTimeRequestType {
 
 [PornNetwork("adulttime")]
 [PornSite("adulttime")]
-public class AdultTimeRipper : ISceneScraper, ISceneDownloader
+public class AdultTimeRipper : ISiteScraper
 {
     private readonly IDownloader _downloader;
 

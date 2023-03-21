@@ -13,7 +13,7 @@ namespace CultureExtractor.Sites;
 [PornSite("eternaldesire")]
 [PornSite("straplez")]
 [PornSite("hustler")]
-public class MetArtNetworkRipper : ISceneScraper, ISceneDownloader
+public class MetArtNetworkRipper : ISiteScraper
 {
     private readonly IDownloader _downloader;
 

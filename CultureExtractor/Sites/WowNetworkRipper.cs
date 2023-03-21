@@ -11,7 +11,7 @@ namespace CultureExtractor.Sites;
 [PornSite("wowgirls")]
 [PornSite("wowporn")]
 [PornSite("ultrafilms")]
-public class WowNetworkRipper : ISceneScraper, ISceneDownloader
+public class WowNetworkRipper : ISiteScraper
 {
     private readonly IDownloader _downloader;
 

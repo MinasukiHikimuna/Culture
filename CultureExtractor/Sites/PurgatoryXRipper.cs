@@ -6,7 +6,7 @@ namespace CultureExtractor.Sites;
 
 [PornNetwork("purgatoryx")]
 [PornSite("purgatoryx")]
-public class PurgatoryXRipper : ISceneScraper, ISceneDownloader
+public class PurgatoryXRipper : ISiteScraper
 {
     private readonly IDownloader _downloader;
 

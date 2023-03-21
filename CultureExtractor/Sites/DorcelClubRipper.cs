@@ -7,7 +7,7 @@ namespace CultureExtractor.Sites;
 
 [PornNetwork("dorcelclub")]
 [PornSite("dorcelclub")]
-public class DorcelClubRipper : ISceneScraper, ISceneDownloader
+public class DorcelClubRipper : ISiteScraper
 {
     private readonly IDownloader _downloader;
     private readonly ICaptchaSolver _captchaSolver;

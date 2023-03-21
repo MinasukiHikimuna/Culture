@@ -10,7 +10,7 @@ namespace CultureExtractor.Sites;
 [PornSite("czechvrcasting")]
 [PornSite("czechvrfetish")]
 [PornSite("czechvrintimacy")]
-public class CzechVRNetworkRipper : ISceneScraper, ISceneDownloader
+public class CzechVRNetworkRipper : ISiteScraper
 {
     private readonly IDownloader _downloader;
 

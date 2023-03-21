@@ -6,7 +6,7 @@ namespace CultureExtractor.Sites;
 
 [PornNetwork("newsensations")]
 [PornSite("newsensations")]
-public class NewSensationsRipper : ISceneScraper, ISceneDownloader
+public class NewSensationsRipper : ISiteScraper
 {
     private readonly IDownloader _downloader;
 

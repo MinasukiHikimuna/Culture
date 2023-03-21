@@ -8,7 +8,7 @@ namespace CultureExtractor.Sites;
 
 [PornNetwork("nubilesporn")]
 [PornSite("nubilesporn")]
-public class NubilesPornRipper : ISceneScraper, ISceneDownloader
+public class NubilesPornRipper : ISiteScraper
 {
     private readonly IDownloader _downloader;
     private readonly IRepository _repository;
