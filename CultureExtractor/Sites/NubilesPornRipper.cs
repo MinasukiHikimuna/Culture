@@ -97,14 +97,21 @@ public class NubilesPornRipper : ISceneScraper, ISceneDownloader
 
         string pattern = @"/video/watch/(?<id>\d+)/";
         Match match = Regex.Match(url, pattern);
-        if (!match.Success)
+        if (match.Success)
         {
-            throw new Exception($"Unable to parse ID from {url}");
+            var id = match.Groups["id"].Value;
+            return (url, id);
         }
 
-        var id = match.Groups["id"].Value;
+        string altPattern = @"%2Fvideo%2Fwatch%2F(?<id>\d+)%2F";
+        Match altMatch = Regex.Match(url, altPattern);
+        if (altMatch.Success)
+        {
+            var id = altMatch.Groups["id"].Value;
+            return (url, id);
+        }
 
-        return (url, id);
+        throw new Exception($"Unable to parse ID from {url}");
     }
 
     public async Task GoToNextFilmsPageAsync(IPage page)
