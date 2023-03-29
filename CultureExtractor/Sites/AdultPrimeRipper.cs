@@ -201,7 +201,6 @@ public class AdultPrimeRipper : ISiteScraper, ISubSiteScraper
 
         return await _downloader.DownloadSceneAsync(scene, page, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, async () =>
         {
-            await page.GetByRole(AriaRole.Button).Filter(new LocatorFilterOptions() { HasText = "Downloads" }).ClickAsync();
             await selectedDownload.ElementHandle.ClickAsync();
         });
     }
@@ -217,7 +216,7 @@ public class AdultPrimeRipper : ISiteScraper, ISubSiteScraper
             var descriptionRaw = await downloadLink.InnerTextAsync();
             var description = descriptionRaw.Replace("\n", " ").Trim();
 
-            var resolutionWidth = HumanParser.ParseResolutionWidth(description);
+            var resolutionHeight = HumanParser.ParseResolutionHeight(description);
 
             var url = await downloadLink.GetAttributeAsync("href");
 
@@ -225,15 +224,15 @@ public class AdultPrimeRipper : ISiteScraper, ISubSiteScraper
                 new DownloadDetailsAndElementHandle(
                     new DownloadOption(
                         description,
-                        resolutionWidth,
                         -1,
+                        resolutionHeight,
                         -1,
                         -1,
                         string.Empty,
                         url),
                     downloadLink));
         }
-        return availableDownloads.OrderByDescending(d => d.DownloadOption.FileSize).ToList();
+        return availableDownloads.OrderByDescending(d => d.DownloadOption.ResolutionHeight).ToList();
     }
 
     public async Task<IReadOnlyList<SubSite>> GetSubSitesAsync(Site site, IPage page)
