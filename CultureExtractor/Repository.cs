@@ -49,6 +49,7 @@ public class Repository : IRepository
     {
         var siteEntities = await _sqliteContext.Scenes
             .Include(s => s.Site)
+            .Include(s => s.SubSite)
             .Include(s => s.Performers)
             .Include(s => s.Tags)
             .Where(s => s.SiteId == site.Id)
