@@ -99,6 +99,9 @@ public class BaseOptions
     [Option("site-short-name", Required = true, HelpText = "Site short name")]
     public string SiteShortName { get; set; }
 
+    [Option("sub-site", Required = false, HelpText = "Sub site to scrape.")]
+    public string SubSite { get; set; }
+
     [Option("visible-browser",
       Default = false,
       HelpText = "Visible browser")]
