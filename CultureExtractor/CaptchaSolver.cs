@@ -15,7 +15,7 @@ namespace CultureExtractor
 
         public async Task SolveCaptchaIfNeededAsync(IPage page)
         {
-            Thread.Sleep(3000);
+            await Task.Delay(3000);
 
             var blocked = await page.IsVisibleAsync("div#g-recaptcha");
             if (!blocked)
@@ -28,15 +28,15 @@ namespace CultureExtractor
 
             var iframeName = await page.EvaluateAsync<string>("document.querySelector(\"iframe[title='reCAPTCHA']\").name");
 
-            Thread.Sleep(1000);
+            await Task.Delay(1000);
 
             await page.FrameLocator($"iframe[name=\"{iframeName}\"]").GetByRole(AriaRole.Checkbox, new() { NameString = "I'm not a robot" }).ClickAsync();
 
-            Thread.Sleep(1000);
+            await Task.Delay(1000);
 
             var innerIframeName = await page.EvaluateAsync<string>("document.querySelector(\"iframe[title='recaptcha challenge expires in two minutes']\").name");
 
-            Thread.Sleep(2000);
+            await Task.Delay(2000);
 
             await page.FrameLocator($"iframe[name=\"{innerIframeName}\"]").Locator("button#recaptcha-audio-button").ClickAsync();
             var audioUrl = await page.FrameLocator($"iframe[name=\"{innerIframeName}\"]").Locator("a.rc-audiochallenge-tdownload-link").GetAttributeAsync("href");
@@ -48,27 +48,27 @@ namespace CultureExtractor
 
             Log.Verbose($"CAPTCHA challenge text transcriped: {result.Text}");
 
-            Thread.Sleep(5000);
+            await Task.Delay(5000);
 
             await page
                 .FrameLocator($"iframe[name=\"{innerIframeName}\"]")
                 .GetByRole(AriaRole.Textbox, new() { NameString = "Enter what you hear" })
                 .FillAsync(result.Text);
 
-            Thread.Sleep(2000);
+            await Task.Delay(2000);
 
             await page
                 .FrameLocator($"iframe[name=\"{innerIframeName}\"]")
                 .GetByRole(AriaRole.Button, new() { NameString = "Verify" })
                 .ClickAsync();
 
-            Thread.Sleep(3000);
+            await Task.Delay(3000);
 
             /*await page
                 .Locator($"div#blocked input[type=\"submit\"]")
                 .ClickAsync();*/
 
-            Thread.Sleep(5000);
+            await Task.Delay(5000);
 
             Log.Information("CAPTCHA solved!");
         }

@@ -80,7 +80,7 @@ public class PurgatoryXRipper : ISiteScraper
 
     public async Task<Scene> ScrapeSceneAsync(Site site, SubSite subSite, string url, string sceneShortName, IPage page, IList<CapturedResponse> responses)
     {
-        Thread.Sleep(5000);
+        await Task.Delay(5000);
 
         var releaseDateRaw = await page.Locator("p.content-meta > span.date").TextContentAsync();
         var releaseDate = DateOnly.Parse(releaseDateRaw);
