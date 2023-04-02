@@ -184,4 +184,9 @@ public class SensualLoveRipper : ISiteScraper
         }
         return availableDownloads.OrderByDescending(d => d.DownloadOption.ResolutionWidth).ThenByDescending(d => d.DownloadOption.Fps).ToList();
     }
+
+    public Task GoToPageAsync(IPage page, Site site, SubSite subSite, int pageNumber)
+    {
+        throw new NotImplementedException();
+    }
 }

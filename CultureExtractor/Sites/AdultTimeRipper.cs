@@ -854,6 +854,11 @@ public class AdultTimeRipper : ISiteScraper
 
         return availableDownloads.OrderByDescending(d => d.DownloadOption.FileSize).ToList();
     }
+
+    public Task GoToPageAsync(IPage page, Site site, SubSite subSite, int pageNumber)
+    {
+        throw new NotImplementedException();
+    }
 }
 
 public class StringOrNumberConverter : JsonConverter<string>

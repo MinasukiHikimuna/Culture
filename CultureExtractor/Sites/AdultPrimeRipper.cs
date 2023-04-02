@@ -2,8 +2,6 @@
 using Microsoft.Playwright;
 using Serilog;
 using System.Globalization;
-using System.Net;
-using System.Text.RegularExpressions;
 
 namespace CultureExtractor.Sites;
 
@@ -12,7 +10,6 @@ namespace CultureExtractor.Sites;
 public class AdultPrimeRipper : ISiteScraper, ISubSiteScraper
 {
     private readonly IDownloader _downloader;
-    private readonly IRepository _repository;
 
     public AdultPrimeRipper(IDownloader downloader)
     {
@@ -295,5 +292,11 @@ public class AdultPrimeRipper : ISiteScraper, ISubSiteScraper
         var lastPageLinkHandle = pageLinkHandles.Last();
         var lastPageLinkText = await lastPageLinkHandle.TextContentAsync();
         return int.Parse(lastPageLinkText);
+    }
+
+    public async Task GoToPageAsync(IPage page, Site site, SubSite subSite, int pageNumber)
+    {
+        await page.GotoAsync($"/studios/videos?website={subSite.Name}&page={pageNumber}");
+        await Task.Delay(5000);
     }
 }

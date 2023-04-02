@@ -306,4 +306,9 @@ public class CzechVRNetworkRipper : ISiteScraper
         var content = await page.Locator("div.post > div.left > div.text").TextContentAsync();
         return content.Replace("\n", "").Replace("\t", "").Trim();
     }
+
+    public Task GoToPageAsync(IPage page, Site site, SubSite subSite, int pageNumber)
+    {
+        throw new NotImplementedException();
+    }
 }

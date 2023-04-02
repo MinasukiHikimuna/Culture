@@ -299,4 +299,9 @@ public class MetArtNetworkRipper : ISiteScraper
         }
         return availableDownloads;
     }
+
+    public Task GoToPageAsync(IPage page, Site site, SubSite subSite, int pageNumber)
+    {
+        throw new NotImplementedException();
+    }
 }

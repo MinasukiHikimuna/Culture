@@ -264,4 +264,9 @@ public class NubilesPornRipper : ISiteScraper
         }
         return availableDownloads.OrderByDescending(d => d.DownloadOption.FileSize).ToList();
     }
+
+    public Task GoToPageAsync(IPage page, Site site, SubSite subSite, int pageNumber)
+    {
+        throw new NotImplementedException();
+    }
 }

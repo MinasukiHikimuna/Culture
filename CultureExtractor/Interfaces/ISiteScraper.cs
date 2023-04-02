@@ -12,6 +12,7 @@ public interface ISiteScraper
     Task<Scene> ScrapeSceneAsync(Site site, SubSite subSite, string url, string sceneShortName, IPage page, IList<CapturedResponse> responses);
     Task DownloadPreviewImageAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene);
     Task GoToNextFilmsPageAsync(IPage page);
+    Task GoToPageAsync(IPage page, Site site, SubSite subSite, int pageNumber);
 
     /// <summary>
     /// Can either capture a response by returning CapturedResponse or ignore it by returning null.
