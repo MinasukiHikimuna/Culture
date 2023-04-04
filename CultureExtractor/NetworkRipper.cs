@@ -33,10 +33,10 @@ public class NetworkRipper : INetworkRipper
         IPage page = await CreatePageAndLoginAsync(siteScraper, site, browserSettings);
         var totalPages = await siteScraper.NavigateToScenesAndReturnPageCountAsync(site, page);
 
-        var startPage = 1;
+        var startPage = int.MaxValue;
 
         var scrapedScenes = 0;
-        for (int currentPage = startPage; currentPage <= totalPages; currentPage++)
+        for (int currentPage = Math.Min(startPage, totalPages); currentPage >= 1; currentPage--)
         {
             await siteScraper.GoToPageAsync(page, site, null, currentPage);
             await Task.Delay(5000);
@@ -72,10 +72,6 @@ public class NetworkRipper : INetworkRipper
                         await Task.Delay(3000);
                     }
                 }
-            }
-            if (currentPage != totalPages)
-            {
-                await siteScraper.GoToNextFilmsPageAsync(page);
             }
         }
     }
@@ -180,37 +176,37 @@ public class NetworkRipper : INetworkRipper
 
         try
         {
-        var responses = new List<CapturedResponse>();
-        EventHandler<IResponse> responseCapturer = async (_, response) =>
-        {
-            var capturedResponse = await siteScraper.FilterResponsesAsync(sceneShortName, response);
-            if (capturedResponse != null)
+            var responses = new List<CapturedResponse>();
+            EventHandler<IResponse> responseCapturer = async (_, response) =>
             {
-                responses.Add(capturedResponse);
+                var capturedResponse = await siteScraper.FilterResponsesAsync(sceneShortName, response);
+                if (capturedResponse != null)
+                {
+                    responses.Add(capturedResponse);
+                }
+            };
+            scenePage.Response += responseCapturer;
+
+            await scenePage.GotoAsync(url);
+            await scenePage.WaitForLoadStateAsync();
+
+            await Task.Delay(1000);
+
+            scenePage.Response -= responseCapturer;
+
+            var scene = await siteScraper.ScrapeSceneAsync(site, subSite, url, sceneShortName, scenePage, responses);
+            if (existingScene != null)
+            {
+                scene = scene with { Id = existingScene.Id };
             }
-        };
-        scenePage.Response += responseCapturer;
 
-        await scenePage.GotoAsync(url);
-        await scenePage.WaitForLoadStateAsync();
+            var savedScene = await _repository.UpsertScene(scene);
+            await siteScraper.DownloadPreviewImageAsync(savedScene, scenePage, page, currentScene);
 
-        await Task.Delay(1000);
+            await scenePage.CloseAsync();
 
-        scenePage.Response -= responseCapturer;
-
-        var scene = await siteScraper.ScrapeSceneAsync(site, subSite, url, sceneShortName, scenePage, responses);
-        if (existingScene != null)
-        {
-            scene = scene with { Id = existingScene.Id };
+            return savedScene;
         }
-
-        var savedScene = await _repository.UpsertScene(scene);
-        await siteScraper.DownloadPreviewImageAsync(savedScene, scenePage, page, currentScene);
-
-        await scenePage.CloseAsync();
-
-        return savedScene;
-    }
         finally
         {
             await scenePage.CloseAsync();
