@@ -189,11 +189,10 @@ public class XevUnleashedRipper : ISiteScraper
 
     public async Task DownloadPreviewImageAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene)
     {
-        var previewElement = await scenePage.Locator("div.mejs__poster").ElementHandleAsync();
-        var style = await previewElement.GetAttributeAsync("style");
-        var backgroundImageUrl = style.Replace("background-image: url(\"", "").Replace("\"); width: 100%; height: 100%; display: none;", "");
+        var ogImageMeta = await scenePage.QuerySelectorAsync("meta[property='og:image']");
+        string ogImageUrl = await ogImageMeta.GetAttributeAsync("content");
 
-        await _downloader.DownloadSceneImageAsync(scene, scene.Site.Url + backgroundImageUrl, scene.Url);
+        await _downloader.DownloadSceneImageAsync(scene, ogImageUrl, scene.Url);
     }
 
     public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions, IList<CapturedResponse> responses)
