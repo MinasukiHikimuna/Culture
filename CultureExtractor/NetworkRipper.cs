@@ -178,6 +178,8 @@ public class NetworkRipper : INetworkRipper
         }
         var scenePage = await page.Context.NewPageAsync();
 
+        try
+        {
         var responses = new List<CapturedResponse>();
         EventHandler<IResponse> responseCapturer = async (_, response) =>
         {
@@ -208,6 +210,11 @@ public class NetworkRipper : INetworkRipper
         await scenePage.CloseAsync();
 
         return savedScene;
+    }
+        finally
+        {
+            await scenePage.CloseAsync();
+        }
     }
 
     public async Task DownloadScenesAsync(Site site, BrowserSettings browserSettings, DownloadConditions downloadConditions, DownloadOptions downloadOptions)
