@@ -161,6 +161,10 @@ public class XevUnleashedRipper : ISiteScraper
                 resolutionWidth = 3840;
                 resolutionHeight = 2160;
             }
+            else if (description.Contains("PDF"))
+            {
+                continue;
+            }
             else
             {
                 throw new InvalidOperationException($"Could not parse width and height from description: {description}");
