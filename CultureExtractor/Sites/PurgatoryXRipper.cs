@@ -61,7 +61,7 @@ public class PurgatoryXRipper : ISiteScraper
         return currentScenes;
     }
 
-    public async Task<(string Url, string ShortName)> GetSceneIdAsync(Site site, IElementHandle currentScene)
+    public async Task<SceneIdAndUrl> GetSceneIdAsync(Site site, IElementHandle currentScene)
     {
         var linkElement = await currentScene.QuerySelectorAsync("div.container > div.row > a");
         var url = await linkElement.GetAttributeAsync("href");
@@ -70,7 +70,7 @@ public class PurgatoryXRipper : ISiteScraper
             ? idWithQueryStrings.Substring(0, idWithQueryStrings.IndexOf("?"))
             : idWithQueryStrings;
 
-        return (url, shortName);
+        return new SceneIdAndUrl(shortName, url);
     }
 
     public async Task GoToNextFilmsPageAsync(IPage page)

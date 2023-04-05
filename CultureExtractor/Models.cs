@@ -106,4 +106,6 @@ public class PathsOptions
     public string DownloadPath { get; set; } = String.Empty;
 }
 
+public record SceneIdAndUrl(string Id, string Url);
+
 public record CapturedResponse(string Name, IResponse Response);

@@ -82,7 +82,7 @@ public class AdultPrimeRipper : ISiteScraper, ISubSiteScraper
             .AsReadOnly();
     }
 
-    public async Task<(string Url, string ShortName)> GetSceneIdAsync(Site site, IElementHandle currentScene)
+    public async Task<SceneIdAndUrl> GetSceneIdAsync(Site site, IElementHandle currentScene)
     {
         var overlayElement = await currentScene.QuerySelectorAsync("div.overlay");
         var aElement = await overlayElement.QuerySelectorAsync("a");
@@ -90,7 +90,7 @@ public class AdultPrimeRipper : ISiteScraper, ISubSiteScraper
 
         var shortName = await overlayElement.GetAttributeAsync("data-id");
 
-        return (url, shortName);
+        return new SceneIdAndUrl(shortName, url);
     }
 
     public async Task GoToNextFilmsPageAsync(IPage page)

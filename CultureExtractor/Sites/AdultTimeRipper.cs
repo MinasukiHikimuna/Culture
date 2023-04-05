@@ -623,12 +623,12 @@ public class AdultTimeRipper : ISiteScraper
         return currentScenes;
     }
 
-    public async Task<(string Url, string ShortName)> GetSceneIdAsync(Site site, IElementHandle currentScene)
+    public async Task<SceneIdAndUrl> GetSceneIdAsync(Site site, IElementHandle currentScene)
     {
         var thumbLinkElement = await currentScene.QuerySelectorAsync("a");
         var url = await thumbLinkElement.GetAttributeAsync("href");
         var id = url.Substring(url.LastIndexOf("/") + 1);
-        return (url, id);
+        return new SceneIdAndUrl(id, url);
     }
 
     public async Task GoToNextFilmsPageAsync(IPage page)

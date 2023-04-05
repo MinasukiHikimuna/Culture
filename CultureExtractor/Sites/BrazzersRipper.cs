@@ -83,7 +83,7 @@ public class BrazzersRipper : ISiteScraper
         return currentScenes;
     }
 
-    public async Task<(string Url, string ShortName)> GetSceneIdAsync(Site site, IElementHandle currentScene)
+    public async Task<SceneIdAndUrl> GetSceneIdAsync(Site site, IElementHandle currentScene)
     {
         var url = await currentScene.GetAttributeAsync("href");
 
@@ -96,7 +96,7 @@ public class BrazzersRipper : ISiteScraper
 
         var id = match.Groups["id"].Value;
 
-        return (url, id);
+        return new SceneIdAndUrl(id, url);
     }
 
     public async Task GoToNextFilmsPageAsync(IPage page)

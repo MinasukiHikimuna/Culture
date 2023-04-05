@@ -105,7 +105,7 @@ public class NubilesPornRipper : ISiteScraper
         return currentScenes;
     }
 
-    public async Task<(string Url, string ShortName)> GetSceneIdAsync(Site site, IElementHandle currentScene)
+    public async Task<SceneIdAndUrl> GetSceneIdAsync(Site site, IElementHandle currentScene)
     {
         var linkElement = await currentScene.QuerySelectorAsync("figcaption > div.caption-header > span.title > a");
         var url = await linkElement.GetAttributeAsync("href");
@@ -115,7 +115,7 @@ public class NubilesPornRipper : ISiteScraper
         if (match.Success)
         {
             var id = match.Groups["id"].Value;
-            return (url, id);
+            return new SceneIdAndUrl(id, url);
         }
 
         string altPattern = @"%2Fvideo%2Fwatch%2F(?<id>\d+)%2F";
@@ -123,7 +123,7 @@ public class NubilesPornRipper : ISiteScraper
         if (altMatch.Success)
         {
             var id = altMatch.Groups["id"].Value;
-            return (url, id);
+            return new SceneIdAndUrl(id, url);
         }
 
         throw new Exception($"Unable to parse ID from {url}");

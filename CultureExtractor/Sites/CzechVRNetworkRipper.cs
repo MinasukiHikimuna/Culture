@@ -92,7 +92,7 @@ public class CzechVRNetworkRipper : ISiteScraper
         return page.Locator("div.tagyCenter > div.postTag").ElementHandlesAsync();
     }
 
-    public async Task<(string Url, string ShortName)> GetSceneIdAsync(Site site, IElementHandle currentScene)
+    public async Task<SceneIdAndUrl> GetSceneIdAsync(Site site, IElementHandle currentScene)
     {
         var linkElement = await currentScene.QuerySelectorAsync("div.nazev > h2 > a");
         var relativeUrl = await linkElement.GetAttributeAsync("href");
@@ -113,8 +113,8 @@ public class CzechVRNetworkRipper : ISiteScraper
 
         var sceneShortName = match.Groups["id"].Value;
 
-        return (relativeUrl, sceneShortName);
-    }
+        return new SceneIdAndUrl(sceneShortName, relativeUrl);
+    }   
 
     public async Task<Scene> ScrapeSceneAsync(Site site, SubSite subSite, string url, string sceneShortName, IPage page, IList<CapturedResponse> responses)
     {

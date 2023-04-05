@@ -58,29 +58,19 @@ public class NewSensationsRipper : ISiteScraper
         return currentScenes;
     }
 
-    public async Task<(string Url, string ShortName)> GetSceneIdAsync(Site site, IElementHandle currentScene)
+    public async Task<SceneIdAndUrl> GetSceneIdAsync(Site site, IElementHandle currentScene)
     {
-        try
+        var thumbLinkElement = await currentScene.QuerySelectorAsync("a");
+        var url = await thumbLinkElement.GetAttributeAsync("href");
+        var pattern = @"id=(\d+)&";
+        Match match = Regex.Match(url, pattern);
+        if (!match.Success)
         {
-            var thumbLinkElement = await currentScene.QuerySelectorAsync("a");
-            var url = await thumbLinkElement.GetAttributeAsync("href");
-            var pattern = @"id=(\d+)&";
-            Match match = Regex.Match(url, pattern);
-            if (!match.Success)
-            {
-                throw new InvalidOperationException($"Could not parse numerical ID from {url} using pattern {pattern}.");
-            }
-
-            string shortName = match.Groups[1].Value;
-            return (url, shortName);
-
-        }
-        catch
-        {
-
+            throw new InvalidOperationException($"Could not parse numerical ID from {url} using pattern {pattern}.");
         }
 
-        return (null, null);
+        string shortName = match.Groups[1].Value;
+        return new SceneIdAndUrl(shortName, url);
     }
 
     public async Task GoToNextFilmsPageAsync(IPage page)

@@ -72,7 +72,7 @@ public class DorcelClubRipper : ISiteScraper
         return currentScenes;
     }
 
-    public async Task<(string Url, string ShortName)> GetSceneIdAsync(Site site, IElementHandle currentScene)
+    public async Task<SceneIdAndUrl> GetSceneIdAsync(Site site, IElementHandle currentScene)
     {
         var thumbLinkElement = await currentScene.QuerySelectorAsync("a.thumb");
         var url = await thumbLinkElement.GetAttributeAsync("href");
@@ -84,7 +84,7 @@ public class DorcelClubRipper : ISiteScraper
         }
 
         string shortName = match.Groups[1].Value;
-        return (url, shortName);
+        return new SceneIdAndUrl(shortName, url);
     }
 
     public async Task GoToNextFilmsPageAsync(IPage page)

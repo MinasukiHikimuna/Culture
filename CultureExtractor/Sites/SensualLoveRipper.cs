@@ -50,12 +50,12 @@ public class SensualLoveRipper : ISiteScraper
         return await scenesLocator.ElementHandlesAsync();
     }
 
-    public async Task<(string Url, string ShortName)> GetSceneIdAsync(Site site, IElementHandle currentScene)
+    public async Task<SceneIdAndUrl> GetSceneIdAsync(Site site, IElementHandle currentScene)
     {
         var linkElement = await currentScene.QuerySelectorAsync("a");
         var url = await linkElement.GetAttributeAsync("href");
         var id = url.Replace("/members/content/item/", "");
-        return (url, id);
+        return new SceneIdAndUrl(id, url);
     }
 
     public async Task<Scene> ScrapeSceneAsync(Site site, SubSite subSite, string url, string sceneShortName, IPage page, IList<CapturedResponse> responses)
