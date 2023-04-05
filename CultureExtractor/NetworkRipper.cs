@@ -39,7 +39,7 @@ public class NetworkRipper : INetworkRipper
         for (int currentPage = Math.Min(startPage, totalPages); currentPage >= 1; currentPage--)
         {
             await siteScraper.GoToPageAsync(page, site, null, currentPage);
-            await Task.Delay(5000);
+            await Task.Delay(1000);
             var currentScenes = await siteScraper.GetCurrentScenesAsync(site, page);
 
             Log.Information(totalPages == int.MaxValue
