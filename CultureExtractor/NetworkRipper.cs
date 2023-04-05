@@ -142,7 +142,15 @@ public class NetworkRipper : INetworkRipper
 
     private static void LogScrapedSceneDescription(Scene scene)
     {
-        var sceneDescription = new { Site = scene.Site.Name, SubSite = scene.SubSite?.Name, ShortName = scene.ShortName, ReleaseDate = scene.ReleaseDate, Name = scene.Name, Url = scene.Url.StartsWith("https://") ? scene.Url : scene.Site.Url + scene.Url };
+        var sceneDescription = new {
+            Site = scene.Site.Name,
+            SubSite = scene.SubSite?.Name,
+            ShortName = scene.ShortName,
+            ReleaseDate = scene.ReleaseDate,
+            Name = scene.Name,
+            Url = scene.Url.StartsWith("https://")
+                ? scene.Url
+                : scene.Site.Url + scene.Url };
         Log.Information("Scraped scene: {@Scene}", sceneDescription);
     }
 
@@ -339,7 +347,9 @@ public class NetworkRipper : INetworkRipper
                         Site = existingScene.Site.Name,
                         ReleaseDate = existingScene.ReleaseDate,
                         Name = existingScene.Name,
-                        Url = site.Url + existingScene.Url,
+                        Url = existingScene.Url.StartsWith("https://")
+                            ? existingScene.Url
+                            : existingScene.Site.Url + existingScene.Url,
                         Quality = downloadConditions.PreferredDownloadQuality
                     };
                     Log.Verbose("Downloading: {@Scene}", sceneDescription);
@@ -356,7 +366,9 @@ public class NetworkRipper : INetworkRipper
                         Site = existingScene.Site.Name,
                         ReleaseDate = existingScene.ReleaseDate,
                         Name = existingScene.Name,
-                        Url = site.Url + existingScene.Url,
+                        Url = existingScene.Url.StartsWith("https://")
+                            ? existingScene.Url
+                            : existingScene.Site.Url + existingScene.Url,
                         Quality = downloadConditions.PreferredDownloadQuality,
                         Phash = download.VideoHashes?.PHash
                     };
