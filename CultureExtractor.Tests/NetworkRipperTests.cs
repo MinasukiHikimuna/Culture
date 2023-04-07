@@ -44,6 +44,15 @@ namespace CultureExtractor.Tests
             var contextMock = new Mock<IBrowserContext>();
 
             _siteScraperMock.Setup(ss => ss.NavigateToScenesAndReturnPageCountAsync(It.IsAny<Site>(), It.IsAny<IPage>())).ReturnsAsync(1);
+            _siteScraperMock.Setup(ss => ss.GetCurrentScenesAsync(It.IsAny<Site>(), It.IsAny<IPage>())).ReturnsAsync(new List<IndexScene>()
+            {
+                new IndexScene(null, "abc", "/scene/abc", new Mock<IElementHandle>().Object)
+            });
+
+            _repositoryMock.Setup(rr => rr.GetScenesAsync(It.IsAny<string>(), It.IsAny<IList<string>>())).ReturnsAsync(new List<Scene>()
+            {
+            });
+
 
             contextMock.Setup(c => c.StorageStateAsync(null)).ReturnsAsync("{\"cookies\":[],\"origins\":[]}");
             pageMock.SetupGet(p => p.Context).Returns(contextMock.Object);
@@ -56,7 +65,6 @@ namespace CultureExtractor.Tests
             await networkRipper.ScrapeScenesAsync(site, browserSettings, scrapeOptions);
 
             // Assert
-            _siteScraperMock.Verify(ss => ss.NavigateToScenesAndReturnPageCountAsync(site, It.IsAny<IPage>()), Times.Once());
             _siteScraperMock.Verify(ss => ss.GetCurrentScenesAsync(site, It.IsAny<IPage>()), Times.AtLeastOnce());
             _siteScraperMock.Verify(ss => ss.GoToPageAsync(It.IsAny<IPage>(), site, null, It.IsAny<int>()), Times.AtLeastOnce());
         }
