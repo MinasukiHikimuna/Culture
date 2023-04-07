@@ -2,9 +2,9 @@
 
 namespace CultureExtractor;
 
-public static class PlaywrightFactory
+public class PlaywrightFactory : IPlaywrightFactory
 {
-    public static async Task<IPage> CreatePageAsync(Site site, BrowserSettings browserSettings)
+    public async Task<IPage> CreatePageAsync(Site site, BrowserSettings browserSettings)
     {
         var playwright = await Playwright.CreateAsync();
         var browser = await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
