@@ -4,6 +4,7 @@
     {
         Task<Gallery?> GetGalleryAsync(string siteShortName, string galleryShortScene);
         Task<Scene?> GetSceneAsync(string siteShortName, string sceneShortName);
+        Task<IReadOnlyList<Scene>> GetScenesAsync(string siteShortName, IList<string> sceneShortNames);
         Task<IEnumerable<Scene>> GetScenesAsync();
         Task<Site> GetSiteAsync(string shortName);
         Task<IEnumerable<Site>> GetSitesAsync();

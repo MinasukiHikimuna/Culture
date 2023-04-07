@@ -75,6 +75,21 @@ public class Repository : IRepository
             : null;
     }
 
+    public async Task<IReadOnlyList<Scene>> GetScenesAsync(string siteShortName, IList<string> sceneShortNames)
+    {
+        var sceneEntities = await _sqliteContext.Scenes
+            .Include(s => s.Site)
+            .Include(s => s.Performers)
+            .Include(s => s.Tags)
+            .Where(s => s.Site.ShortName == siteShortName && sceneShortNames.Contains(s.ShortName))
+            .ToListAsync();
+
+        return sceneEntities
+            .Select(Convert)
+            .ToList()
+            .AsReadOnly();
+    }
+
     public async Task<Gallery?> GetGalleryAsync(string siteShortName, string galleryShortScene)
     {
         var sceneEntity = await _sqliteContext.Galleries

@@ -1,6 +1,5 @@
 ﻿using CultureExtractor.Exceptions;
 using CultureExtractor.Interfaces;
-using CultureExtractor.Migrations;
 using Microsoft.Playwright;
 using Serilog;
 
@@ -40,13 +39,23 @@ public class NetworkRipper : INetworkRipper
         {
             await siteScraper.GoToPageAsync(page, site, null, currentPage);
             await Task.Delay(1000);
-            var currentScenes = await siteScraper.GetCurrentScenesAsync(site, page);
+            var indexScenes = await siteScraper.GetCurrentScenesAsync(site, page);
 
             Log.Information(totalPages == int.MaxValue
-                ? $"Batch {currentPage} of infinite page contains {currentScenes.Count} scenes"
-                : $"Page {currentPage}/{totalPages} contains {currentScenes.Count} scenes");
+                ? $"Batch {currentPage} of infinite page contains {indexScenes.Count} scenes"
+                : $"Page {currentPage}/{totalPages} contains {indexScenes.Count} scenes");
 
-            foreach (var currentScene in currentScenes)
+            var existingScenes = await _repository.GetScenesAsync(site.ShortName, indexScenes.Select(s => s.ShortName).ToList());
+            var checkedIndexScenes = new List<IndexScene>();
+            foreach (var indexScene in indexScenes)
+            {
+                checkedIndexScenes.Add(indexScene with { Scene = existingScenes.FirstOrDefault(s => s.ShortName == indexScene.ShortName) });
+            }
+            var unscrapedIndexScenes = scrapeOptions.FullScrape
+                ? checkedIndexScenes
+                : checkedIndexScenes.Where(s => s.Scene == null).ToList();
+
+            foreach (var currentScene in unscrapedIndexScenes)
             {
                 if (scrapedScenes >= scrapeOptions.MaxScenes)
                 {
@@ -59,6 +68,12 @@ public class NetworkRipper : INetworkRipper
                     try
                     {
                         var scene = await ScrapeSceneAsync(currentScene, siteScraper, site, null, page, scrapeOptions);
+                        if (scene == null)
+                        {
+                            // already exists
+                            break;
+                        }
+
                         if (scene != null)
                         {
                             LogScrapedSceneDescription(scene);
@@ -80,11 +95,6 @@ public class NetworkRipper : INetworkRipper
     {
         IPage page = await CreatePageAndLoginAsync(subSiteScraper, site, browserSettings);
 
-        var startPage = 1;
-        
-        // var startPage = 187;
-        // TODO: move to interface and nubiles porn
-
         var subSites = await subSiteScraper.GetSubSitesAsync(site, page);
         subSites = !string.IsNullOrWhiteSpace(scrapeOptions.SubSite)
             ? subSites.Where(x => x.Name == scrapeOptions.SubSite).ToList()
@@ -100,16 +110,26 @@ public class NetworkRipper : INetworkRipper
             var totalPages = await subSiteScraper.NavigateToSubSiteAndReturnPageCountAsync(site, subSite, page);
 
             var scrapedScenes = 0;
-            for (int currentPage = Math.Min(startPage, totalPages); currentPage >= 1; currentPage--)
+            for (int currentPage = totalPages; currentPage >= 1; currentPage--)
             {
                 await subSiteScraper.GoToPageAsync(page, site, subSite, currentPage);
-                var currentScenes = await subSiteScraper.GetCurrentScenesAsync(site, page);
+                var indexScenes = await subSiteScraper.GetCurrentScenesAsync(site, page);
 
                 Log.Information(totalPages == int.MaxValue
-                    ? $"Batch {currentPage} of infinite page contains {currentScenes.Count} scenes"
-                    : $"Page {currentPage}/{totalPages} contains {currentScenes.Count} scenes");
+                    ? $"Batch {currentPage} of infinite page contains {indexScenes.Count} scenes"
+                    : $"Page {currentPage}/{totalPages} contains {indexScenes.Count} scenes");
 
-                foreach (var currentScene in currentScenes)
+                var existingScenes = await _repository.GetScenesAsync(site.ShortName, indexScenes.Select(s => s.ShortName).ToList());
+                var checkedIndexScenes = new List<IndexScene>();
+                foreach (var indexScene in indexScenes)
+                {
+                    checkedIndexScenes.Add(indexScene with { Scene = existingScenes.FirstOrDefault(s => s.ShortName == indexScene.ShortName) });
+                }
+                var unscrapedIndexScenes = scrapeOptions.FullScrape
+                    ? checkedIndexScenes
+                    : checkedIndexScenes.Where(s => s.Scene == null).ToList();
+
+                foreach (var currentScene in unscrapedIndexScenes)
                 {
                     if (scrapedScenes >= scrapeOptions.MaxScenes)
                     {
@@ -154,32 +174,8 @@ public class NetworkRipper : INetworkRipper
         Log.Information("Scraped scene: {@Scene}", sceneDescription);
     }
 
-    private async Task<Scene> ScrapeSceneAsync(IElementHandle currentScene, ISiteScraper siteScraper, Site site, SubSite subSite, IPage page, ScrapeOptions scrapeOptions)
+    private async Task<Scene> ScrapeSceneAsync(IndexScene currentScene, ISiteScraper siteScraper, Site site, SubSite subSite, IPage page, ScrapeOptions scrapeOptions)
     {
-        await currentScene.ScrollIntoViewIfNeededAsync();
-        (string url, string sceneShortName) = await siteScraper.GetSceneIdAsync(site, currentScene);
-
-        /*if (retries > 0)
-        {
-            Log.Information($"Retrying {retries + 1} attempt for {url}");
-
-            await page.ReloadAsync();
-            if (siteScraper != null)
-            {
-                if (page.Url == "https://site-ma.brazzers.com/login")
-                {
-                    await siteScraper.LoginAsync(site, page);
-                }
-
-                await page.GotoAsync("/scenes?page=" + currentPage);
-            }
-        }*/
-
-        var existingScene = await _repository.GetSceneAsync(site.ShortName, sceneShortName);
-        if (existingScene != null && !scrapeOptions.FullScrape)
-        {
-            return null;
-        }
         var scenePage = await page.Context.NewPageAsync();
 
         try
@@ -187,7 +183,7 @@ public class NetworkRipper : INetworkRipper
             var responses = new List<CapturedResponse>();
             EventHandler<IResponse> responseCapturer = async (_, response) =>
             {
-                var capturedResponse = await siteScraper.FilterResponsesAsync(sceneShortName, response);
+                var capturedResponse = await siteScraper.FilterResponsesAsync(currentScene.ShortName, response);
                 if (capturedResponse != null)
                 {
                     responses.Add(capturedResponse);
@@ -195,21 +191,21 @@ public class NetworkRipper : INetworkRipper
             };
             scenePage.Response += responseCapturer;
 
-            await scenePage.GotoAsync(url);
+            await scenePage.GotoAsync(currentScene.Url);
             await scenePage.WaitForLoadStateAsync();
 
             await Task.Delay(1000);
 
             scenePage.Response -= responseCapturer;
 
-            var scene = await siteScraper.ScrapeSceneAsync(site, subSite, url, sceneShortName, scenePage, responses);
-            if (existingScene != null)
+            var scene = await siteScraper.ScrapeSceneAsync(site, subSite, currentScene.Url, currentScene.ShortName, scenePage, responses);
+            if (currentScene.Scene != null)
             {
-                scene = scene with { Id = existingScene.Id };
+                scene = scene with { Id = currentScene.Scene.Id };
             }
 
             var savedScene = await _repository.UpsertScene(scene);
-            await siteScraper.DownloadPreviewImageAsync(savedScene, scenePage, page, currentScene);
+            await siteScraper.DownloadPreviewImageAsync(savedScene, scenePage, page, currentScene.ElementHandle);
 
             await scenePage.CloseAsync();
 

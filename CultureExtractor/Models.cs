@@ -110,4 +110,4 @@ public record SceneIdAndUrl(string Id, string Url);
 
 public record CapturedResponse(string Name, IResponse Response);
 
-public record IndexScene(string Id, string Url, IElementHandle ElementHandle);
+public record IndexScene(Scene? Scene, string ShortName, string Url, IElementHandle ElementHandle);

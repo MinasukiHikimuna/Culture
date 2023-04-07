@@ -81,7 +81,7 @@ public class AdultPrimeRipper : ISiteScraper, ISubSiteScraper
         foreach (var sceneHandle in sceneHandles.Reverse())
         {
             var sceneIdAndUrl = await GetSceneIdAsync(site, sceneHandle);
-            indexScenes.Add(new IndexScene(sceneIdAndUrl.Id, sceneIdAndUrl.Url, sceneHandle));
+            indexScenes.Add(new IndexScene(null, sceneIdAndUrl.Id, sceneIdAndUrl.Url, sceneHandle));
         }
 
         return indexScenes.AsReadOnly();
@@ -302,6 +302,6 @@ public class AdultPrimeRipper : ISiteScraper, ISubSiteScraper
     public async Task GoToPageAsync(IPage page, Site site, SubSite subSite, int pageNumber)
     {
         await page.GotoAsync($"/studios/videos?website={subSite.Name}&page={pageNumber}");
-        await Task.Delay(5000);
+        await Task.Delay(1000);
     }
 }

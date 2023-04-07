@@ -107,7 +107,7 @@ public class NubilesPornRipper : ISiteScraper
         foreach (var sceneHandle in sceneHandles.Reverse())
         {
             var sceneIdAndUrl = await GetSceneIdAsync(site, sceneHandle);
-            indexScenes.Add(new IndexScene(sceneIdAndUrl.Id, sceneIdAndUrl.Url, sceneHandle));
+            indexScenes.Add(new IndexScene(null, sceneIdAndUrl.Id, sceneIdAndUrl.Url, sceneHandle));
         }
 
         return indexScenes.AsReadOnly();
