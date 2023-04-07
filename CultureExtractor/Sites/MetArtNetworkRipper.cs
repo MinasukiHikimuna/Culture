@@ -105,16 +105,25 @@ public class MetArtNetworkRipper : ISiteScraper
         return totalPages;
     }
 
-    public async Task<IReadOnlyList<IElementHandle>> GetCurrentScenesAsync(Site site, IPage page)
+    public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, IPage page)
     {
         var currentPage = await page.Locator("nav.pagination > a.active").TextContentAsync();
         var skipAdScene = currentPage == "1" && site.ShortName != "hustler";
 
         var currentScenes = await page.Locator("div.card-media a").ElementHandlesAsync();
 
-        return skipAdScene
+        var sceneHandles = skipAdScene
             ? currentScenes.Skip(1).ToList().AsReadOnly()
             : currentScenes;
+
+        var indexScenes = new List<IndexScene>();
+        foreach (var sceneHandle in sceneHandles.Reverse())
+        {
+            var sceneIdAndUrl = await GetSceneIdAsync(site, sceneHandle);
+            indexScenes.Add(new IndexScene(sceneIdAndUrl.Id, sceneIdAndUrl.Url, sceneHandle));
+        }
+
+        return indexScenes.AsReadOnly();
     }
 
     public async Task<SceneIdAndUrl> GetSceneIdAsync(Site site, IElementHandle currentScene)

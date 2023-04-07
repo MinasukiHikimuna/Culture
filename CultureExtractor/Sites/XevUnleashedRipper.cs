@@ -66,13 +66,18 @@ public class XevUnleashedRipper : ISiteScraper
         await Task.Delay(5000);
     }
 
-    public async Task<IReadOnlyList<IElementHandle>> GetCurrentScenesAsync(Site site, IPage page)
+    public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, IPage page)
     {
-        var currentScenes = await page.Locator("div.update_details").ElementHandlesAsync();
-        return currentScenes
-            .Reverse()
-            .ToList()
-            .AsReadOnly();
+        var sceneHandles = await page.Locator("div.update_details").ElementHandlesAsync();
+
+        var indexScenes = new List<IndexScene>();
+        foreach (var sceneHandle in sceneHandles.Reverse())
+        {
+            var sceneIdAndUrl = await GetSceneIdAsync(site, sceneHandle);
+            indexScenes.Add(new IndexScene(sceneIdAndUrl.Id, sceneIdAndUrl.Url, sceneHandle));
+        }
+
+        return indexScenes.AsReadOnly();
     }
 
     public async Task<SceneIdAndUrl> GetSceneIdAsync(Site site, IElementHandle currentScene)
