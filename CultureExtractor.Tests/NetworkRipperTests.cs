@@ -1,6 +1,8 @@
 ﻿using CultureExtractor.Interfaces;
 using Microsoft.Playwright;
 using Moq;
+using Serilog;
+using Serilog.Sinks.InMemory;
 
 namespace CultureExtractor.Tests
 {
@@ -16,6 +18,11 @@ namespace CultureExtractor.Tests
         [SetUp]
         public void SetUp()
         {
+            Log.Logger = new LoggerConfiguration()
+                .MinimumLevel.Verbose()
+                .WriteTo.InMemory()
+                .CreateLogger();
+
             _repositoryMock = new Mock<IRepository>();
             _serviceProviderMock = new Mock<IServiceProvider>();
             _downloaderMock = new Mock<IDownloader>();
@@ -33,7 +40,15 @@ namespace CultureExtractor.Tests
             var browserSettings = new BrowserSettings(true, "browserChannel");
             var scrapeOptions = new ScrapeOptions { FullScrape = false };
 
-            _playwrightFactoryMock.Setup(pf => pf.CreatePageAsync(site, browserSettings)).ReturnsAsync(new Mock<IPage>().Object);
+            var pageMock = new Mock<IPage>();
+            var contextMock = new Mock<IBrowserContext>();
+
+            _siteScraperMock.Setup(ss => ss.NavigateToScenesAndReturnPageCountAsync(It.IsAny<Site>(), It.IsAny<IPage>())).ReturnsAsync(1);
+
+            contextMock.Setup(c => c.StorageStateAsync(null)).ReturnsAsync("{\"cookies\":[],\"origins\":[]}");
+            pageMock.SetupGet(p => p.Context).Returns(contextMock.Object);
+
+            _playwrightFactoryMock.Setup(pf => pf.CreatePageAsync(site, browserSettings)).ReturnsAsync(pageMock.Object);
 
             var networkRipper = new NetworkRipper(_repositoryMock.Object, _serviceProviderMock.Object, _downloaderMock.Object, _playwrightFactoryMock.Object);
 
