@@ -161,7 +161,11 @@ public class HentaiedRipper : ISiteScraper
 
     private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloadsAsync(IPage page)
     {
-        var input = await page.EvaluateAsync<string>("Array.from(document.querySelectorAll('script')).map(script => script.innerHTML).find(content => content && content.includes(\"var playerInstance_\"))");
+        var input = await page.EvaluateAsync<string>(@"
+            Array.from(document.querySelectorAll('script'))
+            .map(script => script.innerHTML)
+            .find(content => content && content.includes('var playerInstance_'))
+        ");
         var sources = ParseSources(input);
 
         var availableDownloads = new List<DownloadDetailsAndElementHandle>();
