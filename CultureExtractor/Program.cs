@@ -45,6 +45,7 @@ class Program
             .ConfigureServices(services => {
                 services.AddDbContext<ISqliteContext, SqliteContext>(options => options.UseSqlite(@"Data Source=B:\Ripping\ripping.db"));
 
+                services.AddScoped<IPlaywrightFactory, PlaywrightFactory>();
                 services.AddScoped<ICaptchaSolver, CaptchaSolver>();
                 services.AddScoped<IRepository, Repository>();
                 services.AddScoped<IDownloader, Downloader>();
