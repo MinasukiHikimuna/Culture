@@ -6,8 +6,13 @@ public interface ISiteScraper
 {
     Task LoginAsync(Site site, IPage page);
 
+
+    string? IndexRequestFilterPath => null;
+    Func<IRequest, bool>? IndexRequestFilterPredicate => null;
+
+
     Task<int> NavigateToScenesAndReturnPageCountAsync(Site site, IPage page);
-    Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, IPage page);
+    Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, IPage page, IReadOnlyList<IRequest> requests);
     Task<SceneIdAndUrl> GetSceneIdAsync(Site site, IElementHandle currentScene);
     Task<Scene> ScrapeSceneAsync(Site site, SubSite subSite, string url, string sceneShortName, IPage page, IList<CapturedResponse> responses);
     Task DownloadPreviewImageAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene);

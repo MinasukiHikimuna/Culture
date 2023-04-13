@@ -99,7 +99,7 @@ public class NubilesPornRipper : ISiteScraper
         }
     }
 
-    public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, IPage page)
+    public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, IPage page, IReadOnlyList<IRequest> requests)
     {
         var sceneHandles = await page.Locator("div.Videoset div.content-grid-item").ElementHandlesAsync();
 

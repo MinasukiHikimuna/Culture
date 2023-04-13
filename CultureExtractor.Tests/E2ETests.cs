@@ -1,0 +1,29 @@
+﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using System.Security.Cryptography.X509Certificates;
+
+namespace CultureExtractor.Tests;
+
+[TestFixture]
+public class E2ETests
+{
+    [Test]
+    public async Task BasicData()
+    {
+        var scrapeOptions = new ScrapeOptions()
+        {
+            SiteShortName = "sexart",
+            MaxScenes = int.MaxValue
+        };
+
+        var host = AppHostFactory.CreateHost(new string[0], scrapeOptions.SiteShortName);
+        var networkRipper = host.Services.GetRequiredService<INetworkRipper>();
+        var repository = host.Services.GetRequiredService<IRepository>();
+
+        var browserSettings = new BrowserSettings(false, "chrome");
+
+        var site = await repository.GetSiteAsync(scrapeOptions.SiteShortName);
+
+        await networkRipper.ScrapeScenesAsync(site, browserSettings, scrapeOptions);
+    }
+}

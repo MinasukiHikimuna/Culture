@@ -1,8 +1,266 @@
 ﻿using Microsoft.Playwright;
 using CultureExtractor.Interfaces;
 using CultureExtractor.Exceptions;
+using System.Text.Json;
+using System.Net.Http.Json;
+using CultureExtractor.Sites.MetArt;
 
 namespace CultureExtractor.Sites;
+
+public class MetArtSceneData
+{
+    public Model[] models { get; set; }
+    public Photographer[] photographers { get; set; }
+    public string[] tags { get; set; }
+    public string[] relatedGalleries { get; set; }
+    public MetArtCategory[] categories { get; set; }
+    public Crew[] crew { get; set; }
+    public string UUID { get; set; }
+    public string name { get; set; }
+    public string description { get; set; }
+    public string path { get; set; }
+    public string coverImagePath { get; set; }
+    public string thumbnailCoverPath { get; set; }
+    public string type { get; set; }
+    public string siteUUID { get; set; }
+    public bool isPublic { get; set; }
+    public DateTime createdAt { get; set; }
+    public DateTime publishedAt { get; set; }
+    public float ratingAverage { get; set; }
+    public int favoriteCount { get; set; }
+    public int ratingCount { get; set; }
+    public int views { get; set; }
+    public Ranks ranks { get; set; }
+    public Leaderboardviews leaderboardViews { get; set; }
+    public string coverCleanImagePath { get; set; }
+    public string zipFile { get; set; }
+    public string splashImagePath { get; set; }
+    public bool isStaffSelection { get; set; }
+    public int imageCount { get; set; }
+    public int runtime { get; set; }
+    public string permalink { get; set; }
+    public string metaDescription { get; set; }
+    public string metaTitle { get; set; }
+    public bool hasCleanCover { get; set; }
+    public bool hasCover { get; set; }
+    public bool isPrivate { get; set; }
+    public bool downloadsDisabled { get; set; }
+    public bool hasPermissions { get; set; }
+    public bool isIntimateSelection { get; set; }
+    public Comments comments { get; set; }
+    public Files files { get; set; }
+    public object[] globalContent { get; set; }
+    public Media media { get; set; }
+    public Photos photos { get; set; }
+    public Relatedgallery relatedGallery { get; set; }
+    public object[] relatedMovies { get; set; }
+}
+
+public class Ranks
+{
+    public int day { get; set; }
+    public int week { get; set; }
+    public int month { get; set; }
+    public int year { get; set; }
+    public string siteUUID { get; set; }
+}
+
+public class Leaderboardviews
+{
+    public int day { get; set; }
+    public int week { get; set; }
+    public int month { get; set; }
+    public int year { get; set; }
+    public string siteUUID { get; set; }
+}
+
+public class Comments
+{
+    public int total { get; set; }
+    public object[] comments { get; set; }
+}
+
+public class Files
+{
+    public object[] teasers { get; set; }
+    public Sizes sizes { get; set; }
+}
+
+public class Sizes
+{
+    public Relatedphoto[] relatedPhotos { get; set; }
+    public Video[] videos { get; set; }
+    public Zip[] zips { get; set; }
+}
+
+public class Relatedphoto
+{
+    public string id { get; set; }
+    public string size { get; set; }
+}
+
+public class Video
+{
+    public string id { get; set; }
+    public string size { get; set; }
+}
+
+public class Zip
+{
+    public string fileName { get; set; }
+    public string quality { get; set; }
+    public string size { get; set; }
+}
+
+public class Media
+{
+    public string[] relatedGalleries { get; set; }
+    public string UUID { get; set; }
+    public string siteUUID { get; set; }
+    public string galleryUUID { get; set; }
+    public string rating { get; set; }
+    public int ratingCount { get; set; }
+    public int views { get; set; }
+    public int displayOrder { get; set; }
+    public string resolution { get; set; }
+    public int runtime { get; set; }
+}
+
+public class Photos
+{
+    public Medium[] media { get; set; }
+    public int total { get; set; }
+}
+
+public class Medium
+{
+    public string[] relatedGalleries { get; set; }
+    public string UUID { get; set; }
+    public string siteUUID { get; set; }
+    public string galleryUUID { get; set; }
+    public string rating { get; set; }
+    public int ratingCount { get; set; }
+    public int views { get; set; }
+    public int displayOrder { get; set; }
+    public string resolution { get; set; }
+    public int runtime { get; set; }
+}
+
+public class Relatedgallery
+{
+    public Medium1[] media { get; set; }
+    public int total { get; set; }
+}
+
+public class Medium1
+{
+    public string[] relatedGalleries { get; set; }
+    public string UUID { get; set; }
+    public string siteUUID { get; set; }
+    public string galleryUUID { get; set; }
+    public string rating { get; set; }
+    public int ratingCount { get; set; }
+    public int views { get; set; }
+    public int displayOrder { get; set; }
+    public string resolution { get; set; }
+    public int runtime { get; set; }
+}
+
+public class Model
+{
+    public int age { get; set; }
+    public string breasts { get; set; }
+    public Comments1 comments { get; set; }
+    public Country country { get; set; }
+    public string ethnicity { get; set; }
+    public string eyes { get; set; }
+    public int publishAge { get; set; }
+    public int galleriesCount { get; set; }
+    public string gender { get; set; }
+    public string hair { get; set; }
+    public string headshotImagePath { get; set; }
+    public int height { get; set; }
+    public int moviesCount { get; set; }
+    public string name { get; set; }
+    public string path { get; set; }
+    public string pubicHair { get; set; }
+    public Ranks1 ranks { get; set; }
+    public string siteUUID { get; set; }
+    public string size { get; set; }
+    public object[] tags { get; set; }
+    public string UUID { get; set; }
+    public int weight { get; set; }
+    public int ratingCount { get; set; }
+    public int favoriteCount { get; set; }
+    public float ratingAverage { get; set; }
+    public int views { get; set; }
+    public bool downloadsDisabled { get; set; }
+}
+
+public class Comments1
+{
+    public int total { get; set; }
+    public object[] comments { get; set; }
+}
+
+public class Country
+{
+    public string UUID { get; set; }
+    public string name { get; set; }
+    public string isoCode3 { get; set; }
+}
+
+public class Ranks1
+{
+    public int day { get; set; }
+    public int week { get; set; }
+    public int month { get; set; }
+    public int year { get; set; }
+    public string siteUUID { get; set; }
+}
+
+public class Photographer
+{
+    public Comments2 comments { get; set; }
+    public string coverImagePath { get; set; }
+    public string coverSiteUUID { get; set; }
+    public string coverCleanImagePath { get; set; }
+    public int galleriesCount { get; set; }
+    public int moviesCount { get; set; }
+    public string name { get; set; }
+    public string path { get; set; }
+    public string siteUUID { get; set; }
+    public string[] tags { get; set; }
+    public string thumbnailCoverPath { get; set; }
+    public string UUID { get; set; }
+    public bool isPublic { get; set; }
+    public int favoriteCount { get; set; }
+    public int ratingCount { get; set; }
+    public int views { get; set; }
+    public object[] ranks { get; set; }
+    public object[] leaderboardViews { get; set; }
+    public float ratingAverage { get; set; }
+}
+
+public class Comments2
+{
+    public int total { get; set; }
+    public object[] comments { get; set; }
+}
+
+public class MetArtCategory
+{
+    public string name { get; set; }
+    public string UUID { get; set; }
+    public bool isRelated { get; set; }
+}
+
+public class Crew
+{
+    public string[] names { get; set; }
+    public string role { get; set; }
+}
+
 
 [PornNetwork("metart")]
 [PornSite("metart")]
@@ -50,9 +308,11 @@ public class MetArtNetworkRipper : ISiteScraper
             {
                 await page.Locator(".close-btn").ClickAsync();
             }
-            if (await page.Locator(".fa-times-circle").IsVisibleAsync())
+
+            var modalClose = page.Locator("div.modal-content a.alt-close");
+            if (await modalClose.IsVisibleAsync())
             {
-                await page.Locator(".fa-times-circle").ClickAsync();
+                await modalClose.ClickAsync();
             }
         }
         catch (Exception ex)
@@ -105,25 +365,23 @@ public class MetArtNetworkRipper : ISiteScraper
         return totalPages;
     }
 
-    public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, IPage page)
+    public string IndexRequestFilterPath => "**/api/movies*";
+    public Func<IRequest, bool> IndexRequestFilterPredicate => (IRequest request) => true;
+
+    public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, IPage page, IReadOnlyList<IRequest> requests)
     {
-        var currentPage = await page.Locator("nav.pagination > a.active").TextContentAsync();
+        var response = await requests[0].ResponseAsync();
+        var content = await response.TextAsync();
+        var data = JsonSerializer.Deserialize<MetArtMovies>(content);
+
+        var currentPage = page.Url.Substring(page.Url.LastIndexOf("/") + 1);
         var skipAdScene = currentPage == "1" && site.ShortName != "hustler";
 
-        var currentScenes = await page.Locator("div.card-media a").ElementHandlesAsync();
-
-        var sceneHandles = skipAdScene
-            ? currentScenes.Skip(1).ToList().AsReadOnly()
-            : currentScenes;
-
-        var indexScenes = new List<IndexScene>();
-        foreach (var sceneHandle in sceneHandles.Reverse())
-        {
-            var sceneIdAndUrl = await GetSceneIdAsync(site, sceneHandle);
-            indexScenes.Add(new IndexScene(null, sceneIdAndUrl.Id, sceneIdAndUrl.Url, sceneHandle));
-        }
-
-        return indexScenes.AsReadOnly();
+        return data.galleries.Skip(skipAdScene ? 1 : 0)
+            .Select(g => new IndexScene(null, g.path.Substring(g.path.LastIndexOf("/movie/") + "/movie/".Length + 1), g.path, null))
+            .Reverse()
+            .ToList()
+            .AsReadOnly();
     }
 
     public async Task<SceneIdAndUrl> GetSceneIdAsync(Site site, IElementHandle currentScene)
@@ -133,31 +391,55 @@ public class MetArtNetworkRipper : ISiteScraper
         return new SceneIdAndUrl(sceneShortName, url);
     }
 
-    public async Task<Scene> ScrapeSceneAsync(Site site, SubSite subSite, string url, string sceneShortName, IPage page, IList<CapturedResponse> responses)
+    public async Task<CapturedResponse?> FilterResponsesAsync(string sceneShortName, IResponse response)
     {
-        var releaseDate = await ScrapeReleaseDateAsync(page);
-        var duration = await ScrapeDurationAsync(page);
-        var description = await ScrapeDescriptionAsync(page);
-        var name = await ScrapeTitleAsync(page);
-        var performers = await ScrapePerformersAsync(page, site.Url);
-
-        var tagElements = await page.Locator("div.tags-wrapper > div > a").ElementHandlesAsync();
-        var tags = new List<SiteTag>();
-        foreach (var tagElement in tagElements)
+        if (response.Url.Contains("/api/movie?name="))
         {
-            var tagUrl = await tagElement.GetAttributeAsync("href");
-            var tagShortName = tagUrl.Replace("/tags/", "");
-            var tagName = await tagElement.TextContentAsync();
-            tags.Add(new SiteTag(tagShortName, tagName, tagUrl));
+            return new CapturedResponse(Enum.GetName(AdultTimeRequestType.SceneMetadata)!, response);
         }
 
-        var downloadOptionsAndHandles = await ParseAvailableDownloadsAsync(page);
+        return null;
+    }
 
-        var scene = new Scene(
+    public async Task<Scene> ScrapeSceneAsync(Site site, SubSite subSite, string url, string sceneShortName, IPage page, IList<CapturedResponse> responses)
+    {
+        if (!responses.Any())
+        {
+            throw new Exception("Could not read API response.");
+        }
+
+        var sceneMetadataResponse = responses[0];
+        var body = await sceneMetadataResponse.Response.BodyAsync();
+        var jsonContent = System.Text.Encoding.UTF8.GetString(body);
+        var data = JsonSerializer.Deserialize<MetArtSceneData>(jsonContent)!;
+
+        var releaseDate = data.publishedAt;
+        var duration = TimeSpan.FromSeconds(data.runtime);
+        var description = data.description;
+        var name = data.name;
+
+        
+        var performers = data.models.Where(a => a.gender == "female").ToList()
+            .Concat(data.models.Where(a => a.gender != "female").ToList())
+            .Select(m => new SitePerformer(m.path.Substring(m.path.LastIndexOf("/") + 1), m.name, m.path))
+            .ToList();
+
+        var tags = data.tags
+            .Select(t => new SiteTag(t.Replace(" ", "+"), t, "/tags/" + t.Replace(" ", "+")))
+            .ToList();
+
+        var downloads = data.files.sizes.videos
+            .Select(d => new DownloadOption(d.id, -1, HumanParser.ParseResolutionHeight(d.id), HumanParser.ParseFileSize(d.size), -1, string.Empty, $"/api/download-media/{data.siteUUID}/film/{d.id}"))
+            .OrderByDescending(d => d.ResolutionHeight)
+            .ToList();
+
+        // var downloadOptionsAndHandles = await ParseAvailableDownloadsAsync(page);
+
+        return new Scene(
             null,
             site,
             null,
-            releaseDate,
+            DateOnly.FromDateTime(releaseDate),
             sceneShortName,
             name,
             url,
@@ -165,78 +447,15 @@ public class MetArtNetworkRipper : ISiteScraper
             duration.TotalSeconds,
             performers,
             tags,
-            downloadOptionsAndHandles.Select(f => f.DownloadOption).ToList(),
-            "{}"
+            downloads,
+            jsonContent
         );
-
-        return scene;
-    }
-
-    private async Task<DateOnly> ScrapeReleaseDateAsync(IPage page)
-    {
-        var releaseDateRaw = await page.Locator("div.movie-details > div > div > div > ul > li:nth-child(3) > span:nth-child(2)").TextContentAsync();
-        return DateOnly.Parse(releaseDateRaw);
-    }
-
-    private async Task<string> ScrapeTitleAsync(IPage page)
-    {
-        var title = await page.Locator("div.movie-details h3.headline").TextContentAsync();
-        title = title.Substring(0, title.LastIndexOf("(") - 1);
-        return title;
-    }
-
-    private async Task<IList<SitePerformer>> ScrapePerformersAsync(IPage page, string baseUrl)
-    {
-        var castElements = await page.Locator("div.movie-details > div > div > div > ul > li:nth-child(1) > span:nth-child(2) > a").ElementHandlesAsync();
-        var performers = new List<SitePerformer>();
-        foreach (var castElement in castElements)
-        {
-            var castUrl = await castElement.GetAttributeAsync("href");
-            var castId = castUrl.Substring(castUrl.LastIndexOf("/") + 1);
-            var castName = await castElement.TextContentAsync();
-            performers.Add(new SitePerformer(castId, castName, castUrl));
-        }
-        return performers.AsReadOnly();
-    }
-
-    private async Task<TimeSpan> ScrapeDurationAsync(IPage page)
-    {
-        var duration = await page.Locator("div.movie-details > div > div > div > ul > li:nth-child(4) > span:nth-child(2)").TextContentAsync();
-        if (TimeSpan.TryParse(duration, out TimeSpan timespan))
-        {
-            return timespan;
-        }
-
-        return TimeSpan.FromSeconds(0);
-    }
-
-    private async Task<string> ScrapeDescriptionAsync(IPage page)
-    {
-        if (!await page.Locator("div.movie-details a").Filter(new() { HasTextString = "Read More" }).IsVisibleAsync())
-        {
-            return string.Empty;
-        }
-
-        await page.Locator("div.movie-details a").Filter(new() { HasTextString = "Read More" }).ClickAsync();
-        var elementHandles = await page.Locator("div.movie-details div.info-container div p").ElementHandlesAsync();
-        var descriptionParagraphs = new List<string>();
-        foreach (var elementHandle in elementHandles)
-        {
-            var descriptionParagraph = await elementHandle.TextContentAsync();
-            if (!string.IsNullOrWhiteSpace(descriptionParagraph))
-            {
-                descriptionParagraphs.Add(descriptionParagraph);
-            }
-        }
-        return string.Join("\r\n\r\n", descriptionParagraphs);
     }
 
     public async Task DownloadPreviewImageAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene)
     {
-        var previewElement = await scenePage.Locator(".jw-preview").ElementHandleAsync();
-        var style = await previewElement.GetAttributeAsync("style");
-        var backgroundImageUrl = style.Replace("background-image: url(\"", "").Replace("\");", "");
-        await _downloader.DownloadSceneImageAsync(scene, backgroundImageUrl);
+        var data = JsonSerializer.Deserialize<MetArtSceneData>(scene.JsonDocument)!;
+        await _downloader.DownloadSceneImageAsync(scene, scene.Site.Url + data.splashImagePath);
     }
 
     public async Task GoToNextFilmsPageAsync(IPage page)
@@ -309,8 +528,8 @@ public class MetArtNetworkRipper : ISiteScraper
         return availableDownloads;
     }
 
-    public Task GoToPageAsync(IPage page, Site site, SubSite subSite, int pageNumber)
+    public async Task GoToPageAsync(IPage page, Site site, SubSite subSite, int pageNumber)
     {
-        throw new NotImplementedException();
+        await page.GotoAsync($"/movies/{pageNumber}");
     }
 }

@@ -80,7 +80,7 @@ public class HentaiedRipper : ISiteScraper
         await Task.Delay(5000);
     }
 
-    public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, IPage page)
+    public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, IPage page, IReadOnlyList<IRequest> requests)
     {
         var sceneHandles = await page.Locator("div.catposts div.half").ElementHandlesAsync();
 

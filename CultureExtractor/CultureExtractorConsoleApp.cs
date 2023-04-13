@@ -3,7 +3,7 @@ using Serilog;
 
 namespace CultureExtractor;
 
-class CultureExtractorConsoleApp
+public class CultureExtractorConsoleApp
 {
     private readonly INetworkRipper _networkRipper;
     private readonly IRepository _repository;

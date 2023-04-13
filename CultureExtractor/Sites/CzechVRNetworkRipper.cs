@@ -87,7 +87,7 @@ public class CzechVRNetworkRipper : ISiteScraper
         return (int)Math.Ceiling((double)totalVideoCount / videosOnCurrentPage.Count());
     }
 
-    public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, IPage page)
+    public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, IPage page, IReadOnlyList<IRequest> requests)
     {
         var sceneHandles = await page.Locator("div.tagyCenter > div.postTag").ElementHandlesAsync();
 

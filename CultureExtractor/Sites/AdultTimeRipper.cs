@@ -617,7 +617,7 @@ public class AdultTimeRipper : ISiteScraper
         await _downloader.DownloadSceneImageAsync(scene, output, scene.Url);
     }
 
-    public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, IPage page)
+    public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, IPage page, IReadOnlyList<IRequest> requests)
     {
         var sceneHandles = await page.Locator("div.ListingGrid-ListingGridItem").ElementHandlesAsync();
 

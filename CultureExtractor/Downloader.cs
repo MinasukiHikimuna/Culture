@@ -115,7 +115,7 @@ public class Downloader : IDownloader
 
         var videoHashes = Hasher.Phash(@"""" + path + @"""");
 
-        return new Download(scene, "foo", name, downloadDetails, videoHashes);
+        return new Download(scene, suggestedFilename, name, downloadDetails, videoHashes);
     }
 
     private static async Task DownloadFileAsync(string url, string fileName, string rippingPath, Dictionary<HttpRequestHeader, string> headers = null, string referer = "")

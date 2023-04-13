@@ -1,7 +1,11 @@
 ﻿using CultureExtractor.Exceptions;
 using CultureExtractor.Interfaces;
+using CultureExtractor.Sites;
+using CultureExtractor.Sites.MetArt;
 using Microsoft.Playwright;
 using Serilog;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace CultureExtractor;
 
@@ -57,9 +61,24 @@ public class NetworkRipper : INetworkRipper
         var scrapedScenes = 0;
         for (int currentPage = totalPages; currentPage >= 1; currentPage--)
         {
+            var requests = new List<IRequest>();
+            if (siteScraper.IndexRequestFilterPath != null)
+            {
+                await page.RouteAsync(siteScraper.IndexRequestFilterPath, async route =>
+                {
+                    if (siteScraper.IndexRequestFilterPredicate == null || siteScraper.IndexRequestFilterPredicate(route.Request))
+                    {
+                        requests.Add(route.Request);
+                    }
+
+                    await route.ContinueAsync();
+                });
+            }
+
             await siteScraper.GoToPageAsync(page, site, subSite, currentPage);
             await Task.Delay(1000);
-            var indexScenes = await siteScraper.GetCurrentScenesAsync(site, page);
+
+            var indexScenes = await siteScraper.GetCurrentScenesAsync(site, page, requests);
 
             Log.Information(totalPages == int.MaxValue
                 ? $"Batch {currentPage} of infinite page contains {indexScenes.Count} scenes"

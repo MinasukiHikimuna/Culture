@@ -1,9 +1,4 @@
 ﻿using CommandLine;
-using CultureExtractor.Interfaces;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using System.Reflection;
 
 namespace CultureExtractor;
 
@@ -13,7 +8,7 @@ class Program
     {
         if (System.Diagnostics.Debugger.IsAttached)
         {
-            var siteShortName = "adultprime";
+            var siteShortName = "sexart";
 
             /*args = new string[] {
                 "scrape",
@@ -41,57 +36,9 @@ class Program
 
         var options = (BaseOptions) Parser.Default.ParseArguments<ScrapeOptions, DownloadOptions>(args).Value;
 
-        var host = Host.CreateDefaultBuilder(args)
-            .ConfigureServices(services => {
-                services.AddDbContext<ISqliteContext, SqliteContext>(options => options.UseSqlite(@"Data Source=B:\Ripping\ripping.db"));
-
-                services.AddScoped<IPlaywrightFactory, PlaywrightFactory>();
-                services.AddScoped<ICaptchaSolver, CaptchaSolver>();
-                services.AddScoped<IRepository, Repository>();
-                services.AddScoped<IDownloader, Downloader>();
-                services.AddTransient<INetworkRipper, NetworkRipper>();
-                services.AddTransient<CultureExtractorConsoleApp>();
-
-                Type siteScraper = GetSiteScraperType<ISiteScraper>(options.SiteShortName);
-                IList<Type> types = new List<Type>() { typeof(ISiteScraper) };
-                foreach (var type in types)
-                {
-                    if (siteScraper.IsAssignableTo(type))
-                    {
-                        services.AddTransient(type, siteScraper);
-                    }
-                }
-            })
-            .Build();
-        
-        var cultureExtractor = host.Services.GetRequiredService<CultureExtractorConsoleApp>();
+        var host = AppHostFactory.CreateHost(args, options.SiteShortName);
+        var cultureExtractor = AppHostFactory.CreateCultureExtractorConsoleApp(host);
         cultureExtractor.ExecuteConsoleApp(args);
-    }
-
-    private static Type GetSiteScraperType<T>(string shortName) where T : ISiteScraper
-    {
-        Type attributeType = typeof(PornSiteAttribute);
-
-        var siteRipperTypes = Assembly
-            .GetExecutingAssembly()
-            .GetTypes()
-            .Where(type => typeof(T).IsAssignableFrom(type))
-            .Where(type =>
-            {
-                object[] attributes = type.GetCustomAttributes(attributeType, true);
-                return attributes.Length > 0 && attributes.Any(attribute => (attribute as PornSiteAttribute)?.ShortName == shortName);
-            });
-
-        if (!siteRipperTypes.Any())
-        {
-            throw new ArgumentException($"Could not find any class with short name {shortName} with type {typeof(T)}");
-        }
-        if (siteRipperTypes.Count() > 2)
-        {
-            throw new ArgumentException($"Found more than one classes with short name {shortName} with type {typeof(T)}");
-        }
-
-        return siteRipperTypes.Single();
     }
 }
 

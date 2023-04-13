@@ -43,7 +43,7 @@ public class SensualLoveRipper : ISiteScraper
         return 1;
     }
 
-    public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, IPage page)
+    public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, IPage page, IReadOnlyList<IRequest> requests)
     {
         var scenesLocator = page.Locator("div.content-view-lg > div.content-view-grid > div.content-grid-item-wrapper");
         await scenesLocator.First.WaitForAsync(new() { State = WaitForSelectorState.Visible });
