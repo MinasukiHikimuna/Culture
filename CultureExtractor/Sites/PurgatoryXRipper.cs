@@ -86,7 +86,7 @@ public class PurgatoryXRipper : ISiteScraper
         await page.GetByRole(AriaRole.Link, new() { NameString = "Next »" }).ClickAsync();
     }
 
-    public async Task<Scene> ScrapeSceneAsync(Site site, SubSite subSite, string url, string sceneShortName, IPage page, IList<CapturedResponse> responses)
+    public async Task<Scene> ScrapeSceneAsync(Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
         await Task.Delay(5000);
 
@@ -135,7 +135,7 @@ public class PurgatoryXRipper : ISiteScraper
         );
     }
 
-    public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions, IList<CapturedResponse> responses)
+    public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)
     {
         await page.GotoAsync(scene.Url);
         await page.WaitForLoadStateAsync();

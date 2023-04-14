@@ -125,7 +125,7 @@ public class CzechVRNetworkRipper : ISiteScraper
         return new SceneIdAndUrl(sceneShortName, relativeUrl);
     }   
 
-    public async Task<Scene> ScrapeSceneAsync(Site site, SubSite subSite, string url, string sceneShortName, IPage page, IList<CapturedResponse> responses)
+    public async Task<Scene> ScrapeSceneAsync(Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
         var releaseDate = await ScrapeReleaseDateAsync(page);
         var duration = await ScrapeDurationAsync(page);
@@ -168,7 +168,7 @@ public class CzechVRNetworkRipper : ISiteScraper
         await page.Locator("div.strankovani > span > a.next").ClickAsync();
     }
 
-    public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions, IList<CapturedResponse> responses)
+    public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)
     {
         await page.GotoAsync(scene.Url);
         await page.WaitForLoadStateAsync();

@@ -115,7 +115,7 @@ public class AdultPrimeRipper : ISiteScraper, ISubSiteScraper
         return null;
     }
 
-    public async Task<Scene> ScrapeSceneAsync(Site site, SubSite subSite, string url, string sceneShortName, IPage page, IList<CapturedResponse> responses)
+    public async Task<Scene> ScrapeSceneAsync(Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
         var releaseDateElement = await page.QuerySelectorAsync("p.update-info-line:nth-of-type(1) i.fa-calendar + b");
         string releaseDateRaw = await releaseDateElement.TextContentAsync();
@@ -189,7 +189,7 @@ public class AdultPrimeRipper : ISiteScraper, ISubSiteScraper
         );
     }
 
-    public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions, IList<CapturedResponse> responses)
+    public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)
     {
         var availableDownloads = await ParseAvailableDownloadsAsync(page);
 

@@ -14,7 +14,7 @@ public interface ISiteScraper
     Task<int> NavigateToScenesAndReturnPageCountAsync(Site site, IPage page);
     Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, IPage page, IReadOnlyList<IRequest> requests);
     Task<SceneIdAndUrl> GetSceneIdAsync(Site site, IElementHandle currentScene);
-    Task<Scene> ScrapeSceneAsync(Site site, SubSite subSite, string url, string sceneShortName, IPage page, IList<CapturedResponse> responses);
+    Task<Scene> ScrapeSceneAsync(Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests);
     Task DownloadPreviewImageAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene);
     Task GoToNextFilmsPageAsync(IPage page);
     Task GoToPageAsync(IPage page, Site site, SubSite subSite, int pageNumber);
@@ -24,5 +24,5 @@ public interface ISiteScraper
     /// </summary>
     Task<CapturedResponse?> FilterResponsesAsync(string sceneShortName, IResponse response) { return Task.FromResult<CapturedResponse?>(null); }
 
-    Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions, IList<CapturedResponse> responses);
+    Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests);
 }

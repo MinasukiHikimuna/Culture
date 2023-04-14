@@ -660,11 +660,12 @@ public class AdultTimeRipper : ISiteScraper
         return null;
     }
 
-    public async Task<Scene> ScrapeSceneAsync(Site site, SubSite subSite, string url, string sceneShortName, IPage page, IList<CapturedResponse> responses)
+    public async Task<Scene> ScrapeSceneAsync(Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
-        var sceneMetadataResponse = responses.First(r => r.Name == Enum.GetName(AdultTimeRequestType.SceneMetadata));
+        var request = requests[0];
 
-        var body = await sceneMetadataResponse.Response.BodyAsync();
+        var response = await request.ResponseAsync();
+        var body = await response.BodyAsync();
         var jsonContent = System.Text.Encoding.UTF8.GetString(body);
 
         var data = JsonSerializer.Deserialize<Rootobject>(jsonContent)!;
@@ -738,19 +739,18 @@ public class AdultTimeRipper : ISiteScraper
         return scene;
     }
 
-    public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions, IList<CapturedResponse> responses)
+    public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)
     {
         await page.GotoAsync(scene.Url);
         await page.WaitForLoadStateAsync();
 
         await Task.Delay(3000);
 
-        var sceneMetadataResponse = responses.First(r => r.Name == Enum.GetName(AdultTimeRequestType.SceneMetadata));
+        var request = requests[0];
+        var response = await request.ResponseAsync();
 
-        var body = await sceneMetadataResponse.Response.BodyAsync();
-        var foo = System.Text.Encoding.UTF8.GetString(body);
-
-        var data = JsonSerializer.Deserialize<Rootobject>(foo)!;
+        var body = await response.TextAsync();
+        var data = JsonSerializer.Deserialize<Rootobject>(body)!;
 
 
         var sceneData = data.results[0].hits[0];

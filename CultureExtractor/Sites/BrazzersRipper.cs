@@ -124,14 +124,12 @@ public class BrazzersRipper : ISiteScraper
         return null;
     }
 
-    public async Task<Scene> ScrapeSceneAsync(Site site, SubSite subSite, string url, string sceneShortName, IPage page, IList<CapturedResponse> responses)
+    public async Task<Scene> ScrapeSceneAsync(Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
-        var sceneMetadataResponse = responses.First(r => r.Name == Enum.GetName(AdultTimeRequestType.SceneMetadata));
-
-        var body = await sceneMetadataResponse.Response.BodyAsync();
-        var foo = System.Text.Encoding.UTF8.GetString(body);
-
-        var data = JsonSerializer.Deserialize<BrazzersRootobject>(foo)!;
+        var request = requests[0];
+        var response = await request.ResponseAsync();
+        var jsonContent = await response.BodyAsync();
+        var data = JsonSerializer.Deserialize<BrazzersRootobject>(jsonContent)!;
 
 
         var sceneData = data.result;
@@ -185,14 +183,12 @@ public class BrazzersRipper : ISiteScraper
         return scene;
     }
 
-    public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions, IList<CapturedResponse> responses)
+    public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)
     {
-        var sceneMetadataResponse = responses.First(r => r.Name == Enum.GetName(AdultTimeRequestType.SceneMetadata));
-
-        var body = await sceneMetadataResponse.Response.BodyAsync();
-        var foo = System.Text.Encoding.UTF8.GetString(body);
-
-        var data = JsonSerializer.Deserialize<BrazzersRootobject>(foo)!;
+        var request = requests[0];
+        var response = await request.ResponseAsync();
+        var jsonContent = await response.TextAsync();
+        var data = JsonSerializer.Deserialize<BrazzersRootobject>(jsonContent)!;
         var sceneData = data.result;
 
         sceneData.videos.full.files.Remove("hls");

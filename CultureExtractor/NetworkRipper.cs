@@ -145,25 +145,26 @@ public class NetworkRipper : INetworkRipper
 
         try
         {
-            var responses = new List<CapturedResponse>();
-            EventHandler<IResponse> responseCapturer = async (_, response) =>
+            var requests = new List<IRequest>();
+            if (siteScraper.IndexRequestFilterPath != null)
             {
-                var capturedResponse = await siteScraper.FilterResponsesAsync(currentScene.ShortName, response);
-                if (capturedResponse != null)
+                await page.RouteAsync(siteScraper.IndexRequestFilterPath, async route =>
                 {
-                    responses.Add(capturedResponse);
-                }
-            };
-            scenePage.Response += responseCapturer;
+                    if (siteScraper.IndexRequestFilterPredicate == null || siteScraper.IndexRequestFilterPredicate(route.Request))
+                    {
+                        requests.Add(route.Request);
+                    }
+
+                    await route.ContinueAsync();
+                });
+            }
 
             await scenePage.GotoAsync(currentScene.Url);
             await scenePage.WaitForLoadStateAsync();
 
             await Task.Delay(1000);
 
-            scenePage.Response -= responseCapturer;
-
-            var scene = await siteScraper.ScrapeSceneAsync(site, subSite, currentScene.Url, currentScene.ShortName, scenePage, responses);
+            var scene = await siteScraper.ScrapeSceneAsync(site, subSite, currentScene.Url, currentScene.ShortName, scenePage, requests);
             if (currentScene.Scene != null)
             {
                 scene = scene with { Id = currentScene.Scene.Id };
@@ -271,17 +272,19 @@ public class NetworkRipper : INetworkRipper
 
                     var scenePage = await page.Context.NewPageAsync();
 
-                    var responses = new List<CapturedResponse>();
-                    EventHandler<IResponse> responseCapturer = null;
-                    responseCapturer = async (_, response) =>
+                    var requests = new List<IRequest>();
+                    if (siteScraper.IndexRequestFilterPath != null)
                     {
-                        var capturedResponse = await siteScraper.FilterResponsesAsync(matchingScene.ShortName, response);
-                        if (capturedResponse != null)
+                        await page.RouteAsync(siteScraper.IndexRequestFilterPath, async route =>
                         {
-                            responses.Add(capturedResponse);
-                        }
-                    };
-                    scenePage.Response += responseCapturer;
+                            if (siteScraper.IndexRequestFilterPredicate == null || siteScraper.IndexRequestFilterPredicate(route.Request))
+                            {
+                                requests.Add(route.Request);
+                            }
+
+                            await route.ContinueAsync();
+                        });
+                    }
 
                     await scenePage.GotoAsync(matchingScene.Url);
                     await scenePage.WaitForLoadStateAsync();
@@ -290,12 +293,7 @@ public class NetworkRipper : INetworkRipper
 
                     if (siteScraper != null)
                     {
-                        scenePage.Response -= responseCapturer;
-                    }
-
-                    if (siteScraper != null)
-                    {
-                        var scene = await siteScraper.ScrapeSceneAsync(site, null, matchingScene.Url, matchingScene.ShortName, scenePage, responses);
+                        var scene = await siteScraper.ScrapeSceneAsync(site, null, matchingScene.Url, matchingScene.ShortName, scenePage, requests);
                         if (existingScene != null)
                         {
                             scene = scene with { Id = existingScene.Id };
@@ -315,7 +313,7 @@ public class NetworkRipper : INetworkRipper
                     };
                     Log.Verbose("Downloading: {@Scene}", sceneDescription);
 
-                    var download = await siteScraper.DownloadSceneAsync(existingScene, scenePage, downloadConditions, responses);
+                    var download = await siteScraper.DownloadSceneAsync(existingScene, scenePage, downloadConditions, requests);
                     await _repository.SaveDownloadAsync(download, downloadConditions.PreferredDownloadQuality);
 
                     rippedScenes++;
