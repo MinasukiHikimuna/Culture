@@ -40,7 +40,8 @@ public record Scene(
     IEnumerable<SitePerformer> Performers,
     IEnumerable<SiteTag> Tags,
     IEnumerable<DownloadOption> DownloadOptions,
-    string JsonDocument);
+    string JsonDocument,
+    DateTime LastUpdated);
 
 public record Gallery(
     int? Id,

@@ -345,7 +345,8 @@ public class Repository : IRepository
             sceneEntity.Performers.Select(Convert),
             sceneEntity.Tags.Select(Convert),
             JsonSerializer.Deserialize<IEnumerable<DownloadOption>>(downloadOptions),
-            sceneEntity.JsonDocument);
+            sceneEntity.JsonDocument,
+            sceneEntity.LastUpdated);
     }
 
     private static Gallery Convert(GalleryEntity galleryEntity)

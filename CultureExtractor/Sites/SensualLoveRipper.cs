@@ -113,8 +113,8 @@ public class SensualLoveRipper : ISiteScraper
             performers,
             tags,
             downloadOptionsAndHandles.Select(f => f.DownloadOption).ToList(),
-            "{}"
-        );
+            "{}",
+            DateTime.Now);
     }
 
     public async Task DownloadPreviewImageAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene)

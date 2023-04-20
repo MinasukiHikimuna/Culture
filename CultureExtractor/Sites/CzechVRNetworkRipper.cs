@@ -148,8 +148,8 @@ public class CzechVRNetworkRipper : ISiteScraper
             performers,
             tags,
             downloadOptionsAndHandles.Select(f => f.DownloadOption).ToList(),
-            "{}"
-        );
+            "{}",
+            DateTime.Now);
         return scene;
     }
 

@@ -155,8 +155,8 @@ public class HentaiedRipper : ISiteScraper
             performers,
             tags,
             downloadOptionsAndHandles.Select(f => f.DownloadOption).ToList(),
-            "{}"
-        );
+            "{}",
+            DateTime.Now);
     }
 
     private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloadsAsync(IPage page)

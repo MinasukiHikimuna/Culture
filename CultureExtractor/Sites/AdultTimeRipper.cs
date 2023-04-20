@@ -727,8 +727,8 @@ public class AdultTimeRipper : ISiteScraper
             performers,
             tags,
             downloadOptionsAndHandles.Select(f => f.DownloadOption).ToList(),
-            JsonSerializer.Serialize(sceneDocument)
-        );
+            JsonSerializer.Serialize(sceneDocument),
+            DateTime.Now);
 
         if (sceneData.subtitles?.full?.en != null)
         {

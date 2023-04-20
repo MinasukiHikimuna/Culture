@@ -147,8 +147,8 @@ public class NewSensationsRipper : ISiteScraper
             performers,
             new List<SiteTag>(),
             downloadOptionsAndHandles.Select(f => f.DownloadOption).ToList(),
-            "{}"
-        );
+            "{}",
+            DateTime.Now);
     }
 
     public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)

@@ -29,6 +29,11 @@ public class CultureExtractorConsoleApp
         {
             InitializeLogger(opts);
 
+            if (opts.FullScrape && opts.FullScrapeLastUpdated == null)
+            {
+                opts.FullScrapeLastUpdated = DateTime.Now.AddDays(-1);
+            }
+
             Log.Information("Culture Extractor");
 
             string shortName = opts.SiteShortName;

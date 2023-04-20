@@ -24,7 +24,7 @@ class Program
                     "533", "532", "482", "484", "490", "495", "503", "506", "457", "474", "475",
                     "477", "458",*/
                 "--verbose",
-                // "--full",
+                "--full",
                 "--visible-browser",
                 // "--max-scenes", "1000"
                 // "--best",
@@ -75,6 +75,12 @@ public class ScrapeOptions : BaseOptions
       Default = false,
       HelpText = "Full scrape including update existing scenes")]
     public bool FullScrape { get; set; }
+
+    [Option(
+      "full-scrape-last-updated",
+      Default = null,
+      HelpText = "Full scrape including update existing scenes")]
+    public DateTime? FullScrapeLastUpdated { get; set; }
 }
 
 [Verb("download", HelpText = "Download")]

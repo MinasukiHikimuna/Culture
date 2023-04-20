@@ -191,8 +191,8 @@ public class MetArtNetworkRipper : ISiteScraper
             performers,
             tags,
             downloads,
-            @"{""movie"": " + movieJsonContent + @", ""comments"": " + commentsJsonContent + "}"
-        ); ;
+            @"{""movie"": " + movieJsonContent + @", ""comments"": " + commentsJsonContent + "}",
+            DateTime.Now); ;
     }
 
     public async Task DownloadPreviewImageAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene)

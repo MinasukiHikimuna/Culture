@@ -132,8 +132,8 @@ public class WowNetworkRipper : ISiteScraper
             performers,
             tags,
             downloadOptionsAndHandles.Select(f => f.DownloadOption).ToList(),
-            "{}"
-        );
+            "{}",
+            DateTime.Now);
     }
 
     private async Task<DateOnly> ScrapeReleaseDateAsync(IPage page)

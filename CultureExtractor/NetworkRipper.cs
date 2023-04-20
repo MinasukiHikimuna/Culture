@@ -89,7 +89,7 @@ public class NetworkRipper : INetworkRipper
             checkedIndexScenes.Add(indexScene with { Scene = existingScenes.FirstOrDefault(s => s.ShortName == indexScene.ShortName) });
         }
         var unscrapedIndexScenes = scrapeOptions.FullScrape
-            ? checkedIndexScenes.Where(s => s.Scene.las)
+            ? checkedIndexScenes.Where(s => s.Scene.LastUpdated < scrapeOptions.FullScrapeLastUpdated)
             : checkedIndexScenes.Where(s => s.Scene == null).ToList();
 
         foreach (var currentScene in unscrapedIndexScenes)

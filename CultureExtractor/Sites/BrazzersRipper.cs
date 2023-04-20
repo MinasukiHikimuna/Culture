@@ -177,8 +177,8 @@ public class BrazzersRipper : ISiteScraper
             performers,
             tags,
             downloadOptionsAndHandles.Select(f => f.DownloadOption).ToList(),
-            JsonSerializer.Serialize(sceneData)
-        );
+            JsonSerializer.Serialize(sceneData),
+            DateTime.Now);
 
         return scene;
     }
