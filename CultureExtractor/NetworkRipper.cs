@@ -53,10 +53,19 @@ public class NetworkRipper : INetworkRipper
         }
     }
 
+    private static IEnumerable<int> PageEnumeration(ScrapeOptions scrapeOptions, int totalPages)
+    {
+        for (int currentPage = scrapeOptions.ReverseOrder ? 1 : totalPages;
+             scrapeOptions.ReverseOrder ? currentPage <= totalPages : currentPage >= 1;
+             currentPage += scrapeOptions.ReverseOrder ? 1 : -1)
+        {
+            yield return currentPage;
+        }
+    }
+
     private async Task ScrapeScenesInternalAsync(Site site, SubSite subSite, ScrapeOptions scrapeOptions, ISiteScraper siteScraper, IPage page, int totalPages)
     {
-        // for (int currentPage = 1; currentPage <= totalPages; currentPage++)
-        for (int currentPage = totalPages; currentPage >= 1; currentPage--)
+        foreach (var currentPage in PageEnumeration(scrapeOptions, totalPages))
         {
             await ScrapeScenePageAsync(site, subSite, scrapeOptions, siteScraper, page, totalPages, currentPage);
         }
@@ -89,8 +98,12 @@ public class NetworkRipper : INetworkRipper
             checkedIndexScenes.Add(indexScene with { Scene = existingScenes.FirstOrDefault(s => s.ShortName == indexScene.ShortName) });
         }
         var unscrapedIndexScenes = scrapeOptions.FullScrape
-            ? checkedIndexScenes.Where(s => s.Scene.LastUpdated < scrapeOptions.FullScrapeLastUpdated)
+            ? checkedIndexScenes.Where(s => s.Scene == null || s.Scene.LastUpdated < scrapeOptions.FullScrapeLastUpdated)
             : checkedIndexScenes.Where(s => s.Scene == null).ToList();
+        if (scrapeOptions.ReverseOrder)
+        {
+            unscrapedIndexScenes = unscrapedIndexScenes.Reverse();
+        }
 
         foreach (var currentScene in unscrapedIndexScenes)
         {
@@ -200,6 +213,11 @@ public class NetworkRipper : INetworkRipper
             furtherFilteredScenes = furtherFilteredScenes
                 .Take(downloadOptions.MaxScenes)
                 .ToList();
+        }
+
+        if (downloadOptions.ReverseOrder)
+        {
+            furtherFilteredScenes = (furtherFilteredScenes as IEnumerable<Scene>).Reverse().ToList();
         }
 
         await DownloadGivenScenesAsync(

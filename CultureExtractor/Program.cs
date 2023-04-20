@@ -24,8 +24,9 @@ class Program
                     "533", "532", "482", "484", "490", "495", "503", "506", "457", "474", "475",
                     "477", "458",*/
                 "--verbose",
-                "--full",
-                "--visible-browser",
+                // "--full",
+                "--reverse-order",
+                // "--visible-browser",
                 // "--max-scenes", "1000"
                 // "--best",
                 // "--downloaded-file-names", "Yasmin Scott & Simony Diamond - Brazzers - Brazzers - 2019-11-17 - The Pearl Of The Sea.mp4"
@@ -65,6 +66,9 @@ public class BaseOptions
 
     [Option("max-scenes", Default = int.MaxValue, HelpText = "How many scenes to process")]
     public int MaxScenes { get; set; }
+
+    [Option("reverse-order", Required = false, HelpText = "Scrape/download scenes in reverse order (i.e. from latest to oldest)")]
+    public bool ReverseOrder { get; set; }
 }
 
 [Verb("scrape", HelpText = "Scrape")]
@@ -81,6 +85,9 @@ public class ScrapeOptions : BaseOptions
       Default = null,
       HelpText = "Full scrape including update existing scenes")]
     public DateTime? FullScrapeLastUpdated { get; set; }
+
+    [Option("reverse-order", Required = false, HelpText = "Scrape scenes in reverse order (i.e. from latest to oldest)")]
+    public bool ReverseOrder { get; set; }
 }
 
 [Verb("download", HelpText = "Download")]
