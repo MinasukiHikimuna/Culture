@@ -1,11 +1,8 @@
 ﻿using CultureExtractor.Exceptions;
 using CultureExtractor.Interfaces;
-using CultureExtractor.Sites;
-using CultureExtractor.Sites.MetArt;
+using CultureExtractor.Migrations;
 using Microsoft.Playwright;
 using Serilog;
-using System.Text.Json;
-using System.Text.Json.Nodes;
 
 namespace CultureExtractor;
 
@@ -58,70 +55,70 @@ public class NetworkRipper : INetworkRipper
 
     private async Task ScrapeScenesInternalAsync(Site site, SubSite subSite, ScrapeOptions scrapeOptions, ISiteScraper siteScraper, IPage page, int totalPages)
     {
-        var scrapedScenes = 0;
+        // for (int currentPage = 1; currentPage <= totalPages; currentPage++)
         for (int currentPage = totalPages; currentPage >= 1; currentPage--)
         {
-            var requests = new List<IRequest>();
-            if (siteScraper.IndexRequestFilterPath != null)
-            {
-                await page.RouteAsync(siteScraper.IndexRequestFilterPath, async route =>
-                {
-                    if (siteScraper.IndexRequestFilterPredicate == null || siteScraper.IndexRequestFilterPredicate(route.Request))
-                    {
-                        requests.Add(route.Request);
-                    }
+            await ScrapeScenePageAsync(site, subSite, scrapeOptions, siteScraper, page, totalPages, currentPage);
+        }
+    }
 
-                    await route.ContinueAsync();
-                });
+    private async Task ScrapeScenePageAsync(Site site, SubSite subSite, ScrapeOptions scrapeOptions, ISiteScraper siteScraper, IPage page, int totalPages, int currentPage)
+    {
+        var scrapedScenes = 0;
+
+        var requests = new List<IRequest>();
+        await page.RouteAsync("**/*", async route =>
+        {
+            requests.Add(route.Request);
+            await route.ContinueAsync();
+        });
+
+        await siteScraper.GoToPageAsync(page, site, subSite, currentPage);
+        await Task.Delay(1000);
+
+        var indexScenes = await siteScraper.GetCurrentScenesAsync(site, page, requests);
+
+        Log.Information(totalPages == int.MaxValue
+            ? $"Batch {currentPage} of infinite page contains {indexScenes.Count} scenes"
+            : $"Page {currentPage}/{totalPages} contains {indexScenes.Count} scenes");
+
+        var existingScenes = await _repository.GetScenesAsync(site.ShortName, indexScenes.Select(s => s.ShortName).ToList());
+        var checkedIndexScenes = new List<IndexScene>();
+        foreach (var indexScene in indexScenes)
+        {
+            checkedIndexScenes.Add(indexScene with { Scene = existingScenes.FirstOrDefault(s => s.ShortName == indexScene.ShortName) });
+        }
+        var unscrapedIndexScenes = scrapeOptions.FullScrape
+            ? checkedIndexScenes.Where(s => s.Scene.las)
+            : checkedIndexScenes.Where(s => s.Scene == null).ToList();
+
+        foreach (var currentScene in unscrapedIndexScenes)
+        {
+            if (scrapedScenes >= scrapeOptions.MaxScenes)
+            {
+                Log.Information($"Scraped {scrapedScenes} scenes, exiting");
+                return;
             }
 
-            await siteScraper.GoToPageAsync(page, site, subSite, currentPage);
-            await Task.Delay(1000);
-
-            var indexScenes = await siteScraper.GetCurrentScenesAsync(site, page, requests);
-
-            Log.Information(totalPages == int.MaxValue
-                ? $"Batch {currentPage} of infinite page contains {indexScenes.Count} scenes"
-                : $"Page {currentPage}/{totalPages} contains {indexScenes.Count} scenes");
-
-            var existingScenes = await _repository.GetScenesAsync(site.ShortName, indexScenes.Select(s => s.ShortName).ToList());
-            var checkedIndexScenes = new List<IndexScene>();
-            foreach (var indexScene in indexScenes)
+            for (int retries = 0; retries < 3; retries++)
             {
-                checkedIndexScenes.Add(indexScene with { Scene = existingScenes.FirstOrDefault(s => s.ShortName == indexScene.ShortName) });
-            }
-            var unscrapedIndexScenes = scrapeOptions.FullScrape
-                ? checkedIndexScenes
-                : checkedIndexScenes.Where(s => s.Scene == null).ToList();
-
-            foreach (var currentScene in unscrapedIndexScenes)
-            {
-                if (scrapedScenes >= scrapeOptions.MaxScenes)
+                try
                 {
-                    Log.Information($"Scraped {scrapedScenes} scenes, exiting");
-                    return;
-                }
-
-                for (int retries = 0; retries < 3; retries++)
-                {
-                    try
+                    var scene = await ScrapeSceneAsync(currentScene, siteScraper, site, subSite, page, scrapeOptions);
+                    if (scene != null)
                     {
-                        var scene = await ScrapeSceneAsync(currentScene, siteScraper, site, subSite, page, scrapeOptions);
-                        if (scene != null)
-                        {
-                            LogScrapedSceneDescription(scene);
-                            await Task.Delay(3000);
-                            break;
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Log.Error(ex.ToString(), ex);
+                        LogScrapedSceneDescription(scene);
                         await Task.Delay(3000);
+                        break;
                     }
                 }
-                scrapedScenes++;
+                catch (Exception ex)
+                {
+                    Log.Error(ex.ToString(), ex);
+                    await Task.Delay(3000);
+                }
             }
+            scrapedScenes++;
         }
     }
 
@@ -146,18 +143,11 @@ public class NetworkRipper : INetworkRipper
         try
         {
             var requests = new List<IRequest>();
-            if (siteScraper.IndexRequestFilterPath != null)
+            await scenePage.RouteAsync("**/*", async route =>
             {
-                await page.RouteAsync(siteScraper.IndexRequestFilterPath, async route =>
-                {
-                    if (siteScraper.IndexRequestFilterPredicate == null || siteScraper.IndexRequestFilterPredicate(route.Request))
-                    {
-                        requests.Add(route.Request);
-                    }
-
-                    await route.ContinueAsync();
-                });
-            }
+                requests.Add(route.Request);
+                await route.ContinueAsync();
+            });
 
             await scenePage.GotoAsync(currentScene.Url);
             await scenePage.WaitForLoadStateAsync();
@@ -253,7 +243,8 @@ public class NetworkRipper : INetworkRipper
             // Ungh, throws exception
             _downloader.CheckFreeSpace();
 
-            for (int retries = 0; retries < 3; retries++)
+            const int maxRetries = 3;
+            for (int retries = 0; retries < maxRetries; retries++)
             {
                 try
                 {
@@ -273,34 +264,24 @@ public class NetworkRipper : INetworkRipper
                     var scenePage = await page.Context.NewPageAsync();
 
                     var requests = new List<IRequest>();
-                    if (siteScraper.IndexRequestFilterPath != null)
+                    await scenePage.RouteAsync("**/*", async route =>
                     {
-                        await page.RouteAsync(siteScraper.IndexRequestFilterPath, async route =>
-                        {
-                            if (siteScraper.IndexRequestFilterPredicate == null || siteScraper.IndexRequestFilterPredicate(route.Request))
-                            {
-                                requests.Add(route.Request);
-                            }
-
-                            await route.ContinueAsync();
-                        });
-                    }
+                        requests.Add(route.Request);
+                        await route.ContinueAsync();
+                    });
 
                     await scenePage.GotoAsync(matchingScene.Url);
                     await scenePage.WaitForLoadStateAsync();
 
                     await Task.Delay(1000);
 
-                    if (siteScraper != null)
+                    var scene = await siteScraper.ScrapeSceneAsync(site, null, matchingScene.Url, matchingScene.ShortName, scenePage, requests);
+                    if (existingScene != null)
                     {
-                        var scene = await siteScraper.ScrapeSceneAsync(site, null, matchingScene.Url, matchingScene.ShortName, scenePage, requests);
-                        if (existingScene != null)
-                        {
-                            scene = scene with { Id = existingScene.Id };
-                        }
-
-                        existingScene = await _repository.UpsertScene(scene);
+                        scene = scene with { Id = existingScene.Id };
                     }
+
+                    existingScene = await _repository.UpsertScene(scene);
 
                     var sceneDescription = new {
                         Site = existingScene.Site.Name,
@@ -361,6 +342,11 @@ public class NetworkRipper : INetworkRipper
                 {
                     Log.Error(ex.ToString(), ex);
                     await Task.Delay(3000);
+                }
+
+                if (retries == maxRetries)
+                {
+                    Log.Warning($"Failed to scrape {matchingScene.Url}");
                 }
             }
         }
