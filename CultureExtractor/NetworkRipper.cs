@@ -273,12 +273,7 @@ public class NetworkRipper : INetworkRipper
                     if (retries > 0)
                     {
                         Log.Information($"Retrying {retries + 1} attempt for {matchingScene.Url}");
-
                         await page.ReloadAsync();
-                        if (page.Url == "https://site-ma.brazzers.com/login")
-                        {
-                            await siteScraper.LoginAsync(site, page);
-                        }
                     }
 
                     var existingScene = await _repository.GetSceneAsync(site.ShortName, matchingScene.ShortName);
