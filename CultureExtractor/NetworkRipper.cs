@@ -217,7 +217,11 @@ public class NetworkRipper : INetworkRipper
 
         if (downloadOptions.ReverseOrder)
         {
-            furtherFilteredScenes = (furtherFilteredScenes as IEnumerable<Scene>).Reverse().ToList();
+            furtherFilteredScenes = furtherFilteredScenes.OrderByDescending(s => s.ReleaseDate).ToList();
+        }
+        else
+        {
+            furtherFilteredScenes = furtherFilteredScenes.OrderBy(s => s.ReleaseDate).ToList();
         }
 
         await DownloadGivenScenesAsync(
