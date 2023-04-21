@@ -17,7 +17,7 @@ class Program
                 "--full"
             };*/
             args = new string[] {
-                "scrape",
+                "download",
                 "--site-short-name", siteShortName,
                 /*"--scenes",
                     "464", "462", "530", "557", "555", "554", "551", "549", "548", "541", "531",
@@ -25,8 +25,8 @@ class Program
                     "477", "458",*/
                 "--verbose",
                 // "--full",
-                "--reverse-order",
-                // "--visible-browser",
+                // "--reverse-order",
+                "--visible-browser",
                 // "--max-scenes", "1000"
                 // "--best",
                 // "--downloaded-file-names", "Yasmin Scott & Simony Diamond - Brazzers - Brazzers - 2019-11-17 - The Pearl Of The Sea.mp4"

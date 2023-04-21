@@ -1,10 +1,63 @@
-﻿using System.Globalization;
+﻿using MaybeF;
+using System.Globalization;
 using System.Text.RegularExpressions;
 
 namespace CultureExtractor;
 
+public static class M
+{
+    public sealed record class FileSizeParseError(string Input) : IMsg { }
+}
+
 public static class HumanParser
 {
+    public static Maybe<double> ParseFileSizeMaybe(string sizeString)
+    {
+        string newSensationsPattern = @"\((?<wholeNumbers>[0-9]+)(?<decimalNumbers>.[0-9]+)? (?<unit>GB|MB|Gb|Mb)\)";
+        Match newSensationsMatch = Regex.Match(sizeString, newSensationsPattern);
+        if (newSensationsMatch.Success)
+        {
+            var wholeNumbers = int.Parse(newSensationsMatch.Groups["wholeNumbers"].Value);
+            var decimalNumbers =
+                !string.IsNullOrEmpty(newSensationsMatch.Groups["decimalNumbers"].Value)
+                    ? double.Parse("0." + newSensationsMatch.Groups["decimalNumbers"].Value[1..], CultureInfo.InvariantCulture)
+                    : 0.0;
+            var unitFactor = GetUnitFactor(newSensationsMatch.Groups["unit"].Value);
+            return F.Some((wholeNumbers + decimalNumbers) * unitFactor);
+        }
+
+        sizeString = sizeString.Replace(" ", "");
+
+        string purgatoryPattern = @"(?<thousands>[0-9]+),(?<wholeNumbers>[0-9]+).(?<decimalNumbers>[0-9]+)?(?<unit>GB|MB|Gb|Mb)";
+        Match purgatoryMatch = Regex.Match(sizeString, purgatoryPattern);
+        if (purgatoryMatch.Success)
+        {
+            var thousands = int.Parse(purgatoryMatch.Groups["thousands"].Value);
+            var wholeNumbers = int.Parse(purgatoryMatch.Groups["wholeNumbers"].Value);
+            var decimalNumbers =
+                !string.IsNullOrEmpty(purgatoryMatch.Groups["decimalNumbers"].Value)
+                    ? double.Parse("0." + purgatoryMatch.Groups["decimalNumbers"].Value, CultureInfo.InvariantCulture)
+                    : 0.0;
+            var unitFactor = GetUnitFactor(purgatoryMatch.Groups["unit"].Value);
+            return F.Some((thousands * 1000 + wholeNumbers + decimalNumbers) * unitFactor);
+        }
+
+        string pattern = @"(?<wholeNumbers>[0-9]+)(?<decimalNumbers>(.|,)[0-9]+)?(?<unit>GB|MB|Gb|Mb)";
+        Match match = Regex.Match(sizeString, pattern);
+        if (match.Success)
+        {
+            var wholeNumbers = int.Parse(match.Groups["wholeNumbers"].Value);
+            var decimalNumbers =
+                !string.IsNullOrEmpty(match.Groups["decimalNumbers"].Value)
+                    ? double.Parse("0." + match.Groups["decimalNumbers"].Value[1..], CultureInfo.InvariantCulture)
+                    : 0.0;
+            var unitFactor = GetUnitFactor(match.Groups["unit"].Value);
+            return F.Some((wholeNumbers + decimalNumbers) * unitFactor);
+        }
+
+        return F.None<double>(new M.FileSizeParseError(sizeString));
+    }
+
     public static double ParseFileSize(string sizeString)
     {
         string newSensationsPattern = @"\((?<wholeNumbers>[0-9]+)(?<decimalNumbers>.[0-9]+)? (?<unit>GB|MB|Gb|Mb)\)";

@@ -288,9 +288,9 @@ public class NetworkRipper : INetworkRipper
                     });
 
                     await scenePage.GotoAsync(matchingScene.Url);
-                    await scenePage.WaitForLoadStateAsync();
+                    await scenePage.WaitForLoadStateAsync(LoadState.NetworkIdle);
 
-                    await Task.Delay(1000);
+                    await scenePage.UnrouteAsync("**/*");
 
                     var scene = await siteScraper.ScrapeSceneAsync(site, null, matchingScene.Url, matchingScene.ShortName, scenePage, requests);
                     if (existingScene != null)

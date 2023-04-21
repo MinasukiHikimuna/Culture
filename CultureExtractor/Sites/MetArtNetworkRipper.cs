@@ -147,18 +147,31 @@ public class MetArtNetworkRipper : ISiteScraper
 
     public async Task<Scene> ScrapeSceneAsync(Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
-        var movieRequest = requests.SingleOrDefault(r => r.Url.StartsWith(site.Url + "/api/movie?name="));
-        var commentsRequest = requests.SingleOrDefault(r => r.Url.StartsWith(site.Url + "/api/comments?"));
+        var apiRequests = requests.Where(r => r.Url.StartsWith(site.Url + "/api/movie?name="));
 
-        if (!requests.Any())
+        var movieRequest = apiRequests.SingleOrDefault(r => r.Url.StartsWith(site.Url + "/api/movie?name="));
+        if (movieRequest == null)
         {
-            throw new Exception("Could not read API response.");
+            throw new Exception("Could not read movie API response.");
         }
 
-        var movieJsonContent = await (await movieRequest.ResponseAsync()).TextAsync();
+        var movieResponse = await movieRequest.ResponseAsync();
+        if (movieResponse.Status == 404)
+        {
+            throw new Exception("Got 404 for scene: " + url);
+        }
+
+        var movieJsonContent = await movieResponse.TextAsync();
         var movieData = JsonSerializer.Deserialize<MetArtSceneData>(movieJsonContent)!;
 
-        var commentsJsonContent = await (await commentsRequest.ResponseAsync()).TextAsync();
+        var commentsRequest = apiRequests.SingleOrDefault(r => r.Url.StartsWith(site.Url + "/api/comments?"));
+        if (commentsRequest == null)
+        {
+            throw new Exception("Could not read comments API response.");
+        }
+
+        var commentsResponse = await commentsRequest.ResponseAsync();
+        var commentsJsonContent = await commentsResponse.TextAsync();
 
         var releaseDate = movieData.publishedAt;
         var duration = TimeSpan.FromSeconds(movieData.runtime);
@@ -175,7 +188,14 @@ public class MetArtNetworkRipper : ISiteScraper
             .ToList();
 
         var downloads = movieData.files.sizes.videos
-            .Select(d => new DownloadOption(d.id, -1, HumanParser.ParseResolutionHeight(d.id), HumanParser.ParseFileSize(d.size), -1, string.Empty, $"/api/download-media/{movieData.siteUUID}/film/{d.id}"))
+            .Select(d => new DownloadOption(
+                d.id,
+                -1,
+                HumanParser.ParseResolutionHeight(d.id),
+                HumanParser.ParseFileSizeMaybe(d.size).IsSome(out var fileSizeValue) ? fileSizeValue : -1,
+                -1,
+                string.Empty,
+                $"/api/download-media/{movieData.siteUUID}/film/{d.id}"))
             .OrderByDescending(d => d.ResolutionHeight)
             .ToList();
 

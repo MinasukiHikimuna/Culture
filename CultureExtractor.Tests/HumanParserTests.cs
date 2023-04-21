@@ -18,6 +18,51 @@ public class HumanParserTests
     [TestCase("681.21 Mb", 681.21 * 1024 * 1024)]
     [TestCase("MP4 - 4K - 25Mpbs (5393.2 MB)", 5393.2 * 1024 * 1024)]
     [TestCase("MP4 - 720p - 3Mbps (672.2 MB)", 672.2 * 1024 * 1024)]
+    public void ParseFileSizeMaybeTests(string sizeString, double expectedSize)
+    {
+        var maybeFileSize = HumanParser.ParseFileSizeMaybe(sizeString);
+
+        if (maybeFileSize.IsSome(out var size))
+        {
+            Assert.That(expectedSize, Is.EqualTo(size));
+        }
+        else
+        {
+            Assert.Fail("Failed to parse file size.");
+        }
+    }
+
+    [TestCase("InvalidFileSize")]
+    public void ParseFileSizeMaybeFailureTests(string sizeString)
+    {
+        var maybeFileSize = HumanParser.ParseFileSizeMaybe(sizeString);
+
+        Assert.True(maybeFileSize.IsNone(out var reason), "Expected to fail parsing file size.");
+
+        if (reason is M.FileSizeParseError fileSizeParseError)
+        {
+            Assert.That(sizeString, Is.EqualTo(fileSizeParseError.Input));
+        }
+        else
+        {
+            Assert.Fail("Unexpected reason type.");
+        }
+    }
+
+    [TestCase("13 GB", 13.0 * 1024 * 1024 * 1024)]
+    [TestCase("13,1 GB", 13.1 * 1024 * 1024 * 1024)]
+    [TestCase("13.1 GB", 13.1 * 1024 * 1024 * 1024)]
+    [TestCase("13 Gb", 13.0 * 1024 * 1024 * 1024)]
+    [TestCase("13,1 Gb", 13.1 * 1024 * 1024 * 1024)]
+    [TestCase("13.1 Gb", 13.1 * 1024 * 1024 * 1024)]
+    [TestCase("205 MB", 205.0 * 1024 * 1024)]
+    [TestCase("1,087.81 MB", 1087.81 * 1024 * 1024)]
+    [TestCase("681.21 MB", 681.21 * 1024 * 1024)]
+    [TestCase("205 Mb", 205.0 * 1024 * 1024)]
+    [TestCase("1,087.81 Mb", 1087.81 * 1024 * 1024)]
+    [TestCase("681.21 Mb", 681.21 * 1024 * 1024)]
+    [TestCase("MP4 - 4K - 25Mpbs (5393.2 MB)", 5393.2 * 1024 * 1024)]
+    [TestCase("MP4 - 720p - 3Mbps (672.2 MB)", 672.2 * 1024 * 1024)]
     public void ParseFileSizeTests(string sizeString, double expectedSize)
     {
         HumanParser
