@@ -31,7 +31,7 @@ public class NetworkRipper : INetworkRipper
             await ScrapeSubSiteScenesAsync(site, browserSettings, scrapeOptions, subSiteScraper);
         }
 
-        IPage page = await CreatePageAndLoginAsync(siteScraper, site, browserSettings);
+        IPage page = await CreatePageAndLoginAsync(siteScraper, site, browserSettings, scrapeOptions.GuestMode);
         var totalPages = await siteScraper.NavigateToScenesAndReturnPageCountAsync(site, page);
 
         await ScrapeScenesInternalAsync(site, null, scrapeOptions, siteScraper, page, totalPages);
@@ -39,7 +39,7 @@ public class NetworkRipper : INetworkRipper
 
     private async Task ScrapeSubSiteScenesAsync(Site site, BrowserSettings browserSettings, ScrapeOptions scrapeOptions, ISubSiteScraper subSiteScraper)
     {
-        IPage page = await CreatePageAndLoginAsync(subSiteScraper, site, browserSettings);
+        IPage page = await CreatePageAndLoginAsync(subSiteScraper, site, browserSettings, scrapeOptions.GuestMode);
 
         var subSites = await subSiteScraper.GetSubSitesAsync(site, page);
         subSites = !string.IsNullOrWhiteSpace(scrapeOptions.SubSite)
@@ -246,7 +246,7 @@ public class NetworkRipper : INetworkRipper
             return;
         }
 
-        IPage page = await CreatePageAndLoginAsync(siteScraper, site, browserSettings);
+        IPage page = await CreatePageAndLoginAsync(siteScraper, site, browserSettings, false);
 
         var rippedScenes = 0;
 
@@ -369,12 +369,16 @@ public class NetworkRipper : INetworkRipper
         }
     }
 
-    private async Task<IPage> CreatePageAndLoginAsync(ISiteScraper siteScraper, Site site, BrowserSettings browserSettings)
+    private async Task<IPage> CreatePageAndLoginAsync(ISiteScraper siteScraper, Site site, BrowserSettings browserSettings, bool guestMode)
     {
         IPage page = await _playwrightFactory.CreatePageAsync(site, browserSettings);
-        await siteScraper.LoginAsync(site, page);
 
-        await _repository.UpdateStorageStateAsync(site, await page.Context.StorageStateAsync());
+        if (!guestMode)
+        {
+            await siteScraper.LoginAsync(site, page);
+            await _repository.UpdateStorageStateAsync(site, await page.Context.StorageStateAsync());
+        }
+
         return page;
     }
 }

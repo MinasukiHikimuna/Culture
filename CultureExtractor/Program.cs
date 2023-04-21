@@ -81,6 +81,12 @@ public class ScrapeOptions : BaseOptions
     public bool FullScrape { get; set; }
 
     [Option(
+      "guest-mode",
+      Default = false,
+      HelpText = "Uses guest mode for scraping (i.e. doesn't require subscription)")]
+    public bool GuestMode { get; set; }
+
+    [Option(
       "full-scrape-last-updated",
       Default = null,
       HelpText = "Full scrape including update existing scenes")]
