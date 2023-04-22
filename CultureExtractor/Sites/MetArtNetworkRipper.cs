@@ -158,7 +158,7 @@ public class MetArtNetworkRipper : ISiteScraper
         var movieResponse = await movieRequest.ResponseAsync();
         if (movieResponse.Status == 404)
         {
-            throw new Exception("Got 404 for scene: " + url);
+            throw new ExtractorException(false, "Got 404 for scene: " + url);
         }
 
         var movieJsonContent = await movieResponse.TextAsync();
@@ -285,7 +285,7 @@ public class MetArtNetworkRipper : ISiteScraper
         var downloadMenuLocator = page.Locator("div svg.fa-film");
         if (!await downloadMenuLocator.IsVisibleAsync())
         {
-            throw new DownloadException(false, $"Could not find download menu for {page.Url}. Skipping...");
+            throw new ExtractorException(false, $"Could not find download menu for {page.Url}. Skipping...");
         }
 
         await downloadMenuLocator.ClickAsync();

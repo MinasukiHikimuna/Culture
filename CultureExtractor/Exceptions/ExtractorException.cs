@@ -2,31 +2,31 @@
 
 namespace CultureExtractor.Exceptions;
 
-public class DownloadException : Exception
+public class ExtractorException : Exception
 {
     public bool ShouldRetry { get; }
 
-    public DownloadException()
+    public ExtractorException()
     {
     }
 
-    public DownloadException(string message)
+    public ExtractorException(string message)
         : base(message)
     {
     }
 
-    public DownloadException(string message, Exception inner)
+    public ExtractorException(string message, Exception inner)
         : base(message, inner)
     {
     }
 
-    public DownloadException(bool shouldRetry, string message)
+    public ExtractorException(bool shouldRetry, string message)
     : this(message)
     {
         ShouldRetry = shouldRetry;
     }
 
-    public DownloadException(bool shouldRetry, string message, Exception inner)
+    public ExtractorException(bool shouldRetry, string message, Exception inner)
         : this(message, inner)
     {
         ShouldRetry = shouldRetry;
