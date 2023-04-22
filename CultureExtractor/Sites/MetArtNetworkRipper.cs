@@ -147,7 +147,7 @@ public class MetArtNetworkRipper : ISiteScraper
 
     public async Task<Scene> ScrapeSceneAsync(Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
-        var apiRequests = requests.Where(r => r.Url.StartsWith(site.Url + "/api/movie?name="));
+        var apiRequests = requests.Where(r => r.Url.StartsWith(site.Url + "/api/"));
 
         var movieRequest = apiRequests.SingleOrDefault(r => r.Url.StartsWith(site.Url + "/api/movie?name="));
         if (movieRequest == null)
