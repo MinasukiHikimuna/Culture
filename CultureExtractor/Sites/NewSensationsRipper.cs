@@ -205,8 +205,8 @@ public class NewSensationsRipper : ISiteScraper
         return availableDownloads.OrderByDescending(d => d.DownloadOption.FileSize).ToList();
     }
 
-    public Task GoToPageAsync(IPage page, Site site, SubSite subSite, int pageNumber)
+    public async Task GoToPageAsync(IPage page, Site site, SubSite subSite, int pageNumber)
     {
-        throw new NotImplementedException();
+        await page.GotoAsync($"/members/category.php?id=5&page={pageNumber}&s=d");
     }
 }
