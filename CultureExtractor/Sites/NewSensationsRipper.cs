@@ -207,6 +207,17 @@ public class NewSensationsRipper : ISiteScraper
 
     public async Task GoToPageAsync(IPage page, Site site, SubSite subSite, int pageNumber)
     {
+        for (var i = 0; i < 3; i++)
+        {
+            try
+            {
         await page.GotoAsync($"/members/category.php?id=5&page={pageNumber}&s=d");
+                return;
+            }
+            catch (TimeoutException)
+            {
+                await page.EvaluateAsync("window.stop()");
+            }
+        }
     }
 }
