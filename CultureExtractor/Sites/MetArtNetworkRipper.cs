@@ -5,6 +5,7 @@ using System.Text.Json;
 using CultureExtractor.Sites.MetArtIndexModels;
 using CultureExtractor.Sites.MetArtSceneModels;
 using System.Text.RegularExpressions;
+using System;
 
 namespace CultureExtractor.Sites;
 
@@ -12,7 +13,9 @@ namespace CultureExtractor.Sites;
 [PornSite("metart")]
 [PornSite("metartx")]
 [PornSite("sexart")]
+[PornSite("lovehairy")]
 [PornSite("vivthomas")]
+[PornSite("alsscan")]
 [PornSite("thelifeerotic")]
 [PornSite("eternaldesire")]
 [PornSite("straplez")]
@@ -68,26 +71,40 @@ public class MetArtNetworkRipper : ISiteScraper
 
     public async Task<int> NavigateToScenesAndReturnPageCountAsync(Site site, IPage page)
     {
-        // Close the modal dialog if one is shown.
-        try
-        {
-            await page.WaitForLoadStateAsync();
-            if (await page.Locator(".close-btn").IsVisibleAsync())
-            {
-                await page.Locator(".close-btn").ClickAsync();
-            }
-            if (await page.Locator(".fa-times-circle").IsVisibleAsync())
-            {
-                await page.Locator(".fa-times-circle").ClickAsync();
-            }
-        }
-        catch (Exception ex)
-        {
-        }
+        await CloseModalsIfVisibleAsync(page);
 
         await page.Locator("nav a[href='/movies']").ClickAsync();
         await page.WaitForLoadStateAsync();
 
+        await CloseModalsIfVisibleAsync(page);
+
+        var totalPagesStr = await page.Locator("nav.pagination > a:nth-last-child(2)").TextContentAsync();
+        var totalPages = int.Parse(totalPagesStr);
+
+        return totalPages;
+    }
+
+    private async Task CloseModalsIfVisibleAsync(IPage page)
+    {
+        // Close the modal dialog if one is shown.
+        try
+        {
+            await page.WaitForLoadStateAsync();
+            if (await page.Locator(".close-btn").IsVisibleAsync())
+            {
+                await page.Locator(".close-btn").ClickAsync();
+            }
+
+            var modalClose = page.Locator("div.modal-content a.alt-close");
+            if (await modalClose.IsVisibleAsync())
+            {
+                await modalClose.ClickAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+        }
+
         // Close the modal dialog if one is shown.
         try
         {
@@ -104,11 +121,6 @@ public class MetArtNetworkRipper : ISiteScraper
         catch (Exception ex)
         {
         }
-
-        var totalPagesStr = await page.Locator("nav.pagination > a:nth-child(5)").TextContentAsync();
-        var totalPages = int.Parse(totalPagesStr);
-
-        return totalPages;
     }
 
     public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, IPage page, IReadOnlyList<IRequest> requests)
@@ -147,6 +159,8 @@ public class MetArtNetworkRipper : ISiteScraper
 
     public async Task<Scene> ScrapeSceneAsync(Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
+        await CloseModalsIfVisibleAsync(page);
+
         var apiRequests = requests.Where(r => r.Url.StartsWith(site.Url + "/api/"));
 
         var movieRequest = apiRequests.SingleOrDefault(r => r.Url.StartsWith(site.Url + "/api/movie?name="));
@@ -216,10 +230,26 @@ public class MetArtNetworkRipper : ISiteScraper
             DateTime.Now); ;
     }
 
-    public async Task DownloadPreviewImageAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene)
+    public async Task DownloadPreviewImageAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene, IReadOnlyList<IRequest> requests)
     {
-        var data = JsonSerializer.Deserialize<MetArtSceneData>(scene.JsonDocument)!;
-        await _downloader.DownloadSceneImageAsync(scene, scene.Site.Url + data.splashImagePath);
+        var apiRequests = requests.Where(r => r.Url.StartsWith(scene.Site.Url + "/api/"));
+
+        var movieRequest = apiRequests.SingleOrDefault(r => r.Url.StartsWith(scene.Site.Url + "/api/movie?name="));
+        if (movieRequest == null)
+        {
+            throw new Exception("Could not read movie API response.");
+        }
+
+        var movieResponse = await movieRequest.ResponseAsync();
+        if (movieResponse.Status == 404)
+        {
+            throw new ExtractorException(false, "Got 404 for scene: " + scene.Url);
+        }
+
+        var movieJsonContent = await movieResponse.TextAsync();
+        var movieData = JsonSerializer.Deserialize<MetArtSceneData>(movieJsonContent)!;
+
+        await _downloader.DownloadSceneImageAsync(scene, scene.Site.Url + movieData.splashImagePath);
     }
 
     public async Task GoToNextFilmsPageAsync(IPage page)
@@ -229,6 +259,8 @@ public class MetArtNetworkRipper : ISiteScraper
 
     public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)
     {
+        await CloseModalsIfVisibleAsync(page);
+
         if (!requests.Any())
         {
             throw new Exception("Could not read API response.");

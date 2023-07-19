@@ -46,7 +46,7 @@ public class NewSensationsRipper : ISiteScraper
         return int.Parse(lastPage);
     }
 
-    public async Task DownloadPreviewImageAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene)
+    public async Task DownloadPreviewImageAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene, IReadOnlyList<IRequest> requests)
     {
         var url = await scenePage.GetAttributeAsync("img#default_poster", "src");
         await _downloader.DownloadSceneImageAsync(scene, url);
@@ -211,7 +211,7 @@ public class NewSensationsRipper : ISiteScraper
         {
             try
             {
-        await page.GotoAsync($"/members/category.php?id=5&page={pageNumber}&s=d");
+                await page.GotoAsync($"/members/category.php?id=5&page={pageNumber}&s=d");
                 return;
             }
             catch (TimeoutException)

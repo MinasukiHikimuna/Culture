@@ -64,7 +64,7 @@ public class AdultPrimeRipper : ISiteScraper, ISubSiteScraper
         return int.Parse(lastPage);
     }
 
-    public async Task DownloadPreviewImageAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene)
+    public async Task DownloadPreviewImageAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene, IReadOnlyList<IRequest> requests)
     {
         var previewElement = await scenePage.Locator("div.vjs-poster").ElementHandleAsync();
         var style = await previewElement.GetAttributeAsync("style");

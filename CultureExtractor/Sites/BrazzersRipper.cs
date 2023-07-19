@@ -68,7 +68,7 @@ public class BrazzersRipper : ISiteScraper
         return int.Parse(lastPage);
     }
 
-    public async Task DownloadPreviewImageAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene)
+    public async Task DownloadPreviewImageAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene, IReadOnlyList<IRequest> requests)
     {
         var previewElement = await scenePage.Locator("div.vjs-poster").ElementHandleAsync();
         var style = await previewElement.GetAttributeAsync("style");

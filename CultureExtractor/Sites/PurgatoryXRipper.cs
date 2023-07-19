@@ -47,7 +47,7 @@ public class PurgatoryXRipper : ISiteScraper
         return int.Parse(lastPageText);
     }
 
-    public async Task DownloadPreviewImageAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene)
+    public async Task DownloadPreviewImageAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene, IReadOnlyList<IRequest> requests)
     {
         var previewElement = await scenePage.Locator(".jw-preview").ElementHandleAsync();
         var style = await previewElement.GetAttributeAsync("style");

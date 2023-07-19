@@ -209,7 +209,7 @@ public class WowNetworkRipper : ISiteScraper
     }
 
 
-    public async Task DownloadPreviewImageAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene)
+    public async Task DownloadPreviewImageAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene, IReadOnlyList<IRequest> requests)
     {
         if (_downloader.SceneImageExists(scene))
         {
