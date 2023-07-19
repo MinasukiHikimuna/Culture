@@ -202,6 +202,7 @@ public class Repository : IRepository
         existingSceneEntity.Duration = scene.Duration;
         existingSceneEntity.Performers = performerEntities;
         existingSceneEntity.Tags = tagEntities;
+        existingSceneEntity.JsonDocument = scene.JsonDocument;
 
         if (existingSceneEntity.Created == DateTime.MinValue)
         {
