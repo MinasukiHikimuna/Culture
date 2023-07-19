@@ -174,7 +174,7 @@ public class NetworkRipper : INetworkRipper
             }
 
             var savedScene = await _repository.UpsertScene(scene);
-            await siteScraper.DownloadPreviewImageAsync(savedScene, scenePage, page, currentScene.ElementHandle);
+            await siteScraper.DownloadPreviewImageAsync(savedScene, scenePage, page, currentScene.ElementHandle, requests);
 
             await scenePage.CloseAsync();
 
@@ -343,7 +343,7 @@ public class NetworkRipper : INetworkRipper
                     // Let's try again
                     Log.Error(ex.Message, ex);
                 }
-                catch (DownloadException ex)
+                catch (ExtractorException ex)
                 {
                     Log.Error(ex.Message, ex);
                     if (ex.ShouldRetry)
