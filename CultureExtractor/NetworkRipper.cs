@@ -127,7 +127,7 @@ public class NetworkRipper : INetworkRipper
                 }
                 catch (Exception ex)
                 {
-                    Log.Error(ex.ToString(), ex);
+                    Log.Error($"Caught following exception while scraping {currentScene.Url}:" + ex.ToString(), ex);
                     await Task.Delay(3000);
                 }
             }
