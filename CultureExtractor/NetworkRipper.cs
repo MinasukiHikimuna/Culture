@@ -32,11 +32,11 @@ public class NetworkRipper : INetworkRipper
         }
         else
         {
-        IPage page = await CreatePageAndLoginAsync(siteScraper, site, browserSettings, scrapeOptions.GuestMode);
-        var totalPages = await siteScraper.NavigateToScenesAndReturnPageCountAsync(site, page);
+            IPage page = await CreatePageAndLoginAsync(siteScraper, site, browserSettings, scrapeOptions.GuestMode);
+            var totalPages = await siteScraper.NavigateToScenesAndReturnPageCountAsync(site, page);
 
-        await ScrapeScenesInternalAsync(site, null, scrapeOptions, siteScraper, page, totalPages);
-    }
+            await ScrapeScenesInternalAsync(site, null, scrapeOptions, siteScraper, page, totalPages);
+        }
     }
 
     private async Task ScrapeSubSiteScenesAsync(Site site, BrowserSettings browserSettings, ScrapeOptions scrapeOptions, ISubSiteScraper subSiteScraper)
@@ -132,7 +132,7 @@ public class NetworkRipper : INetworkRipper
                 }
                 catch (Exception ex)
                 {
-                    Log.Error($"Caught following exception while scraping {currentScene.Url}:" + ex.ToString(), ex);
+                    Log.Error($"Caught following exception while scraping {currentScene.Url}: " + ex.ToString(), ex);
                     await Task.Delay(3000);
                 }
             }
