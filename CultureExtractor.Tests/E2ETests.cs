@@ -1,6 +1,4 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using System.Security.Cryptography.X509Certificates;
 
 namespace CultureExtractor.Tests;
 
@@ -20,7 +18,7 @@ public class E2ETests
         var networkRipper = host.Services.GetRequiredService<INetworkRipper>();
         var repository = host.Services.GetRequiredService<IRepository>();
 
-        var browserSettings = new BrowserSettings(false, "chrome");
+        var browserSettings = new BrowserSettings(BrowserMode.Headless, "chrome");
 
         var site = await repository.GetSiteAsync(scrapeOptions.SiteShortName);
 

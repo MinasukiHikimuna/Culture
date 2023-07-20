@@ -8,7 +8,7 @@ class Program
     {
         if (System.Diagnostics.Debugger.IsAttached)
         {
-            var siteShortName = "sexart";
+            var siteShortName = "kink";
 
             /*args = new string[] {
                 "scrape",
@@ -17,21 +17,30 @@ class Program
                 "--full"
             };*/
             args = new string[] {
-                "download",
+                /*"scrape",
                 "--site-short-name", siteShortName,
-                /*"--scenes",
-                    "464", "462", "530", "557", "555", "554", "551", "549", "548", "541", "531",
-                    "533", "532", "482", "484", "490", "495", "503", "506", "457", "474", "475",
-                    "477", "458",*/
-                "--verbose",
+                "--sub-site-short-name", "sex-and-submission",
                 // "--full",
+                // "--guest-mode",
+                // "--reverse-order",
+                "--browser-mode", "Headless",
+                // "--max-scenes", "1000",
+                // "--from", "2020-01-01",
+                // "--to", "2020-12-31",
+                "--verbose",*/
+                /*"download",
+                "--site-short-name", siteShortName,
+                "--sub-site-short-name", "bound-gang-bangs",
+                // "--scenes", "464", "462", "530",
                 // "--reverse-order",
                 "--visible-browser",
                 // "--max-scenes", "1000"
                 // "--best",
-                // "--downloaded-file-names", "Yasmin Scott & Simony Diamond - Brazzers - Brazzers - 2019-11-17 - The Pearl Of The Sea.mp4"
+                "--downloaded-file-names", "Kink - Bound Gang Bangs - 2011-05-03 - #13389 - Public Gangbang 2 - Princess Donna Dolore & Devaun.mp4",
                 // "--from", "2020-01-01",
                 // "--to", "2020-12-31",
+                "--verbose",
+                "--best",*/
             };
         }
 
@@ -48,13 +57,13 @@ public class BaseOptions
     [Option("site-short-name", Required = true, HelpText = "Site short name")]
     public string SiteShortName { get; set; }
 
-    [Option("sub-site", Required = false, HelpText = "Sub site to scrape.")]
+    [Option("sub-site-short-name", Required = false, HelpText = "Sub site short name")]
     public string SubSite { get; set; }
 
-    [Option("visible-browser",
-      Default = false,
-      HelpText = "Visible browser")]
-    public bool VisibleBrowser { get; set; }
+    [Option("browser-mode",
+      Default = BrowserMode.Headless,
+      HelpText = "Browser mode (Headless, ClassicHeadless, Visible)")]
+    public BrowserMode BrowserMode { get; set; }
 
     [Option(
       Default = false,

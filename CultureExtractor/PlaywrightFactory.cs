@@ -9,15 +9,14 @@ public class PlaywrightFactory : IPlaywrightFactory
         var playwright = await Playwright.CreateAsync();
         var browser = await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
         {
-            Headless = browserSettings.Headless,
+            Headless = browserSettings.BrowserMode != BrowserMode.Visible,
             Channel = !string.IsNullOrEmpty(browserSettings.BrowserChannel)
                 ? browserSettings.BrowserChannel
                 : "chrome",
             SlowMo = 1000,
-            // This should be parameterized
-            /* Args = browserSettings.Headless
+            Args = browserSettings.BrowserMode == BrowserMode.Headless
                 ? new[] { "--headless=new" }
-                : Array.Empty<string>()*/
+                : Array.Empty<string>()
         });
         var context = await browser.NewContextAsync(new BrowserNewContextOptions()
         {

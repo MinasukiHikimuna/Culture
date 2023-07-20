@@ -37,7 +37,7 @@ namespace CultureExtractor.Tests
         {
             // Arrange
             var site = new Site(1, "shortName", "name", "https://example.com", "username", "password", "storageState");
-            var browserSettings = new BrowserSettings(true, "browserChannel");
+            var browserSettings = new BrowserSettings(BrowserMode.ClassicHeadless, "browserChannel");
             var scrapeOptions = new ScrapeOptions { FullScrape = false };
 
             var pageMock = new Mock<IPage>();
