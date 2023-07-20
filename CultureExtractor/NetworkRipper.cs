@@ -2,6 +2,8 @@
 using CultureExtractor.Interfaces;
 using CultureExtractor.Migrations;
 using Microsoft.Playwright;
+using Polly;
+using Polly.Retry;
 using Serilog;
 
 namespace CultureExtractor;
@@ -118,24 +120,30 @@ public class NetworkRipper : INetworkRipper
                 return;
             }
 
-            for (int retries = 0; retries < 3; retries++)
-            {
-                try
+            ResilienceStrategy strategy = new ResilienceStrategyBuilder()
+                .AddRetry(new RetryStrategyOptions()
                 {
-                    var scene = await ScrapeSceneAsync(currentScene, siteScraper, site, subSite, page, scrapeOptions);
-                    if (scene != null)
+                    RetryCount = 4,
+                    BaseDelay = TimeSpan.FromSeconds(3),
+                    OnRetry = args =>
                     {
-                        LogScrapedSceneDescription(scene);
-                        await Task.Delay(3000);
-                        break;
+                        Log.Error($"Caught following exception while scraping {currentScene.Url}: " + args.Exception?.ToString(),
+                            args.Exception);
+                        return default;
                     }
-                }
-                catch (Exception ex)
+                })
+                .Build();
+
+            await strategy.ExecuteAsync(async token =>
+            {
+                var scene = await ScrapeSceneAsync(currentScene, siteScraper, site, subSite, page, scrapeOptions);
+                if (scene != null)
                 {
-                    Log.Error($"Caught following exception while scraping {currentScene.Url}: " + ex.ToString(), ex);
-                    await Task.Delay(3000);
+                    LogScrapedSceneDescription(scene);
+                    await Task.Delay(3000, token);
                 }
-            }
+            });
+
             scrapedScenes++;
         }
     }
