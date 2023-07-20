@@ -45,13 +45,16 @@ public class NetworkRipper : INetworkRipper
 
         var subSites = await subSiteScraper.GetSubSitesAsync(site, page);
         subSites = !string.IsNullOrWhiteSpace(scrapeOptions.SubSite)
-            ? subSites.Where(x => x.Name == scrapeOptions.SubSite).ToList()
+            ? subSites.Where(x => x.ShortName == scrapeOptions.SubSite).ToList()
             : subSites;
 
+        var i = 1;
         foreach (var subSite in subSites)
         {
+            Log.Information($"Subsite {i}/{subSites.Count}: {subSite.Name}");
             var totalPages = await subSiteScraper.NavigateToSubSiteAndReturnPageCountAsync(site, subSite, page);
             await ScrapeScenesInternalAsync(site, subSite, scrapeOptions, subSiteScraper, page, totalPages);
+            i++;
         }
     }
 
@@ -207,7 +210,7 @@ public class NetworkRipper : INetworkRipper
         if (!string.IsNullOrWhiteSpace(downloadOptions.SubSite))
         {
             furtherFilteredScenes = furtherFilteredScenes
-                .Where(s => s.SubSite != null && s.SubSite.Name == downloadOptions.SubSite)
+                .Where(s => s.SubSite != null && s.SubSite.ShortName == downloadOptions.SubSite)
                 .ToList();
         }
         if (downloadOptions.MaxScenes != int.MaxValue)
