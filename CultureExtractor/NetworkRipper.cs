@@ -30,11 +30,13 @@ public class NetworkRipper : INetworkRipper
         {
             await ScrapeSubSiteScenesAsync(site, browserSettings, scrapeOptions, subSiteScraper);
         }
-
+        else
+        {
         IPage page = await CreatePageAndLoginAsync(siteScraper, site, browserSettings, scrapeOptions.GuestMode);
         var totalPages = await siteScraper.NavigateToScenesAndReturnPageCountAsync(site, page);
 
         await ScrapeScenesInternalAsync(site, null, scrapeOptions, siteScraper, page, totalPages);
+    }
     }
 
     private async Task ScrapeSubSiteScenesAsync(Site site, BrowserSettings browserSettings, ScrapeOptions scrapeOptions, ISubSiteScraper subSiteScraper)
