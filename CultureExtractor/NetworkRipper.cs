@@ -1,8 +1,8 @@
 ﻿using CultureExtractor.Exceptions;
 using CultureExtractor.Interfaces;
-using CultureExtractor.Migrations;
 using Microsoft.Playwright;
 using Polly;
+using Polly.Fallback;
 using Polly.Retry;
 using Serilog;
 
@@ -82,17 +82,7 @@ public class NetworkRipper : INetworkRipper
     {
         var scrapedScenes = 0;
 
-        var requests = new List<IRequest>();
-        await page.RouteAsync("**/*", async route =>
-        {
-            requests.Add(route.Request);
-            await route.ContinueAsync();
-        });
-
-        await siteScraper.GoToPageAsync(page, site, subSite, currentPage);
-        await Task.Delay(1000);
-
-        var indexScenes = await siteScraper.GetCurrentScenesAsync(site, page, requests);
+        IReadOnlyList<IndexScene> indexScenes = await ScrapePageIndexScenesAsync(site, subSite, siteScraper, page, currentPage);
 
         Log.Information(totalPages == int.MaxValue
             ? $"Batch {currentPage} of infinite page contains {indexScenes.Count} scenes"
@@ -120,32 +110,75 @@ public class NetworkRipper : INetworkRipper
                 return;
             }
 
-            ResilienceStrategy strategy = new ResilienceStrategyBuilder()
-                .AddRetry(new RetryStrategyOptions()
-                {
-                    RetryCount = 4,
-                    BaseDelay = TimeSpan.FromSeconds(3),
-                    OnRetry = args =>
-                    {
-                        Log.Error($"Caught following exception while scraping {currentScene.Url}: " + args.Exception?.ToString(),
-                            args.Exception);
-                        return default;
-                    }
-                })
-                .Build();
-
-            await strategy.ExecuteAsync(async token =>
+            Scene? scene = await ScrapeSceneWithRetryAsync(site, subSite, scrapeOptions, siteScraper, page, currentScene);
+            if (scene != null)
             {
-                var scene = await ScrapeSceneAsync(currentScene, siteScraper, site, subSite, page, scrapeOptions);
-                if (scene != null)
-                {
-                    LogScrapedSceneDescription(scene);
-                    await Task.Delay(3000, token);
-                }
-            });
+                LogScrapedSceneDescription(scene);
+                await Task.Delay(3000);
+            }
 
             scrapedScenes++;
         }
+    }
+
+    private async Task<Scene?> ScrapeSceneWithRetryAsync(Site site, SubSite subSite, ScrapeOptions scrapeOptions, ISiteScraper siteScraper, IPage page, IndexScene? currentScene)
+    {
+        var strategy = new ResilienceStrategyBuilder<Scene?>()
+            .AddFallback(new FallbackStrategyOptions<Scene?>
+            {
+                FallbackAction = _ => Outcome.FromResultAsTask<Scene?>(null)
+            })
+            .AddRetry(new RetryStrategyOptions<Scene?>()
+            {
+                RetryCount = 3,
+                BaseDelay = TimeSpan.FromSeconds(3),
+                OnRetry = args =>
+                {
+                    Log.Error($"Caught following exception while scraping {currentScene.Url}: " + args.Exception?.ToString(),
+                        args.Exception);
+                    return default;
+                }
+            })
+            .Build();
+
+        var scene = await strategy.ExecuteAsync(async token =>
+            await ScrapeSceneAsync(currentScene, siteScraper, site, subSite, page, scrapeOptions)
+        );
+        return scene;
+    }
+
+    private static async Task<IReadOnlyList<IndexScene>> ScrapePageIndexScenesAsync(Site site, SubSite subSite, ISiteScraper siteScraper, IPage page, int currentPage)
+    {
+        var indexRetryStrategy = new ResilienceStrategyBuilder<IReadOnlyList<IndexScene>>()
+            .AddRetry(new RetryStrategyOptions<IReadOnlyList<IndexScene>>()
+            {
+                RetryCount = 3,
+                BaseDelay = TimeSpan.FromSeconds(3),
+                OnRetry = args =>
+                {
+                    Log.Error($"Caught following exception while scraping index page {currentPage}: " + args.Exception?.ToString(),
+                        args.Exception);
+                    return default;
+                }
+            })
+            .Build();
+
+        var indexScenes = await indexRetryStrategy.ExecuteAsync(async token =>
+        {
+            var requests = new List<IRequest>();
+            await page.RouteAsync("**/*", async route =>
+            {
+                requests.Add(route.Request);
+                await route.ContinueAsync();
+            });
+
+            await siteScraper.GoToPageAsync(page, site, subSite, currentPage);
+            await Task.Delay(1000);
+
+            var indexScenes = await siteScraper.GetCurrentScenesAsync(site, page, requests);
+            return indexScenes;
+        });
+        return indexScenes;
     }
 
     private static void LogScrapedSceneDescription(Scene scene)
@@ -162,7 +195,7 @@ public class NetworkRipper : INetworkRipper
         Log.Information("Scraped scene: {@Scene}", sceneDescription);
     }
 
-    private async Task<Scene> ScrapeSceneAsync(IndexScene currentScene, ISiteScraper siteScraper, Site site, SubSite subSite, IPage page, ScrapeOptions scrapeOptions)
+    private async Task<Scene?> ScrapeSceneAsync(IndexScene currentScene, ISiteScraper siteScraper, Site site, SubSite subSite, IPage page, ScrapeOptions scrapeOptions)
     {
         var scenePage = await page.Context.NewPageAsync();
 
@@ -181,6 +214,11 @@ public class NetworkRipper : INetworkRipper
             await Task.Delay(1000);
 
             var scene = await siteScraper.ScrapeSceneAsync(site, subSite, currentScene.Url, currentScene.ShortName, scenePage, requests);
+            if (scene == null)
+            {
+                return null;
+            }
+
             if (currentScene.Scene != null)
             {
                 scene = scene with { Id = currentScene.Scene.Id };
