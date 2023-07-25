@@ -276,6 +276,11 @@ public class KinkRipper : ISiteScraper, ISubSiteScraper
 
             var url = await downloadLink.GetAttributeAsync("href");
 
+            if (string.IsNullOrWhiteSpace(url))
+            {
+                continue;
+            }
+
             availableDownloads.Add(
                 new DownloadDetailsAndElementHandle(
                     new DownloadOption(
