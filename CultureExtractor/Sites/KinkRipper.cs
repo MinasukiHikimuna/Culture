@@ -1,5 +1,6 @@
 ﻿using CultureExtractor.Interfaces;
 using Microsoft.Playwright;
+using Serilog;
 using System.Net;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -125,6 +126,13 @@ public class KinkRipper : ISiteScraper, ISubSiteScraper
 
     public async Task<Scene> ScrapeSceneAsync(Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
+        if (await page.Locator("div.four-oh-four h1").IsVisibleAsync())
+        {
+            Log.Warning("Scene page returns 404 even though scene has been listed on index page.");
+            return null;
+        }
+
+        // fix this:
         var releaseDateElement = await page.QuerySelectorAsync("span.shoot-date");
         string releaseDateRaw = await releaseDateElement.TextContentAsync();
         DateOnly releaseDate = DateOnly.Parse(releaseDateRaw);
