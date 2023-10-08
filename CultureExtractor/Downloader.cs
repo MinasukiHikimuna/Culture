@@ -139,6 +139,8 @@ public class Downloader : IDownloader
                 WebClient.Headers[HttpRequestHeader.Referer] = referer;
             }
 
+            WebClient.DownloadProgressChanged += new DownloadProgressChangedEventHandler(DownloadProgressCallback4);
+
             await WebClient.DownloadFileTaskAsync(new Uri(url), tempPath);
             File.Move(tempPath, finalPath, true);
         }
@@ -151,6 +153,15 @@ public class Downloader : IDownloader
 
             throw;
         }
+    }
+
+    private static void DownloadProgressCallback4(object sender, DownloadProgressChangedEventArgs e)
+    {
+        // Displays the operation identifier, and the transfer progress.
+        Console.Write("\rDownloaded {0}/{1} bytes. {2}% complete...",
+            e.BytesReceived,
+            e.TotalBytesToReceive,
+            e.ProgressPercentage);
     }
 
     public async Task<string> DownloadCaptchaAudioAsync(string captchaUrl)
