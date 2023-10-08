@@ -316,6 +316,7 @@ public class NetworkRipper : INetworkRipper
             // Ungh, throws exception
             _downloader.CheckFreeSpace();
 
+            IPage scenePage = null;
             const int maxRetries = 3;
             for (int retries = 0; retries < maxRetries; retries++)
             {
@@ -329,7 +330,7 @@ public class NetworkRipper : INetworkRipper
 
                     var existingScene = await _repository.GetSceneAsync(site.ShortName, matchingScene.ShortName);
 
-                    var scenePage = await page.Context.NewPageAsync();
+                    scenePage = await page.Context.NewPageAsync();
 
                     var requests = new List<IRequest>();
                     await scenePage.RouteAsync("**/*", async route =>
@@ -339,7 +340,7 @@ public class NetworkRipper : INetworkRipper
                     });
 
                     await scenePage.GotoAsync(matchingScene.Url);
-                    await scenePage.WaitForLoadStateAsync(LoadState.NetworkIdle);
+                    await scenePage.WaitForLoadStateAsync();
 
                     await scenePage.UnrouteAsync("**/*");
 
@@ -410,6 +411,13 @@ public class NetworkRipper : INetworkRipper
                 {
                     Log.Error(ex.ToString(), ex);
                     await Task.Delay(3000);
+                }
+                finally
+                {
+                    if (scenePage != null)
+                    {
+                        await scenePage.CloseAsync();
+                    }
                 }
 
                 if (retries == maxRetries)
