@@ -225,7 +225,7 @@ public class NetworkRipper : INetworkRipper
             }
 
             var savedScene = await _repository.UpsertScene(scene);
-            await siteScraper.DownloadPreviewImageAsync(savedScene, scenePage, page, currentScene.ElementHandle, requests);
+            await siteScraper.DownloadAdditionalFilesAsync(savedScene, scenePage, page, currentScene.ElementHandle, requests);
 
             await scenePage.CloseAsync();
 

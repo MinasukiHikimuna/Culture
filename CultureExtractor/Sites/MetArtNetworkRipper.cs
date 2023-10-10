@@ -230,7 +230,7 @@ public class MetArtNetworkRipper : ISiteScraper
             DateTime.Now); ;
     }
 
-    public async Task DownloadPreviewImageAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene, IReadOnlyList<IRequest> requests)
+    public async Task DownloadAdditionalFilesAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene, IReadOnlyList<IRequest> requests)
     {
         var apiRequests = requests.Where(r => r.Url.StartsWith(scene.Site.Url + "/api/"));
 

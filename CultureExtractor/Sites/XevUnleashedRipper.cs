@@ -192,12 +192,16 @@ public class XevUnleashedRipper : ISiteScraper
         return availableDownloads.OrderByDescending(d => d.DownloadOption.ResolutionHeight).ToList();
     }
 
-    public async Task DownloadPreviewImageAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene, IReadOnlyList<IRequest> requests)
+    public async Task DownloadAdditionalFilesAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene, IReadOnlyList<IRequest> requests)
     {
         var ogImageMeta = await scenePage.QuerySelectorAsync("meta[property='og:image']");
         string ogImageUrl = await ogImageMeta.GetAttributeAsync("content");
 
         await _downloader.DownloadSceneImageAsync(scene, ogImageUrl, scene.Url);
+
+        var videoElement = await scenePage.QuerySelectorAsync("video");
+        string trailerUrl = await videoElement.GetAttributeAsync("src");
+        await _downloader.DownloadTrailerAsync(scene, trailerUrl, scene.Url);
     }
 
     public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)

@@ -239,7 +239,7 @@ public class HentaiedRipper : ISiteScraper
         return new Sources { FileSources = new List<FileSource>() };
     }
 
-    public async Task DownloadPreviewImageAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene, IReadOnlyList<IRequest> requests)
+    public async Task DownloadAdditionalFilesAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene, IReadOnlyList<IRequest> requests)
     {
         var ogImageMeta = await scenePage.QuerySelectorAsync("meta[property='og:image']");
         string ogImageUrl = await ogImageMeta.GetAttributeAsync("content");

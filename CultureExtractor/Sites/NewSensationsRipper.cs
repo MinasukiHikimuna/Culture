@@ -46,7 +46,7 @@ public class NewSensationsRipper : ISiteScraper
         return int.Parse(lastPage);
     }
 
-    public async Task DownloadPreviewImageAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene, IReadOnlyList<IRequest> requests)
+    public async Task DownloadAdditionalFilesAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene, IReadOnlyList<IRequest> requests)
     {
         var url = await scenePage.GetAttributeAsync("img#default_poster", "src");
         await _downloader.DownloadSceneImageAsync(scene, url);

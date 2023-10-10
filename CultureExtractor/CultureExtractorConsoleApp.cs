@@ -31,7 +31,9 @@ public class CultureExtractorConsoleApp
 
             if (opts.FullScrape && opts.FullScrapeLastUpdated == null)
             {
-                opts.FullScrapeLastUpdated = DateTime.Now.AddDays(-1);
+                // temporary, restore before commit
+                // this needs a better option
+                opts.FullScrapeLastUpdated = DateTime.Now.AddDays(0);
             }
 
             Log.Information("Culture Extractor");

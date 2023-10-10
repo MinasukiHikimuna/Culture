@@ -153,7 +153,7 @@ public class CzechVRNetworkRipper : ISiteScraper
         return scene;
     }
 
-    public async Task DownloadPreviewImageAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene, IReadOnlyList<IRequest> requests)
+    public async Task DownloadAdditionalFilesAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene, IReadOnlyList<IRequest> requests)
     {
         if (!_downloader.SceneImageExists(scene))
         {

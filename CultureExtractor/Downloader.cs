@@ -53,6 +53,18 @@ public class Downloader : IDownloader
         await DownloadFileAsync(imageUrl, $"{scene.Id}.jpg", rippingPath, referer: referer);
     }
 
+    public async Task DownloadTrailerAsync(Scene scene, string url, string referer = "")
+    {
+        var rippingPath = Path.Combine(_metadataPath, $@"{scene.Site.Name}\Metadata\Trailers\");
+        Directory.CreateDirectory(rippingPath);
+
+        // parse extension from url
+        var extension = Path.GetExtension(url);
+        var fileName = $"{scene.Id}{extension}";
+
+        await DownloadFileAsync(url, fileName, rippingPath, referer: referer);
+    }
+
     public async Task DownloadGalleryImageasync(Gallery gallery, string imageUrl)
     {
         var rippingPath = Path.Combine(_metadataPath, $@"{gallery.Site.Name}\Metadata\GalleryImages\");
