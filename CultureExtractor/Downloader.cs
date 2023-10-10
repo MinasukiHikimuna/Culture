@@ -153,6 +153,10 @@ public class Downloader : IDownloader
 
             throw;
         }
+        finally
+        {
+            Console.WriteLine();
+        }
     }
 
     private static void DownloadProgressCallback4(object sender, DownloadProgressChangedEventArgs e)
