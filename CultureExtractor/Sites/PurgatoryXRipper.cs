@@ -81,11 +81,6 @@ public class PurgatoryXRipper : ISiteScraper
         return new SceneIdAndUrl(shortName, url);
     }
 
-    public async Task GoToNextFilmsPageAsync(IPage page)
-    {
-        await page.GetByRole(AriaRole.Link, new() { NameString = "Next »" }).ClickAsync();
-    }
-
     public async Task<Scene> ScrapeSceneAsync(Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
         await Task.Delay(5000);

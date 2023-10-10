@@ -124,11 +124,6 @@ public class VixenRipper : ISiteScraper
         return new SceneIdAndUrl(sceneId, url);
     }
 
-    public async Task GoToNextFilmsPageAsync(IPage page)
-    {
-        await page.Locator("ul.pagination > li.page-item").Nth(-2).ClickAsync();
-    }
-
     public async Task<CapturedResponse?> FilterResponsesAsync(string sceneShortName, IResponse response)
     {
         if (response.Url == "https://members.milfy.com/graphql")
@@ -257,7 +252,7 @@ public class VixenRipper : ISiteScraper
         var playButton = await page.QuerySelectorAsync("div[data-test-component='PlayButton']");
         
         await page.WaitForLoadStateAsync();
-        await page.WaitForTimeoutAsync(5000);
+        await page.WaitForTimeoutAsync(10000);
 
         if (await playButton.IsVisibleAsync())
         {

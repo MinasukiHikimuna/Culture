@@ -81,23 +81,6 @@ public class NewSensationsRipper : ISiteScraper
         return new SceneIdAndUrl(shortName, url);
     }
 
-    public async Task GoToNextFilmsPageAsync(IPage page)
-    {
-        var url = await page.Locator("div.pagination > ul > li:last-child > a").GetAttributeAsync("href");
-
-        for (int i = 0; i < 3;  i++)
-        {
-            try
-            {
-                await page.GotoAsync(url);
-            }
-            catch (TimeoutException)
-            {
-                // Let's try again. This happens so often with New Sensations that no sense to spam log with it.
-            }
-        }
-    }
-
     public async Task<Scene> ScrapeSceneAsync(Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
         var releaseDateRaw = await page.Locator("div.datePhotos > span").TextContentAsync();

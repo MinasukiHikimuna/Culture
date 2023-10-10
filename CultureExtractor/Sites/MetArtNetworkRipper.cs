@@ -252,11 +252,6 @@ public class MetArtNetworkRipper : ISiteScraper
         await _downloader.DownloadSceneImageAsync(scene, scene.Site.Url + movieData.splashImagePath);
     }
 
-    public async Task GoToNextFilmsPageAsync(IPage page)
-    {
-        await page.GetByRole(AriaRole.Link, new() { NameString = ">" }).ClickAsync();
-    }
-
     public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)
     {
         await CloseModalsIfVisibleAsync(page);

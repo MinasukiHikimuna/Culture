@@ -125,11 +125,6 @@ public class SensualLoveRipper : ISiteScraper
         await _downloader.DownloadSceneImageAsync(scene, backgroundImageUrl, scene.Site.Url);
     }
 
-    public async Task GoToNextFilmsPageAsync(IPage page)
-    {
-        // noop for now as there is no pagination.
-    }
-
     public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)
     {
         await page.GotoAsync(scene.Url);

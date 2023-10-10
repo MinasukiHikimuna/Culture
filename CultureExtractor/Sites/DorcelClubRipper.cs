@@ -95,12 +95,6 @@ public class DorcelClubRipper : ISiteScraper
         return new SceneIdAndUrl(shortName, url);
     }
 
-    public async Task GoToNextFilmsPageAsync(IPage page)
-    {
-        await page.EvaluateAsync("document.querySelectorAll(\"div.items > div.scene\").forEach(e => e.remove());");
-        await page.GetByRole(AriaRole.Button).Filter(new() { HasTextString = "See more" }).ClickAsync();
-    }
-
     public async Task<Scene> ScrapeSceneAsync(Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
         var releaseDateRaw = await page.Locator("div.right > span.publish_date").TextContentAsync();

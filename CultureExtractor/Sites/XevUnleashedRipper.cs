@@ -225,9 +225,4 @@ public class XevUnleashedRipper : ISiteScraper
 
         return await _downloader.DownloadSceneDirectAsync(scene, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, headers, referer: page.Url);
     }
-
-    public async Task GoToNextFilmsPageAsync(IPage page)
-    {
-        throw new NotImplementedException();
-    }
 }

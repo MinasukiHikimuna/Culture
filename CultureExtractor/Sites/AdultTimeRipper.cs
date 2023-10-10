@@ -639,11 +639,6 @@ public class AdultTimeRipper : ISiteScraper
         return new SceneIdAndUrl(id, url);
     }
 
-    public async Task GoToNextFilmsPageAsync(IPage page)
-    {
-        await page.Locator("a.Pagination-RightControl-Link").ClickAsync();
-    }
-
     public async Task<CapturedResponse?> FilterResponsesAsync(string sceneShortName, IResponse response)
     {
         if (response.Url.Contains("algolia.net"))

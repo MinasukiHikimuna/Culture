@@ -107,11 +107,6 @@ public class BrazzersRipper : ISiteScraper
         return new SceneIdAndUrl(id, url);
     }
 
-    public async Task GoToNextFilmsPageAsync(IPage page)
-    {
-        await page.Locator("a[href^='/scenes?page=']").Nth(-2).ClickAsync();
-    }
-
     public async Task<CapturedResponse?> FilterResponsesAsync(string sceneShortName, IResponse response)
     {
         if (response.Url == "https://site-api.project1service.com/v2/releases/" + sceneShortName)

@@ -98,11 +98,6 @@ public class AdultPrimeRipper : ISiteScraper, ISubSiteScraper
         return new SceneIdAndUrl(shortName, url);
     }
 
-    public async Task GoToNextFilmsPageAsync(IPage page)
-    {
-        await page.Locator("ul.pagination > li.page-item").Nth(-2).ClickAsync();
-    }
-
     public async Task<CapturedResponse?> FilterResponsesAsync(string sceneShortName, IResponse response)
     {
         if (response.Url == "https://site-api.project1service.com/v2/releases/" + sceneShortName)

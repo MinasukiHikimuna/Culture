@@ -163,11 +163,6 @@ public class CzechVRNetworkRipper : ISiteScraper
         }
     }
 
-    public async Task GoToNextFilmsPageAsync(IPage page)
-    {
-        await page.Locator("div.strankovani > span > a.next").ClickAsync();
-    }
-
     public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)
     {
         await page.GotoAsync(scene.Url);

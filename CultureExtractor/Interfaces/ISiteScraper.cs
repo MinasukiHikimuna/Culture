@@ -10,7 +10,6 @@ public interface ISiteScraper
     Task<SceneIdAndUrl> GetSceneIdAsync(Site site, IElementHandle currentScene);
     Task<Scene> ScrapeSceneAsync(Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests);
     Task DownloadPreviewImageAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene, IReadOnlyList<IRequest> requests);
-    Task GoToNextFilmsPageAsync(IPage page);
     Task GoToPageAsync(IPage page, Site site, SubSite subSite, int pageNumber);
 
     /// <summary>
