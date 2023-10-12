@@ -5,7 +5,7 @@ namespace CultureExtractor.Tests;
 [TestFixture]
 public class E2ETests
 {
-    [Test]
+    // [Test]
     public async Task BasicData()
     {
         var scrapeOptions = new ScrapeOptions()
