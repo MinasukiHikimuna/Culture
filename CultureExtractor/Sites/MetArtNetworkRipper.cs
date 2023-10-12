@@ -43,8 +43,8 @@ public class MetArtNetworkRipper : ISiteScraper
             await page.ClickAsync(".sign-in");
             await page.WaitForLoadStateAsync();
 
-            await page.Locator("[name='email']").TypeAsync(site.Username);
-            await page.Locator("[name='password']").TypeAsync(site.Password);
+            await page.Locator("[name='email']").FillAsync(site.Username);
+            await page.Locator("[name='password']").FillAsync(site.Password);
             await page.Locator("button[type='submit']").ClickAsync();
             await page.WaitForLoadStateAsync();
         }
