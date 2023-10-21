@@ -16,6 +16,7 @@ public class HumanParserTests
     [TestCase("205 Mb", 205.0 * 1024 * 1024)]
     [TestCase("1,087.81 Mb", 1087.81 * 1024 * 1024)]
     [TestCase("681.21 Mb", 681.21 * 1024 * 1024)]
+    [TestCase("2,721mb", 2721.0 * 1024 * 1024)]
     [TestCase("MP4 - 4K - 25Mpbs (5393.2 MB)", 5393.2 * 1024 * 1024)]
     [TestCase("MP4 - 720p - 3Mbps (672.2 MB)", 672.2 * 1024 * 1024)]
     public void ParseFileSizeMaybeTests(string sizeString, double expectedSize)
@@ -24,7 +25,7 @@ public class HumanParserTests
 
         if (maybeFileSize.IsSome(out var size))
         {
-            Assert.That(expectedSize, Is.EqualTo(size));
+            Assert.That(size, Is.EqualTo(expectedSize));
         }
         else
         {
