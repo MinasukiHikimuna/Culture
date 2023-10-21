@@ -45,12 +45,12 @@ public class Downloader : IDownloader
         return File.Exists(path);
     }
 
-    public async Task DownloadSceneImageAsync(Scene scene, string imageUrl, string referer = "")
+    public async Task DownloadSceneImageAsync(Scene scene, string imageUrl, string referer = "", Dictionary<HttpRequestHeader, string>? headers = null)
     {
         var rippingPath = Path.Combine(_metadataPath, $@"{scene.Site.Name}\Metadata\SceneImages\");
         Directory.CreateDirectory(rippingPath);
 
-        await DownloadFileAsync(imageUrl, $"{scene.Id}.jpg", rippingPath, referer: referer);
+        await DownloadFileAsync(imageUrl, $"{scene.Id}.jpg", rippingPath, referer: referer, headers: headers);
     }
 
     public async Task DownloadTrailerAsync(Scene scene, string url, string referer = "")
@@ -130,7 +130,7 @@ public class Downloader : IDownloader
         return new Download(scene, suggestedFilename, name, downloadDetails, videoHashes);
     }
 
-    private static async Task DownloadFileAsync(string url, string fileName, string rippingPath, Dictionary<HttpRequestHeader, string> headers = null, string referer = "")
+    private static async Task DownloadFileAsync(string url, string fileName, string rippingPath, Dictionary<HttpRequestHeader, string>? headers = null, string referer = "")
     {
         string? tempPath = null;
         try
