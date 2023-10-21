@@ -28,11 +28,11 @@ public static class HumanParser
 
         sizeString = sizeString.Replace(" ", "");
 
-        string wankzPattern = @"(?<thousands>[0-9]+),(?<wholeNumbers>[0-9]+)(?<unit>mb)";
+        string wankzPattern = @"((?<thousands>[0-9]+),)?(?<wholeNumbers>[0-9]+)(?<unit>mb)";
         Match wankzMatch = Regex.Match(sizeString, wankzPattern);
         if (wankzMatch.Success)
         {
-            var thousands = int.Parse(wankzMatch.Groups["thousands"].Value);
+            var thousands = !string.IsNullOrEmpty(wankzMatch.Groups["thousands"].Value) ? int.Parse(wankzMatch.Groups["thousands"].Value) : 0;
             var wholeNumbers = int.Parse(wankzMatch.Groups["wholeNumbers"].Value);
             var unitFactor = GetUnitFactor(wankzMatch.Groups["unit"].Value);
             return F.Some((thousands * 1000.0 + wholeNumbers) * unitFactor);
