@@ -1,6 +1,5 @@
 using CultureExtractor.Interfaces;
 using Microsoft.Playwright;
-using Serilog;
 using System.Globalization;
 using System.Net;
 using System.Text.Json;
@@ -8,12 +7,14 @@ using System.Text.RegularExpressions;
 
 namespace CultureExtractor.Sites;
 
+/**
+ * Site notes:
+ * - After a handful of downloads, the download speed was limited to 2 MB/s.
+ **/
 [PornNetwork("wankzvr")]
 [PornSite("wankzvr")]
 public class WankzRipper : ISubSiteScraper
 {
-    private static readonly WebClient WebClient = new();
-    
     private readonly IDownloader _downloader;
 
     public WankzRipper(IDownloader downloader)
