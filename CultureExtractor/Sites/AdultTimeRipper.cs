@@ -762,28 +762,8 @@ public class AdultTimeRipper : ISiteScraper
 
         IPage newPage = await page.Context.NewPageAsync();
 
-        var performerNames = scene.Performers.Select(p => p.Name).ToList();
-        var performersStr = performerNames.Count() > 1
-            ? string.Join(", ", performerNames.SkipLast(1)) + " & " + performerNames.Last()
-            : performerNames.FirstOrDefault();
-
-        if (string.IsNullOrWhiteSpace(performersStr))
-        {
-            performersStr = "Unknown";
-        }
-
-        var nameWithoutSuffix =
-            string.Concat(
-                Regex.Replace(
-                    $"{performersStr} - Adult Time - {sceneData.mainChannel.name} - {scene.ReleaseDate.ToString("yyyy-MM-dd")} - {scene.Name}",
-                    @"\s+",
-                    " "
-                ).Split(Path.GetInvalidFileNameChars()));
-
         var suffix = ".mp4";
-        var name = (nameWithoutSuffix + suffix).Length > 244
-            ? nameWithoutSuffix[..(244 - suffix.Length - "...".Length)] + "..." + suffix
-            : nameWithoutSuffix + suffix;
+        var name = SceneNamer.Name(scene, suffix);
 
         // TODO: does download but Playwright won't detect when it finishes
         var download = await _downloader.DownloadSceneAsync(scene, newPage, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, async () =>

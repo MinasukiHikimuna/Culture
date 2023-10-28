@@ -4,17 +4,11 @@ namespace CultureExtractor
 {
     public static class SceneNamer
     {
-        public static string Name(Scene scene, string suffix)
+        public static string Name(Scene scene, string suffix, string performers = "")
         {
-            var performerNames = scene.Performers.Select(p => p.Name).ToList();
-            var performersStr = performerNames.Count() > 1
-                ? string.Join(", ", performerNames.SkipLast(1)) + " & " + performerNames.Last()
-                : performerNames.FirstOrDefault();
-
-            if (string.IsNullOrWhiteSpace(performersStr))
-            {
-                performersStr = "Unknown";
-            }
+            var performersStr = !string.IsNullOrEmpty(performers)
+                ? performers
+                : FormatPerformers(scene);
 
             var subSiteName = scene.SubSite != null ? " - " + scene.SubSite.Name : "";
 
@@ -31,6 +25,21 @@ namespace CultureExtractor
                 : nameWithoutSuffix + suffix;
 
             return name;
+        }
+
+        private static string FormatPerformers(Scene scene)
+        {
+            var performerNames = scene.Performers.Select(p => p.Name).ToList();
+            var performersStr = performerNames.Count > 1
+                ? string.Join(", ", performerNames.SkipLast(1)) + " & " + performerNames.Last()
+                : performerNames.FirstOrDefault();
+
+            if (string.IsNullOrWhiteSpace(performersStr))
+            {
+                performersStr = "Unknown";
+            }
+
+            return performersStr;
         }
     }
 }

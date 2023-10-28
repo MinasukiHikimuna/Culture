@@ -214,33 +214,10 @@ public class VixenRipper : ISiteScraper
             { HttpRequestHeader.Cookie, cookieString }
         };
 
-        var suggestedFilename = selectedDownload.DownloadOption.Url.Substring(selectedDownload.DownloadOption.Url.LastIndexOf("/") + 1);
-        suggestedFilename = suggestedFilename.Substring(0, suggestedFilename.IndexOf("?"));
+        var suggestedFilename = selectedDownload.DownloadOption.Url[(selectedDownload.DownloadOption.Url.LastIndexOf("/", StringComparison.Ordinal) + 1)..];
+        suggestedFilename = suggestedFilename[..suggestedFilename.IndexOf("?", StringComparison.Ordinal)];
         var suffix = Path.GetExtension(suggestedFilename);
-
-        var performerNames = scene.Performers.Select(p => p.Name).ToList();
-        var performersStr = performerNames.Count() > 1
-            ? string.Join(", ", performerNames.SkipLast(1)) + " & " + performerNames.Last()
-            : performerNames.FirstOrDefault();
-
-        if (string.IsNullOrWhiteSpace(performersStr))
-        {
-            performersStr = "Unknown";
-        }
-
-        var subSiteName = scene.SubSite != null ? " - " + scene.SubSite.Name : "";
-
-        var nameWithoutSuffix =
-            string.Concat(
-                Regex.Replace(
-                    $"{scene.Site.Name}{subSiteName} - {scene.ReleaseDate.ToString("yyyy-MM-dd")} - {scene.Name} - {performersStr}",
-                    @"\s+",
-                    " "
-                ).Split(Path.GetInvalidFileNameChars()));
-
-        var name = (nameWithoutSuffix + suffix).Length > 244
-            ? nameWithoutSuffix[..(244 - suffix.Length - "...".Length)] + "..." + suffix
-            : nameWithoutSuffix + suffix;
+        var name = SceneNamer.Name(scene, suffix);
 
         return await _downloader.DownloadSceneDirectAsync(scene, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, headers, referer: page.Url, fileName: name);
     }

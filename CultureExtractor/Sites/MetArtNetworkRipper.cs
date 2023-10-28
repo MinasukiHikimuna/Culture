@@ -276,10 +276,13 @@ public class MetArtNetworkRipper : ISiteScraper
             _ => throw new InvalidOperationException("Could not find a download candidate!")
         };
 
-        IPage newPage = await page.Context.NewPageAsync();
-
-        var genderSorted = data.models.Where(a => a.gender == "female").ToList().Concat(data.models.Where(a => a.gender != "female").ToList()).ToList().Select(a => a.name).ToList();
-        var performersStr = genderSorted.Count() > 1
+        var females = data.models.Where(a => a.gender == "female").ToList();
+        var nonFemales = data.models.Where(a => a.gender != "female").ToList();
+        var genderSorted = females.Concat(nonFemales)
+            .ToList()
+            .Select(a => a.name)
+            .ToList();
+        var performersStr = genderSorted.Count > 1
             ? string.Join(", ", genderSorted.SkipLast(1)) + " & " + genderSorted.Last()
             : genderSorted.FirstOrDefault();
 
@@ -288,18 +291,8 @@ public class MetArtNetworkRipper : ISiteScraper
             performersStr = "Unknown";
         }
 
-        var nameWithoutSuffix =
-            string.Concat(
-                Regex.Replace(
-                    $"{performersStr} - {scene.Site.Name} - {scene.ReleaseDate.ToString("yyyy-MM-dd")} - {scene.Name}",
-                    @"\s+",
-                    " "
-                ).Split(Path.GetInvalidFileNameChars()));
-
-        var suffix = ".mp4";
-        var name = (nameWithoutSuffix + suffix).Length > 244
-            ? nameWithoutSuffix[..(244 - suffix.Length - "...".Length)] + "..." + suffix
-            : nameWithoutSuffix + suffix;
+        const string suffix = ".mp4";
+        var name = SceneNamer.Name(scene, suffix, performersStr);
 
         return await _downloader.DownloadSceneAsync(scene, page, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, async () =>
         {

@@ -199,28 +199,8 @@ public class BrazzersRipper : ISiteScraper
             _ => throw new InvalidOperationException("Could not find a download candidate!")
         };
 
-        var performerNames = scene.Performers.Select(p => p.Name).ToList();
-        var performersStr = performerNames.Count() > 1
-            ? string.Join(", ", performerNames.SkipLast(1)) + " & " + performerNames.Last()
-            : performerNames.FirstOrDefault();
-
-        if (string.IsNullOrWhiteSpace(performersStr))
-        {
-            performersStr = "Unknown";
-        }
-
-        var nameWithoutSuffix =
-            string.Concat(
-                Regex.Replace(
-                    $"{performersStr} - Brazzers - {sceneData.brandMeta.displayName} - {scene.ReleaseDate.ToString("yyyy-MM-dd")} - {scene.Name}",
-                    @"\s+",
-                    " "
-                ).Split(Path.GetInvalidFileNameChars()));
-
-        var suffix = ".mp4";
-        var name = (nameWithoutSuffix + suffix).Length > 244
-            ? nameWithoutSuffix[..(244 - suffix.Length - "...".Length)] + "..." + suffix
-            : nameWithoutSuffix + suffix;
+        const string suffix = ".mp4";
+        var name = SceneNamer.Name(scene, suffix);
 
         var download = await _downloader.DownloadSceneAsync(scene, page, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, async () =>
         {
