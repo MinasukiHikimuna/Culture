@@ -22,8 +22,8 @@ public static class AppHostFactory
                 services.AddTransient<INetworkRipper, NetworkRipper>();
                 services.AddTransient<CultureExtractorConsoleApp>();
 
-                Type siteScraper = GetSiteScraperType<ISiteScraper>(siteShortName);
-                IList<Type> types = new List<Type>() { typeof(ISiteScraper) };
+                var siteScraper = GetSiteScraperType<ISiteScraper>(siteShortName);
+                IList<Type> types = new List<Type> { typeof(ISiteScraper) };
                 foreach (var type in types)
                 {
                     if (siteScraper.IsAssignableTo(type))
@@ -43,7 +43,7 @@ public static class AppHostFactory
     // The existing GetSiteScraperType method can be moved into this class
     private static Type GetSiteScraperType<T>(string shortName) where T : ISiteScraper
     {
-        Type attributeType = typeof(PornSiteAttribute);
+        var attributeType = typeof(PornSiteAttribute);
 
         var siteRipperTypes = Assembly
             .GetExecutingAssembly()
@@ -51,15 +51,16 @@ public static class AppHostFactory
             .Where(type => typeof(T).IsAssignableFrom(type))
             .Where(type =>
             {
-                object[] attributes = type.GetCustomAttributes(attributeType, true);
+                var attributes = type.GetCustomAttributes(attributeType, true);
                 return attributes.Length > 0 && attributes.Any(attribute => (attribute as PornSiteAttribute)?.ShortName == shortName);
-            });
+            })
+            .ToList();
 
         if (!siteRipperTypes.Any())
         {
             throw new ArgumentException($"Could not find any class with short name {shortName} with type {typeof(T)}");
         }
-        if (siteRipperTypes.Count() > 2)
+        if (siteRipperTypes.Count > 2)
         {
             throw new ArgumentException($"Found more than one classes with short name {shortName} with type {typeof(T)}");
         }
