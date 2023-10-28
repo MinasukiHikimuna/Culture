@@ -18,7 +18,7 @@ public class SqliteContext : DbContext, ISqliteContext
 
     public SqliteContext()
     {
-        DbPath = @"B:\Ripping\ripping.db";
+        DbPath = @"I:\Ripping\ripping.db";
     }
 
     public SqliteContext(IConfiguration configuration)
