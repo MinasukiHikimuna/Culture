@@ -555,7 +555,6 @@ public enum AdultTimeRequestType {
     SceneMetadata
 }
 
-[PornNetwork("adulttime")]
 [PornSite("adulttime")]
 public class AdultTimeRipper : ISiteScraper
 {

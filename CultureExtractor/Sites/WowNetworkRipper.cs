@@ -7,7 +7,6 @@ using CultureExtractor.Models;
 
 namespace CultureExtractor.Sites;
 
-[PornNetwork("wow")]
 [PornSite("allfinegirls")]
 [PornSite("wowgirls")]
 [PornSite("wowporn")]

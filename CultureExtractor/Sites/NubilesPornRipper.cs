@@ -7,7 +7,6 @@ using CultureExtractor.Models;
 
 namespace CultureExtractor.Sites;
 
-[PornNetwork("nubilesporn")]
 [PornSite("nubilesporn")]
 public class NubilesPornRipper : ISiteScraper
 {

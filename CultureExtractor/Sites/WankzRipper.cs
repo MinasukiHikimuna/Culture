@@ -12,7 +12,6 @@ namespace CultureExtractor.Sites;
  * Site notes:
  * - After a handful of downloads, the download speed was limited to 2 MB/s.
  **/
-[PornNetwork("wankzvr")]
 [PornSite("wankzvr")]
 public class WankzRipper : ISubSiteScraper
 {

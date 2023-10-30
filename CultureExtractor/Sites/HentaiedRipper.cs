@@ -24,7 +24,6 @@ public class FileSource
 }
 
 
-[PornNetwork("hentaied")]
 [PornSite("hentaied")]
 public class HentaiedRipper : ISiteScraper
 {

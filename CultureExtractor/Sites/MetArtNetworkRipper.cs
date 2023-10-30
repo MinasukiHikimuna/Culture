@@ -10,7 +10,6 @@ using CultureExtractor.Models;
 
 namespace CultureExtractor.Sites;
 
-[PornNetwork("metart")]
 [PornSite("metart")]
 [PornSite("metartx")]
 [PornSite("sexart")]

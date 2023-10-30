@@ -7,7 +7,6 @@ using CultureExtractor.Models;
 
 namespace CultureExtractor.Sites;
 
-[PornNetwork("xevunleashed")]
 [PornSite("xevunleashed")]
 public class XevUnleashedRipper : ISiteScraper
 {
@@ -20,12 +19,14 @@ public class XevUnleashedRipper : ISiteScraper
 
     public async Task LoginAsync(Site site, IPage page)
     {
+        // ReSharper disable once StringLiteralTypo
         var cookieIAgreeLink = page.Locator("#cwarningpopup").GetByRole(AriaRole.Link, new() { NameString = "I AGREE - ENTER" });
         if (await cookieIAgreeLink.IsVisibleAsync())
         {
             await cookieIAgreeLink.ClickAsync();
         }
 
+        // ReSharper disable once StringLiteralTypo
         var adultIAgreeLink = page.Locator("#warningpopup").GetByRole(AriaRole.Link, new() { NameString = "I AGREE - ENTER" });
         if (await adultIAgreeLink.IsVisibleAsync())
         {

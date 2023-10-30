@@ -6,7 +6,6 @@ using CultureExtractor.Models;
 
 namespace CultureExtractor.Sites;
 
-[PornNetwork("czechvr")]
 [PornSite("czechvr")]
 [PornSite("czechvrcasting")]
 [PornSite("czechvrfetish")]
