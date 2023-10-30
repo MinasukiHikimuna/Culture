@@ -1,5 +1,6 @@
 ﻿using CultureExtractor.Exceptions;
 using CultureExtractor.Interfaces;
+using CultureExtractor.Models;
 using Microsoft.Playwright;
 using Polly;
 using Polly.Fallback;
@@ -89,11 +90,11 @@ public class NetworkRipper : INetworkRipper
             : $"Page {currentPage}/{totalPages} contains {indexScenes.Count} scenes");
 
         var existingScenes = await _repository.GetScenesAsync(site.ShortName, indexScenes.Select(s => s.ShortName).ToList());
-        var checkedIndexScenes = new List<IndexScene>();
-        foreach (var indexScene in indexScenes)
-        {
-            checkedIndexScenes.Add(indexScene with { Scene = existingScenes.FirstOrDefault(s => s.ShortName == indexScene.ShortName) });
-        }
+        var checkedIndexScenes = indexScenes.Select(indexScene => indexScene with
+            {
+                Scene = existingScenes.FirstOrDefault(s => s.ShortName == indexScene.ShortName)
+            }
+        ).ToList();
         var unscrapedIndexScenes = scrapeOptions.FullScrape
             ? checkedIndexScenes.Where(s => s.Scene == null || s.Scene.LastUpdated < scrapeOptions.FullScrapeLastUpdated)
             : checkedIndexScenes.Where(s => s.Scene == null).ToList();

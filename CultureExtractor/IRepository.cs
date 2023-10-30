@@ -1,4 +1,6 @@
-﻿namespace CultureExtractor
+﻿using CultureExtractor.Models;
+
+namespace CultureExtractor
 {
     public interface IRepository
     {

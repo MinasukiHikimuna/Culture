@@ -1,5 +1,6 @@
 ﻿using Microsoft.Playwright;
 using System.Net;
+using CultureExtractor.Models;
 
 namespace CultureExtractor
 {

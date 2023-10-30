@@ -1,6 +1,7 @@
 ﻿using CultureExtractor.Interfaces;
 using Microsoft.Playwright;
 using System.Text.RegularExpressions;
+using CultureExtractor.Models;
 
 namespace CultureExtractor.Sites;
 

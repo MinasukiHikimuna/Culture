@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Serilog;
 using System.Text.Json;
+using CultureExtractor.Models;
 
 namespace CultureExtractor;
 

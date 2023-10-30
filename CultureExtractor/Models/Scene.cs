@@ -1,0 +1,17 @@
+namespace CultureExtractor.Models;
+
+public record Scene(
+    int? Id,
+    Site Site,
+    SubSite? SubSite,
+    DateOnly ReleaseDate,
+    string ShortName,
+    string Name,
+    string Url,
+    string Description,
+    double Duration,
+    IEnumerable<SitePerformer> Performers,
+    IEnumerable<SiteTag> Tags,
+    IEnumerable<DownloadOption> DownloadOptions,
+    string JsonDocument,
+    DateTime LastUpdated);

@@ -1,4 +1,5 @@
 ﻿using CommandLine;
+using CultureExtractor.Models;
 using Serilog;
 
 namespace CultureExtractor;

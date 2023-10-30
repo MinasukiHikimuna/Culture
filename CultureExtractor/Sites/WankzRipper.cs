@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Net;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using CultureExtractor.Models;
 
 namespace CultureExtractor.Sites;
 

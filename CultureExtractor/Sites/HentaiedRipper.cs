@@ -5,6 +5,7 @@ using System.Net;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using CultureExtractor.Models;
 
 namespace CultureExtractor.Sites;
 

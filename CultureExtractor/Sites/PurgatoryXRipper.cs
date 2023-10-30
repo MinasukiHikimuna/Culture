@@ -1,4 +1,5 @@
 ﻿using CultureExtractor.Interfaces;
+using CultureExtractor.Models;
 using Microsoft.Playwright;
 using Serilog;
 

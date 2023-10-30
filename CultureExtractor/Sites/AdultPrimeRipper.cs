@@ -2,6 +2,7 @@
 using Microsoft.Playwright;
 using Serilog;
 using System.Globalization;
+using CultureExtractor.Models;
 
 namespace CultureExtractor.Sites;
 

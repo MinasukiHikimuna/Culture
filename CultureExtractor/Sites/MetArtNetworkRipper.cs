@@ -6,6 +6,7 @@ using CultureExtractor.Sites.MetArtIndexModels;
 using CultureExtractor.Sites.MetArtSceneModels;
 using System.Text.RegularExpressions;
 using System;
+using CultureExtractor.Models;
 
 namespace CultureExtractor.Sites;
 
