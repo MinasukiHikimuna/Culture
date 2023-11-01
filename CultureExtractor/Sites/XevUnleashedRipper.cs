@@ -59,7 +59,13 @@ public class XevUnleashedRipper : ISiteScraper
 
         var lastPageLink = page.Locator("div.global_pagination > ul > li.hide_mobile").Nth(-1);
         var lastPageRaw = await lastPageLink.TextContentAsync();
-        return int.Parse(lastPageRaw);
+
+        if (!int.TryParse(lastPageRaw, out var lastPage))
+        {
+            throw new InvalidOperationException($"Could not parse number of out of lastPageRaw={lastPageRaw}");
+        }
+
+        return lastPage;
     }
 
     public async Task GoToPageAsync(IPage page, Site site, SubSite subSite, int pageNumber)
