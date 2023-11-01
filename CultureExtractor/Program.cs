@@ -170,9 +170,15 @@ class Program
                 "--best",
             };
         }
+        
+        // Use this for EF migrations:
+        // var host = AppHostFactory.CreateHost(args, "sexart");
+        // var cultureExtractor = AppHostFactory.CreateCultureExtractorConsoleApp(host);
+        // cultureExtractor.ExecuteConsoleApp(args);
+        
 
+        // Use this when running the application:
         var options = (BaseOptions) Parser.Default.ParseArguments<ScrapeOptions, DownloadOptions>(args).Value;
-
         var host = AppHostFactory.CreateHost(args, options.SiteShortName);
         var cultureExtractor = AppHostFactory.CreateCultureExtractorConsoleApp(host);
         cultureExtractor.ExecuteConsoleApp(args);
