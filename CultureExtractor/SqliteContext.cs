@@ -96,7 +96,7 @@ public class SitePerformerEntity
 public class SceneEntity
 {
     public int Id { get; set; }
-    public string? Uuid { get; set; }
+    public string Uuid { get; set; }
     public required DateOnly ReleaseDate { get; set; }
     public required string ShortName { get; set; }
     public required string Name { get; set; }

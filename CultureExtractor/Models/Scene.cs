@@ -2,7 +2,7 @@ namespace CultureExtractor.Models;
 
 public record Scene(
     int? Id,
-    Guid? Uuid,
+    Guid Uuid,
     Site Site,
     SubSite? SubSite,
     DateOnly ReleaseDate,
