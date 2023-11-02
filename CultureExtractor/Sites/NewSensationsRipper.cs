@@ -119,6 +119,7 @@ public class NewSensationsRipper : ISiteScraper
 
         return new Scene(
             null,
+            UuidGenerator.Generate(),
             site,
             null,
             releaseDate,

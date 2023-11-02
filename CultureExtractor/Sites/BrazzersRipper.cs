@@ -161,6 +161,7 @@ public class BrazzersRipper : ISiteScraper
 
         Scene scene = new Scene(
             null,
+            UuidGenerator.Generate(),
             site,
             null,
             releaseDate,

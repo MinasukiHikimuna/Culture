@@ -26,6 +26,25 @@ public class NetworkRipper : INetworkRipper
 
     public async Task ScrapeScenesAsync(Site site, BrowserSettings browserSettings, ScrapeOptions scrapeOptions)
     {
+        /*var scenes = await _sqliteContext.Scenes.Where(s => s.Uuid == null).ToListAsync();
+        // generate Uuid values for each file and save them to the database
+        int batchSize = 100;  // Adjust batch size as necessary
+        for (int i = 0; i < scenes.Count; i += batchSize)
+        {
+            var batch = scenes.Skip(i).Take(batchSize);
+            foreach (var scene in batch)
+            {
+                var uuid = UuidGenerator.Generate();
+                scene.Uuid = uuid.ToString();
+            }
+            await _sqliteContext.SaveChangesAsync();
+        }*/
+
+        
+
+        
+        
+        
         ISiteScraper siteScraper = (ISiteScraper)_serviceProvider.GetService(typeof(ISiteScraper));
         Log.Information($"Culture Extractor, using {siteScraper.GetType()}");
 

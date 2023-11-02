@@ -166,6 +166,7 @@ public class Repository : IRepository
         {
             var sceneEntity = new SceneEntity()
             {
+                Uuid = scene.Uuid.ToString(),
                 ReleaseDate = scene.ReleaseDate,
                 ShortName = scene.ShortName,
                 Name = scene.Name,
@@ -195,6 +196,7 @@ public class Repository : IRepository
 
         var existingSceneEntity = await _sqliteContext.Scenes.FirstAsync(s => s.Id == scene.Id);
 
+        existingSceneEntity.Uuid = scene.Uuid.ToString();
         existingSceneEntity.ReleaseDate = scene.ReleaseDate;
         existingSceneEntity.ShortName = scene.ShortName;
         existingSceneEntity.Name = scene.Name;
@@ -336,6 +338,7 @@ public class Repository : IRepository
 
         return new Scene(
             sceneEntity.Id,
+            Guid.Parse(sceneEntity.Uuid),
             Convert(sceneEntity.Site),
             Convert(sceneEntity.SubSite),
             sceneEntity.ReleaseDate,

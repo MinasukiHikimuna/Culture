@@ -176,6 +176,7 @@ public class VixenRipper : ISiteScraper
 
         return new Scene(
             null,
+            UuidGenerator.Generate(),
             site,
             subSite,
             releaseDate,

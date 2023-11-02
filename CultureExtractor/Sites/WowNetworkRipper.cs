@@ -121,6 +121,7 @@ public class WowNetworkRipper : ISiteScraper
 
         return new Scene(
             null,
+            UuidGenerator.Generate(),
             site,
             null,
             releaseDate,

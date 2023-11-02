@@ -711,6 +711,7 @@ public class AdultTimeRipper : ISiteScraper
 
         Scene scene = new Scene(
             null,
+            UuidGenerator.Generate(),
             site,
             null,
             releaseDate,

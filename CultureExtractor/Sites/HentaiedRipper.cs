@@ -144,6 +144,7 @@ public class HentaiedRipper : ISiteScraper
 
         return new Scene(
             null,
+            UuidGenerator.Generate(),
             site,
             subSite,
             releaseDate,

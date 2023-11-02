@@ -146,6 +146,7 @@ public class WankzRipper : ISubSiteScraper
 
         return new Scene(
             null,
+            UuidGenerator.Generate(),
             site,
             subSite,
             releaseDate,

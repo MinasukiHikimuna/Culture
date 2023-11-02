@@ -137,6 +137,7 @@ public class CzechVRNetworkRipper : ISiteScraper
 
         var scene = new Scene(
             null,
+            UuidGenerator.Generate(),
             site,
             null,
             releaseDate,

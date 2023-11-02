@@ -135,6 +135,7 @@ public class DorcelClubRipper : ISiteScraper
 
         return new Scene(
             null,
+            UuidGenerator.Generate(),
             site,
             null,
             releaseDate,

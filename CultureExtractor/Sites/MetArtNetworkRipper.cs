@@ -215,6 +215,7 @@ public class MetArtNetworkRipper : ISiteScraper
 
         return new Scene(
             null,
+            UuidGenerator.Generate(),
             site,
             null,
             DateOnly.FromDateTime(releaseDate),

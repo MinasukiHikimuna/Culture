@@ -189,6 +189,7 @@ public class KinkRipper : ISiteScraper, ISubSiteScraper
 
         return new Scene(
             null,
+            UuidGenerator.Generate(),
             site,
             subSite,
             releaseDate,

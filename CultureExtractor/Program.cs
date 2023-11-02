@@ -143,7 +143,7 @@ class Program
                 "--full"
             };*/
             args = new string[] {
-                /*"scrape",
+                "scrape",
                 "--site-short-name", siteShortName,
                 "--sub-site-short-name", subSiteShortName,
                 // "--full",
@@ -153,8 +153,8 @@ class Program
                 // "--max-scenes", "1000",
                 // "--from", "2020-01-01",
                 // "--to", "2020-12-31",
-                "--verbose",*/
-                "download",
+                "--verbose",
+                /*"download",
                 "--site-short-name", siteShortName,
                 "--sub-site-short-name", subSiteShortName,
                 // "--scenes", "103931", "103998",
@@ -167,7 +167,7 @@ class Program
                 // "--from", "2020-01-01",
                 // "--to", "2020-12-31",
                 "--verbose",
-                "--best",
+                "--best",*/
             };
         }
         
@@ -176,7 +176,6 @@ class Program
         // var cultureExtractor = AppHostFactory.CreateCultureExtractorConsoleApp(host);
         // cultureExtractor.ExecuteConsoleApp(args);
         
-
         // Use this when running the application:
         var options = (BaseOptions) Parser.Default.ParseArguments<ScrapeOptions, DownloadOptions>(args).Value;
         var host = AppHostFactory.CreateHost(args, options.SiteShortName);
