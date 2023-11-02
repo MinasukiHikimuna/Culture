@@ -11,7 +11,6 @@ public class SqliteContext : DbContext, ISqliteContext
     public DbSet<SiteEntity> Sites { get; set; }
     public DbSet<SubSiteEntity> SubSites { get; set; }
     public DbSet<SceneEntity> Scenes { get; set; }
-    public DbSet<GalleryEntity> Galleries { get; set; }
     public DbSet<SitePerformerEntity> Performers { get; set; }
     public DbSet<SiteTagEntity> Tags { get; set; }
     public DbSet<StorageStateEntity> StorageStates { get; set; }
@@ -127,22 +126,6 @@ public class SceneEntity
     public SubSiteEntity? SubSite { get; set; }
 
     public required ICollection<DownloadEntity> Downloads { get; set; }
-}
-
-public class GalleryEntity
-{
-    public int Id { get; set; }
-    public required DateOnly ReleaseDate { get; set; }
-    public required string ShortName { get; set; }
-    public required string Name { get; set; }
-    public required string Url { get; set; }
-    public required string Description { get; set; }
-    public required int Pictures { get; set; }
-    public required ICollection<SitePerformerEntity> Performers { get; set; }
-    public required ICollection<SiteTagEntity> Tags { get; set; }
-
-    public required int SiteId { get; set; }
-    public required SiteEntity Site { get; set; }
 }
 
 public class DownloadEntity

@@ -91,19 +91,6 @@ public class Repository : IRepository
             .AsReadOnly();
     }
 
-    public async Task<Gallery?> GetGalleryAsync(string siteShortName, string galleryShortScene)
-    {
-        var sceneEntity = await _sqliteContext.Galleries
-            .Include(s => s.Site)
-            .Include(s => s.Performers)
-            .Include(s => s.Tags)
-            .FirstOrDefaultAsync(s => s.Site.ShortName == siteShortName && s.ShortName == galleryShortScene);
-
-        return sceneEntity != null
-            ? Convert(sceneEntity)
-            : null;
-    }
-
     public async Task<SubSite> UpsertSubSite(SubSite subSite)
     {
         var existingSubSiteEntity = await _sqliteContext.SubSites
@@ -223,34 +210,6 @@ public class Repository : IRepository
         return Convert(existingSceneEntity);
     }
 
-    public async Task<Gallery> SaveGalleryAsync(Gallery gallery)
-    {
-        var siteEntity = await _sqliteContext.Sites.FirstAsync(s => s.Id == gallery.Site.Id);
-
-        List<SitePerformerEntity> performerEntities = await GetOrCreatePerformersAsync(gallery.Performers, siteEntity);
-        List<SiteTagEntity> tagEntities = await GetOrCreateTagsAsync(gallery.Tags, siteEntity);
-
-        var galleryEntity = new GalleryEntity()
-        {
-            ReleaseDate = gallery.ReleaseDate,
-            ShortName = gallery.ShortName,
-            Name = gallery.Name,
-            Url = gallery.Url,
-            Description = gallery.Description,
-            Pictures = gallery.Pictures,
-            Performers = performerEntities,
-            Tags = tagEntities,
-
-            SiteId = siteEntity.Id,
-            Site = siteEntity
-        };
-
-        await _sqliteContext.Galleries.AddAsync(galleryEntity);
-        await _sqliteContext.SaveChangesAsync();
-
-        return Convert(galleryEntity);
-    }
-
     private async Task<List<SitePerformerEntity>> GetOrCreatePerformersAsync(IEnumerable<SitePerformer> performers, SiteEntity siteEntity)
     {
         var performerEntities = performers.Select(p => new SitePerformerEntity() { Name = p.Name, ShortName = p.ShortName, Url = p.Url, SiteId = siteEntity.Id, Site = siteEntity, Scenes = new List<SceneEntity>() }).ToList();
@@ -352,21 +311,6 @@ public class Repository : IRepository
             JsonSerializer.Deserialize<IEnumerable<DownloadOption>>(downloadOptions),
             sceneEntity.JsonDocument,
             sceneEntity.LastUpdated);
-    }
-
-    private static Gallery Convert(GalleryEntity galleryEntity)
-    {
-        return new Gallery(
-            galleryEntity.Id,
-            Convert(galleryEntity.Site),
-            galleryEntity.ReleaseDate,
-            galleryEntity.ShortName,
-            galleryEntity.Name,
-            galleryEntity.Url,
-            galleryEntity.Description,
-            galleryEntity.Pictures,
-            galleryEntity.Performers.Select(Convert),
-            galleryEntity.Tags.Select(Convert));
     }
 
     private static SitePerformer Convert(SitePerformerEntity performerEntity)

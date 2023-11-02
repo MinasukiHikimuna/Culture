@@ -6,7 +6,6 @@ namespace CultureExtractor
     {
         string DbPath { get; }
         DbSet<DownloadEntity> Downloads { get; set; }
-        DbSet<GalleryEntity> Galleries { get; set; }
         DbSet<SitePerformerEntity> Performers { get; set; }
         DbSet<SceneEntity> Scenes { get; set; }
         DbSet<SiteEntity> Sites { get; set; }

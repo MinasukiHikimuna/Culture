@@ -39,13 +39,6 @@ public class Downloader : IDownloader
         return File.Exists(path);
     }
 
-    public bool GalleryImageExists(Gallery gallery)
-    {
-        // TODO: extension might not be jpg
-        var path = Path.Combine(_metadataPath, $@"{gallery.Site.Name}\Metadata\GalleryImages\{gallery.Id}.jpg");
-        return File.Exists(path);
-    }
-
     public async Task DownloadSceneImageAsync(Scene scene, string imageUrl, string referer = "", Dictionary<HttpRequestHeader, string>? headers = null)
     {
         var rippingPath = Path.Combine(_metadataPath, $@"{scene.Site.Name}\Metadata\SceneImages\");
@@ -64,14 +57,6 @@ public class Downloader : IDownloader
         var fileName = $"{scene.Id}{extension}";
 
         await DownloadFileAsync(url, fileName, rippingPath, referer: referer);
-    }
-
-    public async Task DownloadGalleryImageasync(Gallery gallery, string imageUrl)
-    {
-        var rippingPath = Path.Combine(_metadataPath, $@"{gallery.Site.Name}\Metadata\GalleryImages\");
-        Directory.CreateDirectory(rippingPath);
-
-        await DownloadFileAsync(imageUrl, $"{gallery.Id}.jpg", rippingPath);
     }
 
     public async Task DownloadSceneSubtitlesAsync(Scene scene, string fileName, string subtitleUrl, string referer = "")
