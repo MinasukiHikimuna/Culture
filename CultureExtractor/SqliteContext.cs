@@ -1,4 +1,6 @@
-﻿using CultureExtractor.Models;
+﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using CultureExtractor.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 
@@ -36,6 +38,15 @@ public class SqliteContext : DbContext, ISqliteContext
     // Add .LogTo(Log.Debug) to function chain to enable query logging.
     protected override void OnConfiguring(DbContextOptionsBuilder options)
         => options.UseSqlite($"Data Source={DbPath}");
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<DownloadEntity>()
+            .HasOne(downloadEntity => downloadEntity.Scene)
+            .WithMany(sceneEntity => sceneEntity.Downloads)
+            .HasForeignKey(downloadEntity => downloadEntity.SceneUuid)
+            .HasPrincipalKey(sceneEntity => sceneEntity.Uuid);
+    }
 }
 
 public class SiteEntity
@@ -143,7 +154,6 @@ public class DownloadEntity
     public string? OriginalFilename { get; set; }
     public string? SavedFilename { get; set; }
 
-    public string? SceneUuid { get; set; }
-    public required int SceneId { get; set; }
+    public required string SceneUuid { get; set; }
     public required SceneEntity Scene { get; set; }
 }

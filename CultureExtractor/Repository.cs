@@ -391,7 +391,7 @@ public class Repository : IRepository
 
         var json = JsonSerializer.Serialize(new JsonSummary(download.DownloadOption, download.VideoHashes));
 
-        _sqliteContext.Downloads.Add(new DownloadEntity()
+        _sqliteContext.Downloads.Add(new DownloadEntity
         {
             DownloadedAt = DateTime.Now,
             DownloadOptions = json,
@@ -399,7 +399,7 @@ public class Repository : IRepository
             OriginalFilename = download.OriginalFilename,
             SavedFilename = download.SavedFilename,
 
-            SceneId = sceneEntity.Id,
+            SceneUuid = sceneEntity.Uuid,
             Scene = sceneEntity,
         });
         await _sqliteContext.SaveChangesAsync();
