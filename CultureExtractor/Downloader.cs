@@ -35,7 +35,7 @@ public class Downloader : IDownloader
     public bool SceneImageExists(Scene scene)
     {
         // TODO: extension might not be jpg
-        var path = Path.Combine(_metadataPath, $@"{scene.Site.Name}\Metadata\SceneImages\{scene.Id}.jpg");
+        var path = Path.Combine(_metadataPath, $@"{scene.Site.Name}\Metadata\SceneImages\{scene.Uuid}.jpg");
         return File.Exists(path);
     }
 
@@ -44,7 +44,7 @@ public class Downloader : IDownloader
         var rippingPath = Path.Combine(_metadataPath, $@"{scene.Site.Name}\Metadata\SceneImages\");
         Directory.CreateDirectory(rippingPath);
 
-        await DownloadFileAsync(imageUrl, $"{scene.Id}.jpg", rippingPath, referer: referer, headers: headers);
+        await DownloadFileAsync(imageUrl, $"{scene.Uuid}.jpg", rippingPath, referer: referer, headers: headers);
     }
 
     public async Task DownloadTrailerAsync(Scene scene, string url, string referer = "")
@@ -54,7 +54,7 @@ public class Downloader : IDownloader
 
         // parse extension from url
         var extension = Path.GetExtension(url);
-        var fileName = $"{scene.Id}{extension}";
+        var fileName = $"{scene.Uuid}{extension}";
 
         await DownloadFileAsync(url, fileName, rippingPath, referer: referer);
     }

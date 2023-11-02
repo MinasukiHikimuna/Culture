@@ -6,6 +6,7 @@ using Polly;
 using Polly.Fallback;
 using Polly.Retry;
 using Serilog;
+using UUIDNext;
 
 namespace CultureExtractor;
 
@@ -233,15 +234,11 @@ public class NetworkRipper : INetworkRipper
 
             await Task.Delay(1000);
 
-            var scene = await siteScraper.ScrapeSceneAsync(site, subSite, currentScene.Url, currentScene.ShortName, scenePage, requests);
+            var sceneUuid = currentScene.Scene?.Uuid ?? UuidGenerator.Generate();
+            var scene = await siteScraper.ScrapeSceneAsync(sceneUuid, site, subSite, currentScene.Url, currentScene.ShortName, scenePage, requests);
             if (scene == null)
             {
                 return null;
-            }
-
-            if (currentScene.Scene != null)
-            {
-                scene = scene with { Id = currentScene.Scene.Id };
             }
 
             var savedScene = await _repository.UpsertScene(scene);
@@ -364,12 +361,8 @@ public class NetworkRipper : INetworkRipper
 
                     await scenePage.UnrouteAsync("**/*");
 
-                    var scene = await siteScraper.ScrapeSceneAsync(site, null, matchingScene.Url, matchingScene.ShortName, scenePage, requests);
-                    if (existingScene != null)
-                    {
-                        scene = scene with { Id = existingScene.Id };
-                    }
-
+                    var sceneId = existingScene?.Uuid ?? UuidGenerator.Generate();
+                    var scene = await siteScraper.ScrapeSceneAsync(sceneId, site, null, matchingScene.Url, matchingScene.ShortName, scenePage, requests);
                     existingScene = await _repository.UpsertScene(scene);
 
                     var sceneDescription = new {

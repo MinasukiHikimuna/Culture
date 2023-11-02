@@ -107,7 +107,7 @@ public class WowNetworkRipper : ISiteScraper
         return new SceneIdAndUrl(match.Groups["id"].Value, url);
     }
 
-    public async Task<Scene> ScrapeSceneAsync(Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
+    public async Task<Scene> ScrapeSceneAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
         await page.WaitForLoadStateAsync();
 
@@ -120,8 +120,7 @@ public class WowNetworkRipper : ISiteScraper
         var downloadOptionsAndHandles = await ParseAvailableDownloadsAsync(page);
 
         return new Scene(
-            null,
-            UuidGenerator.Generate(),
+            sceneUuid,
             site,
             null,
             releaseDate,

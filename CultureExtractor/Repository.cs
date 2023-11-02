@@ -149,7 +149,9 @@ public class Repository : IRepository
         List<SitePerformerEntity> performerEntities = await GetOrCreatePerformersAsync(scene.Performers, siteEntity);
         List<SiteTagEntity> tagEntities = await GetOrCreateTagsAsync(scene.Tags, siteEntity);
 
-        if (!scene.Id.HasValue)
+        var existingSceneEntity = await _sqliteContext.Scenes.FirstOrDefaultAsync(s => s.Uuid == scene.Uuid.ToString());
+        
+        if (existingSceneEntity == null)
         {
             var sceneEntity = new SceneEntity()
             {
@@ -180,8 +182,6 @@ public class Repository : IRepository
 
             return Convert(sceneEntity);
         }
-
-        var existingSceneEntity = await _sqliteContext.Scenes.FirstAsync(s => s.Id == scene.Id);
 
         existingSceneEntity.Uuid = scene.Uuid.ToString();
         existingSceneEntity.ReleaseDate = scene.ReleaseDate;
@@ -296,7 +296,6 @@ public class Repository : IRepository
             : sceneEntity.DownloadOptions;
 
         return new Scene(
-            sceneEntity.Id,
             Guid.Parse(sceneEntity.Uuid),
             Convert(sceneEntity.Site),
             Convert(sceneEntity.SubSite),
@@ -331,7 +330,7 @@ public class Repository : IRepository
 
     public async Task SaveDownloadAsync(Download download, PreferredDownloadQuality preferredDownloadQuality)
     {
-        var sceneEntity = await _sqliteContext.Scenes.FirstAsync(s => s.Id == download.Scene.Id);
+        var sceneEntity = await _sqliteContext.Scenes.FirstAsync(s => s.Uuid == download.Scene.Uuid.ToString());
 
         var json = JsonSerializer.Serialize(new JsonSummary(download.DownloadOption, download.VideoHashes));
 

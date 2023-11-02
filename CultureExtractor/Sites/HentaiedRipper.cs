@@ -102,7 +102,7 @@ public class HentaiedRipper : ISiteScraper
         return new SceneIdAndUrl(shortName, url);
     }
 
-    public async Task<Scene> ScrapeSceneAsync(Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
+    public async Task<Scene> ScrapeSceneAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
         var releaseDateElement = await page.QuerySelectorAsync("div.durationandtime > div.entry-date");
         string releaseDateRaw = await releaseDateElement.TextContentAsync();
@@ -143,8 +143,7 @@ public class HentaiedRipper : ISiteScraper
         var downloadOptionsAndHandles = await ParseAvailableDownloadsAsync(page);
 
         return new Scene(
-            null,
-            UuidGenerator.Generate(),
+            sceneUuid,
             site,
             subSite,
             releaseDate,

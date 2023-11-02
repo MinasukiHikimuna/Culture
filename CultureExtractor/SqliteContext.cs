@@ -1,5 +1,4 @@
 ﻿using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
 using CultureExtractor.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -105,7 +104,7 @@ public class SitePerformerEntity
 
 public class SceneEntity
 {
-    public int Id { get; set; }
+    [Key]
     public string Uuid { get; set; }
     public required DateOnly ReleaseDate { get; set; }
     public required string ShortName { get; set; }

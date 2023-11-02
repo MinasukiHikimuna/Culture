@@ -67,7 +67,7 @@ public class SensualLoveRipper : ISiteScraper
         return new SceneIdAndUrl(id, url);
     }
 
-    public async Task<Scene> ScrapeSceneAsync(Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
+    public async Task<Scene> ScrapeSceneAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
         var releaseDateRaw = await page.Locator("div.release-date > div.date").TextContentAsync();
         var releaseDate = DateOnly.Parse(releaseDateRaw!);
@@ -101,7 +101,6 @@ public class SensualLoveRipper : ISiteScraper
         var downloadOptionsAndHandles = await ParseAvailableDownloadsAsync(page);
 
         return new Scene(
-            null,
             UuidGenerator.Generate(),
             site,
             null,

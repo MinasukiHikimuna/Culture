@@ -157,7 +157,7 @@ public class MetArtNetworkRipper : ISiteScraper
         return null;
     }
 
-    public async Task<Scene> ScrapeSceneAsync(Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
+    public async Task<Scene> ScrapeSceneAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
         await CloseModalsIfVisibleAsync(page);
 
@@ -214,7 +214,6 @@ public class MetArtNetworkRipper : ISiteScraper
             .ToList();
 
         return new Scene(
-            null,
             UuidGenerator.Generate(),
             site,
             null,

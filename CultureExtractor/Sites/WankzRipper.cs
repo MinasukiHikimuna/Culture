@@ -100,7 +100,7 @@ public class WankzRipper : ISubSiteScraper
         return null;
     }
 
-    public async Task<Scene> ScrapeSceneAsync(Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
+    public async Task<Scene> ScrapeSceneAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
         var releaseDateElement = await page.QuerySelectorAsync("meta[property='video:release_date']");
         string releaseDateRaw = await releaseDateElement.GetAttributeAsync("content");
@@ -145,7 +145,6 @@ public class WankzRipper : ISubSiteScraper
         var downloadOptionsAndHandles = await ParseAvailableDownloadsAsync(page);
 
         return new Scene(
-            null,
             UuidGenerator.Generate(),
             site,
             subSite,

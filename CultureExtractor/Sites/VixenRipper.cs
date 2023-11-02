@@ -136,7 +136,7 @@ public class VixenRipper : ISiteScraper
         return null;
     }
 
-    public async Task<Scene> ScrapeSceneAsync(Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
+    public async Task<Scene> ScrapeSceneAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
         var sceneMetadataRequest = requests
             .Where(r => r.Method == "POST")
@@ -175,7 +175,6 @@ public class VixenRipper : ISiteScraper
         var metadataJson = JsonSerializer.Serialize(data.data.findOneVideo);
 
         return new Scene(
-            null,
             UuidGenerator.Generate(),
             site,
             subSite,

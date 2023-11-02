@@ -9,7 +9,7 @@ public interface ISiteScraper
     Task<int> NavigateToScenesAndReturnPageCountAsync(Site site, IPage page);
     Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, IPage page, IReadOnlyList<IRequest> requests);
     Task<SceneIdAndUrl> GetSceneIdAsync(Site site, IElementHandle currentScene);
-    Task<Scene> ScrapeSceneAsync(Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests);
+    Task<Scene> ScrapeSceneAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests);
     Task DownloadAdditionalFilesAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene, IReadOnlyList<IRequest> requests);
     Task GoToPageAsync(IPage page, Site site, SubSite subSite, int pageNumber);
 

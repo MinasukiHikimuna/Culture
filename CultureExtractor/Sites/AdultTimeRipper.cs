@@ -655,7 +655,7 @@ public class AdultTimeRipper : ISiteScraper
         return null;
     }
 
-    public async Task<Scene> ScrapeSceneAsync(Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
+    public async Task<Scene> ScrapeSceneAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
         var request = requests[0];
 
@@ -710,7 +710,6 @@ public class AdultTimeRipper : ISiteScraper
             sceneData.ActionTags != null ? sceneData.ActionTags : new List<ActionTag>());
 
         Scene scene = new Scene(
-            null,
             UuidGenerator.Generate(),
             site,
             null,

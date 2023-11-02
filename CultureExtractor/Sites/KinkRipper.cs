@@ -119,7 +119,7 @@ public class KinkRipper : ISiteScraper, ISubSiteScraper
         return null;
     }
 
-    public async Task<Scene> ScrapeSceneAsync(Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
+    public async Task<Scene> ScrapeSceneAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
         if (await page.Locator("div.four-oh-four h1").IsVisibleAsync())
         {
@@ -188,7 +188,6 @@ public class KinkRipper : ISiteScraper, ISubSiteScraper
         var metadataJson = JsonSerializer.Serialize(metadata);
 
         return new Scene(
-            null,
             UuidGenerator.Generate(),
             site,
             subSite,

@@ -81,7 +81,7 @@ public class NewSensationsRipper : ISiteScraper
         return new SceneIdAndUrl(shortName, url);
     }
 
-    public async Task<Scene> ScrapeSceneAsync(Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
+    public async Task<Scene> ScrapeSceneAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
         var releaseDateRaw = await page.Locator("div.datePhotos > span").TextContentAsync();
         var releaseDate = DateOnly.Parse(releaseDateRaw);
@@ -118,7 +118,6 @@ public class NewSensationsRipper : ISiteScraper
         var downloadOptionsAndHandles = await ParseAvailableDownloadsAsync(page);
 
         return new Scene(
-            null,
             UuidGenerator.Generate(),
             site,
             null,

@@ -125,7 +125,7 @@ public class CzechVRNetworkRipper : ISiteScraper
         return new SceneIdAndUrl(sceneShortName, relativeUrl);
     }   
 
-    public async Task<Scene> ScrapeSceneAsync(Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
+    public async Task<Scene> ScrapeSceneAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
         var releaseDate = await ScrapeReleaseDateAsync(page);
         var duration = await ScrapeDurationAsync(page);
@@ -136,7 +136,6 @@ public class CzechVRNetworkRipper : ISiteScraper
         var downloadOptionsAndHandles = await ParseAvailableDownloadsAsync(page);
 
         var scene = new Scene(
-            null,
             UuidGenerator.Generate(),
             site,
             null,

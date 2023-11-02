@@ -84,7 +84,7 @@ public class NubilesPornRipper : ISiteScraper
                 {
                     if (ex2.Status == WebExceptionStatus.ProtocolError && (ex2.Response as HttpWebResponse)?.StatusCode == HttpStatusCode.NotFound)
                     {
-                        Log.Warning($"Unable to download preview image for {scene.Id} {scene.Name} from URL {backgroundImageUrl}.", ex2);
+                        Log.Warning($"Unable to download preview image for {scene.Uuid} {scene.Name} from URL {backgroundImageUrl}.", ex2);
                     }
                     else
                     {
@@ -149,7 +149,7 @@ public class NubilesPornRipper : ISiteScraper
         return null;
     }
 
-    public async Task<Scene> ScrapeSceneAsync(Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
+    public async Task<Scene> ScrapeSceneAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
         var releaseDateRaw = await page.Locator("div.content-pane-title span.date").TextContentAsync();
         var releaseDate = DateOnly.Parse(releaseDateRaw);
@@ -197,7 +197,6 @@ public class NubilesPornRipper : ISiteScraper
         var downloadOptionsAndHandles = await ParseAvailableDownloadsAsync(page);
 
         return new Scene(
-            null,
             UuidGenerator.Generate(),
             site,
             subSite,
