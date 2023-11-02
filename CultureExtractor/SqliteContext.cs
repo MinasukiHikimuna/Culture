@@ -143,6 +143,7 @@ public class DownloadEntity
     public string? OriginalFilename { get; set; }
     public string? SavedFilename { get; set; }
 
+    public string? SceneUuid { get; set; }
     public required int SceneId { get; set; }
     public required SceneEntity Scene { get; set; }
 }
