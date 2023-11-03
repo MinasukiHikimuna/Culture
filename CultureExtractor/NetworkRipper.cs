@@ -221,12 +221,7 @@ public class NetworkRipper : INetworkRipper
                 return null;
             }
 
-            var savedScene = await _repository.UpsertScene(scene);
-            await siteScraper.DownloadAdditionalFilesAsync(savedScene, scenePage, page, currentScene.ElementHandle, requests);
-
-            await scenePage.CloseAsync();
-
-            return savedScene;
+            return await _repository.UpsertScene(scene);
         }
         finally
         {
@@ -338,10 +333,6 @@ public class NetworkRipper : INetworkRipper
 
                     await scenePage.GotoAsync(matchingScene.Url);
                     await scenePage.WaitForLoadStateAsync();
-                    // TODO: Why is this needed sometimes to get MetArt comments request?
-                    await Task.Delay(5000);
-
-                    await scenePage.UnrouteAsync("**/*");
 
                     var sceneUuid = existingScene?.Uuid ?? UuidGenerator.Generate();
                     var scene = await siteScraper.ScrapeSceneAsync(sceneUuid, site, null, matchingScene.Url, matchingScene.ShortName, scenePage, requests);
@@ -362,8 +353,6 @@ public class NetworkRipper : INetworkRipper
                     await _repository.SaveDownloadAsync(download, downloadConditions.PreferredDownloadQuality);
 
                     rippedScenes++;
-
-                    await scenePage.CloseAsync();
 
                     var sceneDescription2 = new
                     {

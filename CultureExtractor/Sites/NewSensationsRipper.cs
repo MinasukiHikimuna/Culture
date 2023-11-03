@@ -46,12 +46,6 @@ public class NewSensationsRipper : ISiteScraper
         return int.Parse(lastPage);
     }
 
-    public async Task DownloadAdditionalFilesAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene, IReadOnlyList<IRequest> requests)
-    {
-        var url = await scenePage.GetAttributeAsync("img#default_poster", "src");
-        await _downloader.DownloadSceneImageAsync(scene, url);
-    }
-
     public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, IPage page, IReadOnlyList<IRequest> requests)
     {
         var sceneHandles = await page.Locator("div.videoArea > div.videoBlock").ElementHandlesAsync();
@@ -117,7 +111,7 @@ public class NewSensationsRipper : ISiteScraper
 
         var downloadOptionsAndHandles = await ParseAvailableDownloadsAsync(page);
 
-        return new Scene(
+        var scene = new Scene(
             sceneUuid,
             site,
             null,
@@ -132,6 +126,11 @@ public class NewSensationsRipper : ISiteScraper
             downloadOptionsAndHandles.Select(f => f.DownloadOption).ToList(),
             "{}",
             DateTime.Now);
+        
+        var sceneImageUrl = await page.GetAttributeAsync("img#default_poster", "src");
+        await _downloader.DownloadSceneImageAsync(scene, sceneImageUrl);
+        
+        return scene;
     }
 
     public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)

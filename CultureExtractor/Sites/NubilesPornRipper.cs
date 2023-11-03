@@ -61,44 +61,6 @@ public class NubilesPornRipper : ISiteScraper
         return int.Parse(lastPage);
     }
 
-    public async Task DownloadAdditionalFilesAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene, IReadOnlyList<IRequest> requests)
-    {
-        var previewElement = await scenePage.Locator("div.vjs-poster").ElementHandleAsync();
-        var style = await previewElement.GetAttributeAsync("style");
-        var backgroundImageUrl = style.Replace("background-image: url(\"", "").Replace("\");", "");
-
-        try
-        {
-            var candidate = backgroundImageUrl.Replace("1280", "1920");
-            await _downloader.DownloadSceneImageAsync(scene, candidate, scene.Url);
-        }
-        catch (WebException ex)
-        {
-            if (ex.Status == WebExceptionStatus.ProtocolError && (ex.Response as HttpWebResponse)?.StatusCode == HttpStatusCode.NotFound)
-            {
-                try
-                {
-                    await _downloader.DownloadSceneImageAsync(scene, backgroundImageUrl, scene.Url);
-                }
-                catch (WebException ex2)
-                {
-                    if (ex2.Status == WebExceptionStatus.ProtocolError && (ex2.Response as HttpWebResponse)?.StatusCode == HttpStatusCode.NotFound)
-                    {
-                        Log.Warning($"Unable to download preview image for {scene.Uuid} {scene.Name} from URL {backgroundImageUrl}.", ex2);
-                    }
-                    else
-                    {
-                        throw;
-                    }
-                }
-            }
-            else
-            {
-                throw;
-            }
-        }
-    }
-
     public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, IPage page, IReadOnlyList<IRequest> requests)
     {
         var sceneHandles = await page.Locator("div.Videoset div.content-grid-item").ElementHandlesAsync();
@@ -196,7 +158,7 @@ public class NubilesPornRipper : ISiteScraper
 
         var downloadOptionsAndHandles = await ParseAvailableDownloadsAsync(page);
 
-        return new Scene(
+        var scene = new Scene(
             sceneUuid,
             site,
             subSite,
@@ -211,6 +173,43 @@ public class NubilesPornRipper : ISiteScraper
             downloadOptionsAndHandles.Select(f => f.DownloadOption).ToList(),
             "{}",
             DateTime.Now);
+        
+        var previewElement = await page.Locator("div.vjs-poster").ElementHandleAsync();
+        var style = await previewElement.GetAttributeAsync("style");
+        var backgroundImageUrl = style.Replace("background-image: url(\"", "").Replace("\");", "");
+
+        try
+        {
+            var candidate = backgroundImageUrl.Replace("1280", "1920");
+            await _downloader.DownloadSceneImageAsync(scene, candidate, scene.Url);
+        }
+        catch (WebException ex)
+        {
+            if (ex.Status == WebExceptionStatus.ProtocolError && (ex.Response as HttpWebResponse)?.StatusCode == HttpStatusCode.NotFound)
+            {
+                try
+                {
+                    await _downloader.DownloadSceneImageAsync(scene, backgroundImageUrl, scene.Url);
+                }
+                catch (WebException ex2)
+                {
+                    if (ex2.Status == WebExceptionStatus.ProtocolError && (ex2.Response as HttpWebResponse)?.StatusCode == HttpStatusCode.NotFound)
+                    {
+                        Log.Warning($"Unable to download preview image for {scene.Uuid} {scene.Name} from URL {backgroundImageUrl}.", ex2);
+                    }
+                    else
+                    {
+                        throw;
+                    }
+                }
+            }
+            else
+            {
+                throw;
+            }
+        }
+        
+        return scene;
     }
 
     public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)

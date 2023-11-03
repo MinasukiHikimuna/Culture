@@ -142,7 +142,7 @@ public class HentaiedRipper : ISiteScraper
 
         var downloadOptionsAndHandles = await ParseAvailableDownloadsAsync(page);
 
-        return new Scene(
+        var scene = new Scene(
             sceneUuid,
             site,
             subSite,
@@ -157,6 +157,20 @@ public class HentaiedRipper : ISiteScraper
             downloadOptionsAndHandles.Select(f => f.DownloadOption).ToList(),
             "{}",
             DateTime.Now);
+        
+        var ogImageMeta = await page.QuerySelectorAsync("meta[property='og:image']");
+        string ogImageUrl = await ogImageMeta.GetAttributeAsync("content");
+
+        try
+        {
+            await _downloader.DownloadSceneImageAsync(scene, ogImageUrl, scene.Url);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning($"Could not download preview image: {ex}" );
+        }
+        
+        return scene;
     }
 
     private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloadsAsync(IPage page)
@@ -237,21 +251,6 @@ public class HentaiedRipper : ISiteScraper
         }
 
         return new Sources { FileSources = new List<FileSource>() };
-    }
-
-    public async Task DownloadAdditionalFilesAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene, IReadOnlyList<IRequest> requests)
-    {
-        var ogImageMeta = await scenePage.QuerySelectorAsync("meta[property='og:image']");
-        string ogImageUrl = await ogImageMeta.GetAttributeAsync("content");
-
-        try
-        {
-            await _downloader.DownloadSceneImageAsync(scene, ogImageUrl, scene.Url);
-        }
-        catch (Exception ex)
-        {
-            Log.Warning($"Could not download preview image: {ex}" );
-        }
     }
 
     public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)

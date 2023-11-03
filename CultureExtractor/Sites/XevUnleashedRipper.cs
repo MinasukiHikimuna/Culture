@@ -130,7 +130,7 @@ public class XevUnleashedRipper : ISiteScraper
 
         var downloadOptionsAndHandles = await ParseAvailableDownloadsAsync(page);
 
-        return new Scene(
+        var scene = new Scene(
             sceneUuid,
             site,
             subSite,
@@ -145,6 +145,17 @@ public class XevUnleashedRipper : ISiteScraper
             downloadOptionsAndHandles.Select(f => f.DownloadOption).ToList(),
             "{}",
             DateTime.Now);
+        
+        var ogImageMeta = await page.QuerySelectorAsync("meta[property='og:image']");
+        string ogImageUrl = await ogImageMeta.GetAttributeAsync("content");
+
+        await _downloader.DownloadSceneImageAsync(scene, ogImageUrl, scene.Url);
+
+        var videoElement = await page.QuerySelectorAsync("video");
+        string trailerUrl = await videoElement.GetAttributeAsync("src");
+        await _downloader.DownloadTrailerAsync(scene, trailerUrl, scene.Url);
+        
+        return scene;
     }
 
     private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloadsAsync(IPage page)
@@ -198,18 +209,6 @@ public class XevUnleashedRipper : ISiteScraper
                     downloadLink));
         }
         return availableDownloads.OrderByDescending(d => d.DownloadOption.ResolutionHeight).ToList();
-    }
-
-    public async Task DownloadAdditionalFilesAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene, IReadOnlyList<IRequest> requests)
-    {
-        var ogImageMeta = await scenePage.QuerySelectorAsync("meta[property='og:image']");
-        string ogImageUrl = await ogImageMeta.GetAttributeAsync("content");
-
-        await _downloader.DownloadSceneImageAsync(scene, ogImageUrl, scene.Url);
-
-        var videoElement = await scenePage.QuerySelectorAsync("video");
-        string trailerUrl = await videoElement.GetAttributeAsync("src");
-        await _downloader.DownloadTrailerAsync(scene, trailerUrl, scene.Url);
     }
 
     public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)

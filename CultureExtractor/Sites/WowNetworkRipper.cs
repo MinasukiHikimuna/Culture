@@ -119,7 +119,7 @@ public class WowNetworkRipper : ISiteScraper
         var tags = await ScrapeTagsAsync(page);
         var downloadOptionsAndHandles = await ParseAvailableDownloadsAsync(page);
 
-        return new Scene(
+        var scene = new Scene(
             sceneUuid,
             site,
             null,
@@ -134,6 +134,50 @@ public class WowNetworkRipper : ISiteScraper
             downloadOptionsAndHandles.Select(f => f.DownloadOption).ToList(),
             "{}",
             DateTime.Now);
+        
+        if (_downloader.SceneImageExists(scene))
+        {
+            return scene;
+        }
+
+        // TODO: Fix this
+        /*var previewElement = await currentScene.QuerySelectorAsync("span > img");
+        var originalUrl = await previewElement.GetAttributeAsync("src");
+
+        string regexPattern = "icon_\\d+x\\d+.jpg";
+
+        // We can't be sure which are found so we need to cycle through them.
+        var candidates = new List<string>()
+            {
+                "icon_3840x2160.jpg",
+                "icon_1920x1080.jpg",
+                "icon_1280x720.jpg",
+            }
+            .Select(fileName => Regex.Replace(originalUrl, regexPattern, fileName))
+            .Concat(new List<string> { originalUrl });
+
+        foreach (var candidate in candidates)
+        {
+            try
+            {
+
+                await _downloader.DownloadSceneImageAsync(scene, candidate);
+                Log.Verbose($"Successfully downloaded preview from {candidate}.");
+                break;
+            }
+            catch (WebException ex)
+            {
+                if (ex.Status == WebExceptionStatus.ProtocolError && (ex.Response as HttpWebResponse)?.StatusCode == HttpStatusCode.NotFound)
+                {
+                    Log.Verbose($"Got 404 for preview from {candidate}.");
+                    continue;
+                }
+
+                throw;
+            }
+        }*/
+        
+        return scene;
     }
 
     private async Task<DateOnly> ScrapeReleaseDateAsync(IPage page)
@@ -206,51 +250,6 @@ public class WowNetworkRipper : ISiteScraper
             }
         }
         return string.Join("\r\n\r\n", descriptionParagraphs);
-    }
-
-
-    public async Task DownloadAdditionalFilesAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene, IReadOnlyList<IRequest> requests)
-    {
-        if (_downloader.SceneImageExists(scene))
-        {
-            return;
-        }
-
-        var previewElement = await currentScene.QuerySelectorAsync("span > img");
-        var originalUrl = await previewElement.GetAttributeAsync("src");
-
-        string regexPattern = "icon_\\d+x\\d+.jpg";
-
-        // We can't be sure which are found so we need to cycle through them.
-        var candidates = new List<string>()
-        {
-            "icon_3840x2160.jpg",
-            "icon_1920x1080.jpg",
-            "icon_1280x720.jpg",
-        }
-            .Select(fileName => Regex.Replace(originalUrl, regexPattern, fileName))
-            .Concat(new List<string> { originalUrl });
-
-        foreach (var candidate in candidates)
-        {
-            try
-            {
-
-                await _downloader.DownloadSceneImageAsync(scene, candidate);
-                Log.Verbose($"Successfully downloaded preview from {candidate}.");
-                break;
-            }
-            catch (WebException ex)
-            {
-                if (ex.Status == WebExceptionStatus.ProtocolError && (ex.Response as HttpWebResponse)?.StatusCode == HttpStatusCode.NotFound)
-                {
-                    Log.Verbose($"Got 404 for preview from {candidate}.");
-                    continue;
-                }
-
-                throw;
-            }
-        }
     }
 
     public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)

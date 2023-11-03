@@ -221,7 +221,7 @@ public class MetArtNetworkRipper : ISiteScraper
             .OrderByDescending(d => d.ResolutionHeight)
             .ToList();
 
-        return new Scene(
+        var scene = new Scene(
             sceneUuid,
             site,
             null,
@@ -235,29 +235,11 @@ public class MetArtNetworkRipper : ISiteScraper
             tags,
             downloads,
             @"{""movie"": " + movieJsonContent + @", ""comments"": " + commentsJsonContent + "}",
-            DateTime.Now); ;
-    }
-
-    public async Task DownloadAdditionalFilesAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene, IReadOnlyList<IRequest> requests)
-    {
-        var apiRequests = requests.Where(r => r.Url.StartsWith(scene.Site.Url + "/api/"));
-
-        var movieRequest = apiRequests.SingleOrDefault(r => r.Url.StartsWith(scene.Site.Url + "/api/movie?name="));
-        if (movieRequest == null)
-        {
-            throw new Exception("Could not read movie API response.");
-        }
-
-        var movieResponse = await movieRequest.ResponseAsync();
-        if (movieResponse.Status == 404)
-        {
-            throw new ExtractorException(false, "Got 404 for scene: " + scene.Url);
-        }
-
-        var movieJsonContent = await movieResponse.TextAsync();
-        var movieData = JsonSerializer.Deserialize<MetArtSceneData>(movieJsonContent)!;
+            DateTime.Now);
 
         await _downloader.DownloadSceneImageAsync(scene, scene.Site.Url + movieData.splashImagePath);
+
+        return scene;
     }
 
     public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)

@@ -61,11 +61,6 @@ public class DorcelClubRipper : ISiteScraper
         return int.MaxValue;
     }
 
-    public async Task DownloadAdditionalFilesAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene, IReadOnlyList<IRequest> requests)
-    {
-        return;
-    }
-
     public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, IPage page, IReadOnlyList<IRequest> requests)
     {
         var sceneHandles = await page.Locator("div.items > div.scene").ElementHandlesAsync();

@@ -150,17 +150,16 @@ public class CzechVRNetworkRipper : ISiteScraper
             downloadOptionsAndHandles.Select(f => f.DownloadOption).ToList(),
             "{}",
             DateTime.Now);
-        return scene;
-    }
-
-    public async Task DownloadAdditionalFilesAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene, IReadOnlyList<IRequest> requests)
-    {
+        
+        // TODO: Fix this
         if (!_downloader.SceneImageExists(scene))
         {
-            var previewElement = await currentScene.QuerySelectorAsync("img");
+            /*var previewElement = await currentScene.QuerySelectorAsync("img");
             var originalUrl = await previewElement.GetAttributeAsync("src");
-            await _downloader.DownloadSceneImageAsync(scene, originalUrl);
+            await _downloader.DownloadSceneImageAsync(scene, originalUrl);*/
         }
+        
+        return scene;
     }
 
     public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)

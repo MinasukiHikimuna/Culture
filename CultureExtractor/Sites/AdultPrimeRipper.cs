@@ -66,15 +66,6 @@ public class AdultPrimeRipper : ISiteScraper, ISubSiteScraper
         return int.Parse(lastPage);
     }
 
-    public async Task DownloadAdditionalFilesAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene, IReadOnlyList<IRequest> requests)
-    {
-        var previewElement = await scenePage.Locator("div.vjs-poster").ElementHandleAsync();
-        var style = await previewElement.GetAttributeAsync("style");
-        var backgroundImageUrl = style.Replace("background-image: url(\"", "").Replace("\");", "");
-
-        await _downloader.DownloadSceneImageAsync(scene, backgroundImageUrl, scene.Url);
-    }
-
     public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, IPage page, IReadOnlyList<IRequest> requests)
     {
         var sceneHandles = await page.Locator("div.row.portal-grid div.portal-video-wrapper").ElementHandlesAsync();
@@ -169,7 +160,7 @@ public class AdultPrimeRipper : ISiteScraper, ISubSiteScraper
 
         var downloadOptionsAndHandles = await ParseAvailableDownloadsAsync(page);
 
-        return new Scene(
+        var scene = new Scene(
             sceneUuid,
             site,
             subSite,
@@ -184,6 +175,14 @@ public class AdultPrimeRipper : ISiteScraper, ISubSiteScraper
             downloadOptionsAndHandles.Select(f => f.DownloadOption).ToList(),
             "{}",
             DateTime.Now);
+        
+        var previewElement = await page.Locator("div.vjs-poster").ElementHandleAsync();
+        var style = await previewElement.GetAttributeAsync("style");
+        var backgroundImageUrl = style.Replace("background-image: url(\"", "").Replace("\");", "");
+
+        await _downloader.DownloadSceneImageAsync(scene, backgroundImageUrl, scene.Url);
+
+        return scene;
     }
 
     public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)

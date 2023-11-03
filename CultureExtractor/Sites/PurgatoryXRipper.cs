@@ -47,14 +47,6 @@ public class PurgatoryXRipper : ISiteScraper
         return int.Parse(lastPageText);
     }
 
-    public async Task DownloadAdditionalFilesAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene, IReadOnlyList<IRequest> requests)
-    {
-        var previewElement = await scenePage.Locator(".jw-preview").ElementHandleAsync();
-        var style = await previewElement.GetAttributeAsync("style");
-        var backgroundImageUrl = style.Replace("background-image: url(\"", "").Replace("\");", "").Replace(" background-size: cover;", "");
-        await _downloader.DownloadSceneImageAsync(scene, backgroundImageUrl, "https://members.purgatoryx.com");
-    }
-
     public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, IPage page, IReadOnlyList<IRequest> requests)
     {
         var sceneHandles = await page.Locator("div.content-item").ElementHandlesAsync();
@@ -113,7 +105,7 @@ public class PurgatoryXRipper : ISiteScraper
 
         var downloadOptionsAndHandles = await ParseAvailableDownloadsAsync(page);
 
-        return new Scene(
+        var scene = new Scene(
             sceneUuid,
             site,
             null,
@@ -128,6 +120,13 @@ public class PurgatoryXRipper : ISiteScraper
             downloadOptionsAndHandles.Select(f => f.DownloadOption).ToList(),
             "{}",
             DateTime.Now);
+        
+        var previewElement = await page.Locator(".jw-preview").ElementHandleAsync();
+        var style = await previewElement.GetAttributeAsync("style");
+        var backgroundImageUrl = style.Replace("background-image: url(\"", "").Replace("\");", "").Replace(" background-size: cover;", "");
+        await _downloader.DownloadSceneImageAsync(scene, backgroundImageUrl, "https://members.purgatoryx.com");
+        
+        return scene;
     }
 
     public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)

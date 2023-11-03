@@ -68,15 +68,6 @@ public class BrazzersRipper : ISiteScraper
         return int.Parse(lastPage);
     }
 
-    public async Task DownloadAdditionalFilesAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene, IReadOnlyList<IRequest> requests)
-    {
-        var previewElement = await scenePage.Locator("div.vjs-poster").ElementHandleAsync();
-        var style = await previewElement.GetAttributeAsync("style");
-        var backgroundImageUrl = style.Replace("background-image: url(\"", "").Replace("\");", "");
-
-        await _downloader.DownloadSceneImageAsync(scene, backgroundImageUrl, scene.Url);
-    }
-
     public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, IPage page, IReadOnlyList<IRequest> requests)
     {
         var sceneHandles = await page.Locator("span a[href^='/scene/']").ElementHandlesAsync();
@@ -175,6 +166,12 @@ public class BrazzersRipper : ISiteScraper
             JsonSerializer.Serialize(sceneData),
             DateTime.Now);
 
+        var previewElement = await page.Locator("div.vjs-poster").ElementHandleAsync();
+        var style = await previewElement.GetAttributeAsync("style");
+        var backgroundImageUrl = style.Replace("background-image: url(\"", "").Replace("\");", "");
+
+        await _downloader.DownloadSceneImageAsync(scene, backgroundImageUrl, scene.Url);
+        
         return scene;
     }
 

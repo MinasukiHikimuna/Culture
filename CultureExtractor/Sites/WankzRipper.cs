@@ -52,26 +52,6 @@ public class WankzRipper : ISubSiteScraper
         return int.Parse(lastPage);
     }
 
-    public async Task DownloadAdditionalFilesAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene, IReadOnlyList<IRequest> requests)
-    {
-        var previewElement = await scenePage.Locator("dl8-video").ElementHandleAsync();
-        var url = await previewElement.GetAttributeAsync("poster");
-        var fullUrl = $"https:{url}";
-        
-        var userAgent = await scenePage.EvaluateAsync<string>("() => navigator.userAgent");
-        var cookieString = await scenePage.EvaluateAsync<string>("() => document.cookie");
-
-        var headers = new Dictionary<HttpRequestHeader, string>
-        {
-            { HttpRequestHeader.Referer, scenePage.Url },
-            { HttpRequestHeader.Accept, "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7" },
-            { HttpRequestHeader.UserAgent, userAgent },
-            { HttpRequestHeader.Cookie, cookieString }
-        };
-        
-        await _downloader.DownloadSceneImageAsync(scene, fullUrl, scenePage.Url, headers);
-    }
-
     public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, IPage page, IReadOnlyList<IRequest> requests)
     {
         var sceneHandles = await page.Locator("div.scene").ElementHandlesAsync();
@@ -146,7 +126,7 @@ public class WankzRipper : ISubSiteScraper
        
         var downloadOptionsAndHandles = await ParseAvailableDownloadsAsync(page);
 
-        return new Scene(
+        var scene = new Scene(
             sceneUuid,
             site,
             subSite,
@@ -161,6 +141,25 @@ public class WankzRipper : ISubSiteScraper
             downloadOptionsAndHandles.Select(f => f.DownloadOption).ToList(),
             "{}",
             DateTime.Now);
+        
+        var previewElement = await page.Locator("dl8-video").ElementHandleAsync();
+        var sceneImageUrl = await previewElement.GetAttributeAsync("poster");
+        var fullUrl = $"https:{sceneImageUrl}";
+        
+        var userAgent = await page.EvaluateAsync<string>("() => navigator.userAgent");
+        var cookieString = await page.EvaluateAsync<string>("() => document.cookie");
+
+        var headers = new Dictionary<HttpRequestHeader, string>
+        {
+            { HttpRequestHeader.Referer, page.Url },
+            { HttpRequestHeader.Accept, "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7" },
+            { HttpRequestHeader.UserAgent, userAgent },
+            { HttpRequestHeader.Cookie, cookieString }
+        };
+        
+        await _downloader.DownloadSceneImageAsync(scene, fullUrl, page.Url, headers);
+        
+        return scene;
     }
 
     public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)

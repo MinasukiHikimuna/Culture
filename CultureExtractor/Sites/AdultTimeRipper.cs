@@ -602,21 +602,6 @@ public class AdultTimeRipper : ISiteScraper
         return int.Parse(lastPage);
     }
 
-    public async Task DownloadAdditionalFilesAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene, IReadOnlyList<IRequest> requests)
-    {
-        var url = await scenePage.GetAttributeAsync("img.ScenePlayerHeaderPlus-PosterImage", "src");
-
-        string pattern = @"(width=)\d+";
-        string replacement = "${1}1920";
-        string output = Regex.Replace(url, pattern, replacement);
-
-        pattern = @"(format=)\w+";
-        replacement = "${1}jpg";
-        output = Regex.Replace(output, pattern, replacement);
-
-        await _downloader.DownloadSceneImageAsync(scene, output, scene.Url);
-    }
-
     public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, IPage page, IReadOnlyList<IRequest> requests)
     {
         var sceneHandles = await page.Locator("div.ListingGrid-ListingGridItem").ElementHandlesAsync();
@@ -730,6 +715,18 @@ public class AdultTimeRipper : ISiteScraper
             var subtitleFilename = SceneNamer.Name(scene, ".vtt");
             await _downloader.DownloadSceneSubtitlesAsync(scene, subtitleFilename, "https://subtitles.gammacdn.com/" + sceneData.subtitles.full.en, page.Url);
         }
+
+        var sceneImageUrl = await page.GetAttributeAsync("img.ScenePlayerHeaderPlus-PosterImage", "src");
+
+        string pattern = @"(width=)\d+";
+        string replacement = "${1}1920";
+        string output = Regex.Replace(sceneImageUrl, pattern, replacement);
+
+        pattern = @"(format=)\w+";
+        replacement = "${1}jpg";
+        output = Regex.Replace(output, pattern, replacement);
+
+        await _downloader.DownloadSceneImageAsync(scene, output, scene.Url);
 
         return scene;
     }

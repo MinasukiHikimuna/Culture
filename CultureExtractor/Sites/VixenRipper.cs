@@ -78,25 +78,6 @@ public class VixenRipper : ISiteScraper
         return int.Parse(lastPage);
     }
 
-    public async Task DownloadAdditionalFilesAsync(Scene scene, IPage scenePage, IPage scenesPage, IElementHandle currentScene, IReadOnlyList<IRequest> requests)
-    {
-        var sceneMetadataRequest = requests
-            .Where(r => r.Method == "POST")
-            .Where(r => r.Url == $"{scene.Site.Url}/graphql")
-            .FirstOrDefault();
-        var response = await sceneMetadataRequest.ResponseAsync();
-        var bodyBuffer = await response.BodyAsync();
-        var jsonContent = System.Text.Encoding.UTF8.GetString(bodyBuffer);
-        var data = JsonSerializer.Deserialize<VixenSceneRootObject>(jsonContent)!;
-
-        var posterSource = data.data.findOneVideo.images.poster
-            .OrderByDescending(i => i.width)
-            .Select(i => i.src)
-            .FirstOrDefault();
-
-        await _downloader.DownloadSceneImageAsync(scene, posterSource, scene.Url);
-    }
-
     public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, IPage page, IReadOnlyList<IRequest> requests)
     {
         var sceneHandles = await page.Locator("div[data-test-component='VideoThumbnailContainer']").ElementHandlesAsync();
@@ -174,7 +155,7 @@ public class VixenRipper : ISiteScraper
 
         var metadataJson = JsonSerializer.Serialize(data.data.findOneVideo);
 
-        return new Scene(
+        var scene = new Scene(
             sceneUuid,
             site,
             subSite,
@@ -189,6 +170,15 @@ public class VixenRipper : ISiteScraper
             downloadOptionsAndHandles.Select(f => f.DownloadOption).ToList(),
             metadataJson,
             DateTime.Now);
+        
+        var posterSource = data.data.findOneVideo.images.poster
+            .OrderByDescending(i => i.width)
+            .Select(i => i.src)
+            .FirstOrDefault();
+
+        await _downloader.DownloadSceneImageAsync(scene, posterSource, scene.Url);
+
+        return scene;
     }
 
     public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)
