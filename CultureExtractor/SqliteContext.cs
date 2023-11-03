@@ -40,8 +40,8 @@ public class SqliteContext : DbContext, ISqliteContext
 
 public class SiteEntity
 {
-    public int Id { get; set; }
-    public string Uuid { get; set; }
+    [Key]
+    public required string Uuid { get; set; }
     public required string ShortName { get; set; }
     public required string Name { get; set; }
     public required string Url { get; set; }
@@ -57,7 +57,7 @@ public class SubSiteEntity
     public required string ShortName { get; set; }
     public required string Name { get; set; }
 
-    public required int SiteId { get; set; }
+    public required string SiteUuid { get; set; }
     public required SiteEntity Site { get; set; }
 }
 
@@ -67,7 +67,7 @@ public class StorageStateEntity
     public required string Uuid { get; set; }
     public required string StorageState { get; set; }
 
-    public required int SiteId { get; set; }
+    public required string SiteUuid { get; set; }
     public required SiteEntity Site { get; set; }
 }
 
@@ -79,7 +79,7 @@ public class SiteTagEntity
     public required string Name { get; set; }
     public string? Url { get; set; }
 
-    public required int SiteId { get; set; }
+    public required string SiteUuid { get; set; }
     public required SiteEntity Site { get; set; }
 
     public required ICollection<SceneEntity> Scenes { get; set; }
@@ -92,7 +92,7 @@ public class SitePerformerEntity
     public string? ShortName { get; set; }
     public required string Name { get; set; }
     public string? Url { get; set; }
-    public required int SiteId { get; set; }
+    public required string SiteUuid { get; set; }
     public required SiteEntity Site { get; set; }
 
     public required ICollection<SceneEntity> Scenes { get; set; }
@@ -115,7 +115,7 @@ public class SceneEntity
     public required string DownloadOptions { get; set; }
     public required string JsonDocument { get; set; }
 
-    public required int SiteId { get; set; }
+    public required string SiteUuid { get; set; }
     public required SiteEntity Site { get; set; }
     public string? SubSiteUuid { get; set; }
     public SubSiteEntity? SubSite { get; set; }

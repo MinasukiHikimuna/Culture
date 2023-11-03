@@ -1,7 +1,7 @@
 namespace CultureExtractor.Models;
 
 public record Site(
-    int Id,
+    Guid Uuid,
     string ShortName,
     string Name,
     string Url,

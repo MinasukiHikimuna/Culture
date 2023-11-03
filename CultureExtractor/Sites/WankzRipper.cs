@@ -243,7 +243,7 @@ public class WankzRipper : ISubSiteScraper
         await page.GotoAsync("/");
         await Task.Delay(5000);
         
-        var existingSubSites = await _repository.GetSubSitesAsync(site.Id);
+        var existingSubSites = await _repository.GetSubSitesAsync(site.Uuid);
         
         var svgIconPremiumElements = await page.QuerySelectorAllAsync("svg.icon.premium");
         var linksWithSvgIconPremium = new List<IElementHandle>();

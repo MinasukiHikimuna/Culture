@@ -24,10 +24,10 @@ public class Repository : IRepository
         return siteEntities.Select(Convert).AsEnumerable();
     }
 
-    public async Task<IEnumerable<SubSite?>> GetSubSitesAsync(int siteId)
+    public async Task<IEnumerable<SubSite?>> GetSubSitesAsync(Guid siteUuid)
     {
         var subSites = await _sqliteContext.SubSites
-            .Where(s => s.SiteId == siteId)
+            .Where(s => s.SiteUuid == siteUuid.ToString())
             .OrderBy(s => s.Name)
             .ToListAsync();
 
@@ -63,7 +63,7 @@ public class Repository : IRepository
             .Include(s => s.SubSite)
             .Include(s => s.Performers)
             .Include(s => s.Tags)
-            .Where(s => s.SiteId == site.Id)
+            .Where(s => s.SiteUuid == site.Uuid.ToString())
             .Where(s => !downloadConditions.DownloadedFileNames.Any() || s.Downloads.Any(d => downloadConditions.DownloadedFileNames.Contains(d.SavedFilename)))
             .Where(s => !s.Downloads.Any(d => d.DownloadQuality == Enum.GetName(downloadConditions.PreferredDownloadQuality)))
             .OrderBy(s => s.Site.Name)
@@ -120,13 +120,13 @@ public class Repository : IRepository
             return Convert(existingSubSiteEntity);
         }
 
-        var siteEntity = await _sqliteContext.Sites.FirstAsync(s => s.Id == subSite.Site.Id);
+        var siteEntity = await _sqliteContext.Sites.FirstAsync(s => s.Uuid == subSite.Site.Uuid.ToString());
         var subSiteEntity = new SubSiteEntity()
         {
             Uuid = UuidGenerator.Generate().ToString(),
             ShortName = subSite.ShortName,
             Name = subSite.Name,
-            SiteId = siteEntity.Id,
+            SiteUuid = siteEntity.Uuid,
             Site = siteEntity
         };
 
@@ -138,11 +138,11 @@ public class Repository : IRepository
 
     public async Task<Scene> UpsertScene(Scene scene)
     {
-        var siteEntity = await _sqliteContext.Sites.FirstAsync(s => s.Id == scene.Site.Id);
+        var siteEntity = await _sqliteContext.Sites.FirstAsync(s => s.Uuid == scene.Site.Uuid.ToString());
         SubSiteEntity subSiteEntity = null;
         if (scene.SubSite != null)
         {
-            subSiteEntity = await _sqliteContext.SubSites.FirstOrDefaultAsync(s => s.SiteId == scene.Site.Id && s.ShortName == scene.SubSite.ShortName);
+            subSiteEntity = await _sqliteContext.SubSites.FirstOrDefaultAsync(s => s.SiteUuid == scene.Site.Uuid.ToString() && s.ShortName == scene.SubSite.ShortName);
             if (subSiteEntity == null)
             {
                 subSiteEntity = new SubSiteEntity()
@@ -150,7 +150,7 @@ public class Repository : IRepository
                     Uuid = UuidGenerator.Generate().ToString(),
                     ShortName = scene.SubSite.ShortName,
                     Name = scene.SubSite.Name,
-                    SiteId = siteEntity.Id,
+                    SiteUuid = siteEntity.Uuid,
                     Site = siteEntity
                 };
                 _sqliteContext.SubSites.Add(subSiteEntity);
@@ -179,7 +179,7 @@ public class Repository : IRepository
                 Created = DateTime.Now,
                 LastUpdated = DateTime.Now,
 
-                SiteId = siteEntity.Id,
+                SiteUuid = siteEntity.Uuid,
                 Site = siteEntity,
                 SubSiteUuid = subSiteEntity?.Uuid,
                 SubSite = subSiteEntity,
@@ -212,7 +212,7 @@ public class Repository : IRepository
         }
         existingSceneEntity.LastUpdated = DateTime.Now;
 
-        existingSceneEntity.SiteId = siteEntity.Id;
+        existingSceneEntity.SiteUuid = siteEntity.Uuid;
         existingSceneEntity.Site = siteEntity;
 
         existingSceneEntity.DownloadOptions = JsonSerializer.Serialize(scene.DownloadOptions);
@@ -224,10 +224,10 @@ public class Repository : IRepository
 
     private async Task<List<SitePerformerEntity>> GetOrCreatePerformersAsync(IEnumerable<SitePerformer> performers, SiteEntity siteEntity)
     {
-        var performerEntities = performers.Select(p => new SitePerformerEntity() { Uuid = UuidGenerator.Generate().ToString(), Name = p.Name, ShortName = p.ShortName, Url = p.Url, SiteId = siteEntity.Id, Site = siteEntity, Scenes = new List<SceneEntity>() }).ToList();
+        var performerEntities = performers.Select(p => new SitePerformerEntity() { Uuid = UuidGenerator.Generate().ToString(), Name = p.Name, ShortName = p.ShortName, Url = p.Url, SiteUuid = siteEntity.Uuid, Site = siteEntity, Scenes = new List<SceneEntity>() }).ToList();
         var shortNames = performerEntities.Select(p => p.ShortName).ToList();
 
-        var existingPerformers = await _sqliteContext.Performers.Where(p => p.SiteId == siteEntity.Id && shortNames.Contains(p.ShortName)).ToListAsync();
+        var existingPerformers = await _sqliteContext.Performers.Where(p => p.SiteUuid == siteEntity.Uuid && shortNames.Contains(p.ShortName)).ToListAsync();
         var existingPerformerShortNames = existingPerformers.Select(p => p.ShortName).ToList();
 
         var newPerformers = performerEntities.Where(p => !existingPerformerShortNames.Contains(p.ShortName)).ToList();
@@ -240,7 +240,7 @@ public class Repository : IRepository
 
     private async Task<List<SiteTagEntity>> GetOrCreateTagsAsync(IEnumerable<SiteTag> tags, SiteEntity siteEntity)
     {
-        var tagEntities = tags.Select(p => new SiteTagEntity() { Uuid = UuidGenerator.Generate().ToString(), Name = p.Name, ShortName = p.Id, Url = p.Url, SiteId = siteEntity.Id, Site = siteEntity, Scenes = new List<SceneEntity>() }).ToList();
+        var tagEntities = tags.Select(p => new SiteTagEntity() { Uuid = UuidGenerator.Generate().ToString(), Name = p.Name, ShortName = p.Id, Url = p.Url, SiteUuid = siteEntity.Uuid, Site = siteEntity, Scenes = new List<SceneEntity>() }).ToList();
         var tagShortNames = tagEntities.Select(t => t.ShortName).ToList();
 
         var existingTags = await _sqliteContext.Tags.Where(t => tagShortNames.Contains(t.ShortName)).ToListAsync();
@@ -256,20 +256,20 @@ public class Repository : IRepository
 
     public async Task UpdateStorageStateAsync(Site site, string storageState)
     {
-        var storageStateEntity = await _sqliteContext.StorageStates.FirstOrDefaultAsync(s => s.SiteId == site.Id);
+        var storageStateEntity = await _sqliteContext.StorageStates.FirstOrDefaultAsync(s => s.SiteUuid == site.Uuid.ToString());
         if (storageStateEntity != null)
         {
             storageStateEntity.StorageState = storageState;
         }
         else
         {
-            var siteEntity = await _sqliteContext.Sites.FirstAsync(s => s.Id == site.Id);
+            var siteEntity = await _sqliteContext.Sites.FirstAsync(s => s.Uuid == site.Uuid.ToString());
             _sqliteContext.StorageStates.Add(new StorageStateEntity()
             {
                 Uuid = UuidGenerator.Generate().ToString(),
                 StorageState = storageState,
 
-                SiteId = siteEntity.Id,
+                SiteUuid = siteEntity.Uuid,
                 Site = siteEntity
             });
         }
@@ -281,7 +281,7 @@ public class Repository : IRepository
     private static Site Convert(SiteEntity siteEntity)
     {
         return new Site(
-            siteEntity.Id,
+            Guid.Parse(siteEntity.Uuid),
             siteEntity.ShortName,
             siteEntity.Name,
             siteEntity.Url,

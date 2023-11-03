@@ -283,7 +283,7 @@ public class KinkRipper : ISiteScraper, ISubSiteScraper
 
         await page.Locator("#searchDropdown").SelectOptionAsync(new[] { "alphabetical" });
 
-        var existingSubSites = await _repository.GetSubSitesAsync(site.Id);
+        var existingSubSites = await _repository.GetSubSitesAsync(site.Uuid);
         
         var channelHandles = await page.Locator("div.channel-tile").ElementHandlesAsync();
         List<SubSite> subSites = new List<SubSite>();

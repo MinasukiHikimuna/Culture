@@ -9,7 +9,7 @@ namespace CultureExtractor
         Task<IEnumerable<Scene>> GetScenesAsync();
         Task<Site> GetSiteAsync(string shortName);
         Task<IEnumerable<Site>> GetSitesAsync();
-        Task<IEnumerable<SubSite?>> GetSubSitesAsync(int siteId);
+        Task<IEnumerable<SubSite?>> GetSubSitesAsync(Guid siteUuid);
         Task<IEnumerable<Scene>> QueryScenesAsync(Site site, DownloadConditions downloadConditions);
         Task SaveDownloadAsync(Download download, PreferredDownloadQuality preferredDownloadQuality);
         Task UpdateStorageStateAsync(Site site, string storageState);

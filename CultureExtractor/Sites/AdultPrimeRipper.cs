@@ -239,7 +239,7 @@ public class AdultPrimeRipper : ISiteScraper, ISubSiteScraper
         await page.GotoAsync("/studios");
         await Task.Delay(5000);
 
-        var existingSubSites = await _repository.GetSubSitesAsync(site.Id);
+        var existingSubSites = await _repository.GetSubSitesAsync(site.Uuid);
         
         var studioHandles = await page.Locator("div.studio-item-container").ElementHandlesAsync();
         List<SubSite> subSites = new List<SubSite>();
