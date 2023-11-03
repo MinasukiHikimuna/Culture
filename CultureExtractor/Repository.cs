@@ -336,6 +336,7 @@ public class Repository : IRepository
 
         _sqliteContext.Downloads.Add(new DownloadEntity
         {
+            Uuid = UuidGenerator.Generate().ToString(),
             DownloadedAt = DateTime.Now,
             DownloadOptions = json,
             DownloadQuality = Enum.GetName(preferredDownloadQuality),
