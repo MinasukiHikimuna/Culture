@@ -160,7 +160,7 @@ public class BrazzersRipper : ISiteScraper
         var downloadOptionsAndHandles = await ParseAvailableDownloadsAsync(sceneData);
 
         Scene scene = new Scene(
-            UuidGenerator.Generate(),
+            sceneUuid,
             site,
             null,
             releaseDate,

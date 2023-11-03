@@ -118,7 +118,7 @@ public class NewSensationsRipper : ISiteScraper
         var downloadOptionsAndHandles = await ParseAvailableDownloadsAsync(page);
 
         return new Scene(
-            UuidGenerator.Generate(),
+            sceneUuid,
             site,
             null,
             releaseDate,

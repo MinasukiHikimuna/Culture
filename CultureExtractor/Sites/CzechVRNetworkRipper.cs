@@ -136,7 +136,7 @@ public class CzechVRNetworkRipper : ISiteScraper
         var downloadOptionsAndHandles = await ParseAvailableDownloadsAsync(page);
 
         var scene = new Scene(
-            UuidGenerator.Generate(),
+            sceneUuid,
             site,
             null,
             releaseDate,

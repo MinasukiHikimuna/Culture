@@ -710,7 +710,7 @@ public class AdultTimeRipper : ISiteScraper
             sceneData.ActionTags != null ? sceneData.ActionTags : new List<ActionTag>());
 
         Scene scene = new Scene(
-            UuidGenerator.Generate(),
+            sceneUuid,
             site,
             null,
             releaseDate,

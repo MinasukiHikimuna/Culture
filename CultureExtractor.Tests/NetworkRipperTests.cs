@@ -37,7 +37,7 @@ namespace CultureExtractor.Tests
         public async Task ScrapeScenesAsync_CallsExpectedMethods()
         {
             // Arrange
-            var site = new Site(1, "shortName", "name", "https://example.com", "username", "password", "storageState");
+            var site = new Site(UuidGenerator.Generate(), "shortName", "name", "https://example.com", "username", "password", "storageState");
             var browserSettings = new BrowserSettings(BrowserMode.ClassicHeadless, "browserChannel");
             var scrapeOptions = new ScrapeOptions { FullScrape = false };
 

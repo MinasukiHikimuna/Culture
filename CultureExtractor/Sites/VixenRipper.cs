@@ -175,7 +175,7 @@ public class VixenRipper : ISiteScraper
         var metadataJson = JsonSerializer.Serialize(data.data.findOneVideo);
 
         return new Scene(
-            UuidGenerator.Generate(),
+            sceneUuid,
             site,
             subSite,
             releaseDate,

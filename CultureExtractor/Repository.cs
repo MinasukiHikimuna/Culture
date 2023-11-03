@@ -195,7 +195,6 @@ public class Repository : IRepository
             return Convert(sceneEntity);
         }
 
-        existingSceneEntity.Uuid = scene.Uuid.ToString();
         existingSceneEntity.ReleaseDate = scene.ReleaseDate;
         existingSceneEntity.ShortName = scene.ShortName;
         existingSceneEntity.Name = scene.Name;
@@ -253,10 +252,6 @@ public class Repository : IRepository
 
     private async Task<List<SiteTagEntity>> GetOrCreateTagsAsync(IEnumerable<SiteTag> tags, SiteEntity siteEntity)
     {
-        var tagEntities = tags.Select(p => new SiteTagEntity() { Uuid = UuidGenerator.Generate().ToString(), Name = p.Name, ShortName = p.Id, Url = p.Url, SiteUuid = siteEntity.Uuid, Site = siteEntity, Scenes = new List<SceneEntity>() }).ToList();
-        var tagShortNames = tagEntities.Select(t => t.ShortName).ToList();
-
-        var existingTags = await _sqliteContext.Tags.Where(t => tagShortNames.Contains(t.ShortName)).ToListAsync();
         var tagShortNames = tags.Select(t => t.Id).ToList();
         
         var existingTags = await _sqliteContext.Tags.Where(t => t.SiteUuid == siteEntity.Uuid && tagShortNames.Contains(t.ShortName)).ToListAsync();

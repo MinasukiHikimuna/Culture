@@ -194,7 +194,7 @@ public class KinkRipper : ISiteScraper, ISubSiteScraper
         var metadataJson = JsonSerializer.Serialize(metadata);
 
         return new Scene(
-            UuidGenerator.Generate(),
+            sceneUuid,
             site,
             subSite,
             releaseDate,

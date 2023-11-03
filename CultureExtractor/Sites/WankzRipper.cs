@@ -147,7 +147,7 @@ public class WankzRipper : ISubSiteScraper
         var downloadOptionsAndHandles = await ParseAvailableDownloadsAsync(page);
 
         return new Scene(
-            UuidGenerator.Generate(),
+            sceneUuid,
             site,
             subSite,
             releaseDate,
@@ -266,7 +266,7 @@ public class WankzRipper : ISubSiteScraper
             
             var name = await link.TextContentAsync();
             var uuid = existingSubSites.FirstOrDefault(s => s.ShortName == shortName)?.Uuid ?? UuidGenerator.Generate();
-            subSites.Add(new SubSite(UuidGenerator.Generate(), shortName, name, site));
+            subSites.Add(new SubSite(uuid, shortName, name, site));
         }
 
         return subSites;

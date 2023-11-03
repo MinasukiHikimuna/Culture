@@ -131,7 +131,7 @@ public class XevUnleashedRipper : ISiteScraper
         var downloadOptionsAndHandles = await ParseAvailableDownloadsAsync(page);
 
         return new Scene(
-            UuidGenerator.Generate(),
+            sceneUuid,
             site,
             subSite,
             releaseDate,

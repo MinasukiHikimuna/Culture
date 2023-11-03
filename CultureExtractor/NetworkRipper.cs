@@ -6,7 +6,6 @@ using Polly;
 using Polly.Fallback;
 using Polly.Retry;
 using Serilog;
-using UUIDNext;
 
 namespace CultureExtractor;
 
@@ -27,25 +26,6 @@ public class NetworkRipper : INetworkRipper
 
     public async Task ScrapeScenesAsync(Site site, BrowserSettings browserSettings, ScrapeOptions scrapeOptions)
     {
-        /*var scenes = await _sqliteContext.Scenes.Where(s => s.Uuid == null).ToListAsync();
-        // generate Uuid values for each file and save them to the database
-        int batchSize = 100;  // Adjust batch size as necessary
-        for (int i = 0; i < scenes.Count; i += batchSize)
-        {
-            var batch = scenes.Skip(i).Take(batchSize);
-            foreach (var scene in batch)
-            {
-                var uuid = UuidGenerator.Generate();
-                scene.Uuid = uuid.ToString();
-            }
-            await _sqliteContext.SaveChangesAsync();
-        }*/
-
-        
-
-        
-        
-        
         ISiteScraper siteScraper = (ISiteScraper)_serviceProvider.GetService(typeof(ISiteScraper));
         Log.Information($"Culture Extractor, using {siteScraper.GetType()}");
 
@@ -363,8 +343,8 @@ public class NetworkRipper : INetworkRipper
 
                     await scenePage.UnrouteAsync("**/*");
 
-                    var sceneId = existingScene?.Uuid ?? UuidGenerator.Generate();
-                    var scene = await siteScraper.ScrapeSceneAsync(sceneId, site, null, matchingScene.Url, matchingScene.ShortName, scenePage, requests);
+                    var sceneUuid = existingScene?.Uuid ?? UuidGenerator.Generate();
+                    var scene = await siteScraper.ScrapeSceneAsync(sceneUuid, site, null, matchingScene.Url, matchingScene.ShortName, scenePage, requests);
                     existingScene = await _repository.UpsertScene(scene);
 
                     var sceneDescription = new {

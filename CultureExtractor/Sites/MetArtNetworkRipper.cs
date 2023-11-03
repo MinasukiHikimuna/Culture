@@ -67,6 +67,14 @@ public class MetArtNetworkRipper : ISiteScraper
         catch (Exception ex)
         {
         }
+
+        await Task.Delay(5000);
+        
+        var element = page.GetByRole(AriaRole.Link, new() { Name = "Continue to SexArt" }).Nth(1);
+        if (await element.IsVisibleAsync())
+        {
+            await element.ClickAsync();
+        }
     }
 
     public async Task<int> NavigateToScenesAndReturnPageCountAsync(Site site, IPage page)
@@ -214,7 +222,7 @@ public class MetArtNetworkRipper : ISiteScraper
             .ToList();
 
         return new Scene(
-            UuidGenerator.Generate(),
+            sceneUuid,
             site,
             null,
             DateOnly.FromDateTime(releaseDate),
