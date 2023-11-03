@@ -39,6 +39,7 @@ public class SqliteContext : DbContext, ISqliteContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        // TODO: is this needed after the migration? [Key] is now in place.
         modelBuilder.Entity<DownloadEntity>()
             .HasOne(downloadEntity => downloadEntity.Scene)
             .WithMany(sceneEntity => sceneEntity.Downloads)
