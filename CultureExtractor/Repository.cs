@@ -228,7 +228,7 @@ public class Repository : IRepository
 
     private async Task<List<SiteTagEntity>> GetOrCreateTagsAsync(IEnumerable<SiteTag> tags, SiteEntity siteEntity)
     {
-        var tagEntities = tags.Select(p => new SiteTagEntity() { Name = p.Name, ShortName = p.Id, Url = p.Url, SiteId = siteEntity.Id, Site = siteEntity, Scenes = new List<SceneEntity>() }).ToList();
+        var tagEntities = tags.Select(p => new SiteTagEntity() { Uuid = UuidGenerator.Generate().ToString(), Name = p.Name, ShortName = p.Id, Url = p.Url, SiteId = siteEntity.Id, Site = siteEntity, Scenes = new List<SceneEntity>() }).ToList();
         var tagShortNames = tagEntities.Select(t => t.ShortName).ToList();
 
         var existingTags = await _sqliteContext.Tags.Where(t => tagShortNames.Contains(t.ShortName)).ToListAsync();
