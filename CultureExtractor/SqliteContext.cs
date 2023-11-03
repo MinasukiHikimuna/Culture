@@ -71,8 +71,8 @@ public class SubSiteEntity
 
 public class StorageStateEntity
 {
-    public int Id { get; set; }
-    public string Uuid { get; set; }
+    [Key]
+    public required string Uuid { get; set; }
     public required string StorageState { get; set; }
 
     public required int SiteId { get; set; }
