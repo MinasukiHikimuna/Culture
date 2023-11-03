@@ -36,21 +36,12 @@ public class SqliteContext : DbContext, ISqliteContext
     // Add .LogTo(Log.Debug) to function chain to enable query logging.
     protected override void OnConfiguring(DbContextOptionsBuilder options)
         => options.UseSqlite($"Data Source={DbPath}");
-
-    /*protected override void OnModelCreating(ModelBuilder modelBuilder)
-    {
-        // TODO: is this needed after the migration? [Key] is now in place.
-        modelBuilder.Entity<DownloadEntity>()
-            .HasOne(downloadEntity => downloadEntity.Scene)
-            .WithMany(sceneEntity => sceneEntity.Downloads)
-            .HasForeignKey(downloadEntity => downloadEntity.SceneUuid)
-            .HasPrincipalKey(sceneEntity => sceneEntity.Uuid);
-    }*/
 }
 
 public class SiteEntity
 {
     public int Id { get; set; }
+    public string Uuid { get; set; }
     public required string ShortName { get; set; }
     public required string Name { get; set; }
     public required string Url { get; set; }
