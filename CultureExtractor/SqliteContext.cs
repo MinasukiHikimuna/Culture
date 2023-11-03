@@ -130,6 +130,7 @@ public class SceneEntity
 public class DownloadEntity
 {
     public int Id { get; set; }
+    public string Uuid { get; set; }
     public required DateTime DownloadedAt { get; set; }
     public required string DownloadQuality { get; set; }
     public required string DownloadOptions { get; set; }
