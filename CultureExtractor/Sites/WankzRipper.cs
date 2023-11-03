@@ -261,7 +261,7 @@ public class WankzRipper : ISubSiteScraper
             var shortName = href.Substring(1);
             
             var name = await link.TextContentAsync();
-            subSites.Add(new SubSite(null, shortName, name, site));
+            subSites.Add(new SubSite(UuidGenerator.Generate(), shortName, name, site));
         }
 
         return subSites;

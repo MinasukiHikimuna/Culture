@@ -61,8 +61,8 @@ public class SiteEntity
 
 public class SubSiteEntity
 {
-    public int Id { get; set; }
-    public string Uuid { get; set; }
+    [Key]
+    public required string Uuid { get; set; }
     public required string ShortName { get; set; }
     public required string Name { get; set; }
 
@@ -126,7 +126,7 @@ public class SceneEntity
 
     public required int SiteId { get; set; }
     public required SiteEntity Site { get; set; }
-    public int? SubSiteId { get; set; }
+    public string? SubSiteUuid { get; set; }
     public SubSiteEntity? SubSite { get; set; }
 
     public required ICollection<DownloadEntity> Downloads { get; set; }

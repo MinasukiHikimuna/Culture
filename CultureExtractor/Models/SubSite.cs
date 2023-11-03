@@ -1,7 +1,7 @@
 ﻿namespace CultureExtractor.Models;
 
 public record SubSite(
-    int? Id,
+    Guid Uuid,
     string ShortName,
     string Name,
     Site Site);

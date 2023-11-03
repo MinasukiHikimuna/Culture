@@ -113,6 +113,7 @@ public class Repository : IRepository
         var siteEntity = await _sqliteContext.Sites.FirstAsync(s => s.Id == subSite.Site.Id);
         var subSiteEntity = new SubSiteEntity()
         {
+            Uuid = UuidGenerator.Generate().ToString(),
             ShortName = subSite.ShortName,
             Name = subSite.Name,
             SiteId = siteEntity.Id,
@@ -136,6 +137,7 @@ public class Repository : IRepository
             {
                 subSiteEntity = new SubSiteEntity()
                 {
+                    Uuid = UuidGenerator.Generate().ToString(),
                     ShortName = scene.SubSite.ShortName,
                     Name = scene.SubSite.Name,
                     SiteId = siteEntity.Id,
@@ -169,7 +171,7 @@ public class Repository : IRepository
 
                 SiteId = siteEntity.Id,
                 Site = siteEntity,
-                SubSiteId = subSiteEntity?.Id,
+                SubSiteUuid = subSiteEntity?.Uuid,
                 SubSite = subSiteEntity,
 
                 JsonDocument = scene.JsonDocument,
@@ -282,7 +284,7 @@ public class Repository : IRepository
     {
         return subSiteEntity != null
             ? new SubSite(
-                subSiteEntity.Id,
+                Guid.Parse(subSiteEntity.Uuid),
                 subSiteEntity.ShortName,
                 subSiteEntity.Name,
                 Convert(subSiteEntity.Site)

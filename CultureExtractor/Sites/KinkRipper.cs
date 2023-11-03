@@ -313,7 +313,7 @@ public class KinkRipper : ISiteScraper, ISubSiteScraper
             var h3Handle = await channelHandle.QuerySelectorAsync("h3");
             var name = await h3Handle.TextContentAsync();
 
-            subSites.Add(new SubSite(null, siteName, name, site));
+            subSites.Add(new SubSite(UuidGenerator.Generate(), siteName, name, site));
         }
 
         var uniqueSubSites = subSites
