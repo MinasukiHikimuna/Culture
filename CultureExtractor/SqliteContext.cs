@@ -37,7 +37,7 @@ public class SqliteContext : DbContext, ISqliteContext
     protected override void OnConfiguring(DbContextOptionsBuilder options)
         => options.UseSqlite($"Data Source={DbPath}");
 
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    /*protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         // TODO: is this needed after the migration? [Key] is now in place.
         modelBuilder.Entity<DownloadEntity>()
@@ -45,7 +45,7 @@ public class SqliteContext : DbContext, ISqliteContext
             .WithMany(sceneEntity => sceneEntity.Downloads)
             .HasForeignKey(downloadEntity => downloadEntity.SceneUuid)
             .HasPrincipalKey(sceneEntity => sceneEntity.Uuid);
-    }
+    }*/
 }
 
 public class SiteEntity
@@ -94,6 +94,7 @@ public class SiteTagEntity
 public class SitePerformerEntity
 {
     public int Id { get; set; }
+    public string Uuid { get; set; }
     public string? ShortName { get; set; }
     public required string Name { get; set; }
     public string? Url { get; set; }
