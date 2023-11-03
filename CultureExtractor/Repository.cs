@@ -254,6 +254,7 @@ public class Repository : IRepository
             var siteEntity = await _sqliteContext.Sites.FirstAsync(s => s.Id == site.Id);
             _sqliteContext.StorageStates.Add(new StorageStateEntity()
             {
+                Uuid = UuidGenerator.Generate().ToString(),
                 StorageState = storageState,
 
                 SiteId = siteEntity.Id,
