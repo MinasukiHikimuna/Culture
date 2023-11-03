@@ -62,6 +62,7 @@ public class SiteEntity
 public class SubSiteEntity
 {
     public int Id { get; set; }
+    public string Uuid { get; set; }
     public required string ShortName { get; set; }
     public required string Name { get; set; }
 
