@@ -24,6 +24,16 @@ public class Repository : IRepository
         return siteEntities.Select(Convert).AsEnumerable();
     }
 
+    public async Task<IEnumerable<SubSite?>> GetSubSitesAsync(int siteId)
+    {
+        var subSites = await _sqliteContext.SubSites
+            .Where(s => s.SiteId == siteId)
+            .OrderBy(s => s.Name)
+            .ToListAsync();
+
+        return subSites.Select(Convert).AsEnumerable();
+    }
+    
     public async Task<Site> GetSiteAsync(string shortName)
     {
         var siteEntity = await _sqliteContext.Sites

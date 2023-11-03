@@ -16,10 +16,12 @@ namespace CultureExtractor.Sites;
 public class WankzRipper : ISubSiteScraper
 {
     private readonly IDownloader _downloader;
+    private IRepository _repository;
 
-    public WankzRipper(IDownloader downloader)
+    public WankzRipper(IDownloader downloader, IRepository repository)
     {
         _downloader = downloader;
+        _repository = repository;
     }
 
     public async Task LoginAsync(Site site, IPage page)
@@ -241,6 +243,8 @@ public class WankzRipper : ISubSiteScraper
         await page.GotoAsync("/");
         await Task.Delay(5000);
         
+        var existingSubSites = await _repository.GetSubSitesAsync(site.Id);
+        
         var svgIconPremiumElements = await page.QuerySelectorAllAsync("svg.icon.premium");
         var linksWithSvgIconPremium = new List<IElementHandle>();
         
@@ -261,6 +265,7 @@ public class WankzRipper : ISubSiteScraper
             var shortName = href.Substring(1);
             
             var name = await link.TextContentAsync();
+            var uuid = existingSubSites.FirstOrDefault(s => s.ShortName == shortName)?.Uuid ?? UuidGenerator.Generate();
             subSites.Add(new SubSite(UuidGenerator.Generate(), shortName, name, site));
         }
 

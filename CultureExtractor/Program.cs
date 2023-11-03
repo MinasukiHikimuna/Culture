@@ -133,8 +133,8 @@ class Program
     {
         if (System.Diagnostics.Debugger.IsAttached)
         {
-            var siteShortName = "sexart";
-            var subSiteShortName = "alsscan";
+            var siteShortName = "kink";
+            var subSiteShortName = "sex-and-submission";
 
             /*args = new string[] {
                 "scrape",
@@ -145,7 +145,7 @@ class Program
             args = new string[] {
                 "scrape",
                 "--site-short-name", siteShortName,
-                // "--sub-site-short-name", subSiteShortName,
+                "--sub-site-short-name", subSiteShortName,
                 // "--full",
                 // "--guest-mode",
                 "--reverse-order",
@@ -172,19 +172,19 @@ class Program
         }
         
         // Use this for EF migrations:
-        // /*
+        /*
         var host = AppHostFactory.CreateHost(args, "sexart");
         var cultureExtractor = AppHostFactory.CreateCultureExtractorConsoleApp(host);
         cultureExtractor.ExecuteConsoleApp(args);
-        // */
+        */
         
         // Use this when running the application:
-        /*
+        // /*
         var options = (BaseOptions) Parser.Default.ParseArguments<ScrapeOptions, DownloadOptions>(args).Value;
         var host = AppHostFactory.CreateHost(args, options.SiteShortName);
         var cultureExtractor = AppHostFactory.CreateCultureExtractorConsoleApp(host);
         cultureExtractor.ExecuteConsoleApp(args);
-        */
+        // */
     }
 }
 

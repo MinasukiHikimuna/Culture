@@ -10,10 +10,12 @@ namespace CultureExtractor.Sites;
 public class AdultPrimeRipper : ISiteScraper, ISubSiteScraper
 {
     private readonly IDownloader _downloader;
+    private readonly IRepository _repository;
 
-    public AdultPrimeRipper(IDownloader downloader)
+    public AdultPrimeRipper(IDownloader downloader, IRepository repository)
     {
         _downloader = downloader;
+        _repository = repository;
     }
 
     public async Task LoginAsync(Site site, IPage page)
@@ -237,6 +239,8 @@ public class AdultPrimeRipper : ISiteScraper, ISubSiteScraper
         await page.GotoAsync("/studios");
         await Task.Delay(5000);
 
+        var existingSubSites = await _repository.GetSubSitesAsync(site.Id);
+        
         var studioHandles = await page.Locator("div.studio-item-container").ElementHandlesAsync();
         List<SubSite> subSites = new List<SubSite>();
         foreach (var studioHandle in studioHandles)
@@ -267,7 +271,8 @@ public class AdultPrimeRipper : ISiteScraper, ISubSiteScraper
 
             var siteName = subsiteUrl.Replace("/studios/studio/", "");
 
-            subSites.Add(new SubSite(UuidGenerator.Generate(), siteName, siteName, site));
+            var uuid = existingSubSites.FirstOrDefault(s => s.ShortName == siteName)?.Uuid ?? UuidGenerator.Generate();
+            subSites.Add(new SubSite(uuid, siteName, siteName, site));
         }
 
         var uniqueSubSites = subSites

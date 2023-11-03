@@ -8,14 +8,20 @@ using CultureExtractor.Models;
 
 namespace CultureExtractor.Sites;
 
+/**
+ * Site notes:
+ * - Does not support guest mode fully. At least durations will be currently be based on trailers and not the full scene.
+ **/
 [PornSite("kink")]
 public class KinkRipper : ISiteScraper, ISubSiteScraper
 {
     private readonly IDownloader _downloader;
+    private readonly IRepository _repository;
 
-    public KinkRipper(IDownloader downloader)
+    public KinkRipper(IDownloader downloader, IRepository repository)
     {
         _downloader = downloader;
+        _repository = repository;
     }
 
     public async Task LoginAsync(Site site, IPage page)
@@ -270,8 +276,6 @@ public class KinkRipper : ISiteScraper, ISubSiteScraper
 
     public async Task<IReadOnlyList<SubSite>> GetSubSitesAsync(Site site, IPage page)
     {
-        await page.ScreenshotAsync(new PageScreenshotOptions { Path = @"B:\kink_before_channels.png" });
-
         await page.GotoAsync("/channels");
 
         await page.GetByRole(AriaRole.Heading, new() { NameString = "Channel Type" }).ClickAsync();
@@ -279,6 +283,8 @@ public class KinkRipper : ISiteScraper, ISubSiteScraper
 
         await page.Locator("#searchDropdown").SelectOptionAsync(new[] { "alphabetical" });
 
+        var existingSubSites = await _repository.GetSubSitesAsync(site.Id);
+        
         var channelHandles = await page.Locator("div.channel-tile").ElementHandlesAsync();
         List<SubSite> subSites = new List<SubSite>();
         foreach (var channelHandle in channelHandles)
@@ -313,7 +319,8 @@ public class KinkRipper : ISiteScraper, ISubSiteScraper
             var h3Handle = await channelHandle.QuerySelectorAsync("h3");
             var name = await h3Handle.TextContentAsync();
 
-            subSites.Add(new SubSite(UuidGenerator.Generate(), siteName, name, site));
+            var uuid = existingSubSites.FirstOrDefault(s => s.ShortName == siteName)?.Uuid ?? UuidGenerator.Generate();
+            subSites.Add(new SubSite(uuid, siteName, name, site));
         }
 
         var uniqueSubSites = subSites
