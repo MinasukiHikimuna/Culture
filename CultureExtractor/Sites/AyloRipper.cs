@@ -1,4 +1,5 @@
-﻿using CultureExtractor.Interfaces;
+﻿using System.Net;
+using CultureExtractor.Interfaces;
 using Microsoft.Playwright;
 using Serilog;
 using System.Text.Json;
@@ -8,12 +9,13 @@ using CultureExtractor.Models;
 namespace CultureExtractor.Sites;
 
 [PornSite("brazzers")]
-public class BrazzersRipper : ISiteScraper
+[PornSite("digitalplayground")]
+public class AyloRipper : ISiteScraper
 {
     private readonly IDownloader _downloader;
     private readonly ICaptchaSolver _captchaSolver;
 
-    public BrazzersRipper(IDownloader downloader, ICaptchaSolver captchaSolver)
+    public AyloRipper(IDownloader downloader, ICaptchaSolver captchaSolver)
     {
         _downloader = downloader;
         _captchaSolver = captchaSolver;
@@ -58,10 +60,10 @@ public class BrazzersRipper : ISiteScraper
 
     public async Task<int> NavigateToScenesAndReturnPageCountAsync(Site site, IPage page)
     {
-        await page.GetByRole(AriaRole.Link, new() { NameString = "VIDEOS" }).HoverAsync();
+        await page.GotoAsync(site.Url + "/scenes");
 
-        await page.GetByRole(AriaRole.Link, new() { NameString = "SEE ALL" }).ClickAsync();
-
+        await page.WaitForLoadStateAsync();
+        
         var lastPageUrl = await page.Locator("a[href^='/scenes?page=']").Last.GetAttributeAsync("href");
         var lastPage = lastPageUrl.Replace("/scenes?page=", "");
 
@@ -112,7 +114,14 @@ public class BrazzersRipper : ISiteScraper
 
     public async Task<Scene> ScrapeSceneAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
-        var request = requests[0];
+        // Aylo occasionally forces re-login.
+        if (page.Url.Contains("/login"))
+        {
+            await LoginAsync(site, page);
+            await page.GotoAsync(url);
+        }
+        
+        var request = requests.FirstOrDefault(r => r.Url == "https://site-api.project1service.com/v2/releases/" + sceneShortName);
         var response = await request.ResponseAsync();
         var jsonContent = await response.BodyAsync();
         var data = JsonSerializer.Deserialize<BrazzersRootobject>(jsonContent)!;
@@ -177,7 +186,14 @@ public class BrazzersRipper : ISiteScraper
 
     public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)
     {
-        var request = requests[0];
+        // Aylo occasionally forces re-login.
+        if (page.Url.Contains("/login"))
+        {
+            await LoginAsync(scene.Site, page);
+            await page.GotoAsync(scene.Url);
+        }
+        
+        var request = requests.FirstOrDefault(r => r.Url == "https://site-api.project1service.com/v2/releases/" + scene.ShortName);
         var response = await request.ResponseAsync();
         var jsonContent = await response.TextAsync();
         var data = JsonSerializer.Deserialize<BrazzersRootobject>(jsonContent)!;
@@ -196,29 +212,23 @@ public class BrazzersRipper : ISiteScraper
             _ => throw new InvalidOperationException("Could not find a download candidate!")
         };
 
-        const string suffix = ".mp4";
+        var userAgent = await page.EvaluateAsync<string>("() => navigator.userAgent");
+        var cookieString = await page.EvaluateAsync<string>("() => document.cookie");
+
+        var headers = new Dictionary<HttpRequestHeader, string>
+        {
+            { HttpRequestHeader.Referer, page.Url },
+            { HttpRequestHeader.Accept, "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7" },
+            { HttpRequestHeader.UserAgent, userAgent },
+            { HttpRequestHeader.Cookie, cookieString }
+        };
+
+        var suggestedFilename = selectedDownload.DownloadOption.Url[(selectedDownload.DownloadOption.Url.LastIndexOf("/", StringComparison.Ordinal) + 1)..];
+        suggestedFilename = suggestedFilename[..suggestedFilename.IndexOf("?", StringComparison.Ordinal)];
+        var suffix = Path.GetExtension(suggestedFilename);
         var name = SceneNamer.Name(scene, suffix);
 
-        var download = await _downloader.DownloadSceneAsync(scene, page, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, async () =>
-        {
-            try
-            {
-                await page.GotoAsync(selectedDownload.DownloadOption.Url);
-
-                throw new InvalidOperationException("Should have failed with PlaywrightException and message net::ERR_ABORTED");
-            }
-            catch (PlaywrightException ex)
-            {
-                if (ex.Message.StartsWith("net::ERR_ABORTED"))
-                {
-                    return;
-                }
-
-                throw;
-            }
-        }, name);
-
-        return download;
+        return await _downloader.DownloadSceneDirectAsync(scene, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, headers, referer: page.Url, fileName: name);
     }
 
     private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloadsAsync(BrazzersResult sceneData)
@@ -239,16 +249,16 @@ public class BrazzersRipper : ISiteScraper
                     videoFile.sizeBytes,
                     -1,
                     HumanParser.ParseCodec("H.264"),
-                    videoFile.urls.download),
+                    videoFile.urls.view),
                 null));
         }
 
         return availableDownloads.OrderByDescending(d => d.DownloadOption.FileSize).ToList();
     }
 
-    public Task GoToPageAsync(IPage page, Site site, SubSite subSite, int pageNumber)
+    public async Task GoToPageAsync(IPage page, Site site, SubSite subSite, int pageNumber)
     {
-        throw new NotImplementedException();
+        await page.GotoAsync(site.Url + "/scenes?page=" + pageNumber);
     }
 
     private class BrazzersRootobject
