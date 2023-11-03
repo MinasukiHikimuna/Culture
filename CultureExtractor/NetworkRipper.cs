@@ -358,6 +358,8 @@ public class NetworkRipper : INetworkRipper
 
                     await scenePage.GotoAsync(matchingScene.Url);
                     await scenePage.WaitForLoadStateAsync();
+                    // TODO: Why is this needed sometimes to get MetArt comments request?
+                    await Task.Delay(5000);
 
                     await scenePage.UnrouteAsync("**/*");
 
