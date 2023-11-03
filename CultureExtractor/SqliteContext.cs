@@ -93,8 +93,8 @@ public class SiteTagEntity
 
 public class SitePerformerEntity
 {
-    public int Id { get; set; }
-    public string Uuid { get; set; }
+    [Key]
+    public required string Uuid { get; set; }
     public string? ShortName { get; set; }
     public required string Name { get; set; }
     public string? Url { get; set; }

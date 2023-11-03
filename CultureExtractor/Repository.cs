@@ -212,7 +212,7 @@ public class Repository : IRepository
 
     private async Task<List<SitePerformerEntity>> GetOrCreatePerformersAsync(IEnumerable<SitePerformer> performers, SiteEntity siteEntity)
     {
-        var performerEntities = performers.Select(p => new SitePerformerEntity() { Name = p.Name, ShortName = p.ShortName, Url = p.Url, SiteId = siteEntity.Id, Site = siteEntity, Scenes = new List<SceneEntity>() }).ToList();
+        var performerEntities = performers.Select(p => new SitePerformerEntity() { Uuid = UuidGenerator.Generate().ToString(), Name = p.Name, ShortName = p.ShortName, Url = p.Url, SiteId = siteEntity.Id, Site = siteEntity, Scenes = new List<SceneEntity>() }).ToList();
         var shortNames = performerEntities.Select(p => p.ShortName).ToList();
 
         var existingPerformers = await _sqliteContext.Performers.Where(p => p.SiteId == siteEntity.Id && shortNames.Contains(p.ShortName)).ToListAsync();
