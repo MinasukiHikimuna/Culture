@@ -224,18 +224,31 @@ public class Repository : IRepository
 
     private async Task<List<SitePerformerEntity>> GetOrCreatePerformersAsync(IEnumerable<SitePerformer> performers, SiteEntity siteEntity)
     {
-        var performerEntities = performers.Select(p => new SitePerformerEntity() { Uuid = UuidGenerator.Generate().ToString(), Name = p.Name, ShortName = p.ShortName, Url = p.Url, SiteUuid = siteEntity.Uuid, Site = siteEntity, Scenes = new List<SceneEntity>() }).ToList();
-        var shortNames = performerEntities.Select(p => p.ShortName).ToList();
-
+        var shortNames = performers.Select(p => p.ShortName).ToList();
+        
         var existingPerformers = await _sqliteContext.Performers.Where(p => p.SiteUuid == siteEntity.Uuid && shortNames.Contains(p.ShortName)).ToListAsync();
         var existingPerformerShortNames = existingPerformers.Select(p => p.ShortName).ToList();
+        
+        var newPerformersEntities = performers
+            .Where(p => !existingPerformerShortNames.Contains(p.ShortName))
+            .Select(p => new SitePerformerEntity
+            {
+                Uuid = UuidGenerator.Generate().ToString(),
+                Name = p.Name,
+                ShortName = p.ShortName,
+                Url = p.Url,
+                SiteUuid = siteEntity.Uuid,
+                Site = siteEntity,
+                Scenes = new List<SceneEntity>()
+            }).ToList();
 
-        var newPerformers = performerEntities.Where(p => !existingPerformerShortNames.Contains(p.ShortName)).ToList();
-        await _sqliteContext.Performers.AddRangeAsync(newPerformers);
+        if (newPerformersEntities.Any())
+        {
+            await _sqliteContext.Performers.AddRangeAsync(newPerformersEntities);
+            await _sqliteContext.SaveChangesAsync();            
+        }
 
-        await _sqliteContext.SaveChangesAsync();
-
-        return existingPerformers.Concat(newPerformers).ToList();
+        return existingPerformers.Concat(newPerformersEntities).ToList();
     }
 
     private async Task<List<SiteTagEntity>> GetOrCreateTagsAsync(IEnumerable<SiteTag> tags, SiteEntity siteEntity)
@@ -244,14 +257,31 @@ public class Repository : IRepository
         var tagShortNames = tagEntities.Select(t => t.ShortName).ToList();
 
         var existingTags = await _sqliteContext.Tags.Where(t => tagShortNames.Contains(t.ShortName)).ToListAsync();
+        var tagShortNames = tags.Select(t => t.Id).ToList();
+        
+        var existingTags = await _sqliteContext.Tags.Where(t => t.SiteUuid == siteEntity.Uuid && tagShortNames.Contains(t.ShortName)).ToListAsync();
         var existingTagShortNames = existingTags.Select(t => t.ShortName).ToList();
+        
+        var newTagEntities = tags
+            .Where(t => !existingTagShortNames.Contains(t.Id))
+            .Select(t => new SiteTagEntity
+            {
+                Uuid = UuidGenerator.Generate().ToString(),
+                Name = t.Name,
+                ShortName = t.Id,
+                Url = t.Url,
+                SiteUuid = siteEntity.Uuid,
+                Site = siteEntity,
+                Scenes = new List<SceneEntity>()
+            }).ToList();
 
-        var newTags = tagEntities.Where(t => !existingTagShortNames.Contains(t.ShortName)).ToList();
-        await _sqliteContext.Tags.AddRangeAsync(newTags);
+        if (newTagEntities.Any())
+        {
+            await _sqliteContext.Tags.AddRangeAsync(newTagEntities);
+            await _sqliteContext.SaveChangesAsync();            
+        }
 
-        await _sqliteContext.SaveChangesAsync();
-
-        return existingTags.Concat(newTags).ToList();
+        return existingTags.Concat(newTagEntities).ToList();
     }
 
     public async Task UpdateStorageStateAsync(Site site, string storageState)
