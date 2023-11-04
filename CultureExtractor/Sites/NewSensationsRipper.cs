@@ -55,7 +55,7 @@ public class NewSensationsRipper : ISiteScraper
         var listedReleases = new List<ListedRelease>();
         foreach (var releaseHandle in releaseHandles.Reverse())
         {
-            var releaseIdAndUrl = await GetSceneIdAsync(releaseHandle);
+            var releaseIdAndUrl = await GetReleaseIdAsync(releaseHandle);
             listedReleases.Add(new ListedRelease(null, releaseIdAndUrl.Id, releaseIdAndUrl.Url, releaseHandle));
         }
 
@@ -78,7 +78,7 @@ public class NewSensationsRipper : ISiteScraper
         }
     }
 
-    private static async Task<ReleaseIdAndUrl> GetSceneIdAsync(IElementHandle currentScene)
+    private static async Task<ReleaseIdAndUrl> GetReleaseIdAsync(IElementHandle currentScene)
     {
         var thumbLinkElement = await currentScene.QuerySelectorAsync("a");
         var url = await thumbLinkElement.GetAttributeAsync("href");

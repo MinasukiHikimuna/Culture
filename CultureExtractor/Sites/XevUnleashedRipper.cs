@@ -77,7 +77,7 @@ public class XevUnleashedRipper : ISiteScraper
         var listedReleases = new List<ListedRelease>();
         foreach (var releaseHandle in releaseHandles.Reverse())
         {
-            var releaseIdAndUrl = await GetSceneIdAsync(releaseHandle);
+            var releaseIdAndUrl = await GetReleaseIdAsync(releaseHandle);
             listedReleases.Add(new ListedRelease(null, releaseIdAndUrl.Id, releaseIdAndUrl.Url, releaseHandle));
         }
 
@@ -90,7 +90,7 @@ public class XevUnleashedRipper : ISiteScraper
         await Task.Delay(5000);
     }
 
-    private static async Task<ReleaseIdAndUrl> GetSceneIdAsync(IElementHandle currentScene)
+    private static async Task<ReleaseIdAndUrl> GetReleaseIdAsync(IElementHandle currentScene)
     {
         var shortName = await currentScene.GetAttributeAsync("data-setid");
         // Link in the image and in the title. Both have same URL.

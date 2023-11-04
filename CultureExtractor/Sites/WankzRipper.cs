@@ -61,7 +61,7 @@ public class WankzRipper : ISubSiteScraper
         var listedReleases = new List<ListedRelease>();
         foreach (var releaseHandle in releaseHandles.Reverse())
         {
-            var releaseIdAndUrl = await GetSceneIdAsync(releaseHandle);
+            var releaseIdAndUrl = await GetReleaseIdAsync(releaseHandle);
             listedReleases.Add(new ListedRelease(null, releaseIdAndUrl.Id, releaseIdAndUrl.Url, releaseHandle));
         }
 
@@ -74,7 +74,7 @@ public class WankzRipper : ISubSiteScraper
         await Task.Delay(1000);
     }
 
-    private async Task<ReleaseIdAndUrl> GetSceneIdAsync(IElementHandle currentScene)
+    private async Task<ReleaseIdAndUrl> GetReleaseIdAsync(IElementHandle currentScene)
     {
         // read attribute data-id
         var sceneId = await currentScene.GetAttributeAsync("data-id");

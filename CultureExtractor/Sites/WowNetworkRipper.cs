@@ -87,7 +87,7 @@ public class WowNetworkRipper : ISiteScraper
         var listedReleases = new List<ListedRelease>();
         foreach (var releaseHandle in releaseHandles.Reverse())
         {
-            var releaseIdAndUrl = await GetSceneIdAsync(site, releaseHandle);
+            var releaseIdAndUrl = await GetReleaseIdAsync(site, releaseHandle);
             listedReleases.Add(new ListedRelease(null, releaseIdAndUrl.Id, releaseIdAndUrl.Url, releaseHandle));
         }
 
@@ -99,7 +99,7 @@ public class WowNetworkRipper : ISiteScraper
         throw new NotImplementedException();
     }
     
-    private static async Task<ReleaseIdAndUrl> GetSceneIdAsync(Site site, IElementHandle currentScene)
+    private static async Task<ReleaseIdAndUrl> GetReleaseIdAsync(Site site, IElementHandle currentScene)
     {
         var relativeUrl = await currentScene.GetAttributeAsync("href");
         var url = site.Url + relativeUrl;
