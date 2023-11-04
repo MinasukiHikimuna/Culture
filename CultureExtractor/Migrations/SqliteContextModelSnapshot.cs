@@ -50,7 +50,7 @@ namespace CultureExtractor.Migrations
                     b.ToTable("Downloads");
                 });
 
-            modelBuilder.Entity("CultureExtractor.SceneEntity", b =>
+            modelBuilder.Entity("CultureExtractor.ReleaseEntity", b =>
                 {
                     b.Property<string>("Uuid")
                         .HasColumnType("TEXT");
@@ -234,7 +234,7 @@ namespace CultureExtractor.Migrations
                     b.ToTable("SubSites");
                 });
 
-            modelBuilder.Entity("SceneEntitySitePerformerEntity", b =>
+            modelBuilder.Entity("ReleaseEntitySitePerformerEntity", b =>
                 {
                     b.Property<string>("PerformersUuid")
                         .HasColumnType("TEXT");
@@ -246,10 +246,10 @@ namespace CultureExtractor.Migrations
 
                     b.HasIndex("ReleasesUuid");
 
-                    b.ToTable("SceneEntitySitePerformerEntity");
+                    b.ToTable("ReleaseEntitySitePerformerEntity");
                 });
 
-            modelBuilder.Entity("SceneEntitySiteTagEntity", b =>
+            modelBuilder.Entity("ReleaseEntitySiteTagEntity", b =>
                 {
                     b.Property<string>("ReleasesUuid")
                         .HasColumnType("TEXT");
@@ -261,12 +261,12 @@ namespace CultureExtractor.Migrations
 
                     b.HasIndex("TagsUuid");
 
-                    b.ToTable("SceneEntitySiteTagEntity");
+                    b.ToTable("ReleaseEntitySiteTagEntity");
                 });
 
             modelBuilder.Entity("CultureExtractor.DownloadEntity", b =>
                 {
-                    b.HasOne("CultureExtractor.SceneEntity", "Release")
+                    b.HasOne("CultureExtractor.ReleaseEntity", "Release")
                         .WithMany("Downloads")
                         .HasForeignKey("ReleaseUuid")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -275,7 +275,7 @@ namespace CultureExtractor.Migrations
                     b.Navigation("Release");
                 });
 
-            modelBuilder.Entity("CultureExtractor.SceneEntity", b =>
+            modelBuilder.Entity("CultureExtractor.ReleaseEntity", b =>
                 {
                     b.HasOne("CultureExtractor.SiteEntity", "Site")
                         .WithMany()
@@ -336,7 +336,7 @@ namespace CultureExtractor.Migrations
                     b.Navigation("Site");
                 });
 
-            modelBuilder.Entity("SceneEntitySitePerformerEntity", b =>
+            modelBuilder.Entity("ReleaseEntitySitePerformerEntity", b =>
                 {
                     b.HasOne("CultureExtractor.SitePerformerEntity", null)
                         .WithMany()
@@ -344,16 +344,16 @@ namespace CultureExtractor.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("CultureExtractor.SceneEntity", null)
+                    b.HasOne("CultureExtractor.ReleaseEntity", null)
                         .WithMany()
                         .HasForeignKey("ReleasesUuid")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("SceneEntitySiteTagEntity", b =>
+            modelBuilder.Entity("ReleaseEntitySiteTagEntity", b =>
                 {
-                    b.HasOne("CultureExtractor.SceneEntity", null)
+                    b.HasOne("CultureExtractor.ReleaseEntity", null)
                         .WithMany()
                         .HasForeignKey("ReleasesUuid")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -366,7 +366,7 @@ namespace CultureExtractor.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("CultureExtractor.SceneEntity", b =>
+            modelBuilder.Entity("CultureExtractor.ReleaseEntity", b =>
                 {
                     b.Navigation("Downloads");
                 });
