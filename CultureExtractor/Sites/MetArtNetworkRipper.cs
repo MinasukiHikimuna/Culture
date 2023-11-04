@@ -150,7 +150,7 @@ public class MetArtNetworkRipper : ISiteScraper
             .AsReadOnly();
     }
 
-    public async Task<Release> ScrapeReleaseAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
+    public async Task<Release> ScrapeReleaseAsync(Guid releaseUuid, Site site, SubSite subSite, string url, string releaseShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
         await CloseModalsIfVisibleAsync(page);
 
@@ -207,11 +207,11 @@ public class MetArtNetworkRipper : ISiteScraper
             .ToList();
 
         var scene = new Release(
-            sceneUuid,
+            releaseUuid,
             site,
             null,
             DateOnly.FromDateTime(releaseDate),
-            sceneShortName,
+            releaseShortName,
             name,
             url,
             description,

@@ -99,7 +99,7 @@ public class XevUnleashedRipper : ISiteScraper
         return new SceneIdAndUrl(shortName, url);
     }
 
-    public async Task<Release> ScrapeReleaseAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
+    public async Task<Release> ScrapeReleaseAsync(Guid releaseUuid, Site site, SubSite subSite, string url, string releaseShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
         var releaseDateElement = await page.QuerySelectorAsync("div.cell.update_date");
         string releaseDateRaw = await releaseDateElement.TextContentAsync();
@@ -133,11 +133,11 @@ public class XevUnleashedRipper : ISiteScraper
         var downloadOptionsAndHandles = await ParseAvailableDownloadsAsync(page);
 
         var scene = new Release(
-            sceneUuid,
+            releaseUuid,
             site,
             subSite,
             releaseDate,
-            sceneShortName,
+            releaseShortName,
             title,
             url,
             description,

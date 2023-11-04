@@ -4,8 +4,8 @@ namespace CultureExtractor
 {
     public interface IRepository
     {
-        Task<Release?> GetReleaseAsync(string siteShortName, string sceneShortName);
-        Task<IReadOnlyList<Release>> GetReleasesAsync(string siteShortName, IList<string> sceneShortNames);
+        Task<Release?> GetReleaseAsync(string siteShortName, string releaseShortName);
+        Task<IReadOnlyList<Release>> GetReleasesAsync(string siteShortName, IList<string> releaseShortNames);
         Task<IEnumerable<Release>> GetReleasesAsync();
         Task<Site> GetSiteAsync(string shortName);
         Task<IEnumerable<Site>> GetSitesAsync();

@@ -73,29 +73,29 @@ public class Repository : IRepository
         return siteEntities.Select(Convert).AsEnumerable();
     }
 
-    public async Task<Release?> GetReleaseAsync(string siteShortName, string sceneShortName)
+    public async Task<Release?> GetReleaseAsync(string siteShortName, string releaseShortName)
     {
-        var sceneEntity = await _sqliteContext.Releases
+        var releaseEntity = await _sqliteContext.Releases
             .Include(s => s.Site)
             .Include(s => s.Performers)
             .Include(s => s.Tags)
-            .FirstOrDefaultAsync(s => s.Site.ShortName == siteShortName && s.ShortName == sceneShortName);
+            .FirstOrDefaultAsync(s => s.Site.ShortName == siteShortName && s.ShortName == releaseShortName);
 
-        return sceneEntity != null
-            ? Convert(sceneEntity)
+        return releaseEntity != null
+            ? Convert(releaseEntity)
             : null;
     }
 
-    public async Task<IReadOnlyList<Release>> GetReleasesAsync(string siteShortName, IList<string> sceneShortNames)
+    public async Task<IReadOnlyList<Release>> GetReleasesAsync(string siteShortName, IList<string> releaseShortNames)
     {
-        var sceneEntities = await _sqliteContext.Releases
+        var releaseEntities = await _sqliteContext.Releases
             .Include(s => s.Site)
             .Include(s => s.Performers)
             .Include(s => s.Tags)
-            .Where(s => s.Site.ShortName == siteShortName && sceneShortNames.Contains(s.ShortName))
+            .Where(s => s.Site.ShortName == siteShortName && releaseShortNames.Contains(s.ShortName))
             .ToListAsync();
 
-        return sceneEntities
+        return releaseEntities
             .Select(Convert)
             .ToList()
             .AsReadOnly();
@@ -161,9 +161,9 @@ public class Repository : IRepository
         List<SitePerformerEntity> performerEntities = await GetOrCreatePerformersAsync(release.Performers, siteEntity);
         List<SiteTagEntity> tagEntities = await GetOrCreateTagsAsync(release.Tags, siteEntity);
 
-        var existingSceneEntity = await _sqliteContext.Releases.FirstOrDefaultAsync(s => s.Uuid == release.Uuid.ToString());
+        var existingReleaseEntity = await _sqliteContext.Releases.FirstOrDefaultAsync(s => s.Uuid == release.Uuid.ToString());
         
-        if (existingSceneEntity == null)
+        if (existingReleaseEntity == null)
         {
             var sceneEntity = new ReleaseEntity()
             {
@@ -195,30 +195,30 @@ public class Repository : IRepository
             return Convert(sceneEntity);
         }
 
-        existingSceneEntity.ReleaseDate = release.ReleaseDate;
-        existingSceneEntity.ShortName = release.ShortName;
-        existingSceneEntity.Name = release.Name;
-        existingSceneEntity.Url = release.Url;
-        existingSceneEntity.Description = release.Description;
-        existingSceneEntity.Duration = release.Duration;
-        existingSceneEntity.Performers = performerEntities;
-        existingSceneEntity.Tags = tagEntities;
-        existingSceneEntity.JsonDocument = release.JsonDocument;
+        existingReleaseEntity.ReleaseDate = release.ReleaseDate;
+        existingReleaseEntity.ShortName = release.ShortName;
+        existingReleaseEntity.Name = release.Name;
+        existingReleaseEntity.Url = release.Url;
+        existingReleaseEntity.Description = release.Description;
+        existingReleaseEntity.Duration = release.Duration;
+        existingReleaseEntity.Performers = performerEntities;
+        existingReleaseEntity.Tags = tagEntities;
+        existingReleaseEntity.JsonDocument = release.JsonDocument;
 
-        if (existingSceneEntity.Created == DateTime.MinValue)
+        if (existingReleaseEntity.Created == DateTime.MinValue)
         {
-            existingSceneEntity.Created = DateTime.Now;
+            existingReleaseEntity.Created = DateTime.Now;
         }
-        existingSceneEntity.LastUpdated = DateTime.Now;
+        existingReleaseEntity.LastUpdated = DateTime.Now;
 
-        existingSceneEntity.SiteUuid = siteEntity.Uuid;
-        existingSceneEntity.Site = siteEntity;
+        existingReleaseEntity.SiteUuid = siteEntity.Uuid;
+        existingReleaseEntity.Site = siteEntity;
 
-        existingSceneEntity.DownloadOptions = JsonSerializer.Serialize(release.DownloadOptions);
+        existingReleaseEntity.DownloadOptions = JsonSerializer.Serialize(release.DownloadOptions);
 
         await _sqliteContext.SaveChangesAsync();
 
-        return Convert(existingSceneEntity);
+        return Convert(existingReleaseEntity);
     }
 
     private async Task<List<SitePerformerEntity>> GetOrCreatePerformersAsync(IEnumerable<SitePerformer> performers, SiteEntity siteEntity)

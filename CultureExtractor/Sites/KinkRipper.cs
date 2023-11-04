@@ -10,7 +10,7 @@ namespace CultureExtractor.Sites;
 
 /**
  * Site notes:
- * - Does not support guest mode fully. At least durations will be currently be based on trailers and not the full scene.
+ * - Does not support guest mode fully. At least durations will be currently be based on trailers and not the full video.
  **/
 [PornSite("kink")]
 public class KinkRipper : ISiteScraper, ISubSiteScraper
@@ -104,7 +104,7 @@ public class KinkRipper : ISiteScraper, ISubSiteScraper
         return new SceneIdAndUrl(shortName, url);
     }
 
-    public async Task<Release> ScrapeReleaseAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
+    public async Task<Release> ScrapeReleaseAsync(Guid releaseUuid, Site site, SubSite subSite, string url, string releaseShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
         if (await page.Locator("div.four-oh-four h1").IsVisibleAsync())
         {
@@ -173,11 +173,11 @@ public class KinkRipper : ISiteScraper, ISubSiteScraper
         var metadataJson = JsonSerializer.Serialize(metadata);
 
         var scene = new Release(
-            sceneUuid,
+            releaseUuid,
             site,
             subSite,
             releaseDate,
-            sceneShortName,
+            releaseShortName,
             title,
             url,
             description,

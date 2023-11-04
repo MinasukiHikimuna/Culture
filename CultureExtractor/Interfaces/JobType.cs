@@ -2,6 +2,6 @@
 
 public enum JobType
 {
-    ScrapeScenes,
-    DownloadScenes
+    ScrapeReleases,
+    DownloadReleases
 }

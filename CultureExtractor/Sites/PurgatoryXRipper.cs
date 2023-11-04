@@ -80,7 +80,7 @@ public class PurgatoryXRipper : ISiteScraper
         return new SceneIdAndUrl(shortName, url);
     }
 
-    public async Task<Release> ScrapeReleaseAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
+    public async Task<Release> ScrapeReleaseAsync(Guid releaseUuid, Site site, SubSite subSite, string url, string releaseShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
         await Task.Delay(5000);
 
@@ -113,11 +113,11 @@ public class PurgatoryXRipper : ISiteScraper
         var downloadOptionsAndHandles = await ParseAvailableDownloadsAsync(page);
 
         var scene = new Release(
-            sceneUuid,
+            releaseUuid,
             site,
             null,
             releaseDate,
-            sceneShortName,
+            releaseShortName,
             title,
             url,
             description,

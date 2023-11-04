@@ -78,10 +78,10 @@ public class HentaiedRipper : ISiteScraper
     {
         await GoToPageAsync(page, pageNumber);
         
-        var sceneHandles = await page.Locator("div.catposts div.half").ElementHandlesAsync();
+        var releaseHandles = await page.Locator("div.catposts div.half").ElementHandlesAsync();
 
         var indexScenes = new List<ListedRelease>();
-        foreach (var sceneHandle in sceneHandles.Reverse())
+        foreach (var sceneHandle in releaseHandles.Reverse())
         {
             var sceneIdAndUrl = await GetSceneIdAsync(site, sceneHandle);
             indexScenes.Add(new ListedRelease(null, sceneIdAndUrl.Id, sceneIdAndUrl.Url, sceneHandle));
@@ -104,7 +104,7 @@ public class HentaiedRipper : ISiteScraper
         return new SceneIdAndUrl(shortName, url);
     }
 
-    public async Task<Release> ScrapeReleaseAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
+    public async Task<Release> ScrapeReleaseAsync(Guid releaseUuid, Site site, SubSite subSite, string url, string releaseShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
         var releaseDateElement = await page.QuerySelectorAsync("div.durationandtime > div.entry-date");
         string releaseDateRaw = await releaseDateElement.TextContentAsync();
@@ -145,11 +145,11 @@ public class HentaiedRipper : ISiteScraper
         var downloadOptionsAndHandles = await ParseAvailableDownloadsAsync(page);
 
         var scene = new Release(
-            sceneUuid,
+            releaseUuid,
             site,
             subSite,
             releaseDate,
-            sceneShortName,
+            releaseShortName,
             title,
             url,
             description,

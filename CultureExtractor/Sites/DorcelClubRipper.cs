@@ -98,7 +98,7 @@ public class DorcelClubRipper : ISiteScraper
         return new SceneIdAndUrl(shortName, url);
     }
 
-    public async Task<Release> ScrapeReleaseAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
+    public async Task<Release> ScrapeReleaseAsync(Guid releaseUuid, Site site, SubSite subSite, string url, string releaseShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
         var releaseDateRaw = await page.Locator("div.right > span.publish_date").TextContentAsync();
         var releaseDate = DateOnly.Parse(releaseDateRaw);
@@ -137,11 +137,11 @@ public class DorcelClubRipper : ISiteScraper
         var downloadOptionsAndHandles = await ParseAvailableDownloadsAsync(page);
 
         return new Release(
-            sceneUuid,
+            releaseUuid,
             site,
             null,
             releaseDate,
-            sceneShortName,
+            releaseShortName,
             title,
             url,
             description,
