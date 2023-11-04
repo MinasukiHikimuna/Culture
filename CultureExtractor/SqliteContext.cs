@@ -95,7 +95,7 @@ public class SitePerformerEntity
     public required string SiteUuid { get; set; }
     public required SiteEntity Site { get; set; }
 
-    public required ICollection<SceneEntity> Scenes { get; set; }
+    public required ICollection<SceneEntity> Releases { get; set; }
 }
 
 public class SceneEntity
