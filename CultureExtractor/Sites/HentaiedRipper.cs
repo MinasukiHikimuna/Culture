@@ -74,14 +74,10 @@ public class HentaiedRipper : ISiteScraper
         return int.Parse(lastPageRaw);
     }
 
-    public async Task GoToPageAsync(IPage page, Site site, SubSite subSite, int pageNumber)
+    public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, SubSite subSite, IPage page, IReadOnlyList<IRequest> requests, int pageNumber)
     {
-        await page.GotoAsync($"/all-videos/page/{pageNumber}/");
-        await Task.Delay(5000);
-    }
-
-    public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, IPage page, IReadOnlyList<IRequest> requests)
-    {
+        await GoToPageAsync(page, pageNumber);
+        
         var sceneHandles = await page.Locator("div.catposts div.half").ElementHandlesAsync();
 
         var indexScenes = new List<IndexScene>();
@@ -92,6 +88,12 @@ public class HentaiedRipper : ISiteScraper
         }
 
         return indexScenes.AsReadOnly();
+    }
+
+    private static async Task GoToPageAsync(IPage page, int pageNumber)
+    {
+        await page.GotoAsync($"/all-videos/page/{pageNumber}/");
+        await Task.Delay(5000);
     }
 
     private static async Task<SceneIdAndUrl> GetSceneIdAsync(Site site, IElementHandle currentScene)

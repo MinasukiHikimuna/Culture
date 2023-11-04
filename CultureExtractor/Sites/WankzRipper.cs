@@ -52,8 +52,10 @@ public class WankzRipper : ISubSiteScraper
         return int.Parse(lastPage);
     }
 
-    public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, IPage page, IReadOnlyList<IRequest> requests)
+    public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, SubSite subSite, IPage page, IReadOnlyList<IRequest> requests, int pageNumber)
     {
+        await GoToPageAsync(page, subSite, pageNumber);
+        
         var sceneHandles = await page.Locator("div.scene").ElementHandlesAsync();
 
         var indexScenes = new List<IndexScene>();
@@ -64,6 +66,12 @@ public class WankzRipper : ISubSiteScraper
         }
 
         return indexScenes.AsReadOnly();
+    }
+
+    private static async Task GoToPageAsync(IPage page, SubSite subSite, int pageNumber)
+    {
+        await page.GotoAsync($"/{subSite.ShortName}?o=d&p={pageNumber}");
+        await Task.Delay(1000);
     }
 
     private async Task<SceneIdAndUrl> GetSceneIdAsync(IElementHandle currentScene)
@@ -282,12 +290,6 @@ public class WankzRipper : ISubSiteScraper
         return int.Parse(lastPageLinkText);
     }
 
-    public async Task GoToPageAsync(IPage page, Site site, SubSite subSite, int pageNumber)
-    {
-        await page.GotoAsync($"/{subSite.ShortName}?o=d&p={pageNumber}");
-        await Task.Delay(1000);
-    }
-    
     public record RootObject(
         string _context,
         string _type,

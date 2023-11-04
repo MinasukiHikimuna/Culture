@@ -78,8 +78,10 @@ public class WowNetworkRipper : ISiteScraper
         return totalPages;
     }
 
-    public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, IPage page, IReadOnlyList<IRequest> requests)
+    public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, SubSite subSite, IPage page, IReadOnlyList<IRequest> requests, int pageNumber)
     {
+        await GoToPageAsync(page, site, subSite, pageNumber);
+        
         var sceneHandles = await page.Locator("section.cf_content > ul > li > div.content_item > a.icon").ElementHandlesAsync();
 
         var indexScenes = new List<IndexScene>();
@@ -92,6 +94,11 @@ public class WowNetworkRipper : ISiteScraper
         return indexScenes.AsReadOnly();
     }
 
+    private Task GoToPageAsync(IPage page, Site site, SubSite subSite, int pageNumber)
+    {
+        throw new NotImplementedException();
+    }
+    
     private static async Task<SceneIdAndUrl> GetSceneIdAsync(Site site, IElementHandle currentScene)
     {
         var relativeUrl = await currentScene.GetAttributeAsync("href");
@@ -314,10 +321,5 @@ public class WowNetworkRipper : ISiteScraper
                     downloadLinkElement));
         }
         return availableDownloads.OrderByDescending(d => d.DownloadOption.ResolutionWidth).ThenByDescending(d => d.DownloadOption.Fps).ToList();
-    }
-
-    public Task GoToPageAsync(IPage page, Site site, SubSite subSite, int pageNumber)
-    {
-        throw new NotImplementedException();
     }
 }

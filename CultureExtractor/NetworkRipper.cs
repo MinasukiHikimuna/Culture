@@ -157,7 +157,7 @@ public class NetworkRipper : INetworkRipper
                 BaseDelay = TimeSpan.FromSeconds(3),
                 OnRetry = args =>
                 {
-                    Log.Error($"Caught following exception while scraping index page {currentPage}: " + args.Exception?.ToString(),
+                    Log.Error($"Caught following exception while scraping index page {currentPage}: " + args.Exception,
                         args.Exception);
                     return default;
                 }
@@ -173,10 +173,7 @@ public class NetworkRipper : INetworkRipper
                 await route.ContinueAsync();
             });
 
-            await siteScraper.GoToPageAsync(page, site, subSite, currentPage);
-            await Task.Delay(1000);
-
-            var indexScenes = await siteScraper.GetCurrentScenesAsync(site, page, requests);
+            var indexScenes = await siteScraper.GetCurrentScenesAsync(site, subSite, page, requests, currentPage);
             return indexScenes;
         });
         return indexScenes;

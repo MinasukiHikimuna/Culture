@@ -45,7 +45,7 @@ namespace CultureExtractor.Tests
             var contextMock = new Mock<IBrowserContext>();
 
             _siteScraperMock.Setup(ss => ss.NavigateToScenesAndReturnPageCountAsync(It.IsAny<Site>(), It.IsAny<IPage>())).ReturnsAsync(1);
-            _siteScraperMock.Setup(ss => ss.GetCurrentScenesAsync(It.IsAny<Site>(), It.IsAny<IPage>(), It.IsAny<IReadOnlyList<IRequest>>())).ReturnsAsync(new List<IndexScene>()
+            _siteScraperMock.Setup(ss => ss.GetCurrentScenesAsync(It.IsAny<Site>(), It.IsAny<SubSite>(), It.IsAny<IPage>(), It.IsAny<IReadOnlyList<IRequest>>(), 1)).ReturnsAsync(new List<IndexScene>()
             {
                 new IndexScene(null, "abc", "/scene/abc", new Mock<IElementHandle>().Object)
             });
@@ -66,8 +66,7 @@ namespace CultureExtractor.Tests
             await networkRipper.ScrapeScenesAsync(site, browserSettings, scrapeOptions);
 
             // Assert
-            _siteScraperMock.Verify(ss => ss.GetCurrentScenesAsync(site, It.IsAny<IPage>(), It.IsAny<IReadOnlyList<IRequest>>()), Times.AtLeastOnce());
-            _siteScraperMock.Verify(ss => ss.GoToPageAsync(It.IsAny<IPage>(), site, null, It.IsAny<int>()), Times.AtLeastOnce());
+            _siteScraperMock.Verify(ss => ss.GetCurrentScenesAsync(site, null, It.IsAny<IPage>(), It.IsAny<IReadOnlyList<IRequest>>(), 1), Times.AtLeastOnce());
         }
     }
 }

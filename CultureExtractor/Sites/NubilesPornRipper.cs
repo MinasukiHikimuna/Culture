@@ -61,8 +61,10 @@ public class NubilesPornRipper : ISiteScraper
         return int.Parse(lastPage);
     }
 
-    public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, IPage page, IReadOnlyList<IRequest> requests)
+    public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, SubSite subSite, IPage page, IReadOnlyList<IRequest> requests, int pageNumber)
     {
+        await GoToPageAsync(page, site, subSite, pageNumber);
+        
         var sceneHandles = await page.Locator("div.Videoset div.content-grid-item").ElementHandlesAsync();
 
         var indexScenes = new List<IndexScene>();
@@ -75,6 +77,12 @@ public class NubilesPornRipper : ISiteScraper
         return indexScenes.AsReadOnly();
     }
 
+    
+    public Task GoToPageAsync(IPage page, Site site, SubSite subSite, int pageNumber)
+    {
+        throw new NotImplementedException();
+    }
+    
     private static async Task<SceneIdAndUrl> GetSceneIdAsync(IElementHandle currentScene)
     {
         var linkElement = await currentScene.QuerySelectorAsync("figcaption > div.caption-header > span.title > a");
@@ -253,10 +261,5 @@ public class NubilesPornRipper : ISiteScraper
                     downloadLink));
         }
         return availableDownloads.OrderByDescending(d => d.DownloadOption.FileSize).ToList();
-    }
-
-    public Task GoToPageAsync(IPage page, Site site, SubSite subSite, int pageNumber)
-    {
-        throw new NotImplementedException();
-    }
+     }
 }

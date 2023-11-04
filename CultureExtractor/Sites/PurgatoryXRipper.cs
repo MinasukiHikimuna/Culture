@@ -47,8 +47,10 @@ public class PurgatoryXRipper : ISiteScraper
         return int.Parse(lastPageText);
     }
 
-    public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, IPage page, IReadOnlyList<IRequest> requests)
+    public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, SubSite subSite, IPage page, IReadOnlyList<IRequest> requests, int pageNumber)
     {
+        await GoToPageAsync(page, site, subSite, pageNumber);
+        
         var sceneHandles = await page.Locator("div.content-item").ElementHandlesAsync();
 
         var indexScenes = new List<IndexScene>();
@@ -59,6 +61,11 @@ public class PurgatoryXRipper : ISiteScraper
         }
 
         return indexScenes.AsReadOnly();
+    }
+
+    private Task GoToPageAsync(IPage page, Site site, SubSite subSite, int pageNumber)
+    {
+        throw new NotImplementedException();
     }
 
     private static async Task<SceneIdAndUrl> GetSceneIdAsync(IElementHandle currentScene)
@@ -201,10 +208,5 @@ public class PurgatoryXRipper : ISiteScraper
                     downloadListItem));
         }
         return availableDownloads;
-    }
-
-    public Task GoToPageAsync(IPage page, Site site, SubSite subSite, int pageNumber)
-    {
-        throw new NotImplementedException();
     }
 }

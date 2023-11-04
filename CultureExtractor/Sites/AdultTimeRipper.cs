@@ -602,8 +602,10 @@ public class AdultTimeRipper : ISiteScraper
         return int.Parse(lastPage);
     }
 
-    public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, IPage page, IReadOnlyList<IRequest> requests)
+    public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, SubSite subSite, IPage page, IReadOnlyList<IRequest> requests, int pageNumber)
     {
+        await GoToPageAsync(page, site, subSite, pageNumber);
+        
         var sceneHandles = await page.Locator("div.ListingGrid-ListingGridItem").ElementHandlesAsync();
 
         var indexScenes = new List<IndexScene>();
@@ -616,6 +618,11 @@ public class AdultTimeRipper : ISiteScraper
         return indexScenes.AsReadOnly();
     }
 
+    private Task GoToPageAsync(IPage page, Site site, SubSite subSite, int pageNumber)
+    {
+        throw new NotImplementedException();
+    }
+    
     private static async Task<SceneIdAndUrl> GetSceneIdAsync(IElementHandle currentScene)
     {
         var thumbLinkElement = await currentScene.QuerySelectorAsync("a");
@@ -831,11 +838,6 @@ public class AdultTimeRipper : ISiteScraper
         }
 
         return availableDownloads.OrderByDescending(d => d.DownloadOption.FileSize).ToList();
-    }
-
-    public Task GoToPageAsync(IPage page, Site site, SubSite subSite, int pageNumber)
-    {
-        throw new NotImplementedException();
     }
 }
 

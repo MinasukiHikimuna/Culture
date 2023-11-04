@@ -46,8 +46,10 @@ public class NewSensationsRipper : ISiteScraper
         return int.Parse(lastPage);
     }
 
-    public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, IPage page, IReadOnlyList<IRequest> requests)
+    public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, SubSite subSite, IPage page, IReadOnlyList<IRequest> requests, int pageNumber)
     {
+        await GoToPageAsync(page, pageNumber);
+        
         var sceneHandles = await page.Locator("div.videoArea > div.videoBlock").ElementHandlesAsync();
 
         var indexScenes = new List<IndexScene>();
@@ -58,6 +60,22 @@ public class NewSensationsRipper : ISiteScraper
         }
 
         return indexScenes.AsReadOnly();
+    }
+
+    private static async Task GoToPageAsync(IPage page, int pageNumber)
+    {
+        for (var i = 0; i < 3; i++)
+        {
+            try
+            {
+                await page.GotoAsync($"/members/category.php?id=5&page={pageNumber}&s=d");
+                return;
+            }
+            catch (TimeoutException)
+            {
+                await page.EvaluateAsync("window.stop()");
+            }
+        }
     }
 
     private static async Task<SceneIdAndUrl> GetSceneIdAsync(IElementHandle currentScene)
@@ -185,21 +203,5 @@ public class NewSensationsRipper : ISiteScraper
                     downloadLink));
         }
         return availableDownloads.OrderByDescending(d => d.DownloadOption.FileSize).ToList();
-    }
-
-    public async Task GoToPageAsync(IPage page, Site site, SubSite subSite, int pageNumber)
-    {
-        for (var i = 0; i < 3; i++)
-        {
-            try
-            {
-                await page.GotoAsync($"/members/category.php?id=5&page={pageNumber}&s=d");
-                return;
-            }
-            catch (TimeoutException)
-            {
-                await page.EvaluateAsync("window.stop()");
-            }
-        }
     }
 }

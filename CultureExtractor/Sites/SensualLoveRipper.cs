@@ -43,8 +43,10 @@ public class SensualLoveRipper : ISiteScraper
         return 1;
     }
 
-    public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, IPage page, IReadOnlyList<IRequest> requests)
+    public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, SubSite subSite, IPage page, IReadOnlyList<IRequest> requests, int pageNumber)
     {
+        await GoToPageAsync(page, site, subSite, pageNumber);
+        
         var scenesLocator = page.Locator("div.content-view-lg > div.content-view-grid > div.content-grid-item-wrapper");
         await scenesLocator.First.WaitForAsync(new() { State = WaitForSelectorState.Visible });
         var sceneHandles = await scenesLocator.ElementHandlesAsync();
@@ -59,6 +61,12 @@ public class SensualLoveRipper : ISiteScraper
         return indexScenes.AsReadOnly();
     }
 
+
+    private Task GoToPageAsync(IPage page, Site site, SubSite subSite, int pageNumber)
+    {
+        throw new NotImplementedException();
+    }
+    
     private static async Task<SceneIdAndUrl> GetSceneIdAsync(IElementHandle currentScene)
     {
         var linkElement = await currentScene.QuerySelectorAsync("a");
@@ -186,10 +194,5 @@ public class SensualLoveRipper : ISiteScraper
                     downloadButtonElement));
         }
         return availableDownloads.OrderByDescending(d => d.DownloadOption.ResolutionWidth).ThenByDescending(d => d.DownloadOption.Fps).ToList();
-    }
-
-    public Task GoToPageAsync(IPage page, Site site, SubSite subSite, int pageNumber)
-    {
-        throw new NotImplementedException();
     }
 }

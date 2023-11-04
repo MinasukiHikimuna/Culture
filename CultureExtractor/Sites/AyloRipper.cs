@@ -70,9 +70,31 @@ public class AyloRipper : ISiteScraper
         return int.Parse(lastPage);
     }
 
-    public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, IPage page, IReadOnlyList<IRequest> requests)
+    public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, SubSite subSite, IPage page, IReadOnlyList<IRequest> requests, int pageNumber)
     {
-        var sceneHandles = await page.Locator("span a[href^='/scene/']").ElementHandlesAsync();
+        await GoToPageAsync(site, page, pageNumber);
+        
+        // Aylo occasionally forces re-login.
+        if (page.Url.Contains("/login"))
+        {
+            await LoginAsync(site, page);
+            await GoToPageAsync(site, page, pageNumber);
+        }
+
+        var sceneHandleLocators = page.Locator("span a[href^='/scene/']");
+
+        try
+        {
+            await sceneHandleLocators.First.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        }
+        catch (TimeoutException)
+        {
+            // For unknown reason some pages don't have scenes at all. Especially page 154. Verified manually in
+            // non-Playwright browser.
+        }
+        
+        
+        var sceneHandles = await sceneHandleLocators.ElementHandlesAsync();
 
         var indexScenes = new List<IndexScene>();
         foreach (var sceneHandle in sceneHandles.Reverse())
@@ -82,6 +104,11 @@ public class AyloRipper : ISiteScraper
         }
 
         return indexScenes.AsReadOnly();
+    }
+
+    private static async Task GoToPageAsync(Site site, IPage page, int pageNumber)
+    {
+        await page.GotoAsync(site.Url + "/scenes?page=" + pageNumber);
     }
 
     private static async Task<SceneIdAndUrl> GetSceneIdAsync(IElementHandle currentScene)
@@ -242,11 +269,6 @@ public class AyloRipper : ISiteScraper
         }
 
         return availableDownloads.OrderByDescending(d => d.DownloadOption.FileSize).ToList();
-    }
-
-    public async Task GoToPageAsync(IPage page, Site site, SubSite subSite, int pageNumber)
-    {
-        await page.GotoAsync(site.Url + "/scenes?page=" + pageNumber);
     }
 
     private class BrazzersRootobject

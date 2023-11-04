@@ -87,8 +87,10 @@ public class CzechVRNetworkRipper : ISiteScraper
         return (int)Math.Ceiling((double)totalVideoCount / videosOnCurrentPage.Count());
     }
 
-    public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, IPage page, IReadOnlyList<IRequest> requests)
+    public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, SubSite subSite, IPage page, IReadOnlyList<IRequest> requests, int pageNumber)
     {
+        await GoToPageAsync(page, site, subSite, pageNumber);
+        
         var sceneHandles = await page.Locator("div.tagyCenter > div.postTag").ElementHandlesAsync();
 
         var indexScenes = new List<IndexScene>();
@@ -99,6 +101,11 @@ public class CzechVRNetworkRipper : ISiteScraper
         }
 
         return indexScenes.AsReadOnly();
+    }
+
+    private static Task GoToPageAsync(IPage page, Site site, SubSite subSite, int pageNumber)
+    {
+        throw new NotImplementedException();
     }
 
     private static async Task<SceneIdAndUrl> GetSceneIdAsync(IElementHandle currentScene)
@@ -123,7 +130,7 @@ public class CzechVRNetworkRipper : ISiteScraper
         var sceneShortName = match.Groups["id"].Value;
 
         return new SceneIdAndUrl(sceneShortName, relativeUrl);
-    }   
+    }
 
     public async Task<Scene> ScrapeSceneAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
@@ -308,10 +315,5 @@ public class CzechVRNetworkRipper : ISiteScraper
     {
         var content = await page.Locator("div.post > div.left > div.text").TextContentAsync();
         return content.Replace("\n", "").Replace("\t", "").Trim();
-    }
-
-    public Task GoToPageAsync(IPage page, Site site, SubSite subSite, int pageNumber)
-    {
-        throw new NotImplementedException();
     }
 }

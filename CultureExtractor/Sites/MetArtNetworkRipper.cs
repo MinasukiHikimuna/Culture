@@ -131,8 +131,10 @@ public class MetArtNetworkRipper : ISiteScraper
         }
     }
 
-    public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, IPage page, IReadOnlyList<IRequest> requests)
+    public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, SubSite subSite, IPage page, IReadOnlyList<IRequest> requests, int pageNumber)
     {
+        await GoToPageAsync(page, pageNumber);
+        
         var moviesRequest = requests.SingleOrDefault(r => r.Url.StartsWith(site.Url + "/api/movies?"));
         var response = await moviesRequest.ResponseAsync();
         var content = await response.TextAsync();
@@ -307,7 +309,7 @@ public class MetArtNetworkRipper : ISiteScraper
         return availableDownloads;
     }
 
-    public async Task GoToPageAsync(IPage page, Site site, SubSite subSite, int pageNumber)
+    private static async Task GoToPageAsync(IPage page, int pageNumber)
     {
         await page.GotoAsync($"/movies/{pageNumber}");
     }

@@ -68,14 +68,10 @@ public class XevUnleashedRipper : ISiteScraper
         return lastPage;
     }
 
-    public async Task GoToPageAsync(IPage page, Site site, SubSite subSite, int pageNumber)
+    public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, SubSite subSite, IPage page, IReadOnlyList<IRequest> requests, int pageNumber)
     {
-        await page.GotoAsync($"/access/categories/movies_{pageNumber}_d.html");
-        await Task.Delay(5000);
-    }
-
-    public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, IPage page, IReadOnlyList<IRequest> requests)
-    {
+        await GoToPageAsync(page, pageNumber);
+        
         var sceneHandles = await page.Locator("div.update_details").ElementHandlesAsync();
 
         var indexScenes = new List<IndexScene>();
@@ -86,6 +82,12 @@ public class XevUnleashedRipper : ISiteScraper
         }
 
         return indexScenes.AsReadOnly();
+    }
+
+    private static async Task GoToPageAsync(IPage page, int pageNumber)
+    {
+        await page.GotoAsync($"/access/categories/movies_{pageNumber}_d.html");
+        await Task.Delay(5000);
     }
 
     private static async Task<SceneIdAndUrl> GetSceneIdAsync(IElementHandle currentScene)
