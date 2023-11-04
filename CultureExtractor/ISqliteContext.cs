@@ -7,7 +7,7 @@ namespace CultureExtractor
         string DbPath { get; }
         DbSet<DownloadEntity> Downloads { get; set; }
         DbSet<SitePerformerEntity> Performers { get; set; }
-        DbSet<SceneEntity> Scenes { get; set; }
+        DbSet<SceneEntity> Releases { get; set; }
         DbSet<SiteEntity> Sites { get; set; }
         DbSet<SubSiteEntity> SubSites { get; set; }
         DbSet<StorageStateEntity> StorageStates { get; set; }

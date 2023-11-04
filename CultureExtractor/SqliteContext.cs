@@ -9,7 +9,7 @@ public class SqliteContext : DbContext, ISqliteContext
 {
     public DbSet<SiteEntity> Sites { get; set; }
     public DbSet<SubSiteEntity> SubSites { get; set; }
-    public DbSet<SceneEntity> Scenes { get; set; }
+    public DbSet<SceneEntity> Releases { get; set; }
     public DbSet<SitePerformerEntity> Performers { get; set; }
     public DbSet<SiteTagEntity> Tags { get; set; }
     public DbSet<StorageStateEntity> StorageStates { get; set; }

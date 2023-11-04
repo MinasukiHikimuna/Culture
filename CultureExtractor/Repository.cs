@@ -45,7 +45,7 @@ public class Repository : IRepository
 
     public async Task<IEnumerable<Scene>> GetScenesAsync()
     {
-        var siteEntities = await _sqliteContext.Scenes
+        var siteEntities = await _sqliteContext.Releases
             .Include(s => s.Site)
             .Include(s => s.Performers)
             .Include(s => s.Tags)
@@ -58,7 +58,7 @@ public class Repository : IRepository
 
     public async Task<IEnumerable<Scene>> QueryScenesAsync(Site site, DownloadConditions downloadConditions)
     {
-        var siteEntities = await _sqliteContext.Scenes
+        var siteEntities = await _sqliteContext.Releases
             .Include(s => s.Site)
             .Include(s => s.SubSite)
             .Include(s => s.Performers)
@@ -75,7 +75,7 @@ public class Repository : IRepository
 
     public async Task<Scene?> GetSceneAsync(string siteShortName, string sceneShortName)
     {
-        var sceneEntity = await _sqliteContext.Scenes
+        var sceneEntity = await _sqliteContext.Releases
             .Include(s => s.Site)
             .Include(s => s.Performers)
             .Include(s => s.Tags)
@@ -88,7 +88,7 @@ public class Repository : IRepository
 
     public async Task<IReadOnlyList<Scene>> GetScenesAsync(string siteShortName, IList<string> sceneShortNames)
     {
-        var sceneEntities = await _sqliteContext.Scenes
+        var sceneEntities = await _sqliteContext.Releases
             .Include(s => s.Site)
             .Include(s => s.Performers)
             .Include(s => s.Tags)
@@ -161,7 +161,7 @@ public class Repository : IRepository
         List<SitePerformerEntity> performerEntities = await GetOrCreatePerformersAsync(scene.Performers, siteEntity);
         List<SiteTagEntity> tagEntities = await GetOrCreateTagsAsync(scene.Tags, siteEntity);
 
-        var existingSceneEntity = await _sqliteContext.Scenes.FirstOrDefaultAsync(s => s.Uuid == scene.Uuid.ToString());
+        var existingSceneEntity = await _sqliteContext.Releases.FirstOrDefaultAsync(s => s.Uuid == scene.Uuid.ToString());
         
         if (existingSceneEntity == null)
         {
@@ -189,7 +189,7 @@ public class Repository : IRepository
                 Downloads = new List<DownloadEntity>(),
                 DownloadOptions = JsonSerializer.Serialize(scene.DownloadOptions)
             };
-            await _sqliteContext.Scenes.AddAsync(sceneEntity);
+            await _sqliteContext.Releases.AddAsync(sceneEntity);
             await _sqliteContext.SaveChangesAsync();
 
             return Convert(sceneEntity);
@@ -368,7 +368,7 @@ public class Repository : IRepository
 
     public async Task SaveDownloadAsync(Download download, PreferredDownloadQuality preferredDownloadQuality)
     {
-        var sceneEntity = await _sqliteContext.Scenes.FirstAsync(s => s.Uuid == download.Scene.Uuid.ToString());
+        var sceneEntity = await _sqliteContext.Releases.FirstAsync(s => s.Uuid == download.Scene.Uuid.ToString());
 
         var json = JsonSerializer.Serialize(new JsonSummary(download.DownloadOption, download.VideoHashes));
 
