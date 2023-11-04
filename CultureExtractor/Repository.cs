@@ -165,7 +165,7 @@ public class Repository : IRepository
         
         if (existingReleaseEntity == null)
         {
-            var sceneEntity = new ReleaseEntity()
+            var releaseEntity = new ReleaseEntity()
             {
                 Uuid = release.Uuid.ToString(),
                 ReleaseDate = release.ReleaseDate,
@@ -189,10 +189,10 @@ public class Repository : IRepository
                 Downloads = new List<DownloadEntity>(),
                 DownloadOptions = JsonSerializer.Serialize(release.DownloadOptions)
             };
-            await _sqliteContext.Releases.AddAsync(sceneEntity);
+            await _sqliteContext.Releases.AddAsync(releaseEntity);
             await _sqliteContext.SaveChangesAsync();
 
-            return Convert(sceneEntity);
+            return Convert(releaseEntity);
         }
 
         existingReleaseEntity.ReleaseDate = release.ReleaseDate;
@@ -368,7 +368,7 @@ public class Repository : IRepository
 
     public async Task SaveDownloadAsync(Download download, PreferredDownloadQuality preferredDownloadQuality)
     {
-        var sceneEntity = await _sqliteContext.Releases.FirstAsync(s => s.Uuid == download.Release.Uuid.ToString());
+        var releaseEntity = await _sqliteContext.Releases.FirstAsync(s => s.Uuid == download.Release.Uuid.ToString());
 
         var json = JsonSerializer.Serialize(new JsonSummary(download.DownloadOption, download.VideoHashes));
 
@@ -381,8 +381,8 @@ public class Repository : IRepository
             OriginalFilename = download.OriginalFilename,
             SavedFilename = download.SavedFilename,
 
-            ReleaseUuid = sceneEntity.Uuid,
-            Release = sceneEntity,
+            ReleaseUuid = releaseEntity.Uuid,
+            Release = releaseEntity,
         });
         await _sqliteContext.SaveChangesAsync();
     }
