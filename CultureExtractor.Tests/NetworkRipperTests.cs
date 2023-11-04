@@ -44,10 +44,10 @@ namespace CultureExtractor.Tests
             var pageMock = new Mock<IPage>();
             var contextMock = new Mock<IBrowserContext>();
 
-            _siteScraperMock.Setup(ss => ss.NavigateToScenesAndReturnPageCountAsync(It.IsAny<Site>(), It.IsAny<IPage>())).ReturnsAsync(1);
-            _siteScraperMock.Setup(ss => ss.GetCurrentScenesAsync(It.IsAny<Site>(), It.IsAny<SubSite>(), It.IsAny<IPage>(), It.IsAny<IReadOnlyList<IRequest>>(), 1)).ReturnsAsync(new List<IndexScene>()
+            _siteScraperMock.Setup(ss => ss.NavigateToReleasesAndReturnPageCountAsync(It.IsAny<Site>(), It.IsAny<IPage>())).ReturnsAsync(1);
+            _siteScraperMock.Setup(ss => ss.GetCurrentReleasesAsync(It.IsAny<Site>(), It.IsAny<SubSite>(), It.IsAny<IPage>(), It.IsAny<IReadOnlyList<IRequest>>(), 1)).ReturnsAsync(new List<ListedRelease>()
             {
-                new IndexScene(null, "abc", "/scene/abc", new Mock<IElementHandle>().Object)
+                new ListedRelease(null, "abc", "/scene/abc", new Mock<IElementHandle>().Object)
             });
 
             _repositoryMock.Setup(rr => rr.GetReleasesAsync(It.IsAny<string>(), It.IsAny<IList<string>>())).ReturnsAsync(new List<Release>()
@@ -63,10 +63,10 @@ namespace CultureExtractor.Tests
             var networkRipper = new NetworkRipper(_repositoryMock.Object, _serviceProviderMock.Object, _downloaderMock.Object, _playwrightFactoryMock.Object);
 
             // Act
-            await networkRipper.ScrapeScenesAsync(site, browserSettings, scrapeOptions);
+            await networkRipper.ScrapeReleasesAsync(site, browserSettings, scrapeOptions);
 
             // Assert
-            _siteScraperMock.Verify(ss => ss.GetCurrentScenesAsync(site, null, It.IsAny<IPage>(), It.IsAny<IReadOnlyList<IRequest>>(), 1), Times.AtLeastOnce());
+            _siteScraperMock.Verify(ss => ss.GetCurrentReleasesAsync(site, null, It.IsAny<IPage>(), It.IsAny<IReadOnlyList<IRequest>>(), 1), Times.AtLeastOnce());
         }
     }
 }

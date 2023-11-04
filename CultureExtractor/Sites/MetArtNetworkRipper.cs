@@ -77,7 +77,7 @@ public class MetArtNetworkRipper : ISiteScraper
         }
     }
 
-    public async Task<int> NavigateToScenesAndReturnPageCountAsync(Site site, IPage page)
+    public async Task<int> NavigateToReleasesAndReturnPageCountAsync(Site site, IPage page)
     {
         await CloseModalsIfVisibleAsync(page);
 
@@ -131,7 +131,7 @@ public class MetArtNetworkRipper : ISiteScraper
         }
     }
 
-    public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, SubSite subSite, IPage page, IReadOnlyList<IRequest> requests, int pageNumber)
+    public async Task<IReadOnlyList<ListedRelease>> GetCurrentReleasesAsync(Site site, SubSite subSite, IPage page, IReadOnlyList<IRequest> requests, int pageNumber)
     {
         await GoToPageAsync(page, pageNumber);
         
@@ -144,13 +144,13 @@ public class MetArtNetworkRipper : ISiteScraper
         var skipAdScene = currentPage == "1" && site.ShortName != "hustler";
 
         return data.galleries.Skip(skipAdScene ? 1 : 0)
-            .Select(g => new IndexScene(null, g.path.Substring(g.path.LastIndexOf("/movie/") + "/movie/".Length + 1), g.path, null))
+            .Select(g => new ListedRelease(null, g.path.Substring(g.path.LastIndexOf("/movie/") + "/movie/".Length + 1), g.path, null))
             .Reverse()
             .ToList()
             .AsReadOnly();
     }
 
-    public async Task<Release> ScrapeSceneAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
+    public async Task<Release> ScrapeReleaseAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
         await CloseModalsIfVisibleAsync(page);
 
@@ -227,7 +227,7 @@ public class MetArtNetworkRipper : ISiteScraper
         return scene;
     }
 
-    public async Task<Download> DownloadSceneAsync(Release release, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)
+    public async Task<Download> DownloadReleaseAsync(Release release, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)
     {
         await CloseModalsIfVisibleAsync(page);
 

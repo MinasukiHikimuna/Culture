@@ -24,25 +24,25 @@ public class NetworkRipper : INetworkRipper
         _playwrightFactory = playwrightFactory;
     }
 
-    public async Task ScrapeScenesAsync(Site site, BrowserSettings browserSettings, ScrapeOptions scrapeOptions)
+    public async Task ScrapeReleasesAsync(Site site, BrowserSettings browserSettings, ScrapeOptions scrapeOptions)
     {
         ISiteScraper siteScraper = (ISiteScraper)_serviceProvider.GetService(typeof(ISiteScraper));
         Log.Information($"Culture Extractor, using {siteScraper.GetType()}");
 
         if (siteScraper is ISubSiteScraper subSiteScraper)
         {
-            await ScrapeSubSiteScenesAsync(site, browserSettings, scrapeOptions, subSiteScraper);
+            await ScrapeSubSiteReleasesAsync(site, browserSettings, scrapeOptions, subSiteScraper);
         }
         else
         {
             IPage page = await CreatePageAndLoginAsync(siteScraper, site, browserSettings, scrapeOptions.GuestMode);
-            var totalPages = await siteScraper.NavigateToScenesAndReturnPageCountAsync(site, page);
+            var totalPages = await siteScraper.NavigateToReleasesAndReturnPageCountAsync(site, page);
 
-            await ScrapeScenesInternalAsync(site, null, scrapeOptions, siteScraper, page, totalPages);
+            await ScrapeReleasesInternalAsync(site, null, scrapeOptions, siteScraper, page, totalPages);
         }
     }
 
-    private async Task ScrapeSubSiteScenesAsync(Site site, BrowserSettings browserSettings, ScrapeOptions scrapeOptions, ISubSiteScraper subSiteScraper)
+    private async Task ScrapeSubSiteReleasesAsync(Site site, BrowserSettings browserSettings, ScrapeOptions scrapeOptions, ISubSiteScraper subSiteScraper)
     {
         IPage page = await CreatePageAndLoginAsync(subSiteScraper, site, browserSettings, scrapeOptions.GuestMode);
 
@@ -56,7 +56,7 @@ public class NetworkRipper : INetworkRipper
         {
             Log.Information($"Subsite {i}/{subSites.Count}: {subSite.Name}");
             var totalPages = await subSiteScraper.NavigateToSubSiteAndReturnPageCountAsync(site, subSite, page);
-            await ScrapeScenesInternalAsync(site, subSite, scrapeOptions, subSiteScraper, page, totalPages);
+            await ScrapeReleasesInternalAsync(site, subSite, scrapeOptions, subSiteScraper, page, totalPages);
             i++;
         }
     }
@@ -71,58 +71,58 @@ public class NetworkRipper : INetworkRipper
         }
     }
 
-    private async Task ScrapeScenesInternalAsync(Site site, SubSite subSite, ScrapeOptions scrapeOptions, ISiteScraper siteScraper, IPage page, int totalPages)
+    private async Task ScrapeReleasesInternalAsync(Site site, SubSite subSite, ScrapeOptions scrapeOptions, ISiteScraper siteScraper, IPage page, int totalPages)
     {
         foreach (var currentPage in PageEnumeration(scrapeOptions, totalPages))
         {
-            await ScrapeScenePageAsync(site, subSite, scrapeOptions, siteScraper, page, totalPages, currentPage);
+            await ScrapeReleasePageAsync(site, subSite, scrapeOptions, siteScraper, page, totalPages, currentPage);
         }
     }
 
-    private async Task ScrapeScenePageAsync(Site site, SubSite subSite, ScrapeOptions scrapeOptions, ISiteScraper siteScraper, IPage page, int totalPages, int currentPage)
+    private async Task ScrapeReleasePageAsync(Site site, SubSite subSite, ScrapeOptions scrapeOptions, ISiteScraper siteScraper, IPage page, int totalPages, int currentPage)
     {
-        var scrapedScenes = 0;
+        var scrapedReleases = 0;
 
-        IReadOnlyList<IndexScene> indexScenes = await ScrapePageIndexScenesAsync(site, subSite, siteScraper, page, currentPage);
+        IReadOnlyList<ListedRelease> listedReleases = await ScrapePageListedReleasesAsync(site, subSite, siteScraper, page, currentPage);
 
         Log.Information(totalPages == int.MaxValue
-            ? $"Batch {currentPage} of infinite page contains {indexScenes.Count} scenes"
-            : $"Page {currentPage}/{totalPages} contains {indexScenes.Count} scenes");
+            ? $"Batch {currentPage} of infinite page contains {listedReleases.Count} releases"
+            : $"Page {currentPage}/{totalPages} contains {listedReleases.Count} releases");
 
-        var existingScenes = await _repository.GetReleasesAsync(site.ShortName, indexScenes.Select(s => s.ShortName).ToList());
-        var checkedIndexScenes = indexScenes.Select(indexScene => indexScene with
+        var existingReleases = await _repository.GetReleasesAsync(site.ShortName, listedReleases.Select(s => s.ShortName).ToList());
+        var checkedListedReleases = listedReleases.Select(listedRelease => listedRelease with
             {
-                Scene = existingScenes.FirstOrDefault(s => s.ShortName == indexScene.ShortName)
+                Release = existingReleases.FirstOrDefault(s => s.ShortName == listedRelease.ShortName)
             }
         ).ToList();
-        var unscrapedIndexScenes = scrapeOptions.FullScrape
-            ? checkedIndexScenes.Where(s => s.Scene == null || s.Scene.LastUpdated < scrapeOptions.FullScrapeLastUpdated)
-            : checkedIndexScenes.Where(s => s.Scene == null).ToList();
+        var unscrapedListedReleases = scrapeOptions.FullScrape
+            ? checkedListedReleases.Where(s => s.Release == null || s.Release.LastUpdated < scrapeOptions.FullScrapeLastUpdated)
+            : checkedListedReleases.Where(s => s.Release == null).ToList();
         if (scrapeOptions.ReverseOrder)
         {
-            unscrapedIndexScenes = unscrapedIndexScenes.Reverse();
+            unscrapedListedReleases = unscrapedListedReleases.Reverse();
         }
 
-        foreach (var currentScene in unscrapedIndexScenes)
+        foreach (var currentRelease in unscrapedListedReleases)
         {
-            if (scrapedScenes >= scrapeOptions.MaxScenes)
+            if (scrapedReleases >= scrapeOptions.MaxReleases)
             {
-                Log.Information($"Scraped {scrapedScenes} scenes, exiting");
+                Log.Information($"Scraped {scrapedReleases} releases, exiting");
                 return;
             }
 
-            Release? scene = await ScrapeSceneWithRetryAsync(site, subSite, scrapeOptions, siteScraper, page, currentScene);
-            if (scene != null)
+            Release? release = await ScrapeReleaseWithRetryAsync(site, subSite, scrapeOptions, siteScraper, page, currentRelease);
+            if (release != null)
             {
-                LogScrapedSceneDescription(scene);
+                LogScrapedReleaseDescription(release);
                 await Task.Delay(3000);
             }
 
-            scrapedScenes++;
+            scrapedReleases++;
         }
     }
 
-    private async Task<Release?> ScrapeSceneWithRetryAsync(Site site, SubSite subSite, ScrapeOptions scrapeOptions, ISiteScraper siteScraper, IPage page, IndexScene? currentScene)
+    private async Task<Release?> ScrapeReleaseWithRetryAsync(Site site, SubSite subSite, ScrapeOptions scrapeOptions, ISiteScraper siteScraper, IPage page, ListedRelease? currentRelease)
     {
         var strategy = new ResilienceStrategyBuilder<Release?>()
             .AddFallback(new FallbackStrategyOptions<Release?>
@@ -135,23 +135,23 @@ public class NetworkRipper : INetworkRipper
                 BaseDelay = TimeSpan.FromSeconds(3),
                 OnRetry = args =>
                 {
-                    Log.Error($"Caught following exception while scraping {currentScene.Url}: " + args.Exception?.ToString(),
+                    Log.Error($"Caught following exception while scraping {currentRelease.Url}: " + args.Exception?.ToString(),
                         args.Exception);
                     return default;
                 }
             })
             .Build();
 
-        var scene = await strategy.ExecuteAsync(async token =>
-            await ScrapeSceneAsync(currentScene, siteScraper, site, subSite, page, scrapeOptions)
+        var release = await strategy.ExecuteAsync(async token =>
+            await ScrapeReleaseAsync(currentRelease, siteScraper, site, subSite, page, scrapeOptions)
         );
-        return scene;
+        return release;
     }
 
-    private static async Task<IReadOnlyList<IndexScene>> ScrapePageIndexScenesAsync(Site site, SubSite subSite, ISiteScraper siteScraper, IPage page, int currentPage)
+    private static async Task<IReadOnlyList<ListedRelease>> ScrapePageListedReleasesAsync(Site site, SubSite subSite, ISiteScraper siteScraper, IPage page, int currentPage)
     {
-        var indexRetryStrategy = new ResilienceStrategyBuilder<IReadOnlyList<IndexScene>>()
-            .AddRetry(new RetryStrategyOptions<IReadOnlyList<IndexScene>>()
+        var indexRetryStrategy = new ResilienceStrategyBuilder<IReadOnlyList<ListedRelease>>()
+            .AddRetry(new RetryStrategyOptions<IReadOnlyList<ListedRelease>>()
             {
                 RetryCount = 3,
                 BaseDelay = TimeSpan.FromSeconds(3),
@@ -164,7 +164,7 @@ public class NetworkRipper : INetworkRipper
             })
             .Build();
 
-        var indexScenes = await indexRetryStrategy.ExecuteAsync(async token =>
+        var listedReleases = await indexRetryStrategy.ExecuteAsync(async token =>
         {
             var requests = new List<IRequest>();
             await page.RouteAsync("**/*", async route =>
@@ -173,15 +173,15 @@ public class NetworkRipper : INetworkRipper
                 await route.ContinueAsync();
             });
 
-            var indexScenes = await siteScraper.GetCurrentScenesAsync(site, subSite, page, requests, currentPage);
-            return indexScenes;
+            var listedReleases = await siteScraper.GetCurrentReleasesAsync(site, subSite, page, requests, currentPage);
+            return listedReleases;
         });
-        return indexScenes;
+        return listedReleases;
     }
 
-    private static void LogScrapedSceneDescription(Release release)
+    private static void LogScrapedReleaseDescription(Release release)
     {
-        var sceneDescription = new {
+        var releaseDescription = new {
             Site = release.Site.Name,
             SubSite = release.SubSite?.Name,
             ShortName = release.ShortName,
@@ -190,47 +190,47 @@ public class NetworkRipper : INetworkRipper
             Url = release.Url.StartsWith("https://")
                 ? release.Url
                 : release.Site.Url + release.Url };
-        Log.Information("Scraped scene: {@Scene}", sceneDescription);
+        Log.Information("Scraped release: {@Release}", releaseDescription);
     }
 
-    private async Task<Release?> ScrapeSceneAsync(IndexScene currentScene, ISiteScraper siteScraper, Site site, SubSite subSite, IPage page, ScrapeOptions scrapeOptions)
+    private async Task<Release?> ScrapeReleaseAsync(ListedRelease currentRelease, ISiteScraper siteScraper, Site site, SubSite subSite, IPage page, ScrapeOptions scrapeOptions)
     {
-        var scenePage = await page.Context.NewPageAsync();
+        var releasePage = await page.Context.NewPageAsync();
 
         try
         {
             var requests = new List<IRequest>();
-            await scenePage.RouteAsync("**/*", async route =>
+            await releasePage.RouteAsync("**/*", async route =>
             {
                 requests.Add(route.Request);
                 await route.ContinueAsync();
             });
 
-            await scenePage.GotoAsync(currentScene.Url);
-            await scenePage.WaitForLoadStateAsync();
+            await releasePage.GotoAsync(currentRelease.Url);
+            await releasePage.WaitForLoadStateAsync();
 
             await Task.Delay(1000);
 
-            var sceneUuid = currentScene.Scene?.Uuid ?? UuidGenerator.Generate();
-            var scene = await siteScraper.ScrapeSceneAsync(sceneUuid, site, subSite, currentScene.Url, currentScene.ShortName, scenePage, requests);
-            if (scene == null)
+            var releaseUuid = currentRelease.Release?.Uuid ?? UuidGenerator.Generate();
+            var release = await siteScraper.ScrapeReleaseAsync(releaseUuid, site, subSite, currentRelease.Url, currentRelease.ShortName, releasePage, requests);
+            if (release == null)
             {
                 return null;
             }
 
-            return await _repository.UpsertScene(scene);
+            return await _repository.UpsertRelease(release);
         }
         finally
         {
-            await scenePage.CloseAsync();
+            await releasePage.CloseAsync();
         }
     }
 
-    public async Task DownloadScenesAsync(Site site, BrowserSettings browserSettings, DownloadConditions downloadConditions, DownloadOptions downloadOptions)
+    public async Task DownloadReleasesAsync(Site site, BrowserSettings browserSettings, DownloadConditions downloadConditions, DownloadOptions downloadOptions)
     {
-        var matchingScenes = await _repository.QueryReleasesAsync(site, downloadConditions);
+        var matchingReleases = await _repository.QueryReleasesAsync(site, downloadConditions);
 
-        var furtherFilteredScenes = matchingScenes
+        var furtherFilteredReleases = matchingReleases
             .Where(s =>
                 downloadConditions.DateRange.Start <= s.ReleaseDate &&
                 s.ReleaseDate <= downloadConditions.DateRange.End)
@@ -244,43 +244,43 @@ public class NetworkRipper : INetworkRipper
 
         if (!string.IsNullOrWhiteSpace(downloadOptions.SubSite))
         {
-            furtherFilteredScenes = furtherFilteredScenes
+            furtherFilteredReleases = furtherFilteredReleases
                 .Where(s => s.SubSite != null && s.SubSite.ShortName == downloadOptions.SubSite)
                 .ToList();
         }
-        if (downloadOptions.MaxScenes != int.MaxValue)
+        if (downloadOptions.MaxReleases != int.MaxValue)
         {
-            furtherFilteredScenes = furtherFilteredScenes
-                .Take(downloadOptions.MaxScenes)
+            furtherFilteredReleases = furtherFilteredReleases
+                .Take(downloadOptions.MaxReleases)
                 .ToList();
         }
 
         if (downloadOptions.ReverseOrder)
         {
-            furtherFilteredScenes = furtherFilteredScenes.OrderByDescending(s => s.ReleaseDate).ToList();
+            furtherFilteredReleases = furtherFilteredReleases.OrderByDescending(s => s.ReleaseDate).ToList();
         }
         else
         {
-            furtherFilteredScenes = furtherFilteredScenes.OrderBy(s => s.ReleaseDate).ToList();
+            furtherFilteredReleases = furtherFilteredReleases.OrderBy(s => s.ReleaseDate).ToList();
         }
 
-        await DownloadGivenScenesAsync(
+        await DownloadGivenReleasesAsync(
             site,
             browserSettings,
             downloadConditions,
-            furtherFilteredScenes.ToList());
+            furtherFilteredReleases.ToList());
     }
 
-    private async Task DownloadGivenScenesAsync(Site site, BrowserSettings browserSettings, DownloadConditions downloadConditions, IList<Release> matchingScenes)
+    private async Task DownloadGivenReleasesAsync(Site site, BrowserSettings browserSettings, DownloadConditions downloadConditions, IList<Release> matchingReleases)
     {
-        var matchingScenesStr = string.Join($"{Environment.NewLine}    ", matchingScenes.Select(s => $"{s.Site.Name} - {s.ReleaseDate.ToString("yyyy-MM-dd")} - {s.Name}"));
+        var matchingReleasesStr = string.Join($"{Environment.NewLine}    ", matchingReleases.Select(s => $"{s.Site.Name} - {s.ReleaseDate.ToString("yyyy-MM-dd")} - {s.Name}"));
 
         ISiteScraper siteScraper = (ISiteScraper)_serviceProvider.GetService(typeof(ISiteScraper));
         Log.Information($"Culture Extractor, using {siteScraper.GetType()}");
 
-        Log.Information($"Found {matchingScenes.Count} scenes:{Environment.NewLine}    {matchingScenesStr}");
+        Log.Information($"Found {matchingReleases.Count} releases:{Environment.NewLine}    {matchingReleasesStr}");
 
-        if (!matchingScenes.Any())
+        if (!matchingReleases.Any())
         {
             Log.Information("Nothing to download.");
             return;
@@ -288,24 +288,24 @@ public class NetworkRipper : INetworkRipper
 
         IPage page = await CreatePageAndLoginAsync(siteScraper, site, browserSettings, false);
 
-        var rippedScenes = 0;
+        var rippedReleases = 0;
 
-        foreach (var matchingScene in matchingScenes)
+        foreach (var matchingRelease in matchingReleases)
         {
-            if (rippedScenes >= downloadConditions.MaxDownloads)
+            if (rippedReleases >= downloadConditions.MaxDownloads)
             {
-                Log.Information($"Maximum scene rip limit of {downloadConditions.MaxDownloads} reached. Stopping...");
+                Log.Information($"Maximum release rip limit of {downloadConditions.MaxDownloads} reached. Stopping...");
                 break;
             }
-            if ((matchingScenes.Count - rippedScenes) % 10 == 0)
+            if ((matchingReleases.Count - rippedReleases) % 10 == 0)
             {
-                Log.Information($"Remaining downloads {matchingScenes.Count - rippedScenes}/{matchingScenes.Count} scenes.");
+                Log.Information($"Remaining downloads {matchingReleases.Count - rippedReleases}/{matchingReleases.Count} releases.");
             }
 
             // Ungh, throws exception
             _downloader.CheckFreeSpace();
 
-            IPage scenePage = null;
+            IPage releasePage = null;
             const int maxRetries = 3;
             for (int retries = 0; retries < maxRetries; retries++)
             {
@@ -313,56 +313,56 @@ public class NetworkRipper : INetworkRipper
                 {
                     if (retries > 0)
                     {
-                        Log.Information($"Retrying {retries + 1} attempt for {matchingScene.Url}");
+                        Log.Information($"Retrying {retries + 1} attempt for {matchingRelease.Url}");
                         await page.ReloadAsync();
                     }
 
-                    var existingScene = await _repository.GetSceneAsync(site.ShortName, matchingScene.ShortName);
+                    var existingRelease = await _repository.GetReleaseAsync(site.ShortName, matchingRelease.ShortName);
 
-                    scenePage = await page.Context.NewPageAsync();
+                    releasePage = await page.Context.NewPageAsync();
 
                     var requests = new List<IRequest>();
-                    await scenePage.RouteAsync("**/*", async route =>
+                    await releasePage.RouteAsync("**/*", async route =>
                     {
                         requests.Add(route.Request);
                         await route.ContinueAsync();
                     });
 
-                    await scenePage.GotoAsync(matchingScene.Url);
-                    await scenePage.WaitForLoadStateAsync();
+                    await releasePage.GotoAsync(matchingRelease.Url);
+                    await releasePage.WaitForLoadStateAsync();
 
-                    var sceneUuid = existingScene?.Uuid ?? UuidGenerator.Generate();
-                    var scene = await siteScraper.ScrapeSceneAsync(sceneUuid, site, null, matchingScene.Url, matchingScene.ShortName, scenePage, requests);
-                    existingScene = await _repository.UpsertScene(scene);
+                    var releaseUuid = existingRelease?.Uuid ?? UuidGenerator.Generate();
+                    var release = await siteScraper.ScrapeReleaseAsync(releaseUuid, site, null, matchingRelease.Url, matchingRelease.ShortName, releasePage, requests);
+                    existingRelease = await _repository.UpsertRelease(release);
 
-                    var sceneDescription = new {
-                        Site = existingScene.Site.Name,
-                        ReleaseDate = existingScene.ReleaseDate,
-                        Name = existingScene.Name,
-                        Url = existingScene.Url.StartsWith("https://")
-                            ? existingScene.Url
-                            : existingScene.Site.Url + existingScene.Url,
+                    var releaseDescription = new {
+                        Site = existingRelease.Site.Name,
+                        ReleaseDate = existingRelease.ReleaseDate,
+                        Name = existingRelease.Name,
+                        Url = existingRelease.Url.StartsWith("https://")
+                            ? existingRelease.Url
+                            : existingRelease.Site.Url + existingRelease.Url,
                         Quality = downloadConditions.PreferredDownloadQuality
                     };
-                    Log.Verbose("Downloading: {@Scene}", sceneDescription);
+                    Log.Verbose("Downloading: {@Release}", releaseDescription);
 
-                    var download = await siteScraper.DownloadSceneAsync(existingScene, scenePage, downloadConditions, requests);
+                    var download = await siteScraper.DownloadReleaseAsync(existingRelease, releasePage, downloadConditions, requests);
                     await _repository.SaveDownloadAsync(download, downloadConditions.PreferredDownloadQuality);
 
-                    rippedScenes++;
+                    rippedReleases++;
 
-                    var sceneDescription2 = new
+                    var releaseDescription2 = new
                     {
-                        Site = existingScene.Site.Name,
-                        ReleaseDate = existingScene.ReleaseDate,
-                        Name = existingScene.Name,
-                        Url = existingScene.Url.StartsWith("https://")
-                            ? existingScene.Url
-                            : existingScene.Site.Url + existingScene.Url,
+                        Site = existingRelease.Site.Name,
+                        ReleaseDate = existingRelease.ReleaseDate,
+                        Name = existingRelease.Name,
+                        Url = existingRelease.Url.StartsWith("https://")
+                            ? existingRelease.Url
+                            : existingRelease.Site.Url + existingRelease.Url,
                         Quality = downloadConditions.PreferredDownloadQuality,
                         Phash = download.VideoHashes?.PHash
                     };
-                    Log.Information("Downloaded:  {@Scene}", sceneDescription2);
+                    Log.Information("Downloaded:  {@Release}", releaseDescription2);
                     await Task.Delay(3000);
                     break;
                 }
@@ -395,15 +395,15 @@ public class NetworkRipper : INetworkRipper
                 }
                 finally
                 {
-                    if (scenePage != null)
+                    if (releasePage != null)
                     {
-                        await scenePage.CloseAsync();
+                        await releasePage.CloseAsync();
                     }
                 }
 
                 if (retries == maxRetries)
                 {
-                    Log.Warning($"Failed to scrape {matchingScene.Url}");
+                    Log.Warning($"Failed to scrape {matchingRelease.Url}");
                 }
             }
         }

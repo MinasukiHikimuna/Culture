@@ -43,7 +43,7 @@ public class CultureExtractorConsoleApp
             var browserSettings = new BrowserSettings(opts.BrowserMode, opts.BrowserChannel);
 
             var site = await _repository.GetSiteAsync(shortName);
-            await _networkRipper.ScrapeScenesAsync(site, browserSettings, opts);
+            await _networkRipper.ScrapeReleasesAsync(site, browserSettings, opts);
 
             return 0;
         }
@@ -80,7 +80,7 @@ public class CultureExtractorConsoleApp
             };
 
             var site = await _repository.GetSiteAsync(shortName);
-            await _networkRipper.DownloadScenesAsync(site, browserSettings, downloadConditions, opts);
+            await _networkRipper.DownloadReleasesAsync(site, browserSettings, downloadConditions, opts);
 
             return 0;
         }

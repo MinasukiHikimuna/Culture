@@ -61,7 +61,7 @@ public class KinkRipper : ISiteScraper, ISubSiteScraper
         }
     }
 
-    public async Task<int> NavigateToScenesAndReturnPageCountAsync(Site site, IPage page)
+    public async Task<int> NavigateToReleasesAndReturnPageCountAsync(Site site, IPage page)
     {
         await page.Locator("ul.navbar-nav > li.nav-item > a.nav-link").Nth(0).ClickAsync();
         await page.WaitForLoadStateAsync();
@@ -72,17 +72,17 @@ public class KinkRipper : ISiteScraper, ISubSiteScraper
         return int.Parse(lastPage);
     }
 
-    public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, SubSite subSite, IPage page, IReadOnlyList<IRequest> requests, int pageNumber)
+    public async Task<IReadOnlyList<ListedRelease>> GetCurrentReleasesAsync(Site site, SubSite subSite, IPage page, IReadOnlyList<IRequest> requests, int pageNumber)
     {
         await GoToPageAsync(page, subSite, pageNumber);
         
         var sceneHandles = await page.Locator("div.shoot-card").ElementHandlesAsync();
 
-        var indexScenes = new List<IndexScene>();
+        var indexScenes = new List<ListedRelease>();
         foreach (var sceneHandle in sceneHandles.Reverse())
         {
             var sceneIdAndUrl = await GetSceneIdAsync(sceneHandle);
-            indexScenes.Add(new IndexScene(null, sceneIdAndUrl.Id, sceneIdAndUrl.Url, sceneHandle));
+            indexScenes.Add(new ListedRelease(null, sceneIdAndUrl.Id, sceneIdAndUrl.Url, sceneHandle));
         }
 
         return indexScenes.AsReadOnly();
@@ -104,7 +104,7 @@ public class KinkRipper : ISiteScraper, ISubSiteScraper
         return new SceneIdAndUrl(shortName, url);
     }
 
-    public async Task<Release> ScrapeSceneAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
+    public async Task<Release> ScrapeReleaseAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
         if (await page.Locator("div.four-oh-four h1").IsVisibleAsync())
         {
@@ -205,7 +205,7 @@ public class KinkRipper : ISiteScraper, ISubSiteScraper
         return scene;
     }
 
-    public async Task<Download> DownloadSceneAsync(Release release, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)
+    public async Task<Download> DownloadReleaseAsync(Release release, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)
     {
         var availableDownloads = await ParseAvailableDownloadsAsync(page);
 

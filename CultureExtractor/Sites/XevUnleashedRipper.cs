@@ -49,7 +49,7 @@ public class XevUnleashedRipper : ISiteScraper
         await Task.Delay(5000);
     }
 
-    public async Task<int> NavigateToScenesAndReturnPageCountAsync(Site site, IPage page)
+    public async Task<int> NavigateToReleasesAndReturnPageCountAsync(Site site, IPage page)
     {
         var moviesLink = page.GetByRole(AriaRole.Link, new() { NameString = "Movies" });
         if (await moviesLink.IsVisibleAsync())
@@ -68,17 +68,17 @@ public class XevUnleashedRipper : ISiteScraper
         return lastPage;
     }
 
-    public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, SubSite subSite, IPage page, IReadOnlyList<IRequest> requests, int pageNumber)
+    public async Task<IReadOnlyList<ListedRelease>> GetCurrentReleasesAsync(Site site, SubSite subSite, IPage page, IReadOnlyList<IRequest> requests, int pageNumber)
     {
         await GoToPageAsync(page, pageNumber);
         
         var sceneHandles = await page.Locator("div.update_details").ElementHandlesAsync();
 
-        var indexScenes = new List<IndexScene>();
+        var indexScenes = new List<ListedRelease>();
         foreach (var sceneHandle in sceneHandles.Reverse())
         {
             var sceneIdAndUrl = await GetSceneIdAsync(sceneHandle);
-            indexScenes.Add(new IndexScene(null, sceneIdAndUrl.Id, sceneIdAndUrl.Url, sceneHandle));
+            indexScenes.Add(new ListedRelease(null, sceneIdAndUrl.Id, sceneIdAndUrl.Url, sceneHandle));
         }
 
         return indexScenes.AsReadOnly();
@@ -99,7 +99,7 @@ public class XevUnleashedRipper : ISiteScraper
         return new SceneIdAndUrl(shortName, url);
     }
 
-    public async Task<Release> ScrapeSceneAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
+    public async Task<Release> ScrapeReleaseAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
         var releaseDateElement = await page.QuerySelectorAsync("div.cell.update_date");
         string releaseDateRaw = await releaseDateElement.TextContentAsync();
@@ -213,7 +213,7 @@ public class XevUnleashedRipper : ISiteScraper
         return availableDownloads.OrderByDescending(d => d.DownloadOption.ResolutionHeight).ToList();
     }
 
-    public async Task<Download> DownloadSceneAsync(Release release, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)
+    public async Task<Download> DownloadReleaseAsync(Release release, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)
     {
         var availableDownloads = await ParseAvailableDownloadsAsync(page);
 

@@ -50,7 +50,7 @@ public class NubilesPornRipper : ISiteScraper
         await page.GotoAsync(site.Url);
     }
 
-    public async Task<int> NavigateToScenesAndReturnPageCountAsync(Site site, IPage page)
+    public async Task<int> NavigateToReleasesAndReturnPageCountAsync(Site site, IPage page)
     {
         await page.Locator("ul.navbar-nav > li.nav-item > a.nav-link").Nth(0).ClickAsync();
         await page.WaitForLoadStateAsync();
@@ -61,17 +61,17 @@ public class NubilesPornRipper : ISiteScraper
         return int.Parse(lastPage);
     }
 
-    public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, SubSite subSite, IPage page, IReadOnlyList<IRequest> requests, int pageNumber)
+    public async Task<IReadOnlyList<ListedRelease>> GetCurrentReleasesAsync(Site site, SubSite subSite, IPage page, IReadOnlyList<IRequest> requests, int pageNumber)
     {
         await GoToPageAsync(page, site, subSite, pageNumber);
         
         var sceneHandles = await page.Locator("div.Videoset div.content-grid-item").ElementHandlesAsync();
 
-        var indexScenes = new List<IndexScene>();
+        var indexScenes = new List<ListedRelease>();
         foreach (var sceneHandle in sceneHandles.Reverse())
         {
             var sceneIdAndUrl = await GetSceneIdAsync(sceneHandle);
-            indexScenes.Add(new IndexScene(null, sceneIdAndUrl.Id, sceneIdAndUrl.Url, sceneHandle));
+            indexScenes.Add(new ListedRelease(null, sceneIdAndUrl.Id, sceneIdAndUrl.Url, sceneHandle));
         }
 
         return indexScenes.AsReadOnly();
@@ -107,7 +107,7 @@ public class NubilesPornRipper : ISiteScraper
         throw new Exception($"Unable to parse ID from {url}");
     }
 
-    public async Task<Release> ScrapeSceneAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
+    public async Task<Release> ScrapeReleaseAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
         var releaseDateRaw = await page.Locator("div.content-pane-title span.date").TextContentAsync();
         var releaseDate = DateOnly.Parse(releaseDateRaw);
@@ -208,7 +208,7 @@ public class NubilesPornRipper : ISiteScraper
         return scene;
     }
 
-    public async Task<Download> DownloadSceneAsync(Release release, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)
+    public async Task<Download> DownloadReleaseAsync(Release release, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)
     {
         var availableDownloads = await ParseAvailableDownloadsAsync(page);
 

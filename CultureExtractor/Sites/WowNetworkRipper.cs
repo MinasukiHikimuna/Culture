@@ -42,7 +42,7 @@ public class WowNetworkRipper : ISiteScraper
         }
     }
 
-    public async Task<int> NavigateToScenesAndReturnPageCountAsync(Site site, IPage page)
+    public async Task<int> NavigateToReleasesAndReturnPageCountAsync(Site site, IPage page)
     {
         await page.GetByRole(AriaRole.Link, new() { NameString = "Films" }).Nth(1).ClickAsync();
         await page.WaitForLoadStateAsync();
@@ -78,17 +78,17 @@ public class WowNetworkRipper : ISiteScraper
         return totalPages;
     }
 
-    public async Task<IReadOnlyList<IndexScene>> GetCurrentScenesAsync(Site site, SubSite subSite, IPage page, IReadOnlyList<IRequest> requests, int pageNumber)
+    public async Task<IReadOnlyList<ListedRelease>> GetCurrentReleasesAsync(Site site, SubSite subSite, IPage page, IReadOnlyList<IRequest> requests, int pageNumber)
     {
         await GoToPageAsync(page, site, subSite, pageNumber);
         
         var sceneHandles = await page.Locator("section.cf_content > ul > li > div.content_item > a.icon").ElementHandlesAsync();
 
-        var indexScenes = new List<IndexScene>();
+        var indexScenes = new List<ListedRelease>();
         foreach (var sceneHandle in sceneHandles.Reverse())
         {
             var sceneIdAndUrl = await GetSceneIdAsync(site, sceneHandle);
-            indexScenes.Add(new IndexScene(null, sceneIdAndUrl.Id, sceneIdAndUrl.Url, sceneHandle));
+            indexScenes.Add(new ListedRelease(null, sceneIdAndUrl.Id, sceneIdAndUrl.Url, sceneHandle));
         }
 
         return indexScenes.AsReadOnly();
@@ -114,7 +114,7 @@ public class WowNetworkRipper : ISiteScraper
         return new SceneIdAndUrl(match.Groups["id"].Value, url);
     }
 
-    public async Task<Release> ScrapeSceneAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
+    public async Task<Release> ScrapeReleaseAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
         await page.WaitForLoadStateAsync();
 
@@ -259,7 +259,7 @@ public class WowNetworkRipper : ISiteScraper
         return string.Join("\r\n\r\n", descriptionParagraphs);
     }
 
-    public async Task<Download> DownloadSceneAsync(Release release, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)
+    public async Task<Download> DownloadReleaseAsync(Release release, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)
     {
         await page.GotoAsync(release.Url);
         await page.WaitForLoadStateAsync();

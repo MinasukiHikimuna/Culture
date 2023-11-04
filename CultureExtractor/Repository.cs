@@ -73,7 +73,7 @@ public class Repository : IRepository
         return siteEntities.Select(Convert).AsEnumerable();
     }
 
-    public async Task<Release?> GetSceneAsync(string siteShortName, string sceneShortName)
+    public async Task<Release?> GetReleaseAsync(string siteShortName, string sceneShortName)
     {
         var sceneEntity = await _sqliteContext.Releases
             .Include(s => s.Site)
@@ -136,7 +136,7 @@ public class Repository : IRepository
         return Convert(subSiteEntity);
     }
 
-    public async Task<Release> UpsertScene(Release release)
+    public async Task<Release> UpsertRelease(Release release)
     {
         var siteEntity = await _sqliteContext.Sites.FirstAsync(s => s.Uuid == release.Site.Uuid.ToString());
         SubSiteEntity subSiteEntity = null;

@@ -210,7 +210,7 @@ public class BaseOptions
     public string? BrowserChannel { get; set; }
 
     [Option("max-scenes", Default = int.MaxValue, HelpText = "How many scenes to process")]
-    public int MaxScenes { get; set; }
+    public int MaxReleases { get; set; }
 
     [Option("reverse-order", Required = false, HelpText = "Scrape/download scenes in reverse order (i.e. from latest to oldest)")]
     public bool ReverseOrder { get; set; }

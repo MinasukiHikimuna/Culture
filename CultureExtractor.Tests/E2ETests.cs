@@ -11,7 +11,7 @@ public class E2ETests
         var scrapeOptions = new ScrapeOptions()
         {
             SiteShortName = "sexart",
-            MaxScenes = int.MaxValue
+            MaxReleases = int.MaxValue
         };
 
         var host = AppHostFactory.CreateHost(new string[0], scrapeOptions.SiteShortName);
@@ -22,6 +22,6 @@ public class E2ETests
 
         var site = await repository.GetSiteAsync(scrapeOptions.SiteShortName);
 
-        await networkRipper.ScrapeScenesAsync(site, browserSettings, scrapeOptions);
+        await networkRipper.ScrapeReleasesAsync(site, browserSettings, scrapeOptions);
     }
 }
