@@ -32,42 +32,42 @@ public class Downloader : IDownloader
         }
     }
 
-    public bool SceneImageExists(Scene scene)
+    public bool SceneImageExists(Release release)
     {
         // TODO: extension might not be jpg
-        var path = Path.Combine(_metadataPath, $@"{scene.Site.Name}\Metadata\SceneImages\{scene.Uuid}.jpg");
+        var path = Path.Combine(_metadataPath, $@"{release.Site.Name}\Metadata\SceneImages\{release.Uuid}.jpg");
         return File.Exists(path);
     }
 
-    public async Task DownloadSceneImageAsync(Scene scene, string imageUrl, string referer = "", Dictionary<HttpRequestHeader, string>? headers = null)
+    public async Task DownloadSceneImageAsync(Release release, string imageUrl, string referer = "", Dictionary<HttpRequestHeader, string>? headers = null)
     {
-        var rippingPath = Path.Combine(_metadataPath, $@"{scene.Site.Name}\Metadata\SceneImages\");
+        var rippingPath = Path.Combine(_metadataPath, $@"{release.Site.Name}\Metadata\SceneImages\");
         Directory.CreateDirectory(rippingPath);
 
-        await DownloadFileAsync(imageUrl, $"{scene.Uuid}.jpg", rippingPath, referer: referer, headers: headers);
+        await DownloadFileAsync(imageUrl, $"{release.Uuid}.jpg", rippingPath, referer: referer, headers: headers);
     }
 
-    public async Task DownloadTrailerAsync(Scene scene, string url, string referer = "")
+    public async Task DownloadTrailerAsync(Release release, string url, string referer = "")
     {
-        var rippingPath = Path.Combine(_metadataPath, $@"{scene.Site.Name}\Metadata\Trailers\");
+        var rippingPath = Path.Combine(_metadataPath, $@"{release.Site.Name}\Metadata\Trailers\");
         Directory.CreateDirectory(rippingPath);
 
         // parse extension from url
         var extension = Path.GetExtension(url);
-        var fileName = $"{scene.Uuid}{extension}";
+        var fileName = $"{release.Uuid}{extension}";
 
         await DownloadFileAsync(url, fileName, rippingPath, referer: referer);
     }
 
-    public async Task DownloadSceneSubtitlesAsync(Scene scene, string fileName, string subtitleUrl, string referer = "")
+    public async Task DownloadSceneSubtitlesAsync(Release release, string fileName, string subtitleUrl, string referer = "")
     {
-        var rippingPath = Path.Combine(_metadataPath, $@"{scene.Site.Name}\Metadata\Subtitles\");
+        var rippingPath = Path.Combine(_metadataPath, $@"{release.Site.Name}\Metadata\Subtitles\");
         Directory.CreateDirectory(rippingPath);
 
         await DownloadFileAsync(subtitleUrl, fileName, rippingPath, referer: referer);
     }
 
-    public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadOption downloadDetails, PreferredDownloadQuality downloadQuality, Func<Task> func, string? filename = null)
+    public async Task<Download> DownloadSceneAsync(Release release, IPage page, DownloadOption downloadDetails, PreferredDownloadQuality downloadQuality, Func<Task> func, string? filename = null)
     {
         var waitForDownloadTask = page.WaitForDownloadAsync(new() { Timeout = (float) TimeSpan.FromHours(1).TotalMilliseconds });
 
@@ -78,10 +78,10 @@ public class Downloader : IDownloader
         var suffix = Path.GetExtension(suggestedFilename);
 
         var name = string.IsNullOrWhiteSpace(filename)
-            ? SceneNamer.Name(scene, suffix)
+            ? SceneNamer.Name(release, suffix)
             : $"{filename}";
 
-        var downloadQualityDirectory = Path.Join(_downloadPath, Path.Join(scene.Site.Name, Enum.GetName(downloadQuality)));
+        var downloadQualityDirectory = Path.Join(_downloadPath, Path.Join(release.Site.Name, Enum.GetName(downloadQuality)));
         var path = Path.Join(downloadQualityDirectory, name);
 
         await download.SaveAsAsync(path);
@@ -89,31 +89,31 @@ public class Downloader : IDownloader
 
         var videoHashes = Hasher.Phash(@"""" + path + @"""");
 
-        return new Download(scene, suggestedFilename, name, downloadDetails, videoHashes);
+        return new Download(release, suggestedFilename, name, downloadDetails, videoHashes);
     }
 
-    public async Task<Download> DownloadSceneDirectAsync(Scene scene, DownloadOption downloadDetails, PreferredDownloadQuality downloadQuality, Dictionary<HttpRequestHeader, string> headers, string fileName = "", string referer = "")
+    public async Task<Download> DownloadSceneDirectAsync(Release release, DownloadOption downloadDetails, PreferredDownloadQuality downloadQuality, Dictionary<HttpRequestHeader, string> headers, string fileName = "", string referer = "")
     {
         var suggestedFilename = downloadDetails.Url.Substring(downloadDetails.Url.LastIndexOf("/") + 1);
         var suffix = Path.GetExtension(suggestedFilename);
 
         var name = string.IsNullOrWhiteSpace(fileName)
-            ? SceneNamer.Name(scene, suffix)
+            ? SceneNamer.Name(release, suffix)
             : $"{fileName}";
 
-        var downloadQualityDirectory = Path.Join(_downloadPath, Path.Join(scene.Site.Name, Enum.GetName(downloadQuality)));
+        var downloadQualityDirectory = Path.Join(_downloadPath, Path.Join(release.Site.Name, Enum.GetName(downloadQuality)));
         var path = Path.Join(downloadQualityDirectory, name);
         Directory.CreateDirectory(downloadQualityDirectory);
 
         var url = downloadDetails.Url.StartsWith("https://")
             ? downloadDetails.Url
-            : scene.Site.Url + downloadDetails.Url;
+            : release.Site.Url + downloadDetails.Url;
 
         await DownloadFileAsync(url, name, downloadQualityDirectory, headers, referer);
 
         var videoHashes = Hasher.Phash(@"""" + path + @"""");
 
-        return new Download(scene, suggestedFilename, name, downloadDetails, videoHashes);
+        return new Download(release, suggestedFilename, name, downloadDetails, videoHashes);
     }
 
     private static async Task DownloadFileAsync(string url, string fileName, string rippingPath, Dictionary<HttpRequestHeader, string>? headers = null, string referer = "")

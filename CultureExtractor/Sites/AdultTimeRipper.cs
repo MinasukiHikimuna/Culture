@@ -631,7 +631,7 @@ public class AdultTimeRipper : ISiteScraper
         return new SceneIdAndUrl(id, url);
     }
 
-    public async Task<Scene> ScrapeSceneAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
+    public async Task<Release> ScrapeSceneAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
         // TODO:
         /*
@@ -699,7 +699,7 @@ public class AdultTimeRipper : ISiteScraper
             downloadOptionsAndHandles.Select(f => f.DownloadOption).ToList(),
             sceneData.ActionTags != null ? sceneData.ActionTags : new List<ActionTag>());
 
-        Scene scene = new Scene(
+        Release release = new Release(
             sceneUuid,
             site,
             null,
@@ -717,8 +717,8 @@ public class AdultTimeRipper : ISiteScraper
 
         if (sceneData.subtitles?.full?.en != null)
         {
-            var subtitleFilename = SceneNamer.Name(scene, ".vtt");
-            await _downloader.DownloadSceneSubtitlesAsync(scene, subtitleFilename, "https://subtitles.gammacdn.com/" + sceneData.subtitles.full.en, page.Url);
+            var subtitleFilename = SceneNamer.Name(release, ".vtt");
+            await _downloader.DownloadSceneSubtitlesAsync(release, subtitleFilename, "https://subtitles.gammacdn.com/" + sceneData.subtitles.full.en, page.Url);
         }
 
         var sceneImageUrl = await page.GetAttributeAsync("img.ScenePlayerHeaderPlus-PosterImage", "src");
@@ -731,14 +731,14 @@ public class AdultTimeRipper : ISiteScraper
         replacement = "${1}jpg";
         output = Regex.Replace(output, pattern, replacement);
 
-        await _downloader.DownloadSceneImageAsync(scene, output, scene.Url);
+        await _downloader.DownloadSceneImageAsync(release, output, release.Url);
 
-        return scene;
+        return release;
     }
 
-    public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)
+    public async Task<Download> DownloadSceneAsync(Release release, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)
     {
-        await page.GotoAsync(scene.Url);
+        await page.GotoAsync(release.Url);
         await page.WaitForLoadStateAsync();
 
         await Task.Delay(3000);
@@ -765,10 +765,10 @@ public class AdultTimeRipper : ISiteScraper
         IPage newPage = await page.Context.NewPageAsync();
 
         var suffix = ".mp4";
-        var name = SceneNamer.Name(scene, suffix);
+        var name = SceneNamer.Name(release, suffix);
 
         // TODO: does download but Playwright won't detect when it finishes
-        var download = await _downloader.DownloadSceneAsync(scene, newPage, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, async () =>
+        var download = await _downloader.DownloadSceneAsync(release, newPage, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, async () =>
         {
             try
             {

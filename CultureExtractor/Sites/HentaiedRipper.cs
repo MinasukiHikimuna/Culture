@@ -104,7 +104,7 @@ public class HentaiedRipper : ISiteScraper
         return new SceneIdAndUrl(shortName, url);
     }
 
-    public async Task<Scene> ScrapeSceneAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
+    public async Task<Release> ScrapeSceneAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
         var releaseDateElement = await page.QuerySelectorAsync("div.durationandtime > div.entry-date");
         string releaseDateRaw = await releaseDateElement.TextContentAsync();
@@ -144,7 +144,7 @@ public class HentaiedRipper : ISiteScraper
 
         var downloadOptionsAndHandles = await ParseAvailableDownloadsAsync(page);
 
-        var scene = new Scene(
+        var scene = new Release(
             sceneUuid,
             site,
             subSite,
@@ -255,7 +255,7 @@ public class HentaiedRipper : ISiteScraper
         return new Sources { FileSources = new List<FileSource>() };
     }
 
-    public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)
+    public async Task<Download> DownloadSceneAsync(Release release, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)
     {
         var cookies = await page.Context.CookiesAsync();
 
@@ -281,6 +281,6 @@ public class HentaiedRipper : ISiteScraper
             { HttpRequestHeader.Cookie, cookieString }
         };
 
-        return await _downloader.DownloadSceneDirectAsync(scene, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, headers, referer: page.Url);
+        return await _downloader.DownloadSceneDirectAsync(release, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, headers, referer: page.Url);
     }
 }

@@ -99,7 +99,7 @@ public class XevUnleashedRipper : ISiteScraper
         return new SceneIdAndUrl(shortName, url);
     }
 
-    public async Task<Scene> ScrapeSceneAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
+    public async Task<Release> ScrapeSceneAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
         var releaseDateElement = await page.QuerySelectorAsync("div.cell.update_date");
         string releaseDateRaw = await releaseDateElement.TextContentAsync();
@@ -132,7 +132,7 @@ public class XevUnleashedRipper : ISiteScraper
 
         var downloadOptionsAndHandles = await ParseAvailableDownloadsAsync(page);
 
-        var scene = new Scene(
+        var scene = new Release(
             sceneUuid,
             site,
             subSite,
@@ -213,7 +213,7 @@ public class XevUnleashedRipper : ISiteScraper
         return availableDownloads.OrderByDescending(d => d.DownloadOption.ResolutionHeight).ToList();
     }
 
-    public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)
+    public async Task<Download> DownloadSceneAsync(Release release, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)
     {
         var availableDownloads = await ParseAvailableDownloadsAsync(page);
 
@@ -236,6 +236,6 @@ public class XevUnleashedRipper : ISiteScraper
             { HttpRequestHeader.Cookie, cookieString }
         };
 
-        return await _downloader.DownloadSceneDirectAsync(scene, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, headers, referer: page.Url);
+        return await _downloader.DownloadSceneDirectAsync(release, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, headers, referer: page.Url);
     }
 }

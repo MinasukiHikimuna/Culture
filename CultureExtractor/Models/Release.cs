@@ -1,6 +1,6 @@
 namespace CultureExtractor.Models;
 
-public record Scene(
+public record Release(
     Guid Uuid,
     Site Site,
     SubSite? SubSite,

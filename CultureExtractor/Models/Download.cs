@@ -1,7 +1,7 @@
 namespace CultureExtractor.Models;
 
 public record Download(
-    Scene Scene,
+    Release Release,
     string OriginalFilename,
     string SavedFilename,
     DownloadOption DownloadOption,

@@ -111,7 +111,7 @@ public class NetworkRipper : INetworkRipper
                 return;
             }
 
-            Scene? scene = await ScrapeSceneWithRetryAsync(site, subSite, scrapeOptions, siteScraper, page, currentScene);
+            Release? scene = await ScrapeSceneWithRetryAsync(site, subSite, scrapeOptions, siteScraper, page, currentScene);
             if (scene != null)
             {
                 LogScrapedSceneDescription(scene);
@@ -122,14 +122,14 @@ public class NetworkRipper : INetworkRipper
         }
     }
 
-    private async Task<Scene?> ScrapeSceneWithRetryAsync(Site site, SubSite subSite, ScrapeOptions scrapeOptions, ISiteScraper siteScraper, IPage page, IndexScene? currentScene)
+    private async Task<Release?> ScrapeSceneWithRetryAsync(Site site, SubSite subSite, ScrapeOptions scrapeOptions, ISiteScraper siteScraper, IPage page, IndexScene? currentScene)
     {
-        var strategy = new ResilienceStrategyBuilder<Scene?>()
-            .AddFallback(new FallbackStrategyOptions<Scene?>
+        var strategy = new ResilienceStrategyBuilder<Release?>()
+            .AddFallback(new FallbackStrategyOptions<Release?>
             {
-                FallbackAction = _ => Outcome.FromResultAsTask<Scene?>(null)
+                FallbackAction = _ => Outcome.FromResultAsTask<Release?>(null)
             })
-            .AddRetry(new RetryStrategyOptions<Scene?>()
+            .AddRetry(new RetryStrategyOptions<Release?>()
             {
                 RetryCount = 3,
                 BaseDelay = TimeSpan.FromSeconds(3),
@@ -179,21 +179,21 @@ public class NetworkRipper : INetworkRipper
         return indexScenes;
     }
 
-    private static void LogScrapedSceneDescription(Scene scene)
+    private static void LogScrapedSceneDescription(Release release)
     {
         var sceneDescription = new {
-            Site = scene.Site.Name,
-            SubSite = scene.SubSite?.Name,
-            ShortName = scene.ShortName,
-            ReleaseDate = scene.ReleaseDate,
-            Name = scene.Name,
-            Url = scene.Url.StartsWith("https://")
-                ? scene.Url
-                : scene.Site.Url + scene.Url };
+            Site = release.Site.Name,
+            SubSite = release.SubSite?.Name,
+            ShortName = release.ShortName,
+            ReleaseDate = release.ReleaseDate,
+            Name = release.Name,
+            Url = release.Url.StartsWith("https://")
+                ? release.Url
+                : release.Site.Url + release.Url };
         Log.Information("Scraped scene: {@Scene}", sceneDescription);
     }
 
-    private async Task<Scene?> ScrapeSceneAsync(IndexScene currentScene, ISiteScraper siteScraper, Site site, SubSite subSite, IPage page, ScrapeOptions scrapeOptions)
+    private async Task<Release?> ScrapeSceneAsync(IndexScene currentScene, ISiteScraper siteScraper, Site site, SubSite subSite, IPage page, ScrapeOptions scrapeOptions)
     {
         var scenePage = await page.Context.NewPageAsync();
 
@@ -271,7 +271,7 @@ public class NetworkRipper : INetworkRipper
             furtherFilteredScenes.ToList());
     }
 
-    private async Task DownloadGivenScenesAsync(Site site, BrowserSettings browserSettings, DownloadConditions downloadConditions, IList<Scene> matchingScenes)
+    private async Task DownloadGivenScenesAsync(Site site, BrowserSettings browserSettings, DownloadConditions downloadConditions, IList<Release> matchingScenes)
     {
         var matchingScenesStr = string.Join($"{Environment.NewLine}    ", matchingScenes.Select(s => $"{s.Site.Name} - {s.ReleaseDate.ToString("yyyy-MM-dd")} - {s.Name}"));
 

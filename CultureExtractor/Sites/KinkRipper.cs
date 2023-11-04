@@ -104,7 +104,7 @@ public class KinkRipper : ISiteScraper, ISubSiteScraper
         return new SceneIdAndUrl(shortName, url);
     }
 
-    public async Task<Scene> ScrapeSceneAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
+    public async Task<Release> ScrapeSceneAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
         if (await page.Locator("div.four-oh-four h1").IsVisibleAsync())
         {
@@ -172,7 +172,7 @@ public class KinkRipper : ISiteScraper, ISubSiteScraper
         var metadata = new { director = new { name = directorName, url = directorUrl } };
         var metadataJson = JsonSerializer.Serialize(metadata);
 
-        var scene = new Scene(
+        var scene = new Release(
             sceneUuid,
             site,
             subSite,
@@ -205,7 +205,7 @@ public class KinkRipper : ISiteScraper, ISubSiteScraper
         return scene;
     }
 
-    public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)
+    public async Task<Download> DownloadSceneAsync(Release release, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)
     {
         var availableDownloads = await ParseAvailableDownloadsAsync(page);
 
@@ -231,9 +231,9 @@ public class KinkRipper : ISiteScraper, ISubSiteScraper
         var suggestedFilename = selectedDownload.DownloadOption.Url.Substring(selectedDownload.DownloadOption.Url.LastIndexOf("/") + 1);
         suggestedFilename = suggestedFilename.Substring(0, suggestedFilename.IndexOf("?"));
         var suffix = Path.GetExtension(suggestedFilename);
-        var name = SceneNamer.Name(scene, suffix);
+        var name = SceneNamer.Name(release, suffix);
 
-        return await _downloader.DownloadSceneDirectAsync(scene, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, headers, referer: page.Url, fileName: name);
+        return await _downloader.DownloadSceneDirectAsync(release, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, headers, referer: page.Url, fileName: name);
     }
 
     private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloadsAsync(IPage page)

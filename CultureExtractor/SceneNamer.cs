@@ -5,18 +5,18 @@ namespace CultureExtractor
 {
     public static class SceneNamer
     {
-        public static string Name(Scene scene, string suffix, string performers = "")
+        public static string Name(Release release, string suffix, string performers = "")
         {
             var performersStr = !string.IsNullOrEmpty(performers)
                 ? performers
-                : FormatPerformers(scene);
+                : FormatPerformers(release);
 
-            var subSiteName = scene.SubSite != null ? " - " + scene.SubSite.Name : "";
+            var subSiteName = release.SubSite != null ? " - " + release.SubSite.Name : "";
 
             var nameWithoutSuffix =
                 string.Concat(
                     Regex.Replace(
-                        $"{performersStr} - {scene.Site.Name}{subSiteName} - {scene.ReleaseDate.ToString("yyyy-MM-dd")} - {scene.ShortName} - {scene.Name}",
+                        $"{performersStr} - {release.Site.Name}{subSiteName} - {release.ReleaseDate.ToString("yyyy-MM-dd")} - {release.ShortName} - {release.Name}",
                         @"\s+",
                         " "
                     ).Split(Path.GetInvalidFileNameChars()));
@@ -28,9 +28,9 @@ namespace CultureExtractor
             return name;
         }
 
-        private static string FormatPerformers(Scene scene)
+        private static string FormatPerformers(Release release)
         {
-            var performerNames = scene.Performers.Select(p => p.Name).ToList();
+            var performerNames = release.Performers.Select(p => p.Name).ToList();
             var performersStr = performerNames.Count > 1
                 ? string.Join(", ", performerNames.SkipLast(1)) + " & " + performerNames.Last()
                 : performerNames.FirstOrDefault();

@@ -127,7 +127,7 @@ public class AyloRipper : ISiteScraper
         return new SceneIdAndUrl(id, url);
     }
 
-    public async Task<Scene> ScrapeSceneAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
+    public async Task<Release> ScrapeSceneAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
         // Aylo occasionally forces re-login.
         if (page.Url.Contains("/login"))
@@ -174,7 +174,7 @@ public class AyloRipper : ISiteScraper
 
         var downloadOptionsAndHandles = await ParseAvailableDownloadsAsync(sceneData);
 
-        Scene scene = new Scene(
+        Release release = new Release(
             sceneUuid,
             site,
             null,
@@ -194,21 +194,21 @@ public class AyloRipper : ISiteScraper
         var style = await previewElement.GetAttributeAsync("style");
         var backgroundImageUrl = style.Replace("background-image: url(\"", "").Replace("\");", "");
 
-        await _downloader.DownloadSceneImageAsync(scene, backgroundImageUrl, scene.Url);
+        await _downloader.DownloadSceneImageAsync(release, backgroundImageUrl, release.Url);
         
-        return scene;
+        return release;
     }
 
-    public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)
+    public async Task<Download> DownloadSceneAsync(Release release, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)
     {
         // Aylo occasionally forces re-login.
         if (page.Url.Contains("/login"))
         {
-            await LoginAsync(scene.Site, page);
-            await page.GotoAsync(scene.Url);
+            await LoginAsync(release.Site, page);
+            await page.GotoAsync(release.Url);
         }
         
-        var request = requests.FirstOrDefault(r => r.Url == "https://site-api.project1service.com/v2/releases/" + scene.ShortName);
+        var request = requests.FirstOrDefault(r => r.Url == "https://site-api.project1service.com/v2/releases/" + release.ShortName);
         var response = await request.ResponseAsync();
         var jsonContent = await response.TextAsync();
         var data = JsonSerializer.Deserialize<BrazzersRootobject>(jsonContent)!;
@@ -241,9 +241,9 @@ public class AyloRipper : ISiteScraper
         var suggestedFilename = selectedDownload.DownloadOption.Url[(selectedDownload.DownloadOption.Url.LastIndexOf("/", StringComparison.Ordinal) + 1)..];
         suggestedFilename = suggestedFilename[..suggestedFilename.IndexOf("?", StringComparison.Ordinal)];
         var suffix = Path.GetExtension(suggestedFilename);
-        var name = SceneNamer.Name(scene, suffix);
+        var name = SceneNamer.Name(release, suffix);
 
-        return await _downloader.DownloadSceneDirectAsync(scene, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, headers, referer: page.Url, fileName: name);
+        return await _downloader.DownloadSceneDirectAsync(release, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, headers, referer: page.Url, fileName: name);
     }
 
     private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloadsAsync(BrazzersResult sceneData)

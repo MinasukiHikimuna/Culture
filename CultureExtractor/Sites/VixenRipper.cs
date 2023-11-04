@@ -113,7 +113,7 @@ public class VixenRipper : ISiteScraper
         return new SceneIdAndUrl(sceneId, url);
     }
 
-    public async Task<Scene> ScrapeSceneAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
+    public async Task<Release> ScrapeSceneAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
         var sceneMetadataRequest = requests
             .Where(r => r.Method == "POST")
@@ -151,7 +151,7 @@ public class VixenRipper : ISiteScraper
 
         var metadataJson = JsonSerializer.Serialize(data.data.findOneVideo);
 
-        var scene = new Scene(
+        var scene = new Release(
             sceneUuid,
             site,
             subSite,
@@ -177,7 +177,7 @@ public class VixenRipper : ISiteScraper
         return scene;
     }
 
-    public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)
+    public async Task<Download> DownloadSceneAsync(Release release, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)
     {
         var availableDownloads = await ParseAvailableDownloadsAsync(page);
 
@@ -203,9 +203,9 @@ public class VixenRipper : ISiteScraper
         var suggestedFilename = selectedDownload.DownloadOption.Url[(selectedDownload.DownloadOption.Url.LastIndexOf("/", StringComparison.Ordinal) + 1)..];
         suggestedFilename = suggestedFilename[..suggestedFilename.IndexOf("?", StringComparison.Ordinal)];
         var suffix = Path.GetExtension(suggestedFilename);
-        var name = SceneNamer.Name(scene, suffix);
+        var name = SceneNamer.Name(release, suffix);
 
-        return await _downloader.DownloadSceneDirectAsync(scene, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, headers, referer: page.Url, fileName: name);
+        return await _downloader.DownloadSceneDirectAsync(release, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, headers, referer: page.Url, fileName: name);
     }
 
     private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloadsAsync(IPage page)

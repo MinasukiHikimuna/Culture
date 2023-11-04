@@ -93,7 +93,7 @@ public class NewSensationsRipper : ISiteScraper
         return new SceneIdAndUrl(shortName, url);
     }
 
-    public async Task<Scene> ScrapeSceneAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
+    public async Task<Release> ScrapeSceneAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
         var releaseDateRaw = await page.Locator("div.datePhotos > span").TextContentAsync();
         var releaseDate = DateOnly.Parse(releaseDateRaw);
@@ -129,7 +129,7 @@ public class NewSensationsRipper : ISiteScraper
 
         var downloadOptionsAndHandles = await ParseAvailableDownloadsAsync(page);
 
-        var scene = new Scene(
+        var scene = new Release(
             sceneUuid,
             site,
             null,
@@ -151,9 +151,9 @@ public class NewSensationsRipper : ISiteScraper
         return scene;
     }
 
-    public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)
+    public async Task<Download> DownloadSceneAsync(Release release, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)
     {
-        await page.GotoAsync(scene.Url);
+        await page.GotoAsync(release.Url);
         await page.WaitForLoadStateAsync();
 
         await Task.Delay(3000);
@@ -169,7 +169,7 @@ public class NewSensationsRipper : ISiteScraper
             _ => throw new InvalidOperationException("Could not find a download candidate!")
         };
 
-        return await _downloader.DownloadSceneAsync(scene, page, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, async () =>
+        return await _downloader.DownloadSceneAsync(release, page, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, async () =>
         {
             await page.Locator("div#download_select > a").ClickAsync();
             await selectedDownload.ElementHandle.ClickAsync();

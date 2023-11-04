@@ -50,7 +50,7 @@ namespace CultureExtractor.Tests
                 new IndexScene(null, "abc", "/scene/abc", new Mock<IElementHandle>().Object)
             });
 
-            _repositoryMock.Setup(rr => rr.GetScenesAsync(It.IsAny<string>(), It.IsAny<IList<string>>())).ReturnsAsync(new List<Scene>()
+            _repositoryMock.Setup(rr => rr.GetScenesAsync(It.IsAny<string>(), It.IsAny<IList<string>>())).ReturnsAsync(new List<Release>()
             {
             });
 

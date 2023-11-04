@@ -75,7 +75,7 @@ public class SensualLoveRipper : ISiteScraper
         return new SceneIdAndUrl(id, url);
     }
 
-    public async Task<Scene> ScrapeSceneAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
+    public async Task<Release> ScrapeSceneAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
         var releaseDateRaw = await page.Locator("div.release-date > div.date").TextContentAsync();
         var releaseDate = DateOnly.Parse(releaseDateRaw!);
@@ -108,7 +108,7 @@ public class SensualLoveRipper : ISiteScraper
 
         var downloadOptionsAndHandles = await ParseAvailableDownloadsAsync(page);
 
-        var scene = new Scene(
+        var scene = new Release(
             sceneUuid,
             site,
             null,
@@ -132,14 +132,14 @@ public class SensualLoveRipper : ISiteScraper
         return scene;
     }
 
-    public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)
+    public async Task<Download> DownloadSceneAsync(Release release, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)
     {
-        await page.GotoAsync(scene.Url);
+        await page.GotoAsync(release.Url);
         await page.WaitForLoadStateAsync();
 
         await Task.Delay(3000);
 
-        var performerNames = scene.Performers.Select(p => p.Name).ToList();
+        var performerNames = release.Performers.Select(p => p.Name).ToList();
         var performersStr = performerNames.Count() > 1 ? string.Join(", ", performerNames.Take(performerNames.Count() - 1)) + " & " + performerNames.Last() : performerNames.FirstOrDefault();
 
         var availableDownloads = await ParseAvailableDownloadsAsync(page);
@@ -152,7 +152,7 @@ public class SensualLoveRipper : ISiteScraper
             _ => throw new InvalidOperationException("Could not find a download candidate!")
         };
 
-        return await _downloader.DownloadSceneAsync(scene, page, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, async () =>
+        return await _downloader.DownloadSceneAsync(release, page, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, async () =>
             await selectedDownload.ElementHandle.ClickAsync()
 );
     }

@@ -150,7 +150,7 @@ public class MetArtNetworkRipper : ISiteScraper
             .AsReadOnly();
     }
 
-    public async Task<Scene> ScrapeSceneAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
+    public async Task<Release> ScrapeSceneAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
         await CloseModalsIfVisibleAsync(page);
 
@@ -206,7 +206,7 @@ public class MetArtNetworkRipper : ISiteScraper
             .OrderByDescending(d => d.ResolutionHeight)
             .ToList();
 
-        var scene = new Scene(
+        var scene = new Release(
             sceneUuid,
             site,
             null,
@@ -227,7 +227,7 @@ public class MetArtNetworkRipper : ISiteScraper
         return scene;
     }
 
-    public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)
+    public async Task<Download> DownloadSceneAsync(Release release, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)
     {
         await CloseModalsIfVisibleAsync(page);
 
@@ -236,7 +236,7 @@ public class MetArtNetworkRipper : ISiteScraper
             throw new Exception("Could not read API response.");
         }
 
-        var movieRequest = requests.SingleOrDefault(r => r.Url.StartsWith(scene.Site.Url + "/api/movie?"));
+        var movieRequest = requests.SingleOrDefault(r => r.Url.StartsWith(release.Site.Url + "/api/movie?"));
         var response = await movieRequest.ResponseAsync();
         var jsonContent = await response.TextAsync();
         var data = JsonSerializer.Deserialize<MetArtSceneData>(jsonContent)!;
@@ -267,9 +267,9 @@ public class MetArtNetworkRipper : ISiteScraper
         }
 
         const string suffix = ".mp4";
-        var name = SceneNamer.Name(scene, suffix, performersStr);
+        var name = SceneNamer.Name(release, suffix, performersStr);
 
-        return await _downloader.DownloadSceneAsync(scene, page, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, async () =>
+        return await _downloader.DownloadSceneAsync(release, page, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, async () =>
         {
             await selectedDownload.ElementHandle.ClickAsync();
         }, name);

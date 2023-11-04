@@ -99,7 +99,7 @@ public class AdultPrimeRipper : ISiteScraper, ISubSiteScraper
         return new SceneIdAndUrl(shortName, url);
     }
 
-    public async Task<Scene> ScrapeSceneAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
+    public async Task<Release> ScrapeSceneAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
         var releaseDateElement = await page.QuerySelectorAsync("p.update-info-line:nth-of-type(1) i.fa-calendar + b");
         string releaseDateRaw = await releaseDateElement.TextContentAsync();
@@ -156,7 +156,7 @@ public class AdultPrimeRipper : ISiteScraper, ISubSiteScraper
 
         var downloadOptionsAndHandles = await ParseAvailableDownloadsAsync(page);
 
-        var scene = new Scene(
+        var scene = new Release(
             sceneUuid,
             site,
             subSite,
@@ -181,7 +181,7 @@ public class AdultPrimeRipper : ISiteScraper, ISubSiteScraper
         return scene;
     }
 
-    public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)
+    public async Task<Download> DownloadSceneAsync(Release release, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)
     {
         var availableDownloads = await ParseAvailableDownloadsAsync(page);
 
@@ -193,7 +193,7 @@ public class AdultPrimeRipper : ISiteScraper, ISubSiteScraper
             _ => throw new InvalidOperationException("Could not find a download candidate!")
         };
 
-        return await _downloader.DownloadSceneAsync(scene, page, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, async () =>
+        return await _downloader.DownloadSceneAsync(release, page, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, async () =>
         {
             await selectedDownload.ElementHandle.ClickAsync();
         });

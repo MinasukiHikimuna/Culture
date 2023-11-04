@@ -80,7 +80,7 @@ public class PurgatoryXRipper : ISiteScraper
         return new SceneIdAndUrl(shortName, url);
     }
 
-    public async Task<Scene> ScrapeSceneAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
+    public async Task<Release> ScrapeSceneAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
         await Task.Delay(5000);
 
@@ -112,7 +112,7 @@ public class PurgatoryXRipper : ISiteScraper
 
         var downloadOptionsAndHandles = await ParseAvailableDownloadsAsync(page);
 
-        var scene = new Scene(
+        var scene = new Release(
             sceneUuid,
             site,
             null,
@@ -136,12 +136,12 @@ public class PurgatoryXRipper : ISiteScraper
         return scene;
     }
 
-    public async Task<Download> DownloadSceneAsync(Scene scene, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)
+    public async Task<Download> DownloadSceneAsync(Release release, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)
     {
-        await page.GotoAsync(scene.Url);
+        await page.GotoAsync(release.Url);
         await page.WaitForLoadStateAsync();
 
-        var performerNames = scene.Performers.Select(p => p.Name).ToList();
+        var performerNames = release.Performers.Select(p => p.Name).ToList();
         var performersStr = performerNames.Count() > 1 ? string.Join(", ", performerNames.Take(performerNames.Count() - 1)) + " & " + performerNames.Last() : performerNames.FirstOrDefault();
 
         await page.GetByRole(AriaRole.Button).Filter(new() { HasTextString = "Download video" }).ClickAsync();
@@ -156,7 +156,7 @@ public class PurgatoryXRipper : ISiteScraper
             _ => throw new InvalidOperationException("Could not find a download candidate!")
         };
 
-        return await _downloader.DownloadSceneAsync(scene, page, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, async () =>
+        return await _downloader.DownloadSceneAsync(release, page, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, async () =>
             await selectedDownload.ElementHandle.ClickAsync()
 );
     }
