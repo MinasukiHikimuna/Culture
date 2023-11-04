@@ -267,7 +267,7 @@ public class Repository : IRepository
                 Url = t.Url,
                 SiteUuid = siteEntity.Uuid,
                 Site = siteEntity,
-                Scenes = new List<SceneEntity>()
+                Releases = new List<SceneEntity>()
             }).ToList();
 
         if (newTagEntities.Any())
