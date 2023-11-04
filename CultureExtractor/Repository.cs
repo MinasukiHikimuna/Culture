@@ -381,8 +381,8 @@ public class Repository : IRepository
             OriginalFilename = download.OriginalFilename,
             SavedFilename = download.SavedFilename,
 
-            SceneUuid = sceneEntity.Uuid,
-            Scene = sceneEntity,
+            ReleaseUuid = sceneEntity.Uuid,
+            Release = sceneEntity,
         });
         await _sqliteContext.SaveChangesAsync();
     }
