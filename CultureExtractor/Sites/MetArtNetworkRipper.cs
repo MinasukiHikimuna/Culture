@@ -148,13 +148,6 @@ public class MetArtNetworkRipper : ISiteScraper
             .AsReadOnly();
     }
 
-    public async Task<SceneIdAndUrl> GetSceneIdAsync(Site site, IElementHandle currentScene)
-    {
-        var url = await currentScene.GetAttributeAsync("href");
-        var sceneShortName = url.Substring(url.LastIndexOf("/movie/") + "/movie/".Length + 1);
-        return new SceneIdAndUrl(sceneShortName, url);
-    }
-
     public async Task<Scene> ScrapeSceneAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
         await CloseModalsIfVisibleAsync(page);

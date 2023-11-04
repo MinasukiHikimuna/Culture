@@ -77,18 +77,18 @@ public class AyloRipper : ISiteScraper
         var indexScenes = new List<IndexScene>();
         foreach (var sceneHandle in sceneHandles.Reverse())
         {
-            var sceneIdAndUrl = await GetSceneIdAsync(site, sceneHandle);
+            var sceneIdAndUrl = await GetSceneIdAsync(sceneHandle);
             indexScenes.Add(new IndexScene(null, sceneIdAndUrl.Id, sceneIdAndUrl.Url, sceneHandle));
         }
 
         return indexScenes.AsReadOnly();
     }
 
-    public async Task<SceneIdAndUrl> GetSceneIdAsync(Site site, IElementHandle currentScene)
+    private static async Task<SceneIdAndUrl> GetSceneIdAsync(IElementHandle currentScene)
     {
         var url = await currentScene.GetAttributeAsync("href");
 
-        string pattern = @"/scene/(?<id>\d+)/";
+        var pattern = @"/scene/(?<id>\d+)/";
         Match match = Regex.Match(url, pattern);
         if (!match.Success)
         {

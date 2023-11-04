@@ -94,7 +94,7 @@ public class HentaiedRipper : ISiteScraper
         return indexScenes.AsReadOnly();
     }
 
-    public async Task<SceneIdAndUrl> GetSceneIdAsync(Site site, IElementHandle currentScene)
+    private static async Task<SceneIdAndUrl> GetSceneIdAsync(Site site, IElementHandle currentScene)
     {
         var link = await currentScene.QuerySelectorAsync("div.allvideostitle > a");
         var url = await link.GetAttributeAsync("href");
