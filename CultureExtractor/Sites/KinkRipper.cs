@@ -94,9 +94,9 @@ public class KinkRipper : ISiteScraper, ISubSiteScraper
         await Task.Delay(1000);
     }
 
-    private static async Task<ReleaseIdAndUrl> GetReleaseIdAsync(IElementHandle currentScene)
+    private static async Task<ReleaseIdAndUrl> GetReleaseIdAsync(IElementHandle currentRelease)
     {
-        var aElement = await currentScene.QuerySelectorAsync("a.shoot-link");
+        var aElement = await currentRelease.QuerySelectorAsync("a.shoot-link");
         var url = await aElement.GetAttributeAsync("href");
 
         var shortName = url.Replace("/shoot/", "");

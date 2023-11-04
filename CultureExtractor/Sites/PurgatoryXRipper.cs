@@ -68,9 +68,9 @@ public class PurgatoryXRipper : ISiteScraper
         throw new NotImplementedException();
     }
 
-    private static async Task<ReleaseIdAndUrl> GetReleaseIdAsync(IElementHandle currentScene)
+    private static async Task<ReleaseIdAndUrl> GetReleaseIdAsync(IElementHandle currentRelease)
     {
-        var linkElement = await currentScene.QuerySelectorAsync("div.container > div.row > a");
+        var linkElement = await currentRelease.QuerySelectorAsync("div.container > div.row > a");
         var url = await linkElement.GetAttributeAsync("href");
         var idWithQueryStrings = url.Substring(url.LastIndexOf("/") + 1);
         var shortName = idWithQueryStrings.Contains("?")

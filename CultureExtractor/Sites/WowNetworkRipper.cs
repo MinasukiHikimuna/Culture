@@ -99,9 +99,9 @@ public class WowNetworkRipper : ISiteScraper
         throw new NotImplementedException();
     }
     
-    private static async Task<ReleaseIdAndUrl> GetReleaseIdAsync(Site site, IElementHandle currentScene)
+    private static async Task<ReleaseIdAndUrl> GetReleaseIdAsync(Site site, IElementHandle currentRelease)
     {
-        var relativeUrl = await currentScene.GetAttributeAsync("href");
+        var relativeUrl = await currentRelease.GetAttributeAsync("href");
         var url = site.Url + relativeUrl;
 
         string pattern = @"/film/(?<id>\w+)/.*";
@@ -148,7 +148,7 @@ public class WowNetworkRipper : ISiteScraper
         }
 
         // TODO: Fix this
-        /*var previewElement = await currentScene.QuerySelectorAsync("span > img");
+        /*var previewElement = await currentRelease.QuerySelectorAsync("span > img");
         var originalUrl = await previewElement.GetAttributeAsync("src");
 
         string regexPattern = "icon_\\d+x\\d+.jpg";

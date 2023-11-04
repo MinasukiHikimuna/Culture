@@ -78,7 +78,7 @@ FATAL ERROR: Reached heap limit Allocation failed - JavaScript heap out of memor
    at Microsoft.Playwright.Transport.Connection.InnerSendMessageToServerAsync[T](String guid, String method, Object args) in /_/src/Playwright/Transport/Connection.cs:line 185
    at Microsoft.Playwright.Transport.Connection.WrapApiCallAsync[T](Func`1 action, Boolean isInternal) in /_/src/Playwright/Transport/Connection.cs:line 488
    at Microsoft.Playwright.Core.Page.CloseAsync(PageCloseOptions options) in /_/src/Playwright/Core/Page.cs:line 458
-   at CultureExtractor.NetworkRipper.ScrapeSceneAsync(IndexScene currentScene, ISiteScraper siteScraper, Site site, SubSite subSite, IPage page, ScrapeOptions scrapeOptions) in C:\Github\CultureExtractor\CultureExtractor\NetworkRipper.cs:line 198
+   at CultureExtractor.NetworkRipper.ScrapeSceneAsync(IndexScene currentRelease, ISiteScraper siteScraper, Site site, SubSite subSite, IPage page, ScrapeOptions scrapeOptions) in C:\Github\CultureExtractor\CultureExtractor\NetworkRipper.cs:line 198
    at CultureExtractor.NetworkRipper.<>c__DisplayClass9_2.<<ScrapeScenePageAsync>b__5>d.MoveNext() in C:\Github\CultureExtractor\CultureExtractor\NetworkRipper.cs:line 139
 --- End of stack trace from previous location ---
    at Polly.ResilienceStrategy.<>c.<<ExecuteAsync>b__3_0>d.MoveNext()
@@ -86,7 +86,7 @@ FATAL ERROR: Reached heap limit Allocation failed - JavaScript heap out of memor
    at Microsoft.Playwright.Transport.Connection.InnerSendMessageToServerAsync[T](String guid, String method, Object args) in /_/src/Playwright/Transport/Connection.cs:line 185
    at Microsoft.Playwright.Transport.Connection.WrapApiCallAsync[T](Func`1 action, Boolean isInternal) in /_/src/Playwright/Transport/Connection.cs:line 488
    at Microsoft.Playwright.Core.BrowserContext.NewPageAsync() in /_/src/Playwright/Core/BrowserContext.cs:line 280
-   at CultureExtractor.NetworkRipper.ScrapeSceneAsync(IndexScene currentScene, ISiteScraper siteScraper, Site site, SubSite subSite, IPage page, ScrapeOptions scrapeOptions) in C:\Github\CultureExtractor\CultureExtractor\NetworkRipper.cs:line 167
+   at CultureExtractor.NetworkRipper.ScrapeSceneAsync(IndexScene currentRelease, ISiteScraper siteScraper, Site site, SubSite subSite, IPage page, ScrapeOptions scrapeOptions) in C:\Github\CultureExtractor\CultureExtractor\NetworkRipper.cs:line 167
    at CultureExtractor.NetworkRipper.<>c__DisplayClass9_2.<<ScrapeScenePageAsync>b__5>d.MoveNext() in C:\Github\CultureExtractor\CultureExtractor\NetworkRipper.cs:line 139
 --- End of stack trace from previous location ---
    at Polly.ResilienceStrategy.<>c.<<ExecuteAsync>b__3_0>d.MoveNext()
@@ -94,7 +94,7 @@ FATAL ERROR: Reached heap limit Allocation failed - JavaScript heap out of memor
    at Microsoft.Playwright.Transport.Connection.InnerSendMessageToServerAsync[T](String guid, String method, Object args) in /_/src/Playwright/Transport/Connection.cs:line 185
    at Microsoft.Playwright.Transport.Connection.WrapApiCallAsync[T](Func`1 action, Boolean isInternal) in /_/src/Playwright/Transport/Connection.cs:line 488
    at Microsoft.Playwright.Core.BrowserContext.NewPageAsync() in /_/src/Playwright/Core/BrowserContext.cs:line 280
-   at CultureExtractor.NetworkRipper.ScrapeSceneAsync(IndexScene currentScene, ISiteScraper siteScraper, Site site, SubSite subSite, IPage page, ScrapeOptions scrapeOptions) in C:\Github\CultureExtractor\CultureExtractor\NetworkRipper.cs:line 167
+   at CultureExtractor.NetworkRipper.ScrapeSceneAsync(IndexScene currentRelease, ISiteScraper siteScraper, Site site, SubSite subSite, IPage page, ScrapeOptions scrapeOptions) in C:\Github\CultureExtractor\CultureExtractor\NetworkRipper.cs:line 167
    at CultureExtractor.NetworkRipper.<>c__DisplayClass9_2.<<ScrapeScenePageAsync>b__5>d.MoveNext() in C:\Github\CultureExtractor\CultureExtractor\NetworkRipper.cs:line 139
 --- End of stack trace from previous location ---
    at Polly.ResilienceStrategy.<>c.<<ExecuteAsync>b__3_0>d.MoveNext()
@@ -102,7 +102,7 @@ FATAL ERROR: Reached heap limit Allocation failed - JavaScript heap out of memor
    at Microsoft.Playwright.Transport.Connection.InnerSendMessageToServerAsync[T](String guid, String method, Object args) in /_/src/Playwright/Transport/Connection.cs:line 185
    at Microsoft.Playwright.Transport.Connection.WrapApiCallAsync[T](Func`1 action, Boolean isInternal) in /_/src/Playwright/Transport/Connection.cs:line 488
    at Microsoft.Playwright.Core.BrowserContext.NewPageAsync() in /_/src/Playwright/Core/BrowserContext.cs:line 280
-   at CultureExtractor.NetworkRipper.ScrapeSceneAsync(IndexScene currentScene, ISiteScraper siteScraper, Site site, SubSite subSite, IPage page, ScrapeOptions scrapeOptions) in C:\Github\CultureExtractor\CultureExtractor\NetworkRipper.cs:line 167
+   at CultureExtractor.NetworkRipper.ScrapeSceneAsync(IndexScene currentRelease, ISiteScraper siteScraper, Site site, SubSite subSite, IPage page, ScrapeOptions scrapeOptions) in C:\Github\CultureExtractor\CultureExtractor\NetworkRipper.cs:line 167
    at CultureExtractor.NetworkRipper.<>c__DisplayClass9_2.<<ScrapeScenePageAsync>b__5>d.MoveNext() in C:\Github\CultureExtractor\CultureExtractor\NetworkRipper.cs:line 139
 --- End of stack trace from previous location ---
    at Polly.ResilienceStrategy.<>c.<<ExecuteAsync>b__3_0>d.MoveNext()
@@ -110,7 +110,7 @@ FATAL ERROR: Reached heap limit Allocation failed - JavaScript heap out of memor
    at Microsoft.Playwright.Transport.Connection.InnerSendMessageToServerAsync[T](String guid, String method, Object args) in /_/src/Playwright/Transport/Connection.cs:line 185
    at Microsoft.Playwright.Transport.Connection.WrapApiCallAsync[T](Func`1 action, Boolean isInternal) in /_/src/Playwright/Transport/Connection.cs:line 488
    at Microsoft.Playwright.Core.BrowserContext.NewPageAsync() in /_/src/Playwright/Core/BrowserContext.cs:line 280
-   at CultureExtractor.NetworkRipper.ScrapeSceneAsync(IndexScene currentScene, ISiteScraper siteScraper, Site site, SubSite subSite, IPage page, ScrapeOptions scrapeOptions) in C:\Github\CultureExtractor\CultureExtractor\NetworkRipper.cs:line 167
+   at CultureExtractor.NetworkRipper.ScrapeSceneAsync(IndexScene currentRelease, ISiteScraper siteScraper, Site site, SubSite subSite, IPage page, ScrapeOptions scrapeOptions) in C:\Github\CultureExtractor\CultureExtractor\NetworkRipper.cs:line 167
    at CultureExtractor.NetworkRipper.<>c__DisplayClass9_2.<<ScrapeScenePageAsync>b__5>d.MoveNext() in C:\Github\CultureExtractor\CultureExtractor\NetworkRipper.cs:line 139
 --- End of stack trace from previous location ---
    at Polly.ResilienceStrategy.<>c.<<ExecuteAsync>b__3_0>d.MoveNext()

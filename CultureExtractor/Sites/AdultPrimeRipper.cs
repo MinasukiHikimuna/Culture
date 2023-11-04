@@ -88,9 +88,9 @@ public class AdultPrimeRipper : ISiteScraper, ISubSiteScraper
         await Task.Delay(1000);
     }
 
-    private static async Task<ReleaseIdAndUrl> GetReleaseIdAsync(IElementHandle currentScene)
+    private static async Task<ReleaseIdAndUrl> GetReleaseIdAsync(IElementHandle currentRelease)
     {
-        var overlayElement = await currentScene.QuerySelectorAsync("div.overlay");
+        var overlayElement = await currentRelease.QuerySelectorAsync("div.overlay");
         var aElement = await overlayElement.QuerySelectorAsync("a");
         var url = await aElement.GetAttributeAsync("href");
 

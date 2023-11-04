@@ -78,9 +78,9 @@ public class NewSensationsRipper : ISiteScraper
         }
     }
 
-    private static async Task<ReleaseIdAndUrl> GetReleaseIdAsync(IElementHandle currentScene)
+    private static async Task<ReleaseIdAndUrl> GetReleaseIdAsync(IElementHandle currentRelease)
     {
-        var thumbLinkElement = await currentScene.QuerySelectorAsync("a");
+        var thumbLinkElement = await currentRelease.QuerySelectorAsync("a");
         var url = await thumbLinkElement.GetAttributeAsync("href");
         var pattern = @"id=(\d+)&";
         Match match = Regex.Match(url, pattern);

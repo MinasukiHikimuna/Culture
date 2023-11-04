@@ -83,9 +83,9 @@ public class DorcelClubRipper : ISiteScraper
         throw new NotImplementedException();
     }
     
-    private static async Task<ReleaseIdAndUrl> GetReleaseIdAsync(IElementHandle currentScene)
+    private static async Task<ReleaseIdAndUrl> GetReleaseIdAsync(IElementHandle currentRelease)
     {
-        var thumbLinkElement = await currentScene.QuerySelectorAsync("a.thumb");
+        var thumbLinkElement = await currentRelease.QuerySelectorAsync("a.thumb");
         var url = await thumbLinkElement.GetAttributeAsync("href");
         var pattern = @"\/[a-z]+\/[a-z]+\/(\d+)\/";
         Match match = Regex.Match(url, pattern);

@@ -74,12 +74,12 @@ public class WankzRipper : ISubSiteScraper
         await Task.Delay(1000);
     }
 
-    private async Task<ReleaseIdAndUrl> GetReleaseIdAsync(IElementHandle currentScene)
+    private async Task<ReleaseIdAndUrl> GetReleaseIdAsync(IElementHandle currentRelease)
     {
         // read attribute data-id
-        var sceneId = await currentScene.GetAttributeAsync("data-id");
+        var sceneId = await currentRelease.GetAttributeAsync("data-id");
         
-        var aElement = await currentScene.QuerySelectorAsync("a.thumbnail__link");
+        var aElement = await currentRelease.QuerySelectorAsync("a.thumbnail__link");
         var url = await aElement.GetAttributeAsync("href");
 
         return new ReleaseIdAndUrl(sceneId, url);

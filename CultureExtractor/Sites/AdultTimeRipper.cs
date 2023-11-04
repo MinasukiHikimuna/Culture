@@ -623,9 +623,9 @@ public class AdultTimeRipper : ISiteScraper
         throw new NotImplementedException();
     }
     
-    private static async Task<ReleaseIdAndUrl> GetReleaseIdAsync(IElementHandle currentScene)
+    private static async Task<ReleaseIdAndUrl> GetReleaseIdAsync(IElementHandle currentRelease)
     {
-        var thumbLinkElement = await currentScene.QuerySelectorAsync("a");
+        var thumbLinkElement = await currentRelease.QuerySelectorAsync("a");
         var url = await thumbLinkElement.GetAttributeAsync("href");
         var id = url.Substring(url.LastIndexOf("/") + 1);
         return new ReleaseIdAndUrl(id, url);

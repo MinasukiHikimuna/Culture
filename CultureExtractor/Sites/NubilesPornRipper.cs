@@ -83,9 +83,9 @@ public class NubilesPornRipper : ISiteScraper
         throw new NotImplementedException();
     }
     
-    private static async Task<ReleaseIdAndUrl> GetReleaseIdAsync(IElementHandle currentScene)
+    private static async Task<ReleaseIdAndUrl> GetReleaseIdAsync(IElementHandle currentRelease)
     {
-        var linkElement = await currentScene.QuerySelectorAsync("figcaption > div.caption-header > span.title > a");
+        var linkElement = await currentRelease.QuerySelectorAsync("figcaption > div.caption-header > span.title > a");
         var url = await linkElement.GetAttributeAsync("href");
 
         string pattern = @"/video/watch/(?<id>\d+)/";

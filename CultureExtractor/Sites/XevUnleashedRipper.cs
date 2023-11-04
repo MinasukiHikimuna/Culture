@@ -90,11 +90,11 @@ public class XevUnleashedRipper : ISiteScraper
         await Task.Delay(5000);
     }
 
-    private static async Task<ReleaseIdAndUrl> GetReleaseIdAsync(IElementHandle currentScene)
+    private static async Task<ReleaseIdAndUrl> GetReleaseIdAsync(IElementHandle currentRelease)
     {
-        var shortName = await currentScene.GetAttributeAsync("data-setid");
+        var shortName = await currentRelease.GetAttributeAsync("data-setid");
         // Link in the image and in the title. Both have same URL.
-        var links = await currentScene.QuerySelectorAllAsync("a");
+        var links = await currentRelease.QuerySelectorAllAsync("a");
         var url = await links.First().GetAttributeAsync("href");
         return new ReleaseIdAndUrl(shortName, url);
     }

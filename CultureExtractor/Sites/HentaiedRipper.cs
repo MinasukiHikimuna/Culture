@@ -96,9 +96,9 @@ public class HentaiedRipper : ISiteScraper
         await Task.Delay(5000);
     }
 
-    private static async Task<ReleaseIdAndUrl> GetReleaseIdAsync(Site site, IElementHandle currentScene)
+    private static async Task<ReleaseIdAndUrl> GetReleaseIdAsync(Site site, IElementHandle currentRelease)
     {
-        var link = await currentScene.QuerySelectorAsync("div.allvideostitle > a");
+        var link = await currentRelease.QuerySelectorAsync("div.allvideostitle > a");
         var url = await link.GetAttributeAsync("href");
         var shortName = url.Replace(site.Url, "").Replace("/", "");
         return new ReleaseIdAndUrl(shortName, url);

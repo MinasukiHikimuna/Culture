@@ -108,16 +108,16 @@ public class CzechVRNetworkRipper : ISiteScraper
         throw new NotImplementedException();
     }
 
-    private static async Task<ReleaseIdAndUrl> GetReleaseIdAsync(IElementHandle currentScene)
+    private static async Task<ReleaseIdAndUrl> GetReleaseIdAsync(IElementHandle currentRelease)
     {
-        var linkElement = await currentScene.QuerySelectorAsync("div.nazev > h2 > a");
+        var linkElement = await currentRelease.QuerySelectorAsync("div.nazev > h2 > a");
         var relativeUrl = await linkElement.GetAttributeAsync("href");
         if (relativeUrl.StartsWith("./"))
         {
             relativeUrl = relativeUrl.Substring(2);
         }
 
-        var titleElement = await currentScene.QuerySelectorAsync("div.nazev > h2");
+        var titleElement = await currentRelease.QuerySelectorAsync("div.nazev > h2");
         var title = await titleElement.TextContentAsync();
 
         string pattern = @" (?<id>\d+) - ";
@@ -161,7 +161,7 @@ public class CzechVRNetworkRipper : ISiteScraper
         // TODO: Fix this
         if (!_downloader.SceneImageExists(scene))
         {
-            /*var previewElement = await currentScene.QuerySelectorAsync("img");
+            /*var previewElement = await currentRelease.QuerySelectorAsync("img");
             var originalUrl = await previewElement.GetAttributeAsync("src");
             await _downloader.DownloadSceneImageAsync(scene, originalUrl);*/
         }

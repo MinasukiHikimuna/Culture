@@ -111,9 +111,9 @@ public class AyloRipper : ISiteScraper
         await page.GotoAsync(site.Url + "/scenes?page=" + pageNumber);
     }
 
-    private static async Task<ReleaseIdAndUrl> GetReleaseIdAsync(IElementHandle currentScene)
+    private static async Task<ReleaseIdAndUrl> GetReleaseIdAsync(IElementHandle currentRelease)
     {
-        var url = await currentScene.GetAttributeAsync("href");
+        var url = await currentRelease.GetAttributeAsync("href");
 
         var pattern = @"/scene/(?<id>\d+)/";
         Match match = Regex.Match(url, pattern);

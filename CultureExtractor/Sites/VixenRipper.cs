@@ -100,14 +100,14 @@ public class VixenRipper : ISiteScraper
         await Task.Delay(1000);
     }
 
-    private static async Task<ReleaseIdAndUrl> GetReleaseIdAsync(IElementHandle currentScene)
+    private static async Task<ReleaseIdAndUrl> GetReleaseIdAsync(IElementHandle currentRelease)
     {
-        var videoElement = await currentScene.QuerySelectorAsync("video");
+        var videoElement = await currentRelease.QuerySelectorAsync("video");
         var videoSrc = await videoElement.GetAttributeAsync("src");
 
         var sceneId = Regex.Match(videoSrc, @"videos/(\d+)/").Groups[1].Value;
 
-        var aElement = await currentScene.QuerySelectorAsync("a");
+        var aElement = await currentRelease.QuerySelectorAsync("a");
         var url = await aElement.GetAttributeAsync("href");
 
         return new ReleaseIdAndUrl(sceneId, url);
