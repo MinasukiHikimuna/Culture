@@ -77,11 +77,6 @@ public class WankzRipper : ISubSiteScraper
         return new SceneIdAndUrl(sceneId, url);
     }
 
-    public async Task<CapturedResponse?> FilterResponsesAsync(string sceneShortName, IResponse response)
-    {
-        return null;
-    }
-
     public async Task<Scene> ScrapeSceneAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
         var releaseDateElement = await page.QuerySelectorAsync("meta[property='video:release_date']");

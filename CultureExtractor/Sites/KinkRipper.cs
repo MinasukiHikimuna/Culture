@@ -96,18 +96,6 @@ public class KinkRipper : ISiteScraper, ISubSiteScraper
         return new SceneIdAndUrl(shortName, url);
     }
 
-    public async Task<CapturedResponse?> FilterResponsesAsync(string sceneShortName, IResponse response)
-    {
-        if (response.Url == "https://site-api.project1service.com/v2/releases/" + sceneShortName)
-        {
-            var bodyBuffer = await response.BodyAsync();
-            var body = System.Text.Encoding.UTF8.GetString(bodyBuffer);
-            return new CapturedResponse(Enum.GetName(AdultTimeRequestType.SceneMetadata)!, response);
-        }
-
-        return null;
-    }
-
     public async Task<Scene> ScrapeSceneAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
         if (await page.Locator("div.four-oh-four h1").IsVisibleAsync())

@@ -624,8 +624,10 @@ public class AdultTimeRipper : ISiteScraper
         return new SceneIdAndUrl(id, url);
     }
 
-    public async Task<CapturedResponse?> FilterResponsesAsync(string sceneShortName, IResponse response)
+    public async Task<Scene> ScrapeSceneAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
+        // TODO:
+        /*
         if (response.Url.Contains("algolia.net"))
         {
             var bodyBuffer = await response.BodyAsync();
@@ -636,12 +638,8 @@ public class AdultTimeRipper : ISiteScraper
                 return new CapturedResponse(Enum.GetName(AdultTimeRequestType.SceneMetadata)!, response);
             }
         }
-
-        return null;
-    }
-
-    public async Task<Scene> ScrapeSceneAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
-    {
+        */ 
+        
         var request = requests[0];
 
         var response = await request.ResponseAsync();

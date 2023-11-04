@@ -155,16 +155,6 @@ public class MetArtNetworkRipper : ISiteScraper
         return new SceneIdAndUrl(sceneShortName, url);
     }
 
-    public async Task<CapturedResponse?> FilterResponsesAsync(string sceneShortName, IResponse response)
-    {
-        if (response.Url.Contains("/api/movie?name="))
-        {
-            return new CapturedResponse(Enum.GetName(AdultTimeRequestType.SceneMetadata)!, response);
-        }
-
-        return null;
-    }
-
     public async Task<Scene> ScrapeSceneAsync(Guid sceneUuid, Site site, SubSite subSite, string url, string sceneShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
         await CloseModalsIfVisibleAsync(page);
