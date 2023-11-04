@@ -9,7 +9,7 @@ public class SqliteContext : DbContext, ISqliteContext
 {
     public DbSet<SiteEntity> Sites { get; set; }
     public DbSet<SubSiteEntity> SubSites { get; set; }
-    public DbSet<SceneEntity> Releases { get; set; }
+    public DbSet<ReleaseEntity> Releases { get; set; }
     public DbSet<SitePerformerEntity> Performers { get; set; }
     public DbSet<SiteTagEntity> Tags { get; set; }
     public DbSet<StorageStateEntity> StorageStates { get; set; }
@@ -82,7 +82,7 @@ public class SiteTagEntity
     public required string SiteUuid { get; set; }
     public required SiteEntity Site { get; set; }
 
-    public required ICollection<SceneEntity> Releases { get; set; }
+    public required ICollection<ReleaseEntity> Releases { get; set; }
 }
 
 public class SitePerformerEntity
@@ -95,10 +95,10 @@ public class SitePerformerEntity
     public required string SiteUuid { get; set; }
     public required SiteEntity Site { get; set; }
 
-    public required ICollection<SceneEntity> Releases { get; set; }
+    public required ICollection<ReleaseEntity> Releases { get; set; }
 }
 
-public class SceneEntity
+public class ReleaseEntity
 {
     [Key]
     public required string Uuid { get; set; }
@@ -134,5 +134,5 @@ public class DownloadEntity
     public string? SavedFilename { get; set; }
 
     public required string ReleaseUuid { get; set; }
-    public required SceneEntity Release { get; set; }
+    public required ReleaseEntity Release { get; set; }
 }

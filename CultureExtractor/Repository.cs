@@ -165,7 +165,7 @@ public class Repository : IRepository
         
         if (existingSceneEntity == null)
         {
-            var sceneEntity = new SceneEntity()
+            var sceneEntity = new ReleaseEntity()
             {
                 Uuid = scene.Uuid.ToString(),
                 ReleaseDate = scene.ReleaseDate,
@@ -238,7 +238,7 @@ public class Repository : IRepository
                 Url = p.Url,
                 SiteUuid = siteEntity.Uuid,
                 Site = siteEntity,
-                Releases = new List<SceneEntity>()
+                Releases = new List<ReleaseEntity>()
             }).ToList();
 
         if (newPerformersEntities.Any())
@@ -267,7 +267,7 @@ public class Repository : IRepository
                 Url = t.Url,
                 SiteUuid = siteEntity.Uuid,
                 Site = siteEntity,
-                Releases = new List<SceneEntity>()
+                Releases = new List<ReleaseEntity>()
             }).ToList();
 
         if (newTagEntities.Any())
@@ -327,27 +327,27 @@ public class Repository : IRepository
             : null;
     }
 
-    private static Scene Convert(SceneEntity sceneEntity)
+    private static Scene Convert(ReleaseEntity releaseEntity)
     {
-        var downloadOptions = string.IsNullOrEmpty(sceneEntity.DownloadOptions)
+        var downloadOptions = string.IsNullOrEmpty(releaseEntity.DownloadOptions)
             ? "[]"
-            : sceneEntity.DownloadOptions;
+            : releaseEntity.DownloadOptions;
 
         return new Scene(
-            Guid.Parse(sceneEntity.Uuid),
-            Convert(sceneEntity.Site),
-            Convert(sceneEntity.SubSite),
-            sceneEntity.ReleaseDate,
-            sceneEntity.ShortName,
-            sceneEntity.Name,
-            sceneEntity.Url,
-            sceneEntity.Description,
-            sceneEntity.Duration,
-            sceneEntity.Performers.Select(Convert),
-            sceneEntity.Tags.Select(Convert),
+            Guid.Parse(releaseEntity.Uuid),
+            Convert(releaseEntity.Site),
+            Convert(releaseEntity.SubSite),
+            releaseEntity.ReleaseDate,
+            releaseEntity.ShortName,
+            releaseEntity.Name,
+            releaseEntity.Url,
+            releaseEntity.Description,
+            releaseEntity.Duration,
+            releaseEntity.Performers.Select(Convert),
+            releaseEntity.Tags.Select(Convert),
             JsonSerializer.Deserialize<IEnumerable<DownloadOption>>(downloadOptions),
-            sceneEntity.JsonDocument,
-            sceneEntity.LastUpdated);
+            releaseEntity.JsonDocument,
+            releaseEntity.LastUpdated);
     }
 
     private static SitePerformer Convert(SitePerformerEntity performerEntity)
