@@ -93,14 +93,14 @@ public class CzechVRNetworkRipper : ISiteScraper
         
         var releaseHandles = await page.Locator("div.tagyCenter > div.postTag").ElementHandlesAsync();
 
-        var indexScenes = new List<ListedRelease>();
+        var listedReleases = new List<ListedRelease>();
         foreach (var sceneHandle in releaseHandles.Reverse())
         {
             var sceneIdAndUrl = await GetSceneIdAsync(sceneHandle);
-            indexScenes.Add(new ListedRelease(null, sceneIdAndUrl.Id, sceneIdAndUrl.Url, sceneHandle));
+            listedReleases.Add(new ListedRelease(null, sceneIdAndUrl.Id, sceneIdAndUrl.Url, sceneHandle));
         }
 
-        return indexScenes.AsReadOnly();
+        return listedReleases.AsReadOnly();
     }
 
     private static Task GoToPageAsync(IPage page, Site site, SubSite subSite, int pageNumber)

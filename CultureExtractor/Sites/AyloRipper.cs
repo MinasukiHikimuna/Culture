@@ -96,14 +96,14 @@ public class AyloRipper : ISiteScraper
         
         var releaseHandles = await sceneHandleLocators.ElementHandlesAsync();
 
-        var indexScenes = new List<ListedRelease>();
+        var listedReleases = new List<ListedRelease>();
         foreach (var sceneHandle in releaseHandles.Reverse())
         {
             var sceneIdAndUrl = await GetSceneIdAsync(sceneHandle);
-            indexScenes.Add(new ListedRelease(null, sceneIdAndUrl.Id, sceneIdAndUrl.Url, sceneHandle));
+            listedReleases.Add(new ListedRelease(null, sceneIdAndUrl.Id, sceneIdAndUrl.Url, sceneHandle));
         }
 
-        return indexScenes.AsReadOnly();
+        return listedReleases.AsReadOnly();
     }
 
     private static async Task GoToPageAsync(Site site, IPage page, int pageNumber)
