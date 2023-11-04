@@ -56,7 +56,7 @@ public class Repository : IRepository
         return siteEntities.Select(Convert).AsEnumerable();
     }
 
-    public async Task<IEnumerable<Release>> QueryScenesAsync(Site site, DownloadConditions downloadConditions)
+    public async Task<IEnumerable<Release>> QueryReleasesAsync(Site site, DownloadConditions downloadConditions)
     {
         var siteEntities = await _sqliteContext.Releases
             .Include(s => s.Site)

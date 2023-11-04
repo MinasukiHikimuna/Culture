@@ -228,7 +228,7 @@ public class NetworkRipper : INetworkRipper
 
     public async Task DownloadScenesAsync(Site site, BrowserSettings browserSettings, DownloadConditions downloadConditions, DownloadOptions downloadOptions)
     {
-        var matchingScenes = await _repository.QueryScenesAsync(site, downloadConditions);
+        var matchingScenes = await _repository.QueryReleasesAsync(site, downloadConditions);
 
         var furtherFilteredScenes = matchingScenes
             .Where(s =>
