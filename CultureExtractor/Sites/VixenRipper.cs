@@ -105,21 +105,21 @@ public class VixenRipper : ISiteScraper
         var videoElement = await currentRelease.QuerySelectorAsync("video");
         var videoSrc = await videoElement.GetAttributeAsync("src");
 
-        var sceneId = Regex.Match(videoSrc, @"videos/(\d+)/").Groups[1].Value;
+        var releaseId = Regex.Match(videoSrc, @"videos/(\d+)/").Groups[1].Value;
 
         var aElement = await currentRelease.QuerySelectorAsync("a");
         var url = await aElement.GetAttributeAsync("href");
 
-        return new ReleaseIdAndUrl(sceneId, url);
+        return new ReleaseIdAndUrl(releaseId, url);
     }
 
     public async Task<Release> ScrapeReleaseAsync(Guid releaseUuid, Site site, SubSite subSite, string url, string releaseShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
-        var sceneMetadataRequest = requests
+        var releaseMetadataRequest = requests
             .Where(r => r.Method == "POST")
             .Where(r => r.Url == $"{site.Url}/graphql")
             .FirstOrDefault();
-        var response = await sceneMetadataRequest.ResponseAsync();
+        var response = await releaseMetadataRequest.ResponseAsync();
         var bodyBuffer = await response.BodyAsync();
         var jsonContent = System.Text.Encoding.UTF8.GetString(bodyBuffer);
         var data = JsonSerializer.Deserialize<VixenSceneRootObject>(jsonContent)!;
