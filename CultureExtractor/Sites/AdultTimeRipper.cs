@@ -623,12 +623,12 @@ public class AdultTimeRipper : ISiteScraper
         throw new NotImplementedException();
     }
     
-    private static async Task<SceneIdAndUrl> GetSceneIdAsync(IElementHandle currentScene)
+    private static async Task<ReleaseIdAndUrl> GetSceneIdAsync(IElementHandle currentScene)
     {
         var thumbLinkElement = await currentScene.QuerySelectorAsync("a");
         var url = await thumbLinkElement.GetAttributeAsync("href");
         var id = url.Substring(url.LastIndexOf("/") + 1);
-        return new SceneIdAndUrl(id, url);
+        return new ReleaseIdAndUrl(id, url);
     }
 
     public async Task<Release> ScrapeReleaseAsync(Guid releaseUuid, Site site, SubSite subSite, string url, string releaseShortName, IPage page, IReadOnlyList<IRequest> requests)

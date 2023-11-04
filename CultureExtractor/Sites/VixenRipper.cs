@@ -100,7 +100,7 @@ public class VixenRipper : ISiteScraper
         await Task.Delay(1000);
     }
 
-    private static async Task<SceneIdAndUrl> GetSceneIdAsync(IElementHandle currentScene)
+    private static async Task<ReleaseIdAndUrl> GetSceneIdAsync(IElementHandle currentScene)
     {
         var videoElement = await currentScene.QuerySelectorAsync("video");
         var videoSrc = await videoElement.GetAttributeAsync("src");
@@ -110,7 +110,7 @@ public class VixenRipper : ISiteScraper
         var aElement = await currentScene.QuerySelectorAsync("a");
         var url = await aElement.GetAttributeAsync("href");
 
-        return new SceneIdAndUrl(sceneId, url);
+        return new ReleaseIdAndUrl(sceneId, url);
     }
 
     public async Task<Release> ScrapeReleaseAsync(Guid releaseUuid, Site site, SubSite subSite, string url, string releaseShortName, IPage page, IReadOnlyList<IRequest> requests)

@@ -108,7 +108,7 @@ public class CzechVRNetworkRipper : ISiteScraper
         throw new NotImplementedException();
     }
 
-    private static async Task<SceneIdAndUrl> GetSceneIdAsync(IElementHandle currentScene)
+    private static async Task<ReleaseIdAndUrl> GetSceneIdAsync(IElementHandle currentScene)
     {
         var linkElement = await currentScene.QuerySelectorAsync("div.nazev > h2 > a");
         var relativeUrl = await linkElement.GetAttributeAsync("href");
@@ -129,7 +129,7 @@ public class CzechVRNetworkRipper : ISiteScraper
 
         var sceneShortName = match.Groups["id"].Value;
 
-        return new SceneIdAndUrl(sceneShortName, relativeUrl);
+        return new ReleaseIdAndUrl(sceneShortName, relativeUrl);
     }
 
     public async Task<Release> ScrapeReleaseAsync(Guid releaseUuid, Site site, SubSite subSite, string url, string releaseShortName, IPage page, IReadOnlyList<IRequest> requests)

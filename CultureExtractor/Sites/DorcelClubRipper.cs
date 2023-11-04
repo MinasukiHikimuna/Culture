@@ -83,7 +83,7 @@ public class DorcelClubRipper : ISiteScraper
         throw new NotImplementedException();
     }
     
-    private static async Task<SceneIdAndUrl> GetSceneIdAsync(IElementHandle currentScene)
+    private static async Task<ReleaseIdAndUrl> GetSceneIdAsync(IElementHandle currentScene)
     {
         var thumbLinkElement = await currentScene.QuerySelectorAsync("a.thumb");
         var url = await thumbLinkElement.GetAttributeAsync("href");
@@ -95,7 +95,7 @@ public class DorcelClubRipper : ISiteScraper
         }
 
         string shortName = match.Groups[1].Value;
-        return new SceneIdAndUrl(shortName, url);
+        return new ReleaseIdAndUrl(shortName, url);
     }
 
     public async Task<Release> ScrapeReleaseAsync(Guid releaseUuid, Site site, SubSite subSite, string url, string releaseShortName, IPage page, IReadOnlyList<IRequest> requests)

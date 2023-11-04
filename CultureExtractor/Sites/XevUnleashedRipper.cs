@@ -90,13 +90,13 @@ public class XevUnleashedRipper : ISiteScraper
         await Task.Delay(5000);
     }
 
-    private static async Task<SceneIdAndUrl> GetSceneIdAsync(IElementHandle currentScene)
+    private static async Task<ReleaseIdAndUrl> GetSceneIdAsync(IElementHandle currentScene)
     {
         var shortName = await currentScene.GetAttributeAsync("data-setid");
         // Link in the image and in the title. Both have same URL.
         var links = await currentScene.QuerySelectorAllAsync("a");
         var url = await links.First().GetAttributeAsync("href");
-        return new SceneIdAndUrl(shortName, url);
+        return new ReleaseIdAndUrl(shortName, url);
     }
 
     public async Task<Release> ScrapeReleaseAsync(Guid releaseUuid, Site site, SubSite subSite, string url, string releaseShortName, IPage page, IReadOnlyList<IRequest> requests)

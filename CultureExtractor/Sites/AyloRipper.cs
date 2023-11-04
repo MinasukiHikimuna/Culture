@@ -111,7 +111,7 @@ public class AyloRipper : ISiteScraper
         await page.GotoAsync(site.Url + "/scenes?page=" + pageNumber);
     }
 
-    private static async Task<SceneIdAndUrl> GetSceneIdAsync(IElementHandle currentScene)
+    private static async Task<ReleaseIdAndUrl> GetSceneIdAsync(IElementHandle currentScene)
     {
         var url = await currentScene.GetAttributeAsync("href");
 
@@ -124,7 +124,7 @@ public class AyloRipper : ISiteScraper
 
         var id = match.Groups["id"].Value;
 
-        return new SceneIdAndUrl(id, url);
+        return new ReleaseIdAndUrl(id, url);
     }
 
     public async Task<Release> ScrapeReleaseAsync(Guid releaseUuid, Site site, SubSite subSite, string url, string releaseShortName, IPage page, IReadOnlyList<IRequest> requests)

@@ -99,7 +99,7 @@ public class WowNetworkRipper : ISiteScraper
         throw new NotImplementedException();
     }
     
-    private static async Task<SceneIdAndUrl> GetSceneIdAsync(Site site, IElementHandle currentScene)
+    private static async Task<ReleaseIdAndUrl> GetSceneIdAsync(Site site, IElementHandle currentScene)
     {
         var relativeUrl = await currentScene.GetAttributeAsync("href");
         var url = site.Url + relativeUrl;
@@ -111,7 +111,7 @@ public class WowNetworkRipper : ISiteScraper
             throw new InvalidOperationException($"Could not parse ID from {url} using pattern {pattern}.");
         }
 
-        return new SceneIdAndUrl(match.Groups["id"].Value, url);
+        return new ReleaseIdAndUrl(match.Groups["id"].Value, url);
     }
 
     public async Task<Release> ScrapeReleaseAsync(Guid releaseUuid, Site site, SubSite subSite, string url, string releaseShortName, IPage page, IReadOnlyList<IRequest> requests)

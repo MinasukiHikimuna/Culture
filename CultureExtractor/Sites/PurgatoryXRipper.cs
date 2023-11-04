@@ -68,7 +68,7 @@ public class PurgatoryXRipper : ISiteScraper
         throw new NotImplementedException();
     }
 
-    private static async Task<SceneIdAndUrl> GetSceneIdAsync(IElementHandle currentScene)
+    private static async Task<ReleaseIdAndUrl> GetSceneIdAsync(IElementHandle currentScene)
     {
         var linkElement = await currentScene.QuerySelectorAsync("div.container > div.row > a");
         var url = await linkElement.GetAttributeAsync("href");
@@ -77,7 +77,7 @@ public class PurgatoryXRipper : ISiteScraper
             ? idWithQueryStrings.Substring(0, idWithQueryStrings.IndexOf("?"))
             : idWithQueryStrings;
 
-        return new SceneIdAndUrl(shortName, url);
+        return new ReleaseIdAndUrl(shortName, url);
     }
 
     public async Task<Release> ScrapeReleaseAsync(Guid releaseUuid, Site site, SubSite subSite, string url, string releaseShortName, IPage page, IReadOnlyList<IRequest> requests)

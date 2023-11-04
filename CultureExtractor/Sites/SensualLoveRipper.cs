@@ -67,12 +67,12 @@ public class SensualLoveRipper : ISiteScraper
         throw new NotImplementedException();
     }
     
-    private static async Task<SceneIdAndUrl> GetSceneIdAsync(IElementHandle currentScene)
+    private static async Task<ReleaseIdAndUrl> GetSceneIdAsync(IElementHandle currentScene)
     {
         var linkElement = await currentScene.QuerySelectorAsync("a");
         var url = await linkElement.GetAttributeAsync("href");
         var id = url.Replace("/members/content/item/", "");
-        return new SceneIdAndUrl(id, url);
+        return new ReleaseIdAndUrl(id, url);
     }
 
     public async Task<Release> ScrapeReleaseAsync(Guid releaseUuid, Site site, SubSite subSite, string url, string releaseShortName, IPage page, IReadOnlyList<IRequest> requests)
