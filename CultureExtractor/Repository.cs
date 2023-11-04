@@ -43,7 +43,7 @@ public class Repository : IRepository
         return Convert(siteEntity);
     }
 
-    public async Task<IEnumerable<Release>> GetScenesAsync()
+    public async Task<IEnumerable<Release>> GetReleasesAsync()
     {
         var siteEntities = await _sqliteContext.Releases
             .Include(s => s.Site)
@@ -86,7 +86,7 @@ public class Repository : IRepository
             : null;
     }
 
-    public async Task<IReadOnlyList<Release>> GetScenesAsync(string siteShortName, IList<string> sceneShortNames)
+    public async Task<IReadOnlyList<Release>> GetReleasesAsync(string siteShortName, IList<string> sceneShortNames)
     {
         var sceneEntities = await _sqliteContext.Releases
             .Include(s => s.Site)

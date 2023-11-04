@@ -89,7 +89,7 @@ public class NetworkRipper : INetworkRipper
             ? $"Batch {currentPage} of infinite page contains {indexScenes.Count} scenes"
             : $"Page {currentPage}/{totalPages} contains {indexScenes.Count} scenes");
 
-        var existingScenes = await _repository.GetScenesAsync(site.ShortName, indexScenes.Select(s => s.ShortName).ToList());
+        var existingScenes = await _repository.GetReleasesAsync(site.ShortName, indexScenes.Select(s => s.ShortName).ToList());
         var checkedIndexScenes = indexScenes.Select(indexScene => indexScene with
             {
                 Scene = existingScenes.FirstOrDefault(s => s.ShortName == indexScene.ShortName)
