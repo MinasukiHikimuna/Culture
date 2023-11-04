@@ -267,7 +267,7 @@ public class MetArtNetworkRipper : ISiteScraper
         }
 
         const string suffix = ".mp4";
-        var name = SceneNamer.Name(release, suffix, performersStr);
+        var name = ReleaseNamer.Name(release, suffix, performersStr);
 
         return await _downloader.DownloadSceneAsync(release, page, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, async () =>
         {

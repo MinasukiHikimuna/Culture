@@ -717,7 +717,7 @@ public class AdultTimeRipper : ISiteScraper
 
         if (sceneData.subtitles?.full?.en != null)
         {
-            var subtitleFilename = SceneNamer.Name(release, ".vtt");
+            var subtitleFilename = ReleaseNamer.Name(release, ".vtt");
             await _downloader.DownloadSceneSubtitlesAsync(release, subtitleFilename, "https://subtitles.gammacdn.com/" + sceneData.subtitles.full.en, page.Url);
         }
 
@@ -765,7 +765,7 @@ public class AdultTimeRipper : ISiteScraper
         IPage newPage = await page.Context.NewPageAsync();
 
         var suffix = ".mp4";
-        var name = SceneNamer.Name(release, suffix);
+        var name = ReleaseNamer.Name(release, suffix);
 
         // TODO: does download but Playwright won't detect when it finishes
         var download = await _downloader.DownloadSceneAsync(release, newPage, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, async () =>

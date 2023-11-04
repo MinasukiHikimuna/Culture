@@ -203,7 +203,7 @@ public class VixenRipper : ISiteScraper
         var suggestedFilename = selectedDownload.DownloadOption.Url[(selectedDownload.DownloadOption.Url.LastIndexOf("/", StringComparison.Ordinal) + 1)..];
         suggestedFilename = suggestedFilename[..suggestedFilename.IndexOf("?", StringComparison.Ordinal)];
         var suffix = Path.GetExtension(suggestedFilename);
-        var name = SceneNamer.Name(release, suffix);
+        var name = ReleaseNamer.Name(release, suffix);
 
         return await _downloader.DownloadSceneDirectAsync(release, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, headers, referer: page.Url, fileName: name);
     }

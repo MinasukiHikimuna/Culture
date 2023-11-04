@@ -231,7 +231,7 @@ public class KinkRipper : ISiteScraper, ISubSiteScraper
         var suggestedFilename = selectedDownload.DownloadOption.Url.Substring(selectedDownload.DownloadOption.Url.LastIndexOf("/") + 1);
         suggestedFilename = suggestedFilename.Substring(0, suggestedFilename.IndexOf("?"));
         var suffix = Path.GetExtension(suggestedFilename);
-        var name = SceneNamer.Name(release, suffix);
+        var name = ReleaseNamer.Name(release, suffix);
 
         return await _downloader.DownloadSceneDirectAsync(release, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, headers, referer: page.Url, fileName: name);
     }

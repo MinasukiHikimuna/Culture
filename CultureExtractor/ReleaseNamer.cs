@@ -3,7 +3,7 @@ using CultureExtractor.Models;
 
 namespace CultureExtractor
 {
-    public static class SceneNamer
+    public static class ReleaseNamer
     {
         public static string Name(Release release, string suffix, string performers = "")
         {

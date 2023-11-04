@@ -78,7 +78,7 @@ public class Downloader : IDownloader
         var suffix = Path.GetExtension(suggestedFilename);
 
         var name = string.IsNullOrWhiteSpace(filename)
-            ? SceneNamer.Name(release, suffix)
+            ? ReleaseNamer.Name(release, suffix)
             : $"{filename}";
 
         var downloadQualityDirectory = Path.Join(_downloadPath, Path.Join(release.Site.Name, Enum.GetName(downloadQuality)));
@@ -98,7 +98,7 @@ public class Downloader : IDownloader
         var suffix = Path.GetExtension(suggestedFilename);
 
         var name = string.IsNullOrWhiteSpace(fileName)
-            ? SceneNamer.Name(release, suffix)
+            ? ReleaseNamer.Name(release, suffix)
             : $"{fileName}";
 
         var downloadQualityDirectory = Path.Join(_downloadPath, Path.Join(release.Site.Name, Enum.GetName(downloadQuality)));
