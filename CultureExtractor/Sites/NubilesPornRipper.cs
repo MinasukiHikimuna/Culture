@@ -65,10 +65,10 @@ public class NubilesPornRipper : ISiteScraper
     {
         await GoToPageAsync(page, site, subSite, pageNumber);
         
-        var sceneHandles = await page.Locator("div.Videoset div.content-grid-item").ElementHandlesAsync();
+        var releaseHandles = await page.Locator("div.Videoset div.content-grid-item").ElementHandlesAsync();
 
         var indexScenes = new List<ListedRelease>();
-        foreach (var sceneHandle in sceneHandles.Reverse())
+        foreach (var sceneHandle in releaseHandles.Reverse())
         {
             var sceneIdAndUrl = await GetSceneIdAsync(sceneHandle);
             indexScenes.Add(new ListedRelease(null, sceneIdAndUrl.Id, sceneIdAndUrl.Url, sceneHandle));

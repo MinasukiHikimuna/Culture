@@ -72,10 +72,10 @@ public class XevUnleashedRipper : ISiteScraper
     {
         await GoToPageAsync(page, pageNumber);
         
-        var sceneHandles = await page.Locator("div.update_details").ElementHandlesAsync();
+        var releaseHandles = await page.Locator("div.update_details").ElementHandlesAsync();
 
         var indexScenes = new List<ListedRelease>();
-        foreach (var sceneHandle in sceneHandles.Reverse())
+        foreach (var sceneHandle in releaseHandles.Reverse())
         {
             var sceneIdAndUrl = await GetSceneIdAsync(sceneHandle);
             indexScenes.Add(new ListedRelease(null, sceneIdAndUrl.Id, sceneIdAndUrl.Url, sceneHandle));

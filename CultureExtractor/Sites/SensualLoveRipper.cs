@@ -49,10 +49,10 @@ public class SensualLoveRipper : ISiteScraper
         
         var scenesLocator = page.Locator("div.content-view-lg > div.content-view-grid > div.content-grid-item-wrapper");
         await scenesLocator.First.WaitForAsync(new() { State = WaitForSelectorState.Visible });
-        var sceneHandles = await scenesLocator.ElementHandlesAsync();
+        var releaseHandles = await scenesLocator.ElementHandlesAsync();
 
         var indexScenes = new List<ListedRelease>();
-        foreach (var sceneHandle in sceneHandles.Reverse())
+        foreach (var sceneHandle in releaseHandles.Reverse())
         {
             var sceneIdAndUrl = await GetSceneIdAsync(sceneHandle);
             indexScenes.Add(new ListedRelease(null, sceneIdAndUrl.Id, sceneIdAndUrl.Url, sceneHandle));
