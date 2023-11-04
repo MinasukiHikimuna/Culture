@@ -81,11 +81,11 @@ public class AyloRipper : ISiteScraper
             await GoToPageAsync(site, page, pageNumber);
         }
 
-        var sceneHandleLocators = page.Locator("span a[href^='/scene/']");
+        var releaseHandleLocators = page.Locator("span a[href^='/scene/']");
 
         try
         {
-            await sceneHandleLocators.First.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+            await releaseHandleLocators.First.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
         }
         catch (TimeoutException)
         {
@@ -94,13 +94,13 @@ public class AyloRipper : ISiteScraper
         }
         
         
-        var releaseHandles = await sceneHandleLocators.ElementHandlesAsync();
+        var releaseHandles = await releaseHandleLocators.ElementHandlesAsync();
 
         var listedReleases = new List<ListedRelease>();
-        foreach (var sceneHandle in releaseHandles.Reverse())
+        foreach (var releaseHandle in releaseHandles.Reverse())
         {
-            var sceneIdAndUrl = await GetSceneIdAsync(sceneHandle);
-            listedReleases.Add(new ListedRelease(null, sceneIdAndUrl.Id, sceneIdAndUrl.Url, sceneHandle));
+            var sceneIdAndUrl = await GetSceneIdAsync(releaseHandle);
+            listedReleases.Add(new ListedRelease(null, sceneIdAndUrl.Id, sceneIdAndUrl.Url, releaseHandle));
         }
 
         return listedReleases.AsReadOnly();

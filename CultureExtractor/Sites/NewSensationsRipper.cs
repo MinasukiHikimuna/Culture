@@ -53,10 +53,10 @@ public class NewSensationsRipper : ISiteScraper
         var releaseHandles = await page.Locator("div.videoArea > div.videoBlock").ElementHandlesAsync();
 
         var listedReleases = new List<ListedRelease>();
-        foreach (var sceneHandle in releaseHandles.Reverse())
+        foreach (var releaseHandle in releaseHandles.Reverse())
         {
-            var sceneIdAndUrl = await GetSceneIdAsync(sceneHandle);
-            listedReleases.Add(new ListedRelease(null, sceneIdAndUrl.Id, sceneIdAndUrl.Url, sceneHandle));
+            var sceneIdAndUrl = await GetSceneIdAsync(releaseHandle);
+            listedReleases.Add(new ListedRelease(null, sceneIdAndUrl.Id, sceneIdAndUrl.Url, releaseHandle));
         }
 
         return listedReleases.AsReadOnly();

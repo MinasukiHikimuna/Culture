@@ -85,10 +85,10 @@ public class WowNetworkRipper : ISiteScraper
         var releaseHandles = await page.Locator("section.cf_content > ul > li > div.content_item > a.icon").ElementHandlesAsync();
 
         var listedReleases = new List<ListedRelease>();
-        foreach (var sceneHandle in releaseHandles.Reverse())
+        foreach (var releaseHandle in releaseHandles.Reverse())
         {
-            var sceneIdAndUrl = await GetSceneIdAsync(site, sceneHandle);
-            listedReleases.Add(new ListedRelease(null, sceneIdAndUrl.Id, sceneIdAndUrl.Url, sceneHandle));
+            var sceneIdAndUrl = await GetSceneIdAsync(site, releaseHandle);
+            listedReleases.Add(new ListedRelease(null, sceneIdAndUrl.Id, sceneIdAndUrl.Url, releaseHandle));
         }
 
         return listedReleases.AsReadOnly();

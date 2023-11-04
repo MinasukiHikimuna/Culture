@@ -81,10 +81,10 @@ public class HentaiedRipper : ISiteScraper
         var releaseHandles = await page.Locator("div.catposts div.half").ElementHandlesAsync();
 
         var listedReleases = new List<ListedRelease>();
-        foreach (var sceneHandle in releaseHandles.Reverse())
+        foreach (var releaseHandle in releaseHandles.Reverse())
         {
-            var sceneIdAndUrl = await GetSceneIdAsync(site, sceneHandle);
-            listedReleases.Add(new ListedRelease(null, sceneIdAndUrl.Id, sceneIdAndUrl.Url, sceneHandle));
+            var sceneIdAndUrl = await GetSceneIdAsync(site, releaseHandle);
+            listedReleases.Add(new ListedRelease(null, sceneIdAndUrl.Id, sceneIdAndUrl.Url, releaseHandle));
         }
 
         return listedReleases.AsReadOnly();
