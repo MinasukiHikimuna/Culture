@@ -253,8 +253,8 @@ public class DownloadOptions : BaseOptions
     [Option("best", Required = false, HelpText = "Use best quality")]
     public bool BestQuality { get; set; }
 
-    [Option("scenes", Required = false, HelpText = "One or more scene IDs to download")]
-    public IEnumerable<string> SceneIds { get; set; }
+    [Option("releases", Required = false, HelpText = "One or more release UUIDs to download")]
+    public IEnumerable<string> ReleaseUuids { get; set; }
 
     [Option("performers", Required = false, HelpText = "One or more performers to download")]
     public IEnumerable<string> Performers { get; set; }

@@ -74,7 +74,7 @@ public class CultureExtractorConsoleApp
             var downloadConditions = DownloadConditions.All(downloadQuality) with
             {
                 DateRange = dateRange,
-                SceneIds = opts.SceneIds.ToList() ?? new List<string>(),
+                ReleaseUuids = opts.ReleaseUuids.ToList() ?? new List<string>(),
                 PerformerNames = opts.Performers.ToList() ?? new List<string>(),
                 DownloadedFileNames = opts.DownloadedFileNames.ToList() ?? new List<string>()
             };

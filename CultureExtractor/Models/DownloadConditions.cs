@@ -5,7 +5,7 @@ public record DownloadConditions(
     PreferredDownloadQuality PreferredDownloadQuality,
     int? MaxDownloads,
     IList<string>? PerformerNames,
-    IList<string>? SceneIds,
+    IList<string>? ReleaseUuids,
     IList<string>? DownloadedFileNames
 )
 {

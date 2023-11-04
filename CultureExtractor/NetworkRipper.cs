@@ -238,8 +238,8 @@ public class NetworkRipper : INetworkRipper
                 !downloadConditions.PerformerNames.Any() ||
                 s.Performers.Any(p => downloadConditions.PerformerNames.Contains(p.Name)))
             .Where(s =>
-                !downloadConditions.SceneIds.Any() ||
-                downloadConditions.SceneIds.Contains(s.ShortName))
+                !downloadConditions.ReleaseUuids.Any() ||
+                downloadConditions.ReleaseUuids.Contains(s.ShortName))
             .ToList();
 
         if (!string.IsNullOrWhiteSpace(downloadOptions.SubSite))
