@@ -12,6 +12,6 @@ public record Release(
     double Duration,
     IEnumerable<SitePerformer> Performers,
     IEnumerable<SiteTag> Tags,
-    IEnumerable<DownloadOption> DownloadOptions,
+    IEnumerable<IAvailableFile> DownloadOptions,
     string JsonDocument,
     DateTime LastUpdated);

@@ -7,6 +7,7 @@ using CultureExtractor.Sites.MetArtSceneModels;
 using System.Text.RegularExpressions;
 using System;
 using CultureExtractor.Models;
+using Xabe.FFmpeg;
 
 namespace CultureExtractor.Sites;
 
@@ -194,18 +195,54 @@ public class MetArtNetworkRipper : ISiteScraper
             .Select(t => new SiteTag(t.Replace(" ", "+"), t, "/tags/" + t.Replace(" ", "+")))
             .ToList();
 
-        var downloads = movieData.files.sizes.videos
-            .Select(d => new DownloadOption(
-                d.id,
+        var sceneDownloads = movieData.files.sizes.videos
+            .Select(video => new AvailableVideoFile(
+                "video",
+                "scene",
+                video.id,
+                $"/api/download-media/{movieData.siteUUID}/film/{video.id}",
                 -1,
-                HumanParser.ParseResolutionHeight(d.id),
-                HumanParser.ParseFileSizeMaybe(d.size).IsSome(out var fileSizeValue) ? fileSizeValue : -1,
+                HumanParser.ParseResolutionHeight(video.id),
+                HumanParser.ParseFileSizeMaybe(video.size).IsSome(out var fileSizeValue) ? fileSizeValue : -1,
                 -1,
-                string.Empty,
-                $"/api/download-media/{movieData.siteUUID}/film/{d.id}"))
-            .OrderByDescending(d => d.ResolutionHeight)
+                string.Empty
+            ))
+            .OrderByDescending(availableFile => availableFile.ResolutionHeight)
             .ToList();
 
+        var galleryDownloads = movieData.files.sizes.zips
+            .Select(gallery => new AvailableGalleryZipFile(
+                "zip",
+                "gallery",
+                gallery.quality,
+                $"/api/download-media/{movieData.siteUUID}/photos/{gallery.quality}",
+                -1,
+                -1,
+                HumanParser.ParseFileSizeMaybe(gallery.size).IsSome(out var fileSizeValue) ? fileSizeValue : -1
+            ))
+            .OrderByDescending(availableFile => availableFile.ResolutionHeight)
+            .ToList();
+        
+        var imageDownloads = movieData.files.sizes.relatedPhotos
+            .Select(image => new AvailableImageFile(
+                "image",
+                image.id,
+                string.Empty,
+                $"https://cdn.metartnetwork.com/{movieData.siteUUID}/media/{movieData.UUID}/{image.id.Replace("-", "_")}_{movieData.UUID}.jpg",
+                -1,
+                -1,
+                HumanParser.ParseFileSizeMaybe(image.size).IsSome(out var fileSizeValue) ? fileSizeValue : -1
+            ))
+            .ToList();
+
+        var trailerDownloads = new List<IAvailableFile>()
+        {
+            new AvailableVideoFile("video", "trailer", string.Empty,
+                $"https://www.sexart.com/api/m3u8/{movieData.UUID}/720.m3u8", -1, 720, -1, -1, "h264"),
+            new AvailableVideoFile("video", "trailer", string.Empty,
+                $"https://www.sexart.com/api/m3u8/{movieData.UUID}/270.m3u8", -1, 270, -1, -1, "h264"),
+        };
+        
         var scene = new Release(
             releaseUuid,
             site,
@@ -218,11 +255,13 @@ public class MetArtNetworkRipper : ISiteScraper
             duration.TotalSeconds,
             performers,
             tags,
-            downloads,
+            new List<IAvailableFile>()
+                .Concat(sceneDownloads)
+                .Concat(galleryDownloads)
+                .Concat(imageDownloads)
+                .Concat(trailerDownloads),
             @"{""movie"": " + movieJsonContent + @", ""comments"": " + commentsJsonContent + "}",
             DateTime.Now);
-
-        await _downloader.DownloadSceneImageAsync(scene, scene.Site.Url + movieData.splashImagePath);
 
         return scene;
     }
@@ -245,12 +284,25 @@ public class MetArtNetworkRipper : ISiteScraper
 
         DownloadDetailsAndElementHandle selectedDownload = downloadConditions.PreferredDownloadQuality switch
         {
-            PreferredDownloadQuality.Phash => availableDownloads.FirstOrDefault(f => f.DownloadOption.ResolutionHeight == 360) ?? availableDownloads.Last(),
+            PreferredDownloadQuality.Phash => availableDownloads.FirstOrDefault(f => f.AvailableVideoFile.ResolutionHeight == 360) ?? availableDownloads.Last(),
             PreferredDownloadQuality.Best => availableDownloads.First(),
             PreferredDownloadQuality.Worst => availableDownloads.Last(),
             _ => throw new InvalidOperationException("Could not find a download candidate!")
         };
 
+        foreach (var image in release.DownloadOptions.OfType<AvailableImageFile>())
+        {
+            var imageSuffix = Path.GetExtension(image.Url);
+            await _downloader.DownloadSceneImageAsync(release, image.Url, fileName: $"{image.ContentType}{imageSuffix}");            
+        }
+        
+        var fileInfo = await _downloader.DownloadFileAsync(
+            release,
+            release.DownloadOptions.OfType<AvailableVideoFile>().First(d => d.ContentType == "trailer").Url, 
+            "trailer.m3u8");
+        
+        var snippet = await FFmpeg.Conversions.New().Start($"-protocol_whitelist \"file,http,https,tcp,tls\" -i {fileInfo.FullName} -c copy {Path.Combine(fileInfo.DirectoryName, "trailer.mp4")}");
+        
         var females = data.models.Where(a => a.gender == "female").ToList();
         var nonFemales = data.models.Where(a => a.gender != "female").ToList();
         var genderSorted = females.Concat(nonFemales)
@@ -269,7 +321,7 @@ public class MetArtNetworkRipper : ISiteScraper
         const string suffix = ".mp4";
         var name = ReleaseNamer.Name(release, suffix, performersStr);
 
-        return await _downloader.DownloadSceneAsync(release, page, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, async () =>
+        return await _downloader.DownloadSceneAsync(release, page, selectedDownload.AvailableVideoFile, downloadConditions.PreferredDownloadQuality, async () =>
         {
             await selectedDownload.ElementHandle.ClickAsync();
         }, name);
@@ -296,14 +348,16 @@ public class MetArtNetworkRipper : ISiteScraper
             var url = await downloadLink.GetAttributeAsync("href");
             availableDownloads.Add(
                 new DownloadDetailsAndElementHandle(
-                    new DownloadOption(
+                    new AvailableVideoFile(
+                        "video",
+                        "scene",
                         description,
+                        url,
                         -1,
                         HumanParser.ParseResolutionHeight(resolution),
                         HumanParser.ParseFileSize(size),
                         -1,
-                        string.Empty,
-                        url),
+                        string.Empty),
                     downloadLink));
         }
         return availableDownloads;

@@ -186,7 +186,7 @@ public class AyloRipper : ISiteScraper
             duration.TotalSeconds,
             performers,
             tags,
-            downloadOptionsAndHandles.Select(f => f.DownloadOption).ToList(),
+            downloadOptionsAndHandles.Select(f => f.AvailableVideoFile).ToList(),
             JsonSerializer.Serialize(sceneData),
             DateTime.Now);
 
@@ -238,12 +238,12 @@ public class AyloRipper : ISiteScraper
             { HttpRequestHeader.Cookie, cookieString }
         };
 
-        var suggestedFilename = selectedDownload.DownloadOption.Url[(selectedDownload.DownloadOption.Url.LastIndexOf("/", StringComparison.Ordinal) + 1)..];
+        var suggestedFilename = selectedDownload.AvailableVideoFile.Url[(selectedDownload.AvailableVideoFile.Url.LastIndexOf("/", StringComparison.Ordinal) + 1)..];
         suggestedFilename = suggestedFilename[..suggestedFilename.IndexOf("?", StringComparison.Ordinal)];
         var suffix = Path.GetExtension(suggestedFilename);
         var name = ReleaseNamer.Name(release, suffix);
 
-        return await _downloader.DownloadSceneDirectAsync(release, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, headers, referer: page.Url, fileName: name);
+        return await _downloader.DownloadSceneDirectAsync(release, selectedDownload.AvailableVideoFile, downloadConditions.PreferredDownloadQuality, headers, referer: page.Url, fileName: name);
     }
 
     private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloadsAsync(BrazzersResult sceneData)
@@ -257,18 +257,21 @@ public class AyloRipper : ISiteScraper
 
             availableDownloads.Add(
                 new DownloadDetailsAndElementHandle(
-                new DownloadOption(
+                new AvailableVideoFile(
+                    "video",
+                    "scene",
                     description,
+                    videoFile.urls.view,
                     -1,
                     HumanParser.ParseResolutionHeight(downloadFileSize),
                     videoFile.sizeBytes,
                     -1,
-                    HumanParser.ParseCodec("H.264"),
-                    videoFile.urls.view),
+                    HumanParser.ParseCodec("H.264")
+                ),
                 null));
         }
 
-        return availableDownloads.OrderByDescending(d => d.DownloadOption.FileSize).ToList();
+        return availableDownloads.OrderByDescending(d => d.AvailableVideoFile.FileSize).ToList();
     }
 
     private class BrazzersRootobject

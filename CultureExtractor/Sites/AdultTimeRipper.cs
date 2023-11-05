@@ -21,7 +21,7 @@ public record AdultTimeSceneDocument(
     IEnumerable<SitePerformer> Performers,
     IEnumerable<Director> Directors,
     IEnumerable<SiteTag> Tags,
-    IEnumerable<DownloadOption> DownloadOptions,
+    IEnumerable<AvailableVideoFile> DownloadOptions,
     IEnumerable<ActionTag> Markers);
 
 public class Rootobject
@@ -696,7 +696,7 @@ public class AdultTimeRipper : ISiteScraper
             performers,
             sceneData.Directors,
             tags,
-            downloadOptionsAndHandles.Select(f => f.DownloadOption).ToList(),
+            downloadOptionsAndHandles.Select(f => f.AvailableVideoFile).ToList(),
             sceneData.ActionTags != null ? sceneData.ActionTags : new List<ActionTag>());
 
         Release release = new Release(
@@ -711,7 +711,7 @@ public class AdultTimeRipper : ISiteScraper
             duration.TotalSeconds,
             performers,
             tags,
-            downloadOptionsAndHandles.Select(f => f.DownloadOption).ToList(),
+            downloadOptionsAndHandles.Select(f => f.AvailableVideoFile).ToList(),
             JsonSerializer.Serialize(sceneDocument),
             DateTime.Now);
 
@@ -768,11 +768,11 @@ public class AdultTimeRipper : ISiteScraper
         var name = ReleaseNamer.Name(release, suffix);
 
         // TODO: does download but Playwright won't detect when it finishes
-        var download = await _downloader.DownloadSceneAsync(release, newPage, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, async () =>
+        var download = await _downloader.DownloadSceneAsync(release, newPage, selectedDownload.AvailableVideoFile, downloadConditions.PreferredDownloadQuality, async () =>
         {
             try
             {
-                await newPage.GotoAsync(selectedDownload.DownloadOption.Url);
+                await newPage.GotoAsync(selectedDownload.AvailableVideoFile.Url);
             }
             catch (PlaywrightException ex)
             {
@@ -800,44 +800,48 @@ public class AdultTimeRipper : ISiteScraper
         {
             foreach (var downloadSize in sceneData.DownloadSizes)
             {
-                var description = downloadSize;
-                var resolutionHeight = HumanParser.ParseResolutionHeight(downloadSize);
-
                 availableDownloads.Add(
                     new DownloadDetailsAndElementHandle(
-                    new DownloadOption(
-                        description,
-                        -1,
-                        HumanParser.ParseResolutionHeight(downloadSize),
-                        -1,
-                        -1,
-                        HumanParser.ParseCodec("H.264"),
-                        $"/movieaction/download/{sceneData.clip_id}/{downloadSize}/mp4"),
-                    null));
+                        new AvailableVideoFile(
+                            "video",
+                            "scene",
+                            downloadSize,
+                            $"/movieaction/download/{sceneData.clip_id}/{downloadSize}/mp4",
+                            -1,
+                            HumanParser.ParseResolutionHeight(downloadSize),
+                            -1,
+                            -1,
+                            HumanParser.ParseCodec("H.264")
+                        ),
+                        null
+                    )
+                );
             }
 
-            return availableDownloads.OrderByDescending(d => d.DownloadOption.ResolutionHeight).ToList();
+            return availableDownloads.OrderByDescending(d => d.AvailableVideoFile.ResolutionHeight).ToList();
         }
 
         foreach (var downloadFileSize in sceneData.DownloadFileSizes.Keys)
         {
-            var description = downloadFileSize;
-            var resolutionHeight = HumanParser.ParseResolutionHeight(downloadFileSize);
-
             availableDownloads.Add(
                 new DownloadDetailsAndElementHandle(
-                new DownloadOption(
-                    description,
-                    -1,
-                    HumanParser.ParseResolutionHeight(downloadFileSize),
-                    sceneData.DownloadFileSizes[downloadFileSize],
-                    -1,
-                    HumanParser.ParseCodec("H.264"),
-                    $"/movieaction/download/{sceneData.clip_id}/{downloadFileSize}/mp4"),
-                null));
+                    new AvailableVideoFile(
+                        "video",
+                        "scene",
+                        downloadFileSize,
+                        $"/movieaction/download/{sceneData.clip_id}/{downloadFileSize}/mp4",
+                        -1,
+                        HumanParser.ParseResolutionHeight(downloadFileSize),
+                        sceneData.DownloadFileSizes[downloadFileSize],
+                        -1,
+                        HumanParser.ParseCodec("H.264")
+                    ),
+                    null
+                )
+            );
         }
 
-        return availableDownloads.OrderByDescending(d => d.DownloadOption.FileSize).ToList();
+        return availableDownloads.OrderByDescending(d => d.AvailableVideoFile.FileSize).ToList();
     }
 }
 

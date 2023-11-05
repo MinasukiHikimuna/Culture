@@ -124,7 +124,7 @@ public class PurgatoryXRipper : ISiteScraper
             duration.TotalSeconds,
             performers,
             new List<SiteTag>(),
-            downloadOptionsAndHandles.Select(f => f.DownloadOption).ToList(),
+            downloadOptionsAndHandles.Select(f => f.AvailableVideoFile).ToList(),
             "{}",
             DateTime.Now);
         
@@ -150,13 +150,13 @@ public class PurgatoryXRipper : ISiteScraper
 
         DownloadDetailsAndElementHandle selectedDownload = downloadConditions.PreferredDownloadQuality switch
         {
-            PreferredDownloadQuality.Phash => availableDownloads.FirstOrDefault(f => f.DownloadOption.ResolutionHeight == 360) ?? availableDownloads.Last(),
+            PreferredDownloadQuality.Phash => availableDownloads.FirstOrDefault(f => f.AvailableVideoFile.ResolutionHeight == 360) ?? availableDownloads.Last(),
             PreferredDownloadQuality.Best => availableDownloads.First(),
             PreferredDownloadQuality.Worst => availableDownloads.Last(),
             _ => throw new InvalidOperationException("Could not find a download candidate!")
         };
 
-        return await _downloader.DownloadSceneAsync(release, page, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, async () =>
+        return await _downloader.DownloadSceneAsync(release, page, selectedDownload.AvailableVideoFile, downloadConditions.PreferredDownloadQuality, async () =>
             await selectedDownload.ElementHandle.ClickAsync()
 );
     }
@@ -197,14 +197,16 @@ public class PurgatoryXRipper : ISiteScraper
 
             availableDownloads.Add(
                 new DownloadDetailsAndElementHandle(
-                    new DownloadOption(
+                    new AvailableVideoFile(
+                        "video",
+                        "scene",
                         title,
+                        url,
                         resolutionWidth,
                         resolutionHeight,
                         size,
                         -1,
-                        codec,
-                        url),
+                        codec),
                     downloadListItem));
         }
         return availableDownloads;

@@ -163,7 +163,7 @@ public class VixenRipper : ISiteScraper
             duration.TotalSeconds,
             performers,
             tags,
-            downloadOptionsAndHandles.Select(f => f.DownloadOption).ToList(),
+            downloadOptionsAndHandles.Select(f => f.AvailableVideoFile).ToList(),
             metadataJson,
             DateTime.Now);
         
@@ -200,12 +200,12 @@ public class VixenRipper : ISiteScraper
             { HttpRequestHeader.Cookie, cookieString }
         };
 
-        var suggestedFilename = selectedDownload.DownloadOption.Url[(selectedDownload.DownloadOption.Url.LastIndexOf("/", StringComparison.Ordinal) + 1)..];
+        var suggestedFilename = selectedDownload.AvailableVideoFile.Url[(selectedDownload.AvailableVideoFile.Url.LastIndexOf("/", StringComparison.Ordinal) + 1)..];
         suggestedFilename = suggestedFilename[..suggestedFilename.IndexOf("?", StringComparison.Ordinal)];
         var suffix = Path.GetExtension(suggestedFilename);
         var name = ReleaseNamer.Name(release, suffix);
 
-        return await _downloader.DownloadSceneDirectAsync(release, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, headers, referer: page.Url, fileName: name);
+        return await _downloader.DownloadSceneDirectAsync(release, selectedDownload.AvailableVideoFile, downloadConditions.PreferredDownloadQuality, headers, referer: page.Url, fileName: name);
     }
 
     private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloadsAsync(IPage page)
@@ -259,17 +259,19 @@ public class VixenRipper : ISiteScraper
 
         availableDownloads.Add(
             new DownloadDetailsAndElementHandle(
-                new DownloadOption(
+                new AvailableVideoFile(
+                    "video",
+                    "scene",
                     resolution,
+                    source,
                     -1,
                     int.Parse(resolution),
                     -1,
                     -1,
-                    string.Empty,
-                    source),
+                    string.Empty),
                 null));
 
-        return availableDownloads.OrderByDescending(d => d.DownloadOption.ResolutionHeight).ToList();
+        return availableDownloads.OrderByDescending(d => d.AvailableVideoFile.ResolutionHeight).ToList();
     }
 
     public async Task<int> NavigateToSubSiteAndReturnPageCountAsync(Site site, SubSite subSite, IPage page)

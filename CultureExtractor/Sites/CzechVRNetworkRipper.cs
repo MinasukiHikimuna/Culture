@@ -154,7 +154,7 @@ public class CzechVRNetworkRipper : ISiteScraper
             duration.TotalSeconds,
             performers,
             tags,
-            downloadOptionsAndHandles.Select(f => f.DownloadOption).ToList(),
+            downloadOptionsAndHandles.Select(f => f.AvailableVideoFile).ToList(),
             "{}",
             DateTime.Now);
         
@@ -186,16 +186,16 @@ public class CzechVRNetworkRipper : ISiteScraper
             _ => throw new InvalidOperationException("Could not find a download candidate!")
         };
 
-        return await _downloader.DownloadSceneAsync(release, page, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, async () =>
+        return await _downloader.DownloadSceneAsync(release, page, selectedDownload.AvailableVideoFile, downloadConditions.PreferredDownloadQuality, async () =>
         {
             await page.EvaluateAsync(
-                $"document.querySelector('a[href=\"{selectedDownload.DownloadOption.Url}\"')" +
+                $"document.querySelector('a[href=\"{selectedDownload.AvailableVideoFile.Url}\"')" +
                 $".parentElement" +
                 $".parentElement" +
                 $".parentElement" +
                 $".previousElementSibling" +
                 $".click()");
-            await page.Locator($"a[href=\"{selectedDownload.DownloadOption.Url}\"]").ClickAsync();
+            await page.Locator($"a[href=\"{selectedDownload.AvailableVideoFile.Url}\"]").ClickAsync();
         });
     }
 
@@ -231,17 +231,19 @@ public class CzechVRNetworkRipper : ISiteScraper
             var url = await downloadOption.Link.GetAttributeAsync("href");
             availableDownloads.Add(
                 new DownloadDetailsAndElementHandle(
-                    new DownloadOption(
+                    new AvailableVideoFile(
+                        "scene",
+                        "video",
                         description,
+                        url,
                         resolutionWidth,
                         resolutionHeight,
                         HumanParser.ParseFileSize(description),
                         HumanParser.ParseFps(description),
-                        HumanParser.ParseCodec(description),
-                        url),
+                        HumanParser.ParseCodec(description)),
                     null));
         }
-        return availableDownloads.OrderByDescending(d => d.DownloadOption.FileSize).ToList();
+        return availableDownloads.OrderByDescending(d => d.AvailableVideoFile.FileSize).ToList();
     }
 
     private record DownloadOptionElements(IElementHandle Device, IElementHandle Details, IElementHandle Link);

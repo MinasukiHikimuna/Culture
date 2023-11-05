@@ -120,7 +120,7 @@ public class SensualLoveRipper : ISiteScraper
             duration.TotalSeconds,
             performers,
             tags,
-            downloadOptionsAndHandles.Select(f => f.DownloadOption).ToList(),
+            downloadOptionsAndHandles.Select(f => f.AvailableVideoFile).ToList(),
             "{}",
             DateTime.Now);
         
@@ -152,7 +152,7 @@ public class SensualLoveRipper : ISiteScraper
             _ => throw new InvalidOperationException("Could not find a download candidate!")
         };
 
-        return await _downloader.DownloadSceneAsync(release, page, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, async () =>
+        return await _downloader.DownloadSceneAsync(release, page, selectedDownload.AvailableVideoFile, downloadConditions.PreferredDownloadQuality, async () =>
             await selectedDownload.ElementHandle.ClickAsync()
 );
     }
@@ -183,16 +183,18 @@ public class SensualLoveRipper : ISiteScraper
 
             availableDownloads.Add(
                 new DownloadDetailsAndElementHandle(
-                    new DownloadOption(
+                    new AvailableVideoFile(
+                        "video",
+                        "scene",
                         description,
+                        downloadUrl,
                         resolutionWidth,
                         resolutionHeight,
                         size,
                         -1,
-                        codec,
-                        downloadUrl),
+                        codec),
                     downloadButtonElement));
         }
-        return availableDownloads.OrderByDescending(d => d.DownloadOption.ResolutionWidth).ThenByDescending(d => d.DownloadOption.Fps).ToList();
+        return availableDownloads.OrderByDescending(d => d.AvailableVideoFile.ResolutionWidth).ThenByDescending(d => d.AvailableVideoFile.Fps).ToList();
     }
 }

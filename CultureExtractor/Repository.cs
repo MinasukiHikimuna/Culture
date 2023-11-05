@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Serilog;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using CultureExtractor.Models;
 
 namespace CultureExtractor;
@@ -329,10 +330,11 @@ public class Repository : IRepository
 
     private static Release Convert(ReleaseEntity releaseEntity)
     {
-        var downloadOptions = string.IsNullOrEmpty(releaseEntity.DownloadOptions)
+        var availableFilesJson = string.IsNullOrEmpty(releaseEntity.DownloadOptions)
             ? "[]"
             : releaseEntity.DownloadOptions;
-
+        var availableFiles = JsonSerializer.Deserialize<List<IAvailableFile>>(availableFilesJson).AsReadOnly();
+        
         return new Release(
             Guid.Parse(releaseEntity.Uuid),
             Convert(releaseEntity.Site),
@@ -345,7 +347,7 @@ public class Repository : IRepository
             releaseEntity.Duration,
             releaseEntity.Performers.Select(Convert),
             releaseEntity.Tags.Select(Convert),
-            JsonSerializer.Deserialize<IEnumerable<DownloadOption>>(downloadOptions),
+            availableFiles,
             releaseEntity.JsonDocument,
             releaseEntity.LastUpdated);
     }
@@ -370,7 +372,7 @@ public class Repository : IRepository
     {
         var releaseEntity = await _sqliteContext.Releases.FirstAsync(s => s.Uuid == download.Release.Uuid.ToString());
 
-        var json = JsonSerializer.Serialize(new JsonSummary(download.DownloadOption, download.VideoHashes));
+        var json = JsonSerializer.Serialize(new JsonSummary(download.AvailableVideoFile, download.VideoHashes));
 
         _sqliteContext.Downloads.Add(new DownloadEntity
         {
@@ -389,13 +391,13 @@ public class Repository : IRepository
 
     private class JsonSummary
     {
-        public JsonSummary(DownloadOption downloadOption, VideoHashes videoHashes)
+        public JsonSummary(AvailableVideoFile availableVideoFile, VideoHashes videoHashes)
         {
-            DownloadOption = downloadOption;
+            AvailableVideoFile = availableVideoFile;
             VideoHashes = videoHashes;
         }
 
-        public DownloadOption DownloadOption { get; }
+        public AvailableVideoFile AvailableVideoFile { get; }
         public VideoHashes VideoHashes { get; }
     }
 }

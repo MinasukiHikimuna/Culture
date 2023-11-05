@@ -39,14 +39,36 @@ public class Downloader : IDownloader
         return File.Exists(path);
     }
 
-    public async Task DownloadSceneImageAsync(Release release, string imageUrl, string referer = "", Dictionary<HttpRequestHeader, string>? headers = null)
+    public async Task DownloadSceneImageAsync(Release release, string imageUrl, string referer = "", Dictionary<HttpRequestHeader, string>? headers = null, string fileName = "")
     {
-        var rippingPath = Path.Combine(_metadataPath, $@"{release.Site.Name}\Metadata\SceneImages\");
+        var rippingPath = Path.Combine(_metadataPath, $@"{release.Site.Name}\Metadata\{release.Uuid}\");
         Directory.CreateDirectory(rippingPath);
 
-        await DownloadFileAsync(imageUrl, $"{release.Uuid}.jpg", rippingPath, referer: referer, headers: headers);
+        await DownloadFileAsync(
+            imageUrl, 
+            string.IsNullOrWhiteSpace(fileName)
+                ? $"{release.Uuid}.jpg"
+                : fileName,
+            rippingPath,
+            referer: referer,
+            headers: headers);
     }
 
+    public async Task<FileInfo> DownloadFileAsync(Release release, string url, string fileName, string referer = "", Dictionary<HttpRequestHeader, string>? headers = null)
+    {
+        var rippingPath = Path.Combine(_metadataPath, $@"{release.Site.Name}\Metadata\{release.Uuid}\");
+        Directory.CreateDirectory(rippingPath);
+
+        await DownloadFileAsync(
+            url, 
+            fileName,
+            rippingPath,
+            referer: referer,
+            headers: headers);
+        
+        return new FileInfo(Path.Combine(rippingPath, fileName));
+    }
+    
     public async Task DownloadTrailerAsync(Release release, string url, string referer = "")
     {
         var rippingPath = Path.Combine(_metadataPath, $@"{release.Site.Name}\Metadata\Trailers\");
@@ -67,7 +89,7 @@ public class Downloader : IDownloader
         await DownloadFileAsync(subtitleUrl, fileName, rippingPath, referer: referer);
     }
 
-    public async Task<Download> DownloadSceneAsync(Release release, IPage page, DownloadOption downloadDetails, PreferredDownloadQuality downloadQuality, Func<Task> func, string? filename = null)
+    public async Task<Download> DownloadSceneAsync(Release release, IPage page, AvailableVideoFile downloadDetails, PreferredDownloadQuality downloadQuality, Func<Task> func, string? filename = null)
     {
         var waitForDownloadTask = page.WaitForDownloadAsync(new() { Timeout = (float) TimeSpan.FromHours(1).TotalMilliseconds });
 
@@ -92,7 +114,7 @@ public class Downloader : IDownloader
         return new Download(release, suggestedFilename, name, downloadDetails, videoHashes);
     }
 
-    public async Task<Download> DownloadSceneDirectAsync(Release release, DownloadOption downloadDetails, PreferredDownloadQuality downloadQuality, Dictionary<HttpRequestHeader, string> headers, string fileName = "", string referer = "")
+    public async Task<Download> DownloadSceneDirectAsync(Release release, AvailableVideoFile downloadDetails, PreferredDownloadQuality downloadQuality, Dictionary<HttpRequestHeader, string> headers, string fileName = "", string referer = "")
     {
         var suggestedFilename = downloadDetails.Url.Substring(downloadDetails.Url.LastIndexOf("/") + 1);
         var suffix = Path.GetExtension(suggestedFilename);

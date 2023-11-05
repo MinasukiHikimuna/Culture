@@ -156,7 +156,7 @@ public class HentaiedRipper : ISiteScraper
             duration.TotalSeconds,
             performers,
             tags,
-            downloadOptionsAndHandles.Select(f => f.DownloadOption).ToList(),
+            downloadOptionsAndHandles.Select(f => f.AvailableVideoFile).ToList(),
             "{}",
             DateTime.Now);
         
@@ -223,17 +223,19 @@ public class HentaiedRipper : ISiteScraper
 
             availableDownloads.Add(
                 new DownloadDetailsAndElementHandle(
-                    new DownloadOption(
+                    new AvailableVideoFile(
+                        "video",
+                        "scene",
                         description,
+                        url,
                         resolutionWidth,
                         resolutionHeight,
                         -1,
                         -1,
-                        string.Empty,
-                        url),
+                        string.Empty),
                     null));
         }
-        return availableDownloads.OrderByDescending(d => d.DownloadOption.ResolutionHeight).ToList();
+        return availableDownloads.OrderByDescending(d => d.AvailableVideoFile.ResolutionHeight).ToList();
     }
 
     private static Sources ParseSources(string input)
@@ -281,6 +283,6 @@ public class HentaiedRipper : ISiteScraper
             { HttpRequestHeader.Cookie, cookieString }
         };
 
-        return await _downloader.DownloadSceneDirectAsync(release, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, headers, referer: page.Url);
+        return await _downloader.DownloadSceneDirectAsync(release, selectedDownload.AvailableVideoFile, downloadConditions.PreferredDownloadQuality, headers, referer: page.Url);
     }
 }

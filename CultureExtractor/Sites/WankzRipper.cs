@@ -141,7 +141,7 @@ public class WankzRipper : ISubSiteScraper
             duration.TotalSeconds,
             performers,
             tags,
-            downloadOptionsAndHandles.Select(f => f.DownloadOption).ToList(),
+            downloadOptionsAndHandles.Select(f => f.AvailableVideoFile).ToList(),
             "{}",
             DateTime.Now);
         
@@ -188,7 +188,7 @@ public class WankzRipper : ISubSiteScraper
             { HttpRequestHeader.Cookie, cookieString }
         };
         
-        return await _downloader.DownloadSceneDirectAsync(release, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, headers, referer: page.Url);
+        return await _downloader.DownloadSceneDirectAsync(release, selectedDownload.AvailableVideoFile, downloadConditions.PreferredDownloadQuality, headers, referer: page.Url);
     }
 
     private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloadsAsync(IPage page)
@@ -223,21 +223,23 @@ public class WankzRipper : ISubSiteScraper
 
                 availableDownloads.Add(
                     new DownloadDetailsAndElementHandle(
-                        new DownloadOption(
+                        new AvailableVideoFile(
+                            "video",
+                            "scene",
                             $"{headingText} {description}",
+                            "https://www.wankzvr.com" + url,
                             -1,
                             resolutionHeight,
                             size,
                             -1,
-                            codec,
-                            "https://www.wankzvr.com" + url),
+                            codec),
                         downloadLink));
             }
         }
         
         return availableDownloads
-            .OrderByDescending(d => d.DownloadOption.Codec)
-            .ThenByDescending(d => d.DownloadOption.FileSize).ToList();
+            .OrderByDescending(d => d.AvailableVideoFile.Codec)
+            .ThenByDescending(d => d.AvailableVideoFile.FileSize).ToList();
     }
 
     public async Task<IReadOnlyList<SubSite>> GetSubSitesAsync(Site site, IPage page)

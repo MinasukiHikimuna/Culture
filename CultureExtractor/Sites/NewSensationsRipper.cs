@@ -141,7 +141,7 @@ public class NewSensationsRipper : ISiteScraper
             duration.TotalSeconds,
             performers,
             new List<SiteTag>(),
-            downloadOptionsAndHandles.Select(f => f.DownloadOption).ToList(),
+            downloadOptionsAndHandles.Select(f => f.AvailableVideoFile).ToList(),
             "{}",
             DateTime.Now);
         
@@ -169,7 +169,7 @@ public class NewSensationsRipper : ISiteScraper
             _ => throw new InvalidOperationException("Could not find a download candidate!")
         };
 
-        return await _downloader.DownloadSceneAsync(release, page, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, async () =>
+        return await _downloader.DownloadSceneAsync(release, page, selectedDownload.AvailableVideoFile, downloadConditions.PreferredDownloadQuality, async () =>
         {
             await page.Locator("div#download_select > a").ClickAsync();
             await selectedDownload.ElementHandle.ClickAsync();
@@ -192,16 +192,19 @@ public class NewSensationsRipper : ISiteScraper
 
             availableDownloads.Add(
                 new DownloadDetailsAndElementHandle(
-                    new DownloadOption(
+                    new AvailableVideoFile(
+                        "video",
+                        "scene",
                         description,
+                        url,
                         -1,
                         resolutionHeight,
                         HumanParser.ParseFileSize(description),
                         -1,
-                        string.Empty,
-                        url),
+                        string.Empty
+                    ),
                     downloadLink));
         }
-        return availableDownloads.OrderByDescending(d => d.DownloadOption.FileSize).ToList();
+        return availableDownloads.OrderByDescending(d => d.AvailableVideoFile.FileSize).ToList();
     }
 }

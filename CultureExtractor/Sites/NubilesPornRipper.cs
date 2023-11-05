@@ -166,7 +166,7 @@ public class NubilesPornRipper : ISiteScraper
             duration.TotalSeconds,
             performers,
             new List<SiteTag>(),
-            downloadOptionsAndHandles.Select(f => f.DownloadOption).ToList(),
+            downloadOptionsAndHandles.Select(f => f.AvailableVideoFile).ToList(),
             "{}",
             DateTime.Now);
         
@@ -220,7 +220,7 @@ public class NubilesPornRipper : ISiteScraper
             _ => throw new InvalidOperationException("Could not find a download candidate!")
         };
 
-        return await _downloader.DownloadSceneAsync(release, page, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, async () =>
+        return await _downloader.DownloadSceneAsync(release, page, selectedDownload.AvailableVideoFile, downloadConditions.PreferredDownloadQuality, async () =>
         {
             await page.GetByRole(AriaRole.Button).Filter(new LocatorFilterOptions() { HasText = "Downloads" }).ClickAsync();
             await selectedDownload.ElementHandle.ClickAsync();
@@ -250,16 +250,18 @@ public class NubilesPornRipper : ISiteScraper
 
             availableDownloads.Add(
                 new DownloadDetailsAndElementHandle(
-                    new DownloadOption(
+                    new AvailableVideoFile(
+                        "video",
+                        "scene",
                         description,
+                        url,
                         resolutionWidth,
                         resolutionHeight,
                         HumanParser.ParseFileSize(match.Groups[1].Value + " " + match.Groups[2].Value),
                         -1,
-                        string.Empty,
-                        url),
+                        string.Empty),
                     downloadLink));
         }
-        return availableDownloads.OrderByDescending(d => d.DownloadOption.FileSize).ToList();
+        return availableDownloads.OrderByDescending(d => d.AvailableVideoFile.FileSize).ToList();
      }
 }

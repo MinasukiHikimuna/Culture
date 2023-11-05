@@ -168,7 +168,7 @@ public class AdultPrimeRipper : ISiteScraper, ISubSiteScraper
             duration.TotalSeconds,
             performers,
             tags,
-            downloadOptionsAndHandles.Select(f => f.DownloadOption).ToList(),
+            downloadOptionsAndHandles.Select(f => f.AvailableVideoFile).ToList(),
             "{}",
             DateTime.Now);
         
@@ -193,7 +193,7 @@ public class AdultPrimeRipper : ISiteScraper, ISubSiteScraper
             _ => throw new InvalidOperationException("Could not find a download candidate!")
         };
 
-        return await _downloader.DownloadSceneAsync(release, page, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, async () =>
+        return await _downloader.DownloadSceneAsync(release, page, selectedDownload.AvailableVideoFile, downloadConditions.PreferredDownloadQuality, async () =>
         {
             await selectedDownload.ElementHandle.ClickAsync();
         });
@@ -216,17 +216,19 @@ public class AdultPrimeRipper : ISiteScraper, ISubSiteScraper
 
             availableDownloads.Add(
                 new DownloadDetailsAndElementHandle(
-                    new DownloadOption(
+                    new AvailableVideoFile(
+                        "video",
+                        "scene",
                         description,
+                        url,
                         -1,
                         resolutionHeight,
                         -1,
                         -1,
-                        string.Empty,
-                        url),
+                        string.Empty),
                     downloadLink));
         }
-        return availableDownloads.OrderByDescending(d => d.DownloadOption.ResolutionHeight).ToList();
+        return availableDownloads.OrderByDescending(d => d.AvailableVideoFile.ResolutionHeight).ToList();
     }
 
     public async Task<IReadOnlyList<SubSite>> GetSubSitesAsync(Site site, IPage page)

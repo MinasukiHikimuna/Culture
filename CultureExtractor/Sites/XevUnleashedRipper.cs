@@ -144,7 +144,7 @@ public class XevUnleashedRipper : ISiteScraper
             duration.TotalSeconds,
             performers,
             tags,
-            downloadOptionsAndHandles.Select(f => f.DownloadOption).ToList(),
+            downloadOptionsAndHandles.Select(f => f.AvailableVideoFile).ToList(),
             "{}",
             DateTime.Now);
         
@@ -200,17 +200,19 @@ public class XevUnleashedRipper : ISiteScraper
 
             availableDownloads.Add(
                 new DownloadDetailsAndElementHandle(
-                    new DownloadOption(
+                    new AvailableVideoFile(
+                        "video",
+                        "scene",
                         description,
+                        url,
                         resolutionWidth,
                         resolutionHeight,
                         -1,
                         -1,
-                        string.Empty,
-                        url),
+                        string.Empty),
                     downloadLink));
         }
-        return availableDownloads.OrderByDescending(d => d.DownloadOption.ResolutionHeight).ToList();
+        return availableDownloads.OrderByDescending(d => d.AvailableVideoFile.ResolutionHeight).ToList();
     }
 
     public async Task<Download> DownloadReleaseAsync(Release release, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)
@@ -236,6 +238,6 @@ public class XevUnleashedRipper : ISiteScraper
             { HttpRequestHeader.Cookie, cookieString }
         };
 
-        return await _downloader.DownloadSceneDirectAsync(release, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, headers, referer: page.Url);
+        return await _downloader.DownloadSceneDirectAsync(release, selectedDownload.AvailableVideoFile, downloadConditions.PreferredDownloadQuality, headers, referer: page.Url);
     }
 }

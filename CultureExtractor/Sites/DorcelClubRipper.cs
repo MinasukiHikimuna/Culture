@@ -148,7 +148,7 @@ public class DorcelClubRipper : ISiteScraper
             duration.TotalSeconds,
             performers,
             new List<SiteTag>(),
-            downloadOptionsAndHandles.Select(f => f.DownloadOption).ToList(),
+            downloadOptionsAndHandles.Select(f => f.AvailableVideoFile).ToList(),
             "{}",
             DateTime.Now);
     }
@@ -159,7 +159,7 @@ public class DorcelClubRipper : ISiteScraper
         
         // Prefer ov (original voice) or en language tracks.
         var filteredDownloads = availableDownloads
-            .Where(f => f.DownloadOption.Url.Contains("lang=ov") || f.DownloadOption.Url.Contains("lang=en"));
+            .Where(f => f.AvailableVideoFile.Url.Contains("lang=ov") || f.AvailableVideoFile.Url.Contains("lang=en"));
         if (!filteredDownloads.Any())
         {
             filteredDownloads = availableDownloads;
@@ -167,7 +167,7 @@ public class DorcelClubRipper : ISiteScraper
 
         DownloadDetailsAndElementHandle selectedDownload = downloadConditions.PreferredDownloadQuality switch
         {
-            PreferredDownloadQuality.Phash => filteredDownloads.FirstOrDefault(f => f.DownloadOption.ResolutionHeight == 480) ?? availableDownloads.Last(),
+            PreferredDownloadQuality.Phash => filteredDownloads.FirstOrDefault(f => f.AvailableVideoFile.ResolutionHeight == 480) ?? availableDownloads.Last(),
             PreferredDownloadQuality.Best => filteredDownloads.First(),
             PreferredDownloadQuality.Worst => filteredDownloads.Last(),
             _ => throw new InvalidOperationException("Could not find a download candidate!")
@@ -175,11 +175,11 @@ public class DorcelClubRipper : ISiteScraper
 
         IPage newPage = await page.Context.NewPageAsync();
 
-        var download = await _downloader.DownloadSceneAsync(release, newPage, selectedDownload.DownloadOption, downloadConditions.PreferredDownloadQuality, async () =>
+        var download = await _downloader.DownloadSceneAsync(release, newPage, selectedDownload.AvailableVideoFile, downloadConditions.PreferredDownloadQuality, async () =>
         {
             try
             {
-                await newPage.GotoAsync(selectedDownload.DownloadOption.Url);
+                await newPage.GotoAsync(selectedDownload.AvailableVideoFile.Url);
                 await _captchaSolver.SolveCaptchaIfNeededAsync(newPage);
             }
             catch (PlaywrightException ex)
@@ -218,14 +218,16 @@ public class DorcelClubRipper : ISiteScraper
             var url = await downloadLink.GetAttributeAsync("data-slug");
             availableDownloads.Add(
                 new DownloadDetailsAndElementHandle(
-                    new DownloadOption(
+                    new AvailableVideoFile(
+                        "video",
+                        "scene",
                         description,
+                        url,
                         -1,
                         resolutionHeight,
                         HumanParser.ParseFileSize(description),
                         -1,
-                        string.Empty,
-                        url),
+                        string.Empty),
                     downloadLink));
         }
         return availableDownloads;
