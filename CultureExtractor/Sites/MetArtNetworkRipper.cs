@@ -1,12 +1,14 @@
-﻿using Microsoft.Playwright;
+﻿using System.Net;
+using Microsoft.Playwright;
 using CultureExtractor.Interfaces;
 using CultureExtractor.Exceptions;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using CultureExtractor.Sites.MetArtIndexModels;
 using CultureExtractor.Sites.MetArtSceneModels;
-using System.Text.RegularExpressions;
-using System;
 using CultureExtractor.Models;
+using Serilog;
+using UUIDNext;
 using Xabe.FFmpeg;
 
 namespace CultureExtractor.Sites;
@@ -21,15 +23,160 @@ namespace CultureExtractor.Sites;
 [PornSite("eternaldesire")]
 [PornSite("straplez")]
 [PornSite("hustler")]
-public class MetArtNetworkRipper : ISiteScraper
+public class MetArtNetworkRipper : ISiteScraper, IYieldingScraper
 {
     private readonly IDownloader _downloader;
+    private readonly IPlaywrightFactory _playwrightFactory;
 
-    public MetArtNetworkRipper(IDownloader downloader)
+    private static readonly HttpClient client = new HttpClient();
+    private IRepository _repository;
+
+    public MetArtNetworkRipper(IDownloader downloader, IPlaywrightFactory playwrightFactory, IRepository repository)
     {
         _downloader = downloader;
+        _playwrightFactory = playwrightFactory;
+        _repository = repository;
     }
+    
+    private string GalleriesUrl(int pageNumber) => $"/galleries/{pageNumber}";
 
+    public async IAsyncEnumerable<Release> ScrapeAsync(Site site, BrowserSettings browserSettings)
+    {
+        IPage page = await _playwrightFactory.CreatePageAsync(site, browserSettings);
+
+        await LoginAsync(site, page);
+
+        var requests = new List<IRequest>();
+        await page.RouteAsync("**/*", async route =>
+        {
+            requests.Add(route.Request);
+            await route.ContinueAsync();
+        });
+        
+        await page.GotoAsync(GalleriesUrl(1));
+
+        var galleriesRequest = requests.SingleOrDefault(r => r.Url.StartsWith(site.Url + "/api/galleries?"));
+
+        client.DefaultRequestHeaders.Clear();
+        // get headers from galleriesrequest
+        foreach (var key in galleriesRequest.Headers.Keys)
+        {
+            client.DefaultRequestHeaders.Add(key, galleriesRequest.Headers[key]);
+        }
+
+        using var response = client.GetAsync(galleriesRequest.Url);
+        var contentJson = await response.Result.Content.ReadAsStringAsync();
+        var content = JsonSerializer.Deserialize<MetArtGalleriesRequest.RootObject>(contentJson);
+
+        var pages = (int) Math.Ceiling((double) content.total / content.galleries.Length);
+        for (var pageNumber = 1; pageNumber <= pages; pageNumber++)
+        {
+            Thread.Sleep(5000);
+            
+            var galleriesPageUrl = $"{site.Url}/api/galleries?first=60&galleryType=GALLERY&page={pageNumber}&order=DATE&direction=DESC";
+            
+            using var galleriesPageResponse = client.GetAsync(galleriesPageUrl);
+            var galleriesPageJson = await galleriesPageResponse.Result.Content.ReadAsStringAsync();
+            var galleriesPage = JsonSerializer.Deserialize<MetArtGalleriesRequest.RootObject>(galleriesPageJson);
+
+            Log.Information($"Page {pageNumber}/{pages} contains {galleriesPage.galleries.Length} releases");
+
+
+            // find all instances from galleriesPage.galleries which shortName is not in the database
+            // create a dictionary with short name as key and the gallery as the value
+            var galleries = galleriesPage.galleries
+                .Select((element, index)=> new{ element, index } )
+                .ToDictionary(ele =>
+                {
+                    var date = Regex.Match(ele.element.path, @"\/(\d{8})\/").Groups[1].Value;
+                    var name = Regex.Match(ele.element.path, @"\/(\w+)$").Groups[1].Value;                    
+                    return $"{date}/{name}";
+                }, ele=> ele.element);
+
+            var existingReleases = await _repository
+                .GetReleasesAsync(site.ShortName, galleries.Keys.ToList());
+            
+            var existingShortNames = existingReleases.Select(r => r.ShortName).ToList();
+            
+            // Assuming existingReleases is a list or set of string keys.
+            var nonExistingGalleries = galleries
+                .Where(g => !existingShortNames.Contains(g.Key)) // Check if the gallery key is not in the list of existingShortNames
+                .Select(g => g.Value) // Select the gallery element itself
+                .ToList(); // Convert the result to a List
+
+            
+            foreach (var gallery in nonExistingGalleries)
+            {
+                Thread.Sleep(5000);
+                
+                var date = Regex.Match(gallery.path, @"\/(\d{8})\/").Groups[1].Value;
+                var name = Regex.Match(gallery.path, @"\/(\w+)$").Groups[1].Value;
+
+                var shortName = $"{date}/{name}";
+                
+                var galleryUrl = $"{site.Url}/api/gallery?name={name}&date={date}&page=1&mediaFirst=42";
+                
+                using var galleryResponse = client.GetAsync(galleryUrl);
+                var galleryJson = await galleryResponse.Result.Content.ReadAsStringAsync();
+                var galleryDetails = JsonSerializer.Deserialize<MetArtGalleryRequest.RootObject>(galleryJson);
+                
+                var galleryDownloads = galleryDetails.files.sizes.zips
+                    .Select(gallery => new AvailableGalleryZipFile(
+                        "zip",
+                        "gallery",
+                        gallery.quality,
+                        $"/api/download-media/{galleryDetails.siteUUID}/photos/{gallery.quality}",
+                        -1,
+                        -1,
+                        HumanParser.ParseFileSizeMaybe(gallery.size).IsSome(out var fileSizeValue) ? fileSizeValue : -1
+                    ))
+                    .OrderByDescending(availableFile => availableFile.ResolutionHeight)
+                    .ToList();
+        
+                var imageDownloads = galleryDetails.files.sizes.relatedPhotos
+                    .Select(image => new AvailableImageFile(
+                        "image",
+                        image.id,
+                        string.Empty,
+                        $"https://cdn.metartnetwork.com/{galleryDetails.siteUUID}/media/{galleryDetails.UUID}/{image.id.Replace("-", "_")}_{galleryDetails.UUID}.jpg",
+                        -1,
+                        -1,
+                        HumanParser.ParseFileSizeMaybe(image.size).IsSome(out var fileSizeValue) ? fileSizeValue : -1
+                    ))
+                    .ToList();
+                
+                var performers = galleryDetails.models.Where(a => a.gender == "female").ToList()
+                    .Concat(galleryDetails.models.Where(a => a.gender != "female").ToList())
+                    .Select(m => new SitePerformer(m.path.Substring(m.path.LastIndexOf("/") + 1), m.name, m.path))
+                    .ToList();
+
+                var tags = galleryDetails.tags
+                    .Select(t => new SiteTag(t.Replace(" ", "+"), t, "/tags/" + t.Replace(" ", "+")))
+                    .ToList();
+                
+                var scene = new Release(
+                    /*existingRelease?.Uuid ??*/ UuidGenerator.Generate(),
+                    site,
+                    null,
+                    DateOnly.FromDateTime(galleryDetails.publishedAt),
+                    shortName,
+                    galleryDetails.name,
+                    $"{site.Url}{galleryDetails.path}",
+                    galleryDetails.description,
+                    -1,
+                    performers,
+                    tags,
+                    new List<IAvailableFile>()
+                        .Concat(galleryDownloads)
+                        .Concat(imageDownloads),
+                    @"{""gallery"": " + galleryJson + "}",
+                    DateTime.Now);
+
+                yield return scene;
+            }
+        }
+    }
+    
     public async Task LoginAsync(Site site, IPage page)
     {
         await Task.Delay(5000);
@@ -367,4 +514,9 @@ public class MetArtNetworkRipper : ISiteScraper
     {
         await page.GotoAsync($"/movies/{pageNumber}");
     }
+}
+
+public interface IYieldingScraper
+{
+    IAsyncEnumerable<Release> ScrapeAsync(Site site, BrowserSettings browserSettings);
 }

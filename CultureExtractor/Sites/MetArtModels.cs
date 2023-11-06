@@ -343,3 +343,274 @@ namespace CultureExtractor.Sites.MetArtSceneModels
         public string role { get; set; }
     }
 }
+
+public class MetArtGalleriesRequest
+{
+    public record RootObject(
+        Galleries[] galleries,
+        int total
+    );
+
+    public record Galleries(
+        Models[] models,
+        Photographers[] photographers,
+        string[] tags,
+        object[] relatedGalleries,
+        object[] categories,
+        object[] crew,
+        string UUID,
+        string name,
+        string description,
+        string path,
+        string coverImagePath,
+        string thumbnailCoverPath,
+        string type,
+        string siteUUID,
+        bool isPublic,
+        string createdAt,
+        string publishedAt,
+        double ratingAverage,
+        int favoriteCount,
+        int ratingCount,
+        int views,
+        Ranks ranks,
+        LeaderboardViews leaderboardViews,
+        string coverCleanImagePath,
+        string zipFile,
+        string splashImagePath,
+        bool isStaffSelection,
+        int imageCount,
+        int runtime,
+        string permalink,
+        string metaDescription,
+        string metaTitle,
+        bool hasCleanCover,
+        bool hasCover,
+        bool isPrivate,
+        bool downloadsDisabled,
+        bool isIntimateSelection
+    );
+
+    public record Models(
+        string UUID,
+        string name,
+        string path,
+        string globalUUID
+    );
+
+    public record Photographers(
+        string UUID,
+        string name,
+        string path
+    );
+
+    public record Ranks(
+        int day,
+        int week,
+        int month,
+        int year,
+        string siteUUID
+    );
+
+    public record LeaderboardViews(
+        int day,
+        int week,
+        int month,
+        int year,
+        string siteUUID
+    );
+}
+
+public class MetArtGalleryRequest
+{
+    public record RootObject(
+        string coverImagePath,
+        string coverCleanImagePath,
+        Comments comments,
+        string description,
+        string metaDescription,
+        string metaTitle,
+        GlobalContent[] globalContent,
+        Models[] models,
+        string name,
+        string path,
+        Photographers[] photographers,
+        Photos photos,
+        DateTime publishedAt,
+        Ranks ranks,
+        string siteUUID,
+        string[] tags,
+        string type,
+        string thumbnailCoverPath,
+        string UUID,
+        string originalUUID,
+        bool hasPermissions,
+        int favoriteCount,
+        double ratingAverage,
+        int ratingCount,
+        int views,
+        bool downloadsDisabled,
+        PreviousGallery previousGallery,
+        Files files
+    );
+
+    public record Comments(
+        int total,
+        object[] comments
+    );
+
+    public record GlobalContent(
+        string coverCleanImagePath,
+        string coverImagePath,
+        string name,
+        string path,
+        string siteUUID,
+        string thumbnailCoverPath,
+        string UUID
+    );
+
+    public record Models(
+        int age,
+        string breasts,
+        Comments1 comments,
+        Country country,
+        string ethnicity,
+        string eyes,
+        int publishAge,
+        int galleriesCount,
+        string gender,
+        string hair,
+        string headshotImagePath,
+        int height,
+        int moviesCount,
+        string name,
+        string path,
+        string pubicHair,
+        Ranks1 ranks,
+        int ratingCount,
+        string siteUUID,
+        string size,
+        object[] tags,
+        string UUID,
+        int weight,
+        int favoriteCount,
+        double ratingAverage,
+        int views,
+        bool downloadsDisabled
+    );
+
+    public record Comments1(
+        int total,
+        object[] comments
+    );
+
+    public record Country(
+        string UUID,
+        string name,
+        string isoCode3
+    );
+
+    public record Ranks1(
+        int day,
+        int week,
+        int month,
+        int year,
+        string siteUUID
+    );
+
+    public record Photographers(
+        Comments2 comments,
+        string coverImagePath,
+        string coverCleanImagePath,
+        int galleriesCount,
+        int moviesCount,
+        string name,
+        string path,
+        string siteUUID,
+        string[] tags,
+        string thumbnailCoverPath,
+        string UUID,
+        int favoriteCount,
+        double ratingAverage,
+        int ratingCount,
+        int views
+    );
+
+    public record Comments2(
+        int total,
+        object[] comments
+    );
+
+    public record Photos(
+        Media[] media,
+        int total,
+        int megapixels
+    );
+
+    public record Media(
+        object[] relatedGalleries,
+        string UUID,
+        string siteUUID,
+        string galleryUUID,
+        string rating,
+        int ratingCount,
+        int views,
+        int displayOrder,
+        string resolution,
+        int runtime,
+        ImgPath imgPath
+    );
+
+    public record ImgPath(
+        string low,
+        string medium,
+        string high
+    );
+
+    public record Ranks(
+        int day,
+        int week,
+        int month,
+        int year,
+        string siteUUID
+    );
+
+    public record PreviousGallery(
+        string UUID,
+        Models1[] models,
+        string path,
+        string name,
+        string thumbnailCoverPath,
+        string coverCleanImagePath,
+        string siteUUID
+    );
+
+    public record Models1(
+        string UUID,
+        string name,
+        string path,
+        string globalUUID
+    );
+
+    public record Files(
+        object[] teasers,
+        Sizes sizes
+    );
+
+    public record Sizes(
+        RelatedPhotos[] relatedPhotos,
+        object[] videos,
+        Zips[] zips
+    );
+
+    public record RelatedPhotos(
+        string id,
+        string size
+    );
+
+    public record Zips(
+        string fileName,
+        string quality,
+        string size
+    );
+}

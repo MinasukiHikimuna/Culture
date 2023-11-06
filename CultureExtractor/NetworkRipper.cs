@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 using CultureExtractor.Exceptions;
 using CultureExtractor.Interfaces;
 using CultureExtractor.Models;
+using CultureExtractor.Sites;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Playwright;
 using Polly;
@@ -32,7 +33,27 @@ public class NetworkRipper : INetworkRipper
         ISiteScraper siteScraper = (ISiteScraper)_serviceProvider.GetService(typeof(ISiteScraper));
         Log.Information($"Culture Extractor, using {siteScraper.GetType()}");
 
-        if (siteScraper is ISubSiteScraper subSiteScraper)
+        if (siteScraper is IYieldingScraper yieldingScraper)
+        {
+            await foreach (var release in yieldingScraper.ScrapeAsync(site, browserSettings))
+            {
+                // TODO: deal with existing releases!!
+                await _repository.UpsertRelease(release);
+                
+                var releaseDescription = new {
+                    Uuid = release.Uuid,
+                    Site = release.Site.Name,
+                    SubSite = release.SubSite?.Name,
+                    ShortName = release.ShortName,
+                    ReleaseDate = release.ReleaseDate,
+                    Name = release.Name,
+                    Url = release.Url.StartsWith("https://")
+                        ? release.Url
+                        : release.Site.Url + release.Url };
+                Log.Information("Scraped release: {@Release}", releaseDescription);
+            }
+        }
+        else if (siteScraper is ISubSiteScraper subSiteScraper)
         {
             await ScrapeSubSiteReleasesAsync(site, browserSettings, scrapeOptions, subSiteScraper);
         }
