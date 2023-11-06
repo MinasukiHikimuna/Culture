@@ -35,7 +35,7 @@ public class NetworkRipper : INetworkRipper
 
         if (siteScraper is IYieldingScraper yieldingScraper)
         {
-            await foreach (var release in yieldingScraper.ScrapeAsync(site, browserSettings))
+            await foreach (var release in yieldingScraper.ScrapeAsync(site, browserSettings, scrapeOptions))
             {
                 // TODO: deal with existing releases!!
                 await _repository.UpsertRelease(release);
