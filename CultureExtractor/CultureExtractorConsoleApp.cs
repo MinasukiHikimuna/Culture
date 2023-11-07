@@ -39,7 +39,7 @@ public class CultureExtractorConsoleApp
             {
                 // temporary, restore before commit
                 // this needs a better option
-                opts.FullScrapeLastUpdated = DateTime.Now.AddDays(0);
+                opts.FullScrapeLastUpdated = DateTime.Now.AddDays(-1);
             }
 
             Log.Information("Culture Extractor");
