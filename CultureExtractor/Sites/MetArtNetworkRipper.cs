@@ -40,6 +40,8 @@ public class MetArtNetworkRipper : ISiteScraper, IYieldingScraper
         $"{site.Url}/galleries/{pageNumber}";
     private static string GalleryUrl(Site site, string date, string name) =>
         $"{site.Url}/api/gallery?name={name}&date={date}&page=1&mediaFirst=42";
+    private static string CommentsUrl(Site site, string releaseUuid) =>
+        $"{site.Url}/api/comments?objectUUID={releaseUuid}&order=TIMESTAMP&direction=DESC";
     private static string CdnImageUrl(MetArtGalleryRequest.RootObject gallery, MetArtGalleryRequest.RelatedPhotos image) =>
         $"https://cdn.metartnetwork.com/{gallery.siteUUID}/media/{gallery.UUID}/{image.id.Replace("-", "_")}_{gallery.UUID}.jpg";
 
@@ -124,6 +126,12 @@ public class MetArtNetworkRipper : ISiteScraper, IYieldingScraper
                 using var galleryResponse = client.GetAsync(galleryUrl);
                 var galleryJson = await galleryResponse.Result.Content.ReadAsStringAsync();
                 var galleryDetails = JsonSerializer.Deserialize<MetArtGalleryRequest.RootObject>(galleryJson);
+
+                var commentsUrl = CommentsUrl(site, galleryDetails.UUID);
+
+                using var commentResponse = client.GetAsync(commentsUrl);
+                var commentsJson = await commentResponse.Result.Content.ReadAsStringAsync();
+                var comments = JsonSerializer.Deserialize<MetArtCommentsRequest.RootObject>(commentsJson);
                 
                 var galleryDownloads = galleryDetails.files.sizes.zips
                     .Select(gallery => new AvailableGalleryZipFile(
@@ -176,7 +184,7 @@ public class MetArtNetworkRipper : ISiteScraper, IYieldingScraper
                     new List<IAvailableFile>()
                         .Concat(galleryDownloads)
                         .Concat(imageDownloads),
-                    @"{""gallery"": " + galleryJson + "}",
+                    $$"""{"gallery": """ + galleryJson + """, "comments": """ + commentsJson + "}",
                     DateTime.Now);
 
                 yield return scene;

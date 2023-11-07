@@ -1,4 +1,6 @@
-﻿namespace CultureExtractor.Sites.MetArtIndexModels
+﻿using System.Text.Json.Serialization;
+
+namespace CultureExtractor.Sites.MetArtIndexModels
 {
     public class MetArtMovies
     {
@@ -612,5 +614,65 @@ public class MetArtGalleryRequest
         string fileName,
         string quality,
         string size
+    );
+}
+
+public class MetArtCommentsRequest
+{
+    public record RootObject(
+        int total,
+        Comments[] comments
+    );
+
+    public class Comments
+    {
+        public Comments(bool isEdited,
+            string parentUUID,
+            string siteUUID,
+            string text,
+            string timestamp,
+            string userDisplayName,
+            string UUID,
+            string networkUserUUID,
+            bool isSilenced,
+            bool visible,
+            object badges,
+            MetArtObject metArtObject,
+            int rating)
+        {
+            this.isEdited = isEdited;
+            this.parentUUID = parentUUID;
+            this.siteUUID = siteUUID;
+            this.text = text;
+            this.timestamp = timestamp;
+            this.userDisplayName = userDisplayName;
+            this.UUID = UUID;
+            this.networkUserUUID = networkUserUUID;
+            this.isSilenced = isSilenced;
+            this.visible = visible;
+            this.badges = badges;
+            this.metArtObject = metArtObject;
+            this.rating = rating;
+        }
+
+        public bool isEdited { get; init; }
+        public string parentUUID { get; init; }
+        public string siteUUID { get; init; }
+        public string text { get; init; }
+        public string timestamp { get; init; }
+        public string userDisplayName { get; init; }
+        public string UUID { get; init; }
+        public string networkUserUUID { get; init; }
+        public bool isSilenced { get; init; }
+        public bool visible { get; init; }
+        public object badges { get; init; }
+        [JsonPropertyName("object")]
+        public MetArtObject metArtObject { get; init; }
+        public int rating { get; init; }
+    }
+
+    public record MetArtObject(
+        string name,
+        string path
     );
 }
