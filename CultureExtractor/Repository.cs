@@ -2,6 +2,7 @@
 using Serilog;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using CultureExtractor.Interfaces;
 using CultureExtractor.Models;
 
 namespace CultureExtractor;

@@ -1,4 +1,5 @@
-﻿using CultureExtractor.Models;
+﻿using CultureExtractor.Interfaces;
+using CultureExtractor.Models;
 using Microsoft.Playwright;
 
 namespace CultureExtractor;

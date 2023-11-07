@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using CultureExtractor.Interfaces;
 using CultureExtractor.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;

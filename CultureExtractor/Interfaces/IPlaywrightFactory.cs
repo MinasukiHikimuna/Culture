@@ -1,7 +1,7 @@
 ﻿using CultureExtractor.Models;
 using Microsoft.Playwright;
 
-namespace CultureExtractor;
+namespace CultureExtractor.Interfaces;
 
 public interface IPlaywrightFactory
 {

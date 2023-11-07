@@ -1,4 +1,5 @@
 ﻿using CultureExtractor.CaptchaBuster;
+using CultureExtractor.Interfaces;
 using Microsoft.Playwright;
 using Serilog;
 

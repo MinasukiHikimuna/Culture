@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using CultureExtractor.Interfaces;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace CultureExtractor.Tests;
 
