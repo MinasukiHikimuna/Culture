@@ -57,7 +57,11 @@ public class MetArtNetworkRipper : ISiteScraper, IYieldingScraper
         });
         
         await page.GotoAsync(GalleriesUrl(site, 1));
+        await page.WaitForLoadStateAsync();
+        await Task.Delay(5000);
 
+        await page.UnrouteAsync("**/*");
+        
         var galleriesRequest = requests.SingleOrDefault(r => r.Url.StartsWith(site.Url + "/api/galleries?"));
 
         client.DefaultRequestHeaders.Clear();
