@@ -24,8 +24,8 @@ public class MetArtNetworkRipper : ISiteScraper, IYieldingScraper
     private readonly IDownloader _downloader;
     private readonly IPlaywrightFactory _playwrightFactory;
 
-    private static readonly HttpClient client = new HttpClient();
-    private IRepository _repository;
+    private static readonly HttpClient Client = new HttpClient();
+    private readonly IRepository _repository;
 
     public MetArtNetworkRipper(IDownloader downloader, IPlaywrightFactory playwrightFactory, IRepository repository)
     {
@@ -61,44 +61,52 @@ public class MetArtNetworkRipper : ISiteScraper, IYieldingScraper
         await Task.Delay(5000);
 
         await page.UnrouteAsync("**/*");
-        
+
+        await foreach (var gallery in ScrapeGalleriesAsync(site, scrapeOptions, requests))
+        {
+            yield return gallery;
+        }
+    }
+
+    private async IAsyncEnumerable<Release> ScrapeGalleriesAsync(Site site, ScrapeOptions scrapeOptions, List<IRequest> requests)
+    {
         var galleriesRequest = requests.SingleOrDefault(r => r.Url.StartsWith(site.Url + "/api/galleries?"));
 
-        client.DefaultRequestHeaders.Clear();
+        Client.DefaultRequestHeaders.Clear();
         // get headers from galleriesrequest
         foreach (var key in galleriesRequest.Headers.Keys)
         {
-            client.DefaultRequestHeaders.Add(key, galleriesRequest.Headers[key]);
+            Client.DefaultRequestHeaders.Add(key, galleriesRequest.Headers[key]);
         }
 
-        using var response = client.GetAsync(galleriesRequest.Url);
+        using var response = Client.GetAsync(galleriesRequest.Url);
         var contentJson = await response.Result.Content.ReadAsStringAsync();
         var content = JsonSerializer.Deserialize<MetArtGalleriesRequest.RootObject>(contentJson);
 
-        var pages = (int) Math.Ceiling((double) content.total / content.galleries.Length);
+        var pages = (int)Math.Ceiling((double)content.total / content.galleries.Length);
         for (var pageNumber = 1; pageNumber <= pages; pageNumber++)
         {
             Thread.Sleep(5000);
-            
+
             var galleriesPage = await GetGalleriesPage(site, pageNumber);
 
             Log.Information($"Page {pageNumber}/{pages} contains {galleriesPage.galleries.Length} releases");
 
 
             var galleries = galleriesPage.galleries
-                .Select((element, index)=> new{ element, index } )
+                .Select((element, index) => new { element, index })
                 .ToDictionary(ele =>
                 {
                     var date = Regex.Match(ele.element.path, @"\/(\d{8})\/").Groups[1].Value;
-                    var name = Regex.Match(ele.element.path, @"\/(\w+)$").Groups[1].Value;                    
+                    var name = Regex.Match(ele.element.path, @"\/(\w+)$").Groups[1].Value;
                     return $"{date}/{name}";
-                }, ele=> ele.element);
+                }, ele => ele.element);
 
             var existingReleases = await _repository
                 .GetReleasesAsync(site.ShortName, galleries.Keys.ToList());
-            
+
             var existingReleasesDictionary = existingReleases.ToDictionary(r => r.ShortName, r => r);
-            
+
             List<MetArtGalleriesRequest.Galleries> galleriesToBeScraped;
             if (scrapeOptions.FullScrape)
             {
@@ -113,28 +121,28 @@ public class MetArtNetworkRipper : ISiteScraper, IYieldingScraper
                     .Select(g => g.Value)
                     .ToList();
             }
-            
+
             foreach (var gallery in galleriesToBeScraped)
             {
                 Thread.Sleep(5000);
-                
+
                 var date = Regex.Match(gallery.path, @"\/(\d{8})\/").Groups[1].Value;
                 var name = Regex.Match(gallery.path, @"\/(\w+)$").Groups[1].Value;
 
                 var shortName = $"{date}/{name}";
-                
+
                 var galleryUrl = GalleryUrl(site, date, name);
-                
-                using var galleryResponse = client.GetAsync(galleryUrl);
+
+                using var galleryResponse = Client.GetAsync(galleryUrl);
                 var galleryJson = await galleryResponse.Result.Content.ReadAsStringAsync();
                 var galleryDetails = JsonSerializer.Deserialize<MetArtGalleryRequest.RootObject>(galleryJson);
 
                 var commentsUrl = CommentsUrl(site, galleryDetails.UUID);
 
-                using var commentResponse = client.GetAsync(commentsUrl);
+                using var commentResponse = Client.GetAsync(commentsUrl);
                 var commentsJson = await commentResponse.Result.Content.ReadAsStringAsync();
                 var comments = JsonSerializer.Deserialize<MetArtCommentsRequest.RootObject>(commentsJson);
-                
+
                 var galleryDownloads = galleryDetails.files.sizes.zips
                     .Select(gallery => new AvailableGalleryZipFile(
                         "zip",
@@ -147,7 +155,7 @@ public class MetArtNetworkRipper : ISiteScraper, IYieldingScraper
                     ))
                     .OrderByDescending(availableFile => availableFile.ResolutionHeight)
                     .ToList();
-        
+
                 var imageDownloads = galleryDetails.files.sizes.relatedPhotos
                     .Select(image => new AvailableImageFile(
                         "image",
@@ -159,7 +167,7 @@ public class MetArtNetworkRipper : ISiteScraper, IYieldingScraper
                         HumanParser.ParseFileSizeMaybe(image.size).IsSome(out var fileSizeValue) ? fileSizeValue : -1
                     ))
                     .ToList();
-                
+
                 var performers = galleryDetails.models.Where(a => a.gender == "female").ToList()
                     .Concat(galleryDetails.models.Where(a => a.gender != "female").ToList())
                     .Select(m => new SitePerformer(m.path.Substring(m.path.LastIndexOf("/") + 1), m.name, m.path))
@@ -168,7 +176,7 @@ public class MetArtNetworkRipper : ISiteScraper, IYieldingScraper
                 var tags = galleryDetails.tags
                     .Select(t => new SiteTag(t.Replace(" ", "+"), t, "/tags/" + t.Replace(" ", "+")))
                     .ToList();
-                
+
                 var scene = new Release(
                     existingReleasesDictionary.TryGetValue(shortName, out var existingRelease)
                         ? existingRelease.Uuid
@@ -199,7 +207,7 @@ public class MetArtNetworkRipper : ISiteScraper, IYieldingScraper
         var galleriesPageUrl =
             $"{site.Url}/api/galleries?first=60&galleryType=GALLERY&page={pageNumber}&order=DATE&direction=DESC";
 
-        using var galleriesPageResponse = client.GetAsync(galleriesPageUrl);
+        using var galleriesPageResponse = Client.GetAsync(galleriesPageUrl);
         var galleriesPageJson = await galleriesPageResponse.Result.Content.ReadAsStringAsync();
         var galleriesPage = JsonSerializer.Deserialize<MetArtGalleriesRequest.RootObject>(galleriesPageJson);
         return galleriesPage;
