@@ -73,10 +73,10 @@ public class MetArtNetworkRipper : ISiteScraper, IYieldingScraper
 
         SetHeadersFromActualRequest(site, requests);
         
-        /*await foreach (var gallery in ScrapeGalleriesAsync(site, scrapeOptions, requests))
+        await foreach (var gallery in ScrapeGalleriesAsync(site, scrapeOptions))
         {
             yield return gallery;
-        }*/
+        }
         await foreach (var scene in ScrapeScenesAsync(site, scrapeOptions))
         {
             yield return scene;
