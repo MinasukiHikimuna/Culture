@@ -3,8 +3,6 @@ using CultureExtractor.Interfaces;
 using CultureExtractor.Exceptions;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using CultureExtractor.Sites.MetArtIndexModels;
-using CultureExtractor.Sites.MetArtSceneModels;
 using CultureExtractor.Models;
 using Serilog;
 using Xabe.FFmpeg;
@@ -312,7 +310,7 @@ public class MetArtNetworkRipper : ISiteScraper, IYieldingScraper
         var moviesRequest = requests.SingleOrDefault(r => r.Url.StartsWith(site.Url + "/api/movies?"));
         var response = await moviesRequest.ResponseAsync();
         var content = await response.TextAsync();
-        var data = JsonSerializer.Deserialize<MetArtMovies>(content);
+        var data = JsonSerializer.Deserialize<MetArtMoviesRequest.RootObject>(content);
 
         var currentPage = page.Url.Substring(page.Url.LastIndexOf("/") + 1);
         var skipAdScene = currentPage == "1" && site.ShortName != "hustler";
@@ -343,7 +341,7 @@ public class MetArtNetworkRipper : ISiteScraper, IYieldingScraper
         }
 
         var movieJsonContent = await movieResponse.TextAsync();
-        var movieData = JsonSerializer.Deserialize<MetArtSceneData>(movieJsonContent)!;
+        var movieData = JsonSerializer.Deserialize<MetArtMovieRequest.RootObject>(movieJsonContent)!;
 
         var commentsRequest = apiRequests.SingleOrDefault(r => r.Url.StartsWith(site.Url + "/api/comments?"));
         if (commentsRequest == null)
@@ -451,7 +449,7 @@ public class MetArtNetworkRipper : ISiteScraper, IYieldingScraper
         var movieRequest = requests.SingleOrDefault(r => r.Url.StartsWith(release.Site.Url + "/api/movie?"));
         var response = await movieRequest.ResponseAsync();
         var jsonContent = await response.TextAsync();
-        var data = JsonSerializer.Deserialize<MetArtSceneData>(jsonContent)!;
+        var data = JsonSerializer.Deserialize<MetArtMovieRequest.RootObject>(jsonContent)!;
 
         var availableDownloads = await ParseAvailableDownloadsAsync(page);
 
