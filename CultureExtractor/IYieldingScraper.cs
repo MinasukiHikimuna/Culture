@@ -1,6 +1,6 @@
 using CultureExtractor.Models;
 
-namespace CultureExtractor.Sites;
+namespace CultureExtractor;
 
 public interface IYieldingScraper
 {
