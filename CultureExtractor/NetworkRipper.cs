@@ -1,10 +1,6 @@
-﻿using System.Text.Json;
-using System.Text.Json.Nodes;
-using CultureExtractor.Exceptions;
+﻿using CultureExtractor.Exceptions;
 using CultureExtractor.Interfaces;
 using CultureExtractor.Models;
-using CultureExtractor.Sites;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Playwright;
 using Polly;
 using Polly.Fallback;
@@ -35,9 +31,8 @@ public class NetworkRipper : INetworkRipper
 
         if (siteScraper is IYieldingScraper yieldingScraper)
         {
-            await foreach (var release in yieldingScraper.ScrapeAsync(site, browserSettings, scrapeOptions))
+            await foreach (var release in yieldingScraper.ScrapeReleasesAsync(site, browserSettings, scrapeOptions))
             {
-                // TODO: deal with existing releases!!
                 await _repository.UpsertRelease(release);
                 
                 var releaseDescription = new {
@@ -292,10 +287,12 @@ public class NetworkRipper : INetworkRipper
             site,
             browserSettings,
             downloadConditions,
+            downloadOptions,
             furtherFilteredReleases.ToList());
     }
 
-    private async Task DownloadGivenReleasesAsync(Site site, BrowserSettings browserSettings, DownloadConditions downloadConditions, IList<Release> matchingReleases)
+    private async Task DownloadGivenReleasesAsync(Site site, BrowserSettings browserSettings,
+        DownloadConditions downloadConditions, DownloadOptions downloadOptions, IList<Release> matchingReleases)
     {
         var matchingReleasesStr = string.Join($"{Environment.NewLine}    ", matchingReleases.Select(s => $"{s.Site.Name} - {s.ReleaseDate.ToString("yyyy-MM-dd")} - {s.Name}"));
 
@@ -310,6 +307,16 @@ public class NetworkRipper : INetworkRipper
             return;
         }
 
+        if (siteScraper is IYieldingScraper yieldingScraper)
+        {
+            await foreach (var download in yieldingScraper.DownloadReleasesAsync(site, browserSettings, downloadConditions, downloadOptions))
+            {
+                await _repository.SaveDownloadAsync(download, downloadConditions.PreferredDownloadQuality);
+            }
+
+            return;
+        }
+        
         IPage page = await CreatePageAndLoginAsync(siteScraper, site, browserSettings, false);
 
         var rippedReleases = 0;
@@ -329,7 +336,7 @@ public class NetworkRipper : INetworkRipper
             // Ungh, throws exception
             _downloader.CheckFreeSpace();
 
-            IPage releasePage = null;
+            IPage releasePage = null; 
             const int maxRetries = 3;
             for (int retries = 0; retries < maxRetries; retries++)
             {

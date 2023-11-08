@@ -104,9 +104,42 @@ public class MetArtNetworkRipper : ISiteScraper, IYieldingScraper
 
         await page.UnrouteAsync("**/*");
 
+
+        await page.GotoAsync("https://www.sexart.com/model/jimmy-bud-and-alexis-crystal/movie/20231105/PULSATION");
+        await page.WaitForLoadStateAsync();
+        
+        var downloadMenuLocator = page.Locator("div svg.fa-film");
+        if (!await downloadMenuLocator.IsVisibleAsync())
+        {
+            throw new ExtractorException(false, $"Could not find download menu for {page.Url}. Skipping...");
+        }
+
+        await downloadMenuLocator.ClickAsync();
+
+        
+        var downloadLinks = await page.Locator("div.dropdown-menu a").ElementHandlesAsync();
+        var downloadLink = downloadLinks.Last();
+        
+        var requests2 = new List<IRequest>();
+        await page.RouteAsync("**/*", async route =>
+        {
+            requests2.Add(route.Request);
+            await route.ContinueAsync();
+        });
+        
+        await downloadLink.ClickAsync();
+        
+        await page.WaitForLoadStateAsync();
+        await Task.Delay(5000);
+
+        await page.UnrouteAsync("**/*");
+        
+        
+        
+        
         var headers = SetHeadersFromActualRequest(site, requests);
         var convertedHeaders = ConvertHeaders(headers);
-        
+
         var releases = await _repository.QueryReleasesAsync(site, downloadConditions);
         foreach (var release in releases)
         {
@@ -118,13 +151,26 @@ public class MetArtNetworkRipper : ISiteScraper, IYieldingScraper
 
             if (bestVideo != null)
             {
+                var handler = new HttpClientHandler()
+                {
+                    AllowAutoRedirect = false
+                };
+                var client = new HttpClient(handler);
+                client.DefaultRequestHeaders.Clear();
+                client.DefaultRequestHeaders.Add("cookie", headers["cookie"]);
+                client.DefaultRequestHeaders.Add("user-agent", headers["user-agent"]);
+
+                var request = new HttpRequestMessage(HttpMethod.Head, "https://www.sexart.com/api/download-media/8C18D265EB628B541D685B3DE5C3047C/film/270p");
+                var response = await client.SendAsync(request);
+                
+                
                 var fileInfo = await _downloader.DownloadFileAsync(
                     release,
-                    site.Url + bestVideo.Url,
+                    response.Headers.Location.ToString(),
                     "tissit.mp4",
                     release.Url,
                     convertedHeaders);                
-                
+
                 var videoHashes = Hasher.Phash(@"""" + fileInfo.FullName + @"""");
                 yield return new Download(release, "tissit.mp4", fileInfo.FullName, bestVideo as AvailableVideoFile, videoHashes);
             }
@@ -201,22 +247,10 @@ public class MetArtNetworkRipper : ISiteScraper, IYieldingScraper
     private static WebHeaderCollection ConvertHeaders(Dictionary<string, string> headers)
     {
         var convertedHeaders = new WebHeaderCollection();
-
         foreach (var header in headers)
         {
-            if (Enum.TryParse(header.Key.Replace("-", ""), true, out HttpRequestHeader headerKey))
-            {
-                convertedHeaders.Add(headerKey, header.Value);
-            }
-            else
-            {
-                // Handle the case where the header cannot be parsed into the HttpRequestHeader enum
-                // This might include custom headers, which aren't represented in the HttpRequestHeader enum
-                // You could either ignore these headers or handle them in a way that's appropriate for your application
-                Console.WriteLine($"Warning: '{header.Key}' is not a standard header and was ignored.");
-            }
+            convertedHeaders.Add(header.Key, header.Value);
         }
-
         return convertedHeaders;
     }
     

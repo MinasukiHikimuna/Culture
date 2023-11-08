@@ -161,7 +161,7 @@ public class Downloader : IDownloader
             }
 
             WebClient.DownloadProgressChanged += new DownloadProgressChangedEventHandler(DownloadProgressCallback4);
-
+            
             await WebClient.DownloadFileTaskAsync(new Uri(url), tempPath);
             File.Move(tempPath, finalPath, true);
         }
