@@ -322,7 +322,7 @@ public class MetArtNetworkRipper : ISiteScraper, IYieldingScraper
                         "zip",
                         "gallery",
                         gallery.quality,
-                        $"/api/download-media/{galleryDetails.siteUUID}/photos/{gallery.quality}",
+                        $"/api/download-media/{galleryDetails.UUID}/photos/{gallery.quality}",
                         -1,
                         -1,
                         HumanParser.ParseFileSizeMaybe(gallery.size).IsSome(out var fileSizeValue) ? fileSizeValue : -1
