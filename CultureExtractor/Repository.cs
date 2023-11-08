@@ -392,13 +392,13 @@ public class Repository : IRepository
 
     private class JsonSummary
     {
-        public JsonSummary(AvailableVideoFile availableVideoFile, VideoHashes videoHashes)
+        public JsonSummary(IAvailableFile availableVideoFile, VideoHashes videoHashes)
         {
             AvailableVideoFile = availableVideoFile;
             VideoHashes = videoHashes;
         }
 
-        public AvailableVideoFile AvailableVideoFile { get; }
+        public IAvailableFile AvailableVideoFile { get; }
         public VideoHashes VideoHashes { get; }
     }
 }
