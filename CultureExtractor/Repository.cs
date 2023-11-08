@@ -380,7 +380,7 @@ public class Repository : IRepository
             Uuid = UuidGenerator.Generate().ToString(),
             DownloadedAt = DateTime.Now,
             DownloadOptions = json,
-            DownloadQuality = Enum.GetName(preferredDownloadQuality),
+            DownloadQuality = download.AvailableVideoFile.Variant, // Enum.GetName(preferredDownloadQuality),
             OriginalFilename = download.OriginalFilename,
             SavedFilename = download.SavedFilename,
 

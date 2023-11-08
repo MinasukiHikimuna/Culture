@@ -192,7 +192,7 @@ public class VixenRipper : ISiteScraper
         var userAgent = await page.EvaluateAsync<string>("() => navigator.userAgent");
         var cookieString = await page.EvaluateAsync<string>("() => document.cookie");
 
-        var headers = new Dictionary<HttpRequestHeader, string>
+        var headers = new WebHeaderCollection()
         {
             { HttpRequestHeader.Referer, page.Url },
             { HttpRequestHeader.Accept, "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7" },

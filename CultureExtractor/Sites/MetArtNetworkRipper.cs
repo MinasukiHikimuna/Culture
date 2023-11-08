@@ -52,7 +52,7 @@ public class MetArtNetworkRipper : ISiteScraper, IYieldingScraper
     private static string MovieCdnImageUrl(MetArtMovieRequest.RootObject gallery, MetArtMovieRequest.RelatedPhotos image) =>
         $"https://cdn.metartnetwork.com/{gallery.siteUUID}/media/{gallery.UUID}/{image.id.Replace("-", "_")}_{gallery.UUID}.jpg";
     
-    public async IAsyncEnumerable<Release> ScrapeAsync(Site site, BrowserSettings browserSettings, ScrapeOptions scrapeOptions)
+    public async IAsyncEnumerable<Release> ScrapeReleasesAsync(Site site, BrowserSettings browserSettings, ScrapeOptions scrapeOptions)
     {
         IPage page = await _playwrightFactory.CreatePageAsync(site, browserSettings);
 
@@ -83,6 +83,143 @@ public class MetArtNetworkRipper : ISiteScraper, IYieldingScraper
         }
     }
 
+    public async IAsyncEnumerable<Download> DownloadReleasesAsync(Site site, BrowserSettings browserSettings, DownloadConditions downloadConditions, DownloadOptions downloadOptions)
+    {
+        IPage page = await _playwrightFactory.CreatePageAsync(site, browserSettings);
+
+        await LoginAsync(site, page);
+        
+        await CloseModalsIfVisibleAsync(page);
+
+        var requests = new List<IRequest>();
+        await page.RouteAsync("**/*", async route =>
+        {
+            requests.Add(route.Request);
+            await route.ContinueAsync();
+        });
+        
+        await page.GotoAsync(GalleriesUrl(site, 1));
+        await page.WaitForLoadStateAsync();
+        await Task.Delay(5000);
+
+        await page.UnrouteAsync("**/*");
+
+        var headers = SetHeadersFromActualRequest(site, requests);
+        var convertedHeaders = ConvertHeaders(headers);
+        
+        var releases = await _repository.QueryReleasesAsync(site, downloadConditions);
+        foreach (var release in releases)
+        {
+            // switch based on FileType and ContentType
+            // if video, download video
+            
+            var bestVideo = release.DownloadOptions
+                .LastOrDefault(d => d is { FileType: "video", ContentType: "scene" });
+
+            if (bestVideo != null)
+            {
+                var fileInfo = await _downloader.DownloadFileAsync(
+                    release,
+                    site.Url + bestVideo.Url,
+                    "tissit.mp4",
+                    release.Url,
+                    convertedHeaders);                
+                
+                var videoHashes = Hasher.Phash(@"""" + fileInfo.FullName + @"""");
+                yield return new Download(release, "tissit.mp4", fileInfo.FullName, bestVideo as AvailableVideoFile, videoHashes);
+            }
+            
+            var bestTrailer = release.DownloadOptions
+                .FirstOrDefault(d => d is { FileType: "video", ContentType: "trailer" });
+
+            if (bestTrailer != null)
+            {
+                // Note: we need to download the trailer without cookies because logged in users get the full scene
+                // from the same URL.
+                var fileInfo = await _downloader.DownloadFileAsync(
+                    release,
+                    bestTrailer.Url, 
+                    "trailer.m3u8",
+                    release.Url,
+                    new WebHeaderCollection());
+            
+                var snippet = await FFmpeg.Conversions.New().Start($"-protocol_whitelist \"file,http,https,tcp,tls\" -i {fileInfo.FullName} -c copy {Path.Combine(fileInfo.DirectoryName, "trailer.mp4")}");
+                
+                yield return new Download(release, "trailer.m3u8", fileInfo.FullName, bestTrailer as AvailableVideoFile, null);
+            }
+        }
+
+        /*var movieRequest = requests.SingleOrDefault(r => r.Url.StartsWith(release.Site.Url + "/api/movie?"));
+        var response = await movieRequest.ResponseAsync();
+        var jsonContent = await response.TextAsync();
+        var data = JsonSerializer.Deserialize<MetArtMovieRequest.RootObject>(jsonContent)!;
+
+        var availableDownloads = await ParseAvailableDownloadsAsync(page);
+
+        DownloadDetailsAndElementHandle selectedDownload = downloadConditions.PreferredDownloadQuality switch
+        {
+            PreferredDownloadQuality.Phash => availableDownloads.FirstOrDefault(f => f.AvailableVideoFile.ResolutionHeight == 360) ?? availableDownloads.Last(),
+            PreferredDownloadQuality.Best => availableDownloads.First(),
+            PreferredDownloadQuality.Worst => availableDownloads.Last(),
+            _ => throw new InvalidOperationException("Could not find a download candidate!")
+        };
+
+        foreach (var image in release.DownloadOptions.OfType<AvailableImageFile>())
+        {
+            var imageSuffix = Path.GetExtension(image.Url);
+            await _downloader.DownloadSceneImageAsync(release, image.Url, fileName: $"{image.ContentType}{imageSuffix}");            
+        }
+        
+
+        
+        var snippet = await FFmpeg.Conversions.New().Start($"-protocol_whitelist \"file,http,https,tcp,tls\" -i {fileInfo.FullName} -c copy {Path.Combine(fileInfo.DirectoryName, "trailer.mp4")}");
+        
+        var females = data.models.Where(a => a.gender == "female").ToList();
+        var nonFemales = data.models.Where(a => a.gender != "female").ToList();
+        var genderSorted = females.Concat(nonFemales)
+            .ToList()
+            .Select(a => a.name)
+            .ToList();
+        var performersStr = genderSorted.Count > 1
+            ? string.Join(", ", genderSorted.SkipLast(1)) + " & " + genderSorted.Last()
+            : genderSorted.FirstOrDefault();
+
+        if (string.IsNullOrWhiteSpace(performersStr))
+        {
+            performersStr = "Unknown";
+        }
+
+        const string suffix = ".mp4";
+        var name = ReleaseNamer.Name(release, suffix, performersStr);
+
+        return await _downloader.DownloadSceneAsync(release, page, selectedDownload.AvailableVideoFile, downloadConditions.PreferredDownloadQuality, async () =>
+        {
+            await selectedDownload.ElementHandle.ClickAsync();
+        }, name);*/
+    }
+    
+    private static WebHeaderCollection ConvertHeaders(Dictionary<string, string> headers)
+    {
+        var convertedHeaders = new WebHeaderCollection();
+
+        foreach (var header in headers)
+        {
+            if (Enum.TryParse(header.Key.Replace("-", ""), true, out HttpRequestHeader headerKey))
+            {
+                convertedHeaders.Add(headerKey, header.Value);
+            }
+            else
+            {
+                // Handle the case where the header cannot be parsed into the HttpRequestHeader enum
+                // This might include custom headers, which aren't represented in the HttpRequestHeader enum
+                // You could either ignore these headers or handle them in a way that's appropriate for your application
+                Console.WriteLine($"Warning: '{header.Key}' is not a standard header and was ignored.");
+            }
+        }
+
+        return convertedHeaders;
+    }
+    
     private async IAsyncEnumerable<Release> ScrapeGalleriesAsync(Site site, ScrapeOptions scrapeOptions)
     {
         var galleriesInitialPage = await GetGalleriesPageAsync(site, 1);
@@ -352,7 +489,7 @@ public class MetArtNetworkRipper : ISiteScraper, IYieldingScraper
         }
     }
     
-    private static void SetHeadersFromActualRequest(Site site, IList<IRequest> requests)
+    private static Dictionary<string, string> SetHeadersFromActualRequest(Site site, IList<IRequest> requests)
     {
         var galleriesRequest = requests.SingleOrDefault(r => r.Url.StartsWith(site.Url + "/api/galleries?"));
         if (galleriesRequest == null)
@@ -366,6 +503,8 @@ public class MetArtNetworkRipper : ISiteScraper, IYieldingScraper
         {
             Client.DefaultRequestHeaders.Add(key, galleriesRequest.Headers[key]);
         }
+        
+        return galleriesRequest.Headers;
     }
     
     private static async Task<MetArtGalleriesRequest.RootObject> GetGalleriesPageAsync(Site site, int pageNumber)

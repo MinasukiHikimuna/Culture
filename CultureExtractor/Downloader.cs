@@ -40,7 +40,7 @@ public class Downloader : IDownloader
         return File.Exists(path);
     }
 
-    public async Task DownloadSceneImageAsync(Release release, string imageUrl, string referer = "", Dictionary<HttpRequestHeader, string>? headers = null, string fileName = "")
+    public async Task DownloadSceneImageAsync(Release release, string imageUrl, string referer = "", WebHeaderCollection? headers = null, string fileName = "")
     {
         var rippingPath = Path.Combine(_metadataPath, $@"{release.Site.Name}\Metadata\{release.Uuid}\");
         Directory.CreateDirectory(rippingPath);
@@ -55,7 +55,7 @@ public class Downloader : IDownloader
             headers: headers);
     }
 
-    public async Task<FileInfo> DownloadFileAsync(Release release, string url, string fileName, string referer = "", Dictionary<HttpRequestHeader, string>? headers = null)
+    public async Task<FileInfo> DownloadFileAsync(Release release, string url, string fileName, string referer = "", WebHeaderCollection? headers = null)
     {
         var rippingPath = Path.Combine(_metadataPath, $@"{release.Site.Name}\Metadata\{release.Uuid}\");
         Directory.CreateDirectory(rippingPath);
@@ -115,7 +115,7 @@ public class Downloader : IDownloader
         return new Download(release, suggestedFilename, name, downloadDetails, videoHashes);
     }
 
-    public async Task<Download> DownloadSceneDirectAsync(Release release, AvailableVideoFile downloadDetails, PreferredDownloadQuality downloadQuality, Dictionary<HttpRequestHeader, string> headers, string fileName = "", string referer = "")
+    public async Task<Download> DownloadSceneDirectAsync(Release release, AvailableVideoFile downloadDetails, PreferredDownloadQuality downloadQuality, WebHeaderCollection? headers = null, string fileName = "", string referer = "")
     {
         var suggestedFilename = downloadDetails.Url.Substring(downloadDetails.Url.LastIndexOf("/") + 1);
         var suffix = Path.GetExtension(suggestedFilename);
@@ -139,7 +139,7 @@ public class Downloader : IDownloader
         return new Download(release, suggestedFilename, name, downloadDetails, videoHashes);
     }
 
-    private static async Task DownloadFileAsync(string url, string fileName, string rippingPath, Dictionary<HttpRequestHeader, string>? headers = null, string referer = "")
+    private static async Task DownloadFileAsync(string url, string fileName, string rippingPath, WebHeaderCollection? headers = null, string referer = "")
     {
         string? tempPath = null;
         try
@@ -150,7 +150,7 @@ public class Downloader : IDownloader
             WebClient.Headers.Clear();
             if (headers != null && headers.Count > 0)
             {
-                foreach (var key in headers.Keys)
+                foreach (var key in headers.AllKeys)
                 {
                     WebClient.Headers[key] = headers[key];
                 }

@@ -136,14 +136,8 @@ class Program
             var siteShortName = "sexart";
             // var subSiteShortName = "sex-and-submission";
 
-            /*args = new string[] {
-                "scrape",
-                "--site-short-name", siteShortName,
-                "--visible-browser",
-                "--full"
-            };*/
             args = new string[] {
-                // /*
+                /*
                 "scrape",
                 "--site-short-name", siteShortName,
                 // "--sub-site-short-name", subSiteShortName,
@@ -155,9 +149,9 @@ class Program
                 // "--from", "2020-01-01",
                 // "--to", "2020-12-31",
                 "--verbose",
-                // */
+                */
                 
-                /*
+                ///*
                 "download",
                 "--site-short-name", siteShortName,
                 // "--sub-site-short-name", subSiteShortName,
@@ -172,7 +166,7 @@ class Program
                 // "--to", "2020-12-31",
                 "--verbose",
                 "--best",
-                */
+                // */
                 
                 /*
                 "migrate",
