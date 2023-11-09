@@ -129,8 +129,8 @@ public class DownloadEntity
     [Key]
     public required string Uuid { get; set; }
     public required DateTime DownloadedAt { get; set; }
-    public string FileType { get; set; }
-    public string ContentType { get; set; }
+    public required string FileType { get; set; }
+    public required string ContentType { get; set; }
     public required string Variant { get; set; }
     public required string AvailableFile { get; set; }
     public string? OriginalFilename { get; set; }
