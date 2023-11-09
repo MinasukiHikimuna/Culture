@@ -113,7 +113,7 @@ public class ReleaseEntity
     public required DateTime LastUpdated { get; set; }
     public required ICollection<SitePerformerEntity> Performers { get; set; }
     public required ICollection<SiteTagEntity> Tags { get; set; }
-    public required string DownloadOptions { get; set; }
+    public required string AvailableFiles { get; set; }
     public required string JsonDocument { get; set; }
 
     public required string SiteUuid { get; set; }
@@ -130,7 +130,7 @@ public class DownloadEntity
     public required string Uuid { get; set; }
     public required DateTime DownloadedAt { get; set; }
     public required string DownloadQuality { get; set; }
-    public required string DownloadOptions { get; set; }
+    public required string AvailableFile { get; set; }
     public string? OriginalFilename { get; set; }
     public string? SavedFilename { get; set; }
 

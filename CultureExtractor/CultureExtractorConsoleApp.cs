@@ -107,54 +107,6 @@ public class CultureExtractorConsoleApp
             Log.Information("Culture Extractor");
 
             var releases = await _sqliteContext.Releases.ToListAsync();
-            int batchSize = 100;
-            int totalBatches = (releases.Count + batchSize - 1) / batchSize;
-
-            int successes = 0;
-            int errors = 0;
-            for (int batch = 0; batch < totalBatches; batch++)
-            {
-                var currentBatch = releases.Skip(batch * batchSize).Take(batchSize);
-
-                foreach (var release in currentBatch)
-                {
-                    try
-                    {
-                        if (release.DownloadOptions == "")
-                        {
-                            release.DownloadOptions = "[]";
-                        }
-                    
-                        var downloadOptions =
-                            JsonSerializer.Deserialize<IEnumerable<DownloadOption>>(release.DownloadOptions);
-
-                        IEnumerable<IAvailableFile> availableFiles = downloadOptions.Select(f => new AvailableVideoFile(
-                            "video",
-                            "scene",
-                            f.Description,
-                            f.Url,
-                            f.ResolutionWidth,
-                            f.ResolutionHeight,
-                            f.FileSize,
-                            f.Fps,
-                            f.Codec));
-                        release.DownloadOptions = JsonSerializer.Serialize(availableFiles);
-                        successes++;
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine(ex);
-                        Console.WriteLine(release.Uuid + " " + release.Name);
-                        errors++;
-                    }
-                }
-
-                await _sqliteContext.SaveChangesAsync();
-                Console.WriteLine("Batch " + batch + " of " + totalBatches + " complete.");
-            }
-
-            Console.WriteLine($"Successes: {successes}");
-            Console.WriteLine($"Errors: {errors}");
 
             return 0;
         }
@@ -165,15 +117,6 @@ public class CultureExtractorConsoleApp
             return -1;
         }
     }
-
-    private record DownloadOption(
-        string Description,
-        int? ResolutionWidth,
-        int? ResolutionHeight,
-        double? FileSize,
-        double? Fps,
-        string? Codec,
-        string Url);
     
     private static void InitializeLogger(BaseOptions opts)
     {

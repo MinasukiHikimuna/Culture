@@ -189,7 +189,7 @@ public class Repository : IRepository
                 JsonDocument = release.JsonDocument,
 
                 Downloads = new List<DownloadEntity>(),
-                DownloadOptions = JsonSerializer.Serialize(release.DownloadOptions)
+                AvailableFiles = JsonSerializer.Serialize(release.AvailableFiles)
             };
             await _sqliteContext.Releases.AddAsync(releaseEntity);
             await _sqliteContext.SaveChangesAsync();
@@ -216,7 +216,7 @@ public class Repository : IRepository
         existingReleaseEntity.SiteUuid = siteEntity.Uuid;
         existingReleaseEntity.Site = siteEntity;
 
-        existingReleaseEntity.DownloadOptions = JsonSerializer.Serialize(release.DownloadOptions);
+        existingReleaseEntity.AvailableFiles = JsonSerializer.Serialize(release.AvailableFiles);
 
         await _sqliteContext.SaveChangesAsync();
 
@@ -331,9 +331,9 @@ public class Repository : IRepository
 
     private static Release Convert(ReleaseEntity releaseEntity)
     {
-        var availableFilesJson = string.IsNullOrEmpty(releaseEntity.DownloadOptions)
+        var availableFilesJson = string.IsNullOrEmpty(releaseEntity.AvailableFiles)
             ? "[]"
-            : releaseEntity.DownloadOptions;
+            : releaseEntity.AvailableFiles;
         var availableFiles = JsonSerializer.Deserialize<List<IAvailableFile>>(availableFilesJson).AsReadOnly();
         
         return new Release(
@@ -379,7 +379,7 @@ public class Repository : IRepository
         {
             Uuid = UuidGenerator.Generate().ToString(),
             DownloadedAt = DateTime.Now,
-            DownloadOptions = json,
+            AvailableFile = json,
             DownloadQuality = download.AvailableVideoFile.Variant, // Enum.GetName(preferredDownloadQuality),
             OriginalFilename = download.OriginalFilename,
             SavedFilename = download.SavedFilename,
