@@ -4,5 +4,5 @@ public record Download(
     Release Release,
     string OriginalFilename,
     string SavedFilename,
-    IAvailableFile AvailableVideoFile,
+    IAvailableFile AvailableFile,
     VideoHashes VideoHashes);

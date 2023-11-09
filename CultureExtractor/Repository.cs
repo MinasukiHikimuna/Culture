@@ -373,7 +373,7 @@ public class Repository : IRepository
     {
         var releaseEntity = await _sqliteContext.Releases.FirstAsync(s => s.Uuid == download.Release.Uuid.ToString());
 
-        var json = JsonSerializer.Serialize(new JsonSummary(download.AvailableVideoFile, download.VideoHashes));
+        var json = JsonSerializer.Serialize(new JsonSummary(download.AvailableFile, download.VideoHashes));
 
         _sqliteContext.Downloads.Add(new DownloadEntity
         {
@@ -381,9 +381,9 @@ public class Repository : IRepository
             DownloadedAt = DateTime.Now,
             AvailableFile = json,
             
-            FileType = download.AvailableVideoFile.FileType,
-            ContentType = download.AvailableVideoFile.ContentType,
-            Variant = download.AvailableVideoFile.Variant, // Enum.GetName(preferredDownloadQuality),
+            FileType = download.AvailableFile.FileType,
+            ContentType = download.AvailableFile.ContentType,
+            Variant = download.AvailableFile.Variant, // Enum.GetName(preferredDownloadQuality),
             OriginalFilename = download.OriginalFilename,
             SavedFilename = download.SavedFilename,
 
