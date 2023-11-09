@@ -322,7 +322,7 @@ public class MetArtNetworkRipper : ISiteScraper, IYieldingScraper
                         "zip",
                         "gallery",
                         gallery.quality,
-                        $"/api/download-media/{galleryDetails.UUID}/photos/{gallery.quality}",
+                        $"{site.Url}/api/download-media/{galleryDetails.UUID}/photos/{gallery.quality}",
                         -1,
                         -1,
                         HumanParser.ParseFileSizeMaybe(gallery.size).IsSome(out var fileSizeValue) ? fileSizeValue : -1
@@ -434,7 +434,7 @@ public class MetArtNetworkRipper : ISiteScraper, IYieldingScraper
                         "video",
                         "scene",
                         video.id,
-                        $"/api/download-media/{movieDetails.siteUUID}/film/{video.id}",
+                        $"{site.Url}/api/download-media/{movieDetails.UUID}/film/{video.id}",
                         -1,
                         HumanParser.ParseResolutionHeight(video.id),
                         HumanParser.ParseFileSizeMaybe(video.size).IsSome(out var fileSizeValue) ? fileSizeValue : -1,
@@ -449,7 +449,7 @@ public class MetArtNetworkRipper : ISiteScraper, IYieldingScraper
                         "zip",
                         "gallery",
                         gallery.quality,
-                        $"/api/download-media/{movieDetails.siteUUID}/photos/{gallery.quality}",
+                        $"{site.Url}/api/download-media/{movieDetails.UUID}/photos/{gallery.quality}",
                         -1,
                         -1,
                         HumanParser.ParseFileSizeMaybe(gallery.size).IsSome(out var fileSizeValue) ? fileSizeValue : -1
