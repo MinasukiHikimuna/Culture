@@ -67,7 +67,7 @@ public class Repository : IRepository
             .Include(s => s.Tags)
             .Where(s => s.SiteUuid == site.Uuid.ToString())
             .Where(s => !downloadConditions.DownloadedFileNames.Any() || s.Downloads.Any(d => downloadConditions.DownloadedFileNames.Contains(d.SavedFilename)))
-            .Where(s => !s.Downloads.Any(d => d.DownloadQuality == Enum.GetName(downloadConditions.PreferredDownloadQuality)))
+            .Where(s => !s.Downloads.Any(d => d.Variant == Enum.GetName(downloadConditions.PreferredDownloadQuality)))
             .OrderBy(s => s.Site.Name)
             .ThenByDescending(s => s.ReleaseDate)
             .ToListAsync();
@@ -380,7 +380,7 @@ public class Repository : IRepository
             Uuid = UuidGenerator.Generate().ToString(),
             DownloadedAt = DateTime.Now,
             AvailableFile = json,
-            DownloadQuality = download.AvailableVideoFile.Variant, // Enum.GetName(preferredDownloadQuality),
+            Variant = download.AvailableVideoFile.Variant, // Enum.GetName(preferredDownloadQuality),
             OriginalFilename = download.OriginalFilename,
             SavedFilename = download.SavedFilename,
 
