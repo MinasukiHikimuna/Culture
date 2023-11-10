@@ -391,7 +391,7 @@ public class NetworkRipper : INetworkRipper
                             ? existingRelease.Url
                             : existingRelease.Site.Url + existingRelease.Url,
                         Quality = downloadConditions.PreferredDownloadQuality,
-                        Phash = download.VideoHashes?.PHash
+                        Phash = (download.FileMetadata as VideoFileMetadata)?.Hashes.PHash
                     };
                     Log.Information("Downloaded:  {@Release}", releaseDescription2);
                     await Task.Delay(3000);

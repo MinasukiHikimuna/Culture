@@ -373,7 +373,7 @@ public class Repository : IRepository
     {
         var releaseEntity = await _sqliteContext.Releases.FirstAsync(s => s.Uuid == download.Release.Uuid.ToString());
 
-        var json = JsonSerializer.Serialize(new JsonSummary(download.AvailableFile, download.VideoHashes));
+        var json = JsonSerializer.Serialize(new JsonSummary(download.AvailableFile, download.FileMetadata));
 
         _sqliteContext.Downloads.Add(new DownloadEntity
         {
@@ -393,15 +393,5 @@ public class Repository : IRepository
         await _sqliteContext.SaveChangesAsync();
     }
 
-    private class JsonSummary
-    {
-        public JsonSummary(IAvailableFile availableVideoFile, VideoHashes videoHashes)
-        {
-            AvailableVideoFile = availableVideoFile;
-            VideoHashes = videoHashes;
-        }
-
-        public IAvailableFile AvailableVideoFile { get; }
-        public VideoHashes VideoHashes { get; }
-    }
+    private record JsonSummary(IAvailableFile AvailableFile, IFileMetadata FileMetadata);
 }

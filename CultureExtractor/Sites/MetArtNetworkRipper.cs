@@ -4,6 +4,7 @@ using CultureExtractor.Interfaces;
 using CultureExtractor.Exceptions;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Web;
 using CultureExtractor.Models;
 using Serilog;
 using Xabe.FFmpeg;
@@ -103,38 +104,6 @@ public class MetArtNetworkRipper : ISiteScraper, IYieldingScraper
         await Task.Delay(5000);
 
         await page.UnrouteAsync("**/*");
-
-
-        await page.GotoAsync("https://www.sexart.com/model/jimmy-bud-and-alexis-crystal/movie/20231105/PULSATION");
-        await page.WaitForLoadStateAsync();
-        
-        var downloadMenuLocator = page.Locator("div svg.fa-film");
-        if (!await downloadMenuLocator.IsVisibleAsync())
-        {
-            throw new ExtractorException(false, $"Could not find download menu for {page.Url}. Skipping...");
-        }
-
-        await downloadMenuLocator.ClickAsync();
-
-        
-        var downloadLinks = await page.Locator("div.dropdown-menu a").ElementHandlesAsync();
-        var downloadLink = downloadLinks.Last();
-        
-        var requests2 = new List<IRequest>();
-        await page.RouteAsync("**/*", async route =>
-        {
-            requests2.Add(route.Request);
-            await route.ContinueAsync();
-        });
-        
-        await downloadLink.ClickAsync();
-        
-        await page.WaitForLoadStateAsync();
-        await Task.Delay(5000);
-
-        await page.UnrouteAsync("**/*");
-        
-        
         
         
         var headers = SetHeadersFromActualRequest(site, requests);
@@ -146,8 +115,51 @@ public class MetArtNetworkRipper : ISiteScraper, IYieldingScraper
             // switch based on FileType and ContentType
             // if video, download video
             
-            var bestVideo = release.DownloadOptions
-                .LastOrDefault(d => d is { FileType: "video", ContentType: "scene" });
+            
+            var bestGallery = release.AvailableFiles
+                .FirstOrDefault(d => d is { FileType: "zip", ContentType: "gallery" });
+
+            if (bestGallery != null)
+            {
+                var handler = new HttpClientHandler()
+                {
+                    AllowAutoRedirect = false
+                };
+                var client = new HttpClient(handler);
+                client.DefaultRequestHeaders.Clear();
+                client.DefaultRequestHeaders.Add("cookie", headers["cookie"]);
+                client.DefaultRequestHeaders.Add("user-agent", headers["user-agent"]);
+
+                var request = new HttpRequestMessage(HttpMethod.Head, bestGallery.Url);
+                var response = await client.SendAsync(request);
+
+                var actualMediaUrl = response.Headers.Location?.ToString();
+                if (string.IsNullOrEmpty(actualMediaUrl))
+                {
+                    throw new InvalidOperationException("actualMediaUrl is missing.");
+                }
+                
+                var uri = new Uri(actualMediaUrl);
+                var query = HttpUtility.ParseQueryString(uri.Query);
+                var suggestedFileName = query["filename"] ?? string.Empty;
+                
+                var fileInfo = await _downloader.DownloadFileAsync(
+                    release,
+                    actualMediaUrl,
+                    suggestedFileName,
+                    release.Url,
+                    convertedHeaders);
+
+                var sha256Sum = Downloader.CalculateSHA256(fileInfo.FullName);
+
+                var metadata = new GalleryZipFileMetadata(sha256Sum);
+                
+                yield return new Download(release, suggestedFileName, fileInfo.FullName, bestGallery as AvailableGalleryZipFile, metadata);
+            }
+            
+            
+            var bestVideo = release.AvailableFiles
+                .FirstOrDefault(d => d is { FileType: "video", ContentType: "scene" });
 
             if (bestVideo != null)
             {
@@ -160,22 +172,27 @@ public class MetArtNetworkRipper : ISiteScraper, IYieldingScraper
                 client.DefaultRequestHeaders.Add("cookie", headers["cookie"]);
                 client.DefaultRequestHeaders.Add("user-agent", headers["user-agent"]);
 
-                var request = new HttpRequestMessage(HttpMethod.Head, "https://www.sexart.com/api/download-media/8C18D265EB628B541D685B3DE5C3047C/film/270p");
+                var request = new HttpRequestMessage(HttpMethod.Head, bestVideo.Url);
                 var response = await client.SendAsync(request);
                 
+                var actualMediaUrl = response.Headers?.Location?.ToString();
+                
+                var uri = new Uri(actualMediaUrl);
+                var query = HttpUtility.ParseQueryString(uri.Query);
+                var suggestedFileName = query["filename"];
                 
                 var fileInfo = await _downloader.DownloadFileAsync(
                     release,
                     response.Headers.Location.ToString(),
-                    "tissit.mp4",
+                    suggestedFileName,
                     release.Url,
                     convertedHeaders);                
 
                 var videoHashes = Hasher.Phash(@"""" + fileInfo.FullName + @"""");
-                yield return new Download(release, "tissit.mp4", fileInfo.FullName, bestVideo as AvailableVideoFile, videoHashes);
+                yield return new Download(release, suggestedFileName, fileInfo.FullName, bestVideo as AvailableVideoFile, videoHashes);
             }
             
-            var bestTrailer = release.DownloadOptions
+            var bestTrailer = release.AvailableFiles
                 .FirstOrDefault(d => d is { FileType: "video", ContentType: "trailer" });
 
             if (bestTrailer != null)
@@ -298,7 +315,7 @@ public class MetArtNetworkRipper : ISiteScraper, IYieldingScraper
 
             foreach (var gallery in galleriesToBeScraped)
             {
-                Thread.Sleep(5000);
+                Thread.Sleep(1000);
 
                 var date = Regex.Match(gallery.path, @"\/(\d{8})\/").Groups[1].Value;
                 var name = Regex.Match(gallery.path, @"\/(\w+)$").Groups[1].Value;
@@ -841,7 +858,7 @@ public class MetArtNetworkRipper : ISiteScraper, IYieldingScraper
             _ => throw new InvalidOperationException("Could not find a download candidate!")
         };
 
-        foreach (var image in release.DownloadOptions.OfType<AvailableImageFile>())
+        foreach (var image in release.AvailableFiles.OfType<AvailableImageFile>())
         {
             var imageSuffix = Path.GetExtension(image.Url);
             await _downloader.DownloadSceneImageAsync(release, image.Url, fileName: $"{image.ContentType}{imageSuffix}");            
@@ -849,7 +866,7 @@ public class MetArtNetworkRipper : ISiteScraper, IYieldingScraper
         
         var fileInfo = await _downloader.DownloadFileAsync(
             release,
-            release.DownloadOptions.OfType<AvailableVideoFile>().First(d => d.ContentType == "trailer").Url, 
+            release.AvailableFiles.OfType<AvailableVideoFile>().First(d => d.ContentType == "trailer").Url, 
             "trailer.m3u8");
         
         var snippet = await FFmpeg.Conversions.New().Start($"-protocol_whitelist \"file,http,https,tcp,tls\" -i {fileInfo.FullName} -c copy {Path.Combine(fileInfo.DirectoryName, "trailer.mp4")}");

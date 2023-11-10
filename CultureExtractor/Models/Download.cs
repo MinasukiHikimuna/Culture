@@ -5,4 +5,4 @@ public record Download(
     string OriginalFilename,
     string SavedFilename,
     IAvailableFile AvailableFile,
-    VideoHashes VideoHashes);
+    IFileMetadata FileMetadata);

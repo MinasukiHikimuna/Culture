@@ -1,6 +1,8 @@
 ﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Playwright;
 using System.Net;
+using System.Security.Cryptography;
+using System.Text;
 using CultureExtractor.Interfaces;
 using CultureExtractor.Models;
 
@@ -187,6 +189,22 @@ public class Downloader : IDownloader
             e.BytesReceived,
             e.TotalBytesToReceive,
             e.ProgressPercentage);
+    }
+
+    public static string CalculateSHA256(string filePath)
+    {
+        using var sha256Hash = SHA256.Create();
+        using var fileStream = File.OpenRead(filePath);
+        
+        // Compute the hash of the fileStream.
+        var bytes = sha256Hash.ComputeHash(fileStream);
+        // Convert the byte array to a hexadecimal string.
+        var builder = new StringBuilder();
+        foreach (var b in bytes)
+        {
+            builder.Append(b.ToString("x2"));
+        }
+        return builder.ToString();
     }
 
     public async Task<string> DownloadCaptchaAudioAsync(string captchaUrl)

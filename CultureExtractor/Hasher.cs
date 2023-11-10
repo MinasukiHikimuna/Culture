@@ -2,11 +2,12 @@
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using CultureExtractor.Models;
 using Serilog;
 
 namespace CultureExtractor;
 
-public class VideoHashes
+public class VideoHashes : IFileMetadata
 {
     [JsonPropertyName("duration")]
     public int Duration { get; }
