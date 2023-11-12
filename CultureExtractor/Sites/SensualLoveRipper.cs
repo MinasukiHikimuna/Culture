@@ -1,12 +1,11 @@
 ﻿using CultureExtractor.Interfaces;
 using Microsoft.Playwright;
-using Serilog;
 using System.Text.RegularExpressions;
 using CultureExtractor.Models;
 
 namespace CultureExtractor.Sites;
 
-[PornSite("sensuallove")]
+[Site("sensuallove")]
 public class SensualLoveRipper : ISiteScraper
 {
     private readonly IDownloader _downloader;

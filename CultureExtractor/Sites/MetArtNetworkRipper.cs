@@ -11,16 +11,16 @@ using Xabe.FFmpeg;
 
 namespace CultureExtractor.Sites;
 
-[PornSite("metart")]
-[PornSite("metartx")]
-[PornSite("sexart")]
-[PornSite("lovehairy")]
-[PornSite("vivthomas")]
-[PornSite("alsscan")]
-[PornSite("thelifeerotic")]
-[PornSite("eternaldesire")]
-[PornSite("straplez")]
-[PornSite("hustler")]
+[Site("metart")]
+[Site("metartx")]
+[Site("sexart")]
+[Site("lovehairy")]
+[Site("vivthomas")]
+[Site("alsscan")]
+[Site("thelifeerotic")]
+[Site("eternaldesire")]
+[Site("straplez")]
+[Site("hustler")]
 public class MetArtNetworkRipper : ISiteScraper, IYieldingScraper
 {
     private readonly IDownloader _downloader;

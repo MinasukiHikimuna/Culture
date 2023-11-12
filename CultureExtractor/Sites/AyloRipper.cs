@@ -8,8 +8,8 @@ using CultureExtractor.Models;
 
 namespace CultureExtractor.Sites;
 
-[PornSite("brazzers")]
-[PornSite("digitalplayground")]
+[Site("brazzers")]
+[Site("digitalplayground")]
 public class AyloRipper : ISiteScraper
 {
     private readonly IDownloader _downloader;

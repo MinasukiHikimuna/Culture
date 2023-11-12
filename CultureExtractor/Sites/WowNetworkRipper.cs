@@ -1,16 +1,14 @@
 ﻿using CultureExtractor.Interfaces;
 using Microsoft.Playwright;
-using Serilog;
-using System.Net;
 using System.Text.RegularExpressions;
 using CultureExtractor.Models;
 
 namespace CultureExtractor.Sites;
 
-[PornSite("allfinegirls")]
-[PornSite("wowgirls")]
-[PornSite("wowporn")]
-[PornSite("ultrafilms")]
+[Site("allfinegirls")]
+[Site("wowgirls")]
+[Site("wowporn")]
+[Site("ultrafilms")]
 public class WowNetworkRipper : ISiteScraper
 {
     private readonly IDownloader _downloader;

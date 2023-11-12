@@ -43,7 +43,7 @@ public static class AppHostFactory
     // The existing GetSiteScraperType method can be moved into this class
     private static Type GetSiteScraperType<T>(string shortName) where T : ISiteScraper
     {
-        var attributeType = typeof(PornSiteAttribute);
+        var attributeType = typeof(SiteAttribute);
 
         var siteRipperTypes = Assembly
             .GetExecutingAssembly()
@@ -52,7 +52,7 @@ public static class AppHostFactory
             .Where(type =>
             {
                 var attributes = type.GetCustomAttributes(attributeType, true);
-                return attributes.Length > 0 && attributes.Any(attribute => (attribute as PornSiteAttribute)?.ShortName == shortName);
+                return attributes.Length > 0 && attributes.Any(attribute => (attribute as SiteAttribute)?.ShortName == shortName);
             })
             .ToList();
 

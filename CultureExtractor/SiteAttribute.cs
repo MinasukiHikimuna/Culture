@@ -1,11 +1,11 @@
 ﻿namespace CultureExtractor;
 
 [AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
-public class PornSiteAttribute : Attribute
+public class SiteAttribute : Attribute
 {
     public string ShortName { get; }
 
-    public PornSiteAttribute(string shortName)
+    public SiteAttribute(string shortName)
     {
         ShortName = shortName;
     }

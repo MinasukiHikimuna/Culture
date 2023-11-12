@@ -24,7 +24,7 @@ public class FileSource
 }
 
 
-[PornSite("hentaied")]
+[Site("hentaied")]
 public class HentaiedRipper : ISiteScraper
 {
     private readonly IDownloader _downloader;

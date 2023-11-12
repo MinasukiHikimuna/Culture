@@ -6,10 +6,10 @@ using CultureExtractor.Models;
 
 namespace CultureExtractor.Sites;
 
-[PornSite("czechvr")]
-[PornSite("czechvrcasting")]
-[PornSite("czechvrfetish")]
-[PornSite("czechvrintimacy")]
+[Site("czechvr")]
+[Site("czechvrcasting")]
+[Site("czechvrfetish")]
+[Site("czechvrintimacy")]
 public class CzechVRNetworkRipper : ISiteScraper
 {
     private readonly IDownloader _downloader;

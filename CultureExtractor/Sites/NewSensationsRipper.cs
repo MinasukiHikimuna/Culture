@@ -5,7 +5,7 @@ using CultureExtractor.Models;
 
 namespace CultureExtractor.Sites;
 
-[PornSite("newsensations")]
+[Site("newsensations")]
 public class NewSensationsRipper : ISiteScraper
 {
     private readonly IDownloader _downloader;

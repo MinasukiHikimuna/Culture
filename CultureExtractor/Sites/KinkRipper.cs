@@ -12,7 +12,7 @@ namespace CultureExtractor.Sites;
  * Site notes:
  * - Does not support guest mode fully. At least durations will be currently be based on trailers and not the full video.
  **/
-[PornSite("kink")]
+[Site("kink")]
 public class KinkRipper : ISiteScraper, ISubSiteScraper
 {
     private readonly IDownloader _downloader;

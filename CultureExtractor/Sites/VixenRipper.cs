@@ -8,9 +8,9 @@ using CultureExtractor.Models;
 
 namespace CultureExtractor.Sites;
 
-[PornSite("milfy")]
-[PornSite("deeper")]
-[PornSite("vixen")]
+[Site("milfy")]
+[Site("deeper")]
+[Site("vixen")]
 public class VixenRipper : ISiteScraper
 {
     private readonly IDownloader _downloader;

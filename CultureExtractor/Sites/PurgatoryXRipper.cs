@@ -5,7 +5,7 @@ using Serilog;
 
 namespace CultureExtractor.Sites;
 
-[PornSite("purgatoryx")]
+[Site("purgatoryx")]
 public class PurgatoryXRipper : ISiteScraper
 {
     private readonly IDownloader _downloader;
