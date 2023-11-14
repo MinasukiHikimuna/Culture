@@ -70,6 +70,7 @@ public class Repository : IRepository
             .Where(s => !s.Downloads.Any(d => d.Variant == Enum.GetName(downloadConditions.PreferredDownloadQuality)))
             .OrderBy(s => s.Site.Name)
             .ThenByDescending(s => s.ReleaseDate)
+            .AsNoTracking()
             .ToListAsync();
 
         return siteEntities.Select(Convert).AsEnumerable();
@@ -307,6 +308,11 @@ public class Repository : IRepository
 
     private static Site Convert(SiteEntity siteEntity)
     {
+        if (siteEntity == null)
+        {
+            throw new ArgumentNullException(nameof(siteEntity));
+        }
+        
         return new Site(
             siteEntity.Uuid,
             siteEntity.ShortName,
@@ -329,7 +335,7 @@ public class Repository : IRepository
             : null;
     }
 
-    private static Release Convert(ReleaseEntity releaseEntity)
+    public static Release Convert(ReleaseEntity releaseEntity)
     {
         var availableFilesJson = string.IsNullOrEmpty(releaseEntity.AvailableFiles)
             ? "[]"

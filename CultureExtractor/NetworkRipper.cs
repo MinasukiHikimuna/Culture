@@ -311,6 +311,7 @@ public class NetworkRipper : INetworkRipper
         {
             await foreach (var download in yieldingScraper.DownloadReleasesAsync(site, browserSettings, downloadConditions, downloadOptions))
             {
+                Log.Information($"Downloaded {download.Release.Name} from {download.Release.Site.Name}.");
                 await _repository.SaveDownloadAsync(download, downloadConditions.PreferredDownloadQuality);
             }
 

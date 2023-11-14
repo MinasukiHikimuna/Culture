@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Web;
 using CultureExtractor.Models;
+using Microsoft.EntityFrameworkCore;
 using Serilog;
 using Xabe.FFmpeg;
 
@@ -28,12 +29,14 @@ public class MetArtNetworkRipper : ISiteScraper, IYieldingScraper
 
     private static readonly HttpClient Client = new();
     private readonly IRepository _repository;
+    private readonly ICultureExtractorContext _context;
 
-    public MetArtNetworkRipper(IDownloader downloader, IPlaywrightFactory playwrightFactory, IRepository repository)
+    public MetArtNetworkRipper(IDownloader downloader, IPlaywrightFactory playwrightFactory, IRepository repository, ICultureExtractorContext context)
     {
         _downloader = downloader;
         _playwrightFactory = playwrightFactory;
         _repository = repository;
+        _context = context;
     }
     
     private static string GalleriesUrl(Site site, int pageNumber) =>
@@ -109,7 +112,25 @@ public class MetArtNetworkRipper : ISiteScraper, IYieldingScraper
         var headers = SetHeadersFromActualRequest(site, requests);
         var convertedHeaders = ConvertHeaders(headers);
 
-        var releases = await _repository.QueryReleasesAsync(site, downloadConditions);
+        // var releases = await _repository.QueryReleasesAsync(site, downloadConditions);
+
+        var queryable = _context.Releases
+            .Where(r => r.SiteUuid == site.Uuid)
+            .Include(r => r.Downloads)
+            .Include(r => r.Performers)
+            .Include(r => r.Site)
+            .Include(r => r.Tags)
+            .AsNoTracking();
+
+        if (downloadConditions.PerformerNames != null && downloadConditions.PerformerNames.Any())
+        {
+            queryable = queryable.Where(r => r.Performers.Any(p => downloadConditions.PerformerNames.Contains(p.Name)));
+        }
+
+
+        var releasesOfSite = await queryable.ToListAsync();
+        var releases = releasesOfSite.Select(Repository.Convert);
+        
         foreach (var release in releases)
         {
             // switch based on FileType and ContentType

@@ -4,6 +4,7 @@ using CultureExtractor.Interfaces;
 using CultureExtractor.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Serilog;
 
 namespace CultureExtractor;
 
@@ -24,7 +25,8 @@ public class CultureExtractorContext : DbContext, ICultureExtractorContext
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         => optionsBuilder
             .UseNpgsql("Host=localhost;Port=5434;Database=cultureextractor;Username=ce_admin;Password=gTmtNikmpEGf26Fb;")
-            .UseSnakeCaseNamingConvention();
+            .UseSnakeCaseNamingConvention()
+            .LogTo(Log.Debug);
 }
 
 public class SiteEntity
