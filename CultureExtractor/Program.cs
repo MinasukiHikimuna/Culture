@@ -151,7 +151,7 @@ class Program
                 "--verbose",
                 */
                 
-                // /*
+                /*
                 "download",
                 "--site-short-name", siteShortName,
                 // "--sub-site-short-name", subSiteShortName,
@@ -166,29 +166,29 @@ class Program
                 // "--to", "2020-12-31",
                 "--verbose",
                 "--best",
-                // */
+                */
                 
-                /*
+                // /*
                 "migrate",
                 "--site-short-name", siteShortName,
-                */
+                // */
             };
         }
         
         // Use this for EF migrations:
-        /*
+        // /*
         var host = AppHostFactory.CreateHost(args, "sexart");
         var cultureExtractor = AppHostFactory.CreateCultureExtractorConsoleApp(host);
         cultureExtractor.ExecuteConsoleApp(args);
-        */
+        // */
         
         // Use this when running the application:
-        // /*
+        /*
         var options = (BaseOptions) Parser.Default.ParseArguments<ScrapeOptions, DownloadOptions, MigrateOptions>(args).Value;
         var host = AppHostFactory.CreateHost(args, options?.SiteShortName ?? string.Empty);
         var cultureExtractor = AppHostFactory.CreateCultureExtractorConsoleApp(host);
         cultureExtractor.ExecuteConsoleApp(args);
-        // */
+        */
     }
 }
 

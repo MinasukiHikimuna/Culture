@@ -1,4 +1,5 @@
 ﻿using System.Text.Json;
+using System.Text.Json.Serialization;
 using CommandLine;
 using CultureExtractor.Interfaces;
 using CultureExtractor.Models;
@@ -11,13 +12,13 @@ public class CultureExtractorConsoleApp
 {
     private readonly INetworkRipper _networkRipper;
     private readonly IRepository _repository;
-    private readonly ISqliteContext _sqliteContext;
+    private readonly Interfaces.ICultureExtractorContext _cultureExtractorContext;
 
-    public CultureExtractorConsoleApp(IRepository repository, INetworkRipper networkRipper, ISqliteContext sqliteContext)
+    public CultureExtractorConsoleApp(IRepository repository, INetworkRipper networkRipper, Interfaces.ICultureExtractorContext cultureExtractorContext)
     {
         _networkRipper = networkRipper;
         _repository = repository;
-        _sqliteContext = sqliteContext;
+        _cultureExtractorContext = cultureExtractorContext;
     }
 
     public void ExecuteConsoleApp(string[] args)
@@ -98,26 +99,95 @@ public class CultureExtractorConsoleApp
         }
     }
     
-    private async Task<int> RunMigrateAndReturnExitCode(MigrateOptions opts)
+private async Task<int> RunMigrateAndReturnExitCode(MigrateOptions opts)
+{
+    try
     {
+        InitializeLogger(opts);
+
+        Log.Information("Culture Extractor");
+
+        using var stream = File.OpenRead(@"C:\Github\CultureExtractor\CultureExtractor\downloads.json");
+        using var context = new CultureExtractorContext();
+        var options = new JsonSerializerOptions
+        {
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+            PropertyNameCaseInsensitive = true
+        };
+        options.Converters.Add(new DateTimeConverter());
+
+        // Create a dictionary of SiteEntity objects keyed by their ShortName
+        var releases = await context.Releases.ToDictionaryAsync(s => s.Uuid);
+        var downloads = new List<DownloadEntity>();
+        
         try
         {
-            InitializeLogger(opts);
+            await foreach (var download in JsonSerializer.DeserializeAsyncEnumerable<DownloadEntity>(stream, options))
+            {
+                // Set the SiteEntity reference using the dictionary
+                if (releases.TryGetValue(download.ReleaseUuid, out var release))
+                {
+                    download.Release = release;
+                }
+                else
+                {
+                    Log.Error("Release not found: {Uuid} {ReleaseUuid}", download.Uuid, download.ReleaseUuid);
+                    continue;
+                }
 
-            Log.Information("Culture Extractor");
-
-            var releases = await _sqliteContext.Releases.ToListAsync();
-
-            return 0;
+                Log.Information("Release: {Uuid}, {ReleaseUuid}, {Release}", download.Uuid, download.ReleaseUuid, download.Release.Name);
+                
+                downloads.Add(download);
+                if (downloads.Count >= 1000) // Adjust batch size as needed
+                {
+                    await context.Downloads.AddRangeAsync(downloads);
+                    await context.SaveChangesAsync();
+                    downloads.Clear();
+                }
+            }
+            
+            // Save any remaining releases
+            if (downloads.Count > 0)
+            {
+                await context.Downloads.AddRangeAsync(downloads);
+                await context.SaveChangesAsync();
+            }
         }
-        catch (Exception ex)
+        catch (JsonException ex)
         {
-            Log.Error(ex.ToString(), ex);
+            Log.Error("Failed to deserialize JSON: {Json}", ex.Path);
+            throw;
+        }
 
-            return -1;
+        return 0;
+    }
+    catch (Exception ex)
+    {
+        Log.Error(ex.ToString(), ex);
+
+        return -1;
+    }
+}
+
+        public class DateTimeConverter : JsonConverter<DateTime>
+{
+    public override DateTime Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (DateTime.TryParse(reader.GetString(), out var date))
+        {
+            return date;
+        }
+        else
+        {
+            return DateTime.MinValue;
         }
     }
-    
+
+    public override void Write(Utf8JsonWriter writer, DateTime value, JsonSerializerOptions options)
+    {
+        writer.WriteStringValue(value.ToString("yyyy-MM-dd"));
+    }
+}
     private static void InitializeLogger(BaseOptions opts)
     {
         var minimumLogLevel = opts.Verbose

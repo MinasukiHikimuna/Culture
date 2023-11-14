@@ -33,7 +33,7 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        var repository = new Repository(new SqliteContext(null));
+        var repository = new Repository(new CultureExtractorContext());
         sites = await repository.GetSitesAsync();
     }
 }
