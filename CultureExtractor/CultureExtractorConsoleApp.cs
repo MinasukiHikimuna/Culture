@@ -99,95 +99,170 @@ public class CultureExtractorConsoleApp
         }
     }
     
-private async Task<int> RunMigrateAndReturnExitCode(MigrateOptions opts)
-{
-    try
+    private async Task<int> RunMigrateAndReturnExitCode(MigrateOptions opts)
     {
-        InitializeLogger(opts);
+        // return await MigrateReleases(opts);
+        return await MigrateDownloads(opts);
+    }
 
-        Log.Information("Culture Extractor");
-
-        using var stream = File.OpenRead(@"C:\Github\CultureExtractor\CultureExtractor\downloads.json");
-        using var context = new CultureExtractorContext();
-        var options = new JsonSerializerOptions
-        {
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-            PropertyNameCaseInsensitive = true
-        };
-        options.Converters.Add(new DateTimeConverter());
-
-        // Create a dictionary of SiteEntity objects keyed by their ShortName
-        var releases = await context.Releases.ToDictionaryAsync(s => s.Uuid);
-        var downloads = new List<DownloadEntity>();
-        
+    private static async Task<int> MigrateDownloads(MigrateOptions opts)
+    {
         try
         {
-            await foreach (var download in JsonSerializer.DeserializeAsyncEnumerable<DownloadEntity>(stream, options))
-            {
-                // Set the SiteEntity reference using the dictionary
-                if (releases.TryGetValue(download.ReleaseUuid, out var release))
-                {
-                    download.Release = release;
-                }
-                else
-                {
-                    Log.Error("Release not found: {Uuid} {ReleaseUuid}", download.Uuid, download.ReleaseUuid);
-                    continue;
-                }
+            InitializeLogger(opts);
 
-                Log.Information("Release: {Uuid}, {ReleaseUuid}, {Release}", download.Uuid, download.ReleaseUuid, download.Release.Name);
+            Log.Information("Culture Extractor");
+
+            using var stream = File.OpenRead(@"C:\Github\CultureExtractor\CultureExtractor\downloads.json");
+            using var context = new CultureExtractorContext();
+            var options = new JsonSerializerOptions
+            {
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+                PropertyNameCaseInsensitive = true
+            };
+            options.Converters.Add(new DateTimeConverter());
+
+            // Create a dictionary of SiteEntity objects keyed by their ShortName
+            var releases = await context.Releases.ToDictionaryAsync(s => s.Uuid);
+            var downloads = new List<DownloadEntity>();
+            
+            try
+            {
+                await foreach (var download in JsonSerializer.DeserializeAsyncEnumerable<DownloadEntity>(stream, options))
+                {
+                    // Set the SiteEntity reference using the dictionary
+                    if (releases.TryGetValue(download.ReleaseUuid, out var release))
+                    {
+                        download.Release = release;
+                    }
+                    else
+                    {
+                        Log.Error("Release not found: {Uuid} {ReleaseUuid}", download.Uuid, download.ReleaseUuid);
+                        continue;
+                    }
+
+                    Log.Information("Release: {Uuid}, {ReleaseUuid}, {Release}", download.Uuid, download.ReleaseUuid, download.Release.Name);
+                    
+                    downloads.Add(download);
+                    if (downloads.Count >= 1000) // Adjust batch size as needed
+                    {
+                        await context.Downloads.AddRangeAsync(downloads);
+                        await context.SaveChangesAsync();
+                        downloads.Clear();
+                    }
+                }
                 
-                downloads.Add(download);
-                if (downloads.Count >= 1000) // Adjust batch size as needed
+                // Save any remaining releases
+                if (downloads.Count > 0)
                 {
                     await context.Downloads.AddRangeAsync(downloads);
                     await context.SaveChangesAsync();
-                    downloads.Clear();
                 }
             }
-            
-            // Save any remaining releases
-            if (downloads.Count > 0)
+            catch (JsonException ex)
             {
-                await context.Downloads.AddRangeAsync(downloads);
-                await context.SaveChangesAsync();
+                Log.Error("Failed to deserialize JSON: {Json}", ex.Path);
+                throw;
+            }
+
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex.ToString(), ex);
+
+            return -1;
+        }
+    }
+    
+    private static async Task<int> MigrateReleases(MigrateOptions opts)
+    {
+        try
+        {
+            InitializeLogger(opts);
+
+            Log.Information("Culture Extractor");
+
+            using var stream = File.OpenRead(@"C:\Github\CultureExtractor\CultureExtractor\releases_new.json");
+            using var context = new CultureExtractorContext();
+            var options = new JsonSerializerOptions
+            {
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+                PropertyNameCaseInsensitive = true
+            };
+            options.Converters.Add(new DateTimeConverter());
+
+            var sites = await context.Sites.ToDictionaryAsync(s => s.Uuid);
+            var releases = new List<ReleaseEntity>();
+
+            try
+            {
+                await foreach (var release in JsonSerializer.DeserializeAsyncEnumerable<ReleaseEntity>(stream, options))
+                {
+                    // Set the SiteEntity reference using the dictionary
+                    if (sites.TryGetValue(release.SiteUuid, out var site))
+                    {
+                        release.Site = site;
+                    }
+                    else
+                    {
+                        Log.Error("");
+                    }
+
+                    Log.Information("Release: {Uuid} {Name}", release.Uuid, release.Name);
+
+                    releases.Add(release);
+                    if (releases.Count >= 1000) // Adjust batch size as needed
+                    {
+                        await context.Releases.AddRangeAsync(releases);
+                        await context.SaveChangesAsync();
+                        releases.Clear();
+                    }
+                }
+
+                // Save any remaining releases
+                if (releases.Count > 0)
+                {
+                    await context.Releases.AddRangeAsync(releases);
+                    await context.SaveChangesAsync();
+                }
+            }
+            catch (JsonException ex)
+            {
+                Log.Error("Failed to deserialize JSON: {Json}", ex.Path);
+                throw;
+            }
+
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex.ToString(), ex);
+
+            return -1;
+        }
+    }
+
+    public class DateTimeConverter : JsonConverter<DateTime>
+    {
+        public override DateTime Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            if (DateTime.TryParse(reader.GetString(), out var date))
+            {
+                return date;
+            }
+            else
+            {
+                return DateTime.MinValue;
             }
         }
-        catch (JsonException ex)
-        {
-            Log.Error("Failed to deserialize JSON: {Json}", ex.Path);
-            throw;
-        }
 
-        return 0;
-    }
-    catch (Exception ex)
-    {
-        Log.Error(ex.ToString(), ex);
-
-        return -1;
-    }
-}
-
-        public class DateTimeConverter : JsonConverter<DateTime>
-{
-    public override DateTime Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
-    {
-        if (DateTime.TryParse(reader.GetString(), out var date))
+        public override void Write(Utf8JsonWriter writer, DateTime value, JsonSerializerOptions options)
         {
-            return date;
-        }
-        else
-        {
-            return DateTime.MinValue;
+            writer.WriteStringValue(value.ToString("yyyy-MM-dd"));
         }
     }
-
-    public override void Write(Utf8JsonWriter writer, DateTime value, JsonSerializerOptions options)
-    {
-        writer.WriteStringValue(value.ToString("yyyy-MM-dd"));
-    }
-}
+        
     private static void InitializeLogger(BaseOptions opts)
     {
         var minimumLogLevel = opts.Verbose

@@ -101,19 +101,17 @@ public class ReleaseEntity
     public required DateTime Created { get; set; }
     [Column(TypeName = "timestamp")]
     public required DateTime LastUpdated { get; set; }
-    public ICollection<SitePerformerEntity> Performers { get; set; } = new List<SitePerformerEntity>();
-    public ICollection<SiteTagEntity> Tags { get; set; } = new List<SiteTagEntity>();
-    [Column(TypeName = "jsonb")]
+    public required ICollection<SitePerformerEntity> Performers { get; set; }
+    public required ICollection<SiteTagEntity> Tags { get; set; }
     public required string AvailableFiles { get; set; }
-    [Column(TypeName = "jsonb")]
     public required string JsonDocument { get; set; }
 
     public required Guid SiteUuid { get; set; }
-    public SiteEntity Site { get; set; }
+    public required SiteEntity Site { get; set; }
     public Guid? SubSiteUuid { get; set; }
     public SubSiteEntity? SubSite { get; set; }
 
-    public ICollection<DownloadEntity> Downloads { get; set; } = new List<DownloadEntity>();
+    public required ICollection<DownloadEntity> Downloads { get; set; }
 }
 
 public class DownloadEntity
@@ -125,7 +123,6 @@ public class DownloadEntity
     public required string FileType { get; set; }
     public required string ContentType { get; set; }
     public required string Variant { get; set; }
-    [Column(TypeName = "jsonb")]
     public required string AvailableFile { get; set; }
     public string? OriginalFilename { get; set; }
     public string? SavedFilename { get; set; }
