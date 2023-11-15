@@ -533,13 +533,15 @@ public class MetArtNetworkRipper : IYieldingScraper
                     ))
                     .ToList();
 
-                var trailerDownloads = new List<IAvailableFile>
-                {
-                    new AvailableVideoFile("video", "trailer", "720",
-                        $"https://www.sexart.com/api/m3u8/{movieDetails.UUID}/720.m3u8", -1, 720, -1, -1, "h264"),
-                    new AvailableVideoFile("video", "trailer", "270",
-                        $"https://www.sexart.com/api/m3u8/{movieDetails.UUID}/270.m3u8", -1, 270, -1, -1, "h264"),
-                };
+                var trailerDownloads = movieDetails.files.teasers.Length > 0 
+                    ? new List<IAvailableFile>
+                        {
+                            new AvailableVideoFile("video", "trailer", "720",
+                                $"https://www.sexart.com/api/m3u8/{movieDetails.UUID}/720.m3u8", -1, 720, -1, -1, "h264"),
+                            new AvailableVideoFile("video", "trailer", "270",
+                                $"https://www.sexart.com/api/m3u8/{movieDetails.UUID}/270.m3u8", -1, 270, -1, -1, "h264"),
+                        }
+                    : new List<IAvailableFile>();
 
                 var spriteDownloads = new List<IAvailableFile>
                 {
