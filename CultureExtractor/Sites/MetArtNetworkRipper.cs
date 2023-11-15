@@ -91,27 +91,11 @@ public class MetArtNetworkRipper : IYieldingScraper
         IPage page = await _playwrightFactory.CreatePageAsync(site, browserSettings);
 
         await LoginAsync(site, page);
-        
         await CloseModalsIfVisibleAsync(page);
+        var requests = await CaptureRequests(site, page);
 
-        var requests = new List<IRequest>();
-        await page.RouteAsync("**/*", async route =>
-        {
-            requests.Add(route.Request);
-            await route.ContinueAsync();
-        });
-        
-        await page.GotoAsync(GalleriesUrl(site, 1));
-        await page.WaitForLoadStateAsync();
-        await Task.Delay(5000);
-
-        await page.UnrouteAsync("**/*");
-        
-        
         var headers = SetHeadersFromActualRequest(site, requests);
         var convertedHeaders = ConvertHeaders(headers);
-
-        // var releases = await _repository.QueryReleasesAsync(site, downloadConditions);
 
         var queryable = _context.Releases
             .Where(r => r.SiteUuid == site.Uuid)
@@ -126,7 +110,6 @@ public class MetArtNetworkRipper : IYieldingScraper
         {
             queryable = queryable.Where(r => r.Performers.Any(p => downloadConditions.PerformerNames.Contains(p.Name)));
         }
-
 
         var releasesOfSite = await queryable.ToListAsync();
         var releases = releasesOfSite.Select(Repository.Convert);
@@ -288,6 +271,23 @@ public class MetArtNetworkRipper : IYieldingScraper
                 }
             }
         }
+    }
+
+    private static async Task<List<IRequest>> CaptureRequests(Site site, IPage page)
+    {
+        var requests = new List<IRequest>();
+        await page.RouteAsync("**/*", async route =>
+        {
+            requests.Add(route.Request);
+            await route.ContinueAsync();
+        });
+
+        await page.GotoAsync(GalleriesUrl(site, 1));
+        await page.WaitForLoadStateAsync();
+        await Task.Delay(5000);
+
+        await page.UnrouteAsync("**/*");
+        return requests;
     }
 
     private static bool NotDownloadedYet(List<DownloadEntity> existingDownloadEntities, IAvailableFile bestVideo)
