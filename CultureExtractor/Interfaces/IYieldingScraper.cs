@@ -2,7 +2,7 @@ using CultureExtractor.Models;
 
 namespace CultureExtractor.Interfaces;
 
-public interface IYieldingScraper
+public interface IYieldingScraper : IScraper
 {
     IAsyncEnumerable<Release> ScrapeReleasesAsync(Site site, BrowserSettings browserSettings, ScrapeOptions scrapeOptions);
 

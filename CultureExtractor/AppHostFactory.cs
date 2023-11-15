@@ -22,8 +22,8 @@ public static class AppHostFactory
                 services.AddTransient<INetworkRipper, NetworkRipper>();
                 services.AddTransient<CultureExtractorConsoleApp>();
 
-                var siteScraper = GetSiteScraperType<ISiteScraper>(siteShortName);
-                IList<Type> types = new List<Type> { typeof(ISiteScraper) };
+                var siteScraper = GetSiteScraperType<IScraper>(siteShortName);
+                IList<Type> types = new List<Type> { typeof(IScraper) };
                 foreach (var type in types)
                 {
                     if (siteScraper.IsAssignableTo(type))
@@ -41,7 +41,7 @@ public static class AppHostFactory
     }
 
     // The existing GetSiteScraperType method can be moved into this class
-    private static Type GetSiteScraperType<T>(string shortName) where T : ISiteScraper
+    private static Type GetSiteScraperType<T>(string shortName) where T : IScraper
     {
         var attributeType = typeof(SiteAttribute);
 

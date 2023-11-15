@@ -3,7 +3,7 @@ using Microsoft.Playwright;
 
 namespace CultureExtractor.Interfaces;
 
-public interface ISiteScraper
+public interface ISiteScraper : IScraper
 {
     Task LoginAsync(Site site, IPage page);
     Task<int> NavigateToReleasesAndReturnPageCountAsync(Site site, IPage page);

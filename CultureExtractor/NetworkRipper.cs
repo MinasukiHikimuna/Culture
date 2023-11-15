@@ -26,10 +26,10 @@ public class NetworkRipper : INetworkRipper
 
     public async Task ScrapeReleasesAsync(Site site, BrowserSettings browserSettings, ScrapeOptions scrapeOptions)
     {
-        ISiteScraper siteScraper = (ISiteScraper)_serviceProvider.GetService(typeof(ISiteScraper));
-        Log.Information($"Culture Extractor, using {siteScraper.GetType()}");
+        IScraper scraper = (IScraper)_serviceProvider.GetService(typeof(IScraper));
+        Log.Information($"Culture Extractor, using {scraper.GetType()}");
 
-        if (siteScraper is IYieldingScraper yieldingScraper)
+        if (scraper is IYieldingScraper yieldingScraper)
         {
             await foreach (var release in yieldingScraper.ScrapeReleasesAsync(site, browserSettings, scrapeOptions))
             {
@@ -48,11 +48,11 @@ public class NetworkRipper : INetworkRipper
                 Log.Information("Scraped release: {@Release}", releaseDescription);
             }
         }
-        else if (siteScraper is ISubSiteScraper subSiteScraper)
+        else if (scraper is ISubSiteScraper subSiteScraper)
         {
             await ScrapeSubSiteReleasesAsync(site, browserSettings, scrapeOptions, subSiteScraper);
         }
-        else
+        else if (scraper is ISiteScraper siteScraper)
         {
             IPage page = await CreatePageAndLoginAsync(siteScraper, site, browserSettings, scrapeOptions.GuestMode);
             var totalPages = await siteScraper.NavigateToReleasesAndReturnPageCountAsync(site, page);
@@ -296,12 +296,12 @@ public class NetworkRipper : INetworkRipper
     {
         var matchingReleasesStr = string.Join($"{Environment.NewLine}    ", matchingReleases.Select(s => $"{s.Site.Name} - {s.ReleaseDate.ToString("yyyy-MM-dd")} - {s.Name}"));
 
-        ISiteScraper siteScraper = (ISiteScraper)_serviceProvider.GetService(typeof(ISiteScraper));
-        Log.Information($"Culture Extractor, using {siteScraper.GetType()}");
+        IScraper scraper = (IScraper)_serviceProvider.GetService(typeof(IScraper));
+        Log.Information($"Culture Extractor, using {scraper.GetType()}");
 
         Log.Information($"Found {matchingReleases.Count} releases:{Environment.NewLine}    {matchingReleasesStr}");
 
-        if (siteScraper is IYieldingScraper yieldingScraper)
+        if (scraper is IYieldingScraper yieldingScraper)
         {
             await foreach (var download in yieldingScraper.DownloadReleasesAsync(site, browserSettings, downloadConditions, downloadOptions))
             {
@@ -312,6 +312,8 @@ public class NetworkRipper : INetworkRipper
             return;
         }
 
+        var siteScraper = (ISiteScraper)scraper;
+        
         if (!matchingReleases.Any())
         {
             Log.Information("Nothing to download.");
