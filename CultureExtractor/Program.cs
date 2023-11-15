@@ -156,7 +156,7 @@ class Program
                 "--site-short-name", siteShortName,
                 // "--sub-site-short-name", subSiteShortName,
                 // "--scenes", "0231105/PULSATION",
-                "--performers", "Alexis Crystal",
+                // "--performers", "Alexis Crystal",
                 "--reverse-order",
                 "--browser-mode", "Visible",
                 // "--max-scenes", "1000"
@@ -165,7 +165,7 @@ class Program
                 // "--from", "2020-01-01",
                 // "--to", "2020-12-31",
                 "--verbose",
-                "--best",
+                // "--best",
                 // */
                 
                 /*

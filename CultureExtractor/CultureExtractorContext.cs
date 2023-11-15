@@ -25,8 +25,8 @@ public class CultureExtractorContext : DbContext, ICultureExtractorContext
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         => optionsBuilder
             .UseNpgsql("Host=localhost;Port=5434;Database=cultureextractor;Username=ce_admin;Password=gTmtNikmpEGf26Fb;")
-            .UseSnakeCaseNamingConvention()
-            .LogTo(Log.Debug);
+            .UseSnakeCaseNamingConvention();
+    // .LogTo(Log.Debug);
 }
 
 public class SiteEntity

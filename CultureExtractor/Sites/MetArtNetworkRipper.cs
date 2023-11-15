@@ -120,6 +120,7 @@ public class MetArtNetworkRipper : ISiteScraper, IYieldingScraper
             .Include(r => r.Performers)
             .Include(r => r.Site)
             .Include(r => r.Tags)
+            .OrderByDescending(r => r.ReleaseDate)
             .AsNoTracking();
 
         if (downloadConditions.PerformerNames != null && downloadConditions.PerformerNames.Any())
@@ -133,14 +134,15 @@ public class MetArtNetworkRipper : ISiteScraper, IYieldingScraper
         
         foreach (var release in releases)
         {
+            var existingDownloadEntities = await _context.Downloads.Where(d => d.ReleaseUuid == release.Uuid).ToListAsync();
+            
             // switch based on FileType and ContentType
             // if video, download video
-            
-            
-            var bestGallery = release.AvailableFiles
-                .FirstOrDefault(d => d is { FileType: "zip", ContentType: "gallery" });
-
-            if (bestGallery != null)
+            var availableGalleries = release.AvailableFiles.Where(d => d is { FileType: "zip", ContentType: "gallery" }); 
+            var selectedGallery = downloadOptions.BestQuality 
+                ? availableGalleries.FirstOrDefault()
+                : availableGalleries.LastOrDefault();
+            if (selectedGallery != null && NotDownloadedYet(existingDownloadEntities, selectedGallery))
             {
                 var handler = new HttpClientHandler()
                 {
@@ -151,7 +153,7 @@ public class MetArtNetworkRipper : ISiteScraper, IYieldingScraper
                 client.DefaultRequestHeaders.Add("cookie", headers["cookie"]);
                 client.DefaultRequestHeaders.Add("user-agent", headers["user-agent"]);
 
-                var request = new HttpRequestMessage(HttpMethod.Head, bestGallery.Url);
+                var request = new HttpRequestMessage(HttpMethod.Head, selectedGallery.Url);
                 var response = await client.SendAsync(request);
 
                 var actualMediaUrl = response.Headers.Location?.ToString();
@@ -159,30 +161,36 @@ public class MetArtNetworkRipper : ISiteScraper, IYieldingScraper
                 {
                     throw new InvalidOperationException("actualMediaUrl is missing.");
                 }
-                
+            
                 var uri = new Uri(actualMediaUrl);
                 var query = HttpUtility.ParseQueryString(uri.Query);
                 var suggestedFileName = query["filename"] ?? string.Empty;
-                
+                var suffix = Path.GetExtension(suggestedFileName);
+
+                var performersStr = release.Performers.Count() > 1
+                    ? string.Join(", ", release.Performers.Take(release.Performers.Count() - 1).Select(p => p.Name)) + " & " + release.Performers.Last().Name
+                    : release.Performers.FirstOrDefault()?.Name ?? "Unknown";
+                var fileName = ReleaseNamer.Name(release, suffix, performersStr, selectedGallery.Variant);
+            
                 var fileInfo = await _downloader.DownloadFileAsync(
                     release,
                     actualMediaUrl,
-                    suggestedFileName,
+                    fileName,
                     release.Url,
                     convertedHeaders);
 
                 var sha256Sum = Downloader.CalculateSHA256(fileInfo.FullName);
 
                 var metadata = new GalleryZipFileMetadata(sha256Sum);
-                
-                yield return new Download(release, suggestedFileName, fileInfo.FullName, bestGallery as AvailableGalleryZipFile, metadata);
+            
+                yield return new Download(release, suggestedFileName, fileInfo.Name, selectedGallery as AvailableGalleryZipFile, metadata);
             }
             
-            
-            var bestVideo = release.AvailableFiles
-                .FirstOrDefault(d => d is { FileType: "video", ContentType: "scene" });
-
-            if (bestVideo != null)
+            var availableVideos = release.AvailableFiles.Where(d => d is { FileType: "video", ContentType: "scene" });
+            var selectedVideo = downloadOptions.BestQuality
+                ? availableVideos.FirstOrDefault()
+                : availableVideos.LastOrDefault();
+            if (selectedVideo != null && NotDownloadedYet(existingDownloadEntities, selectedVideo))
             {
                 var handler = new HttpClientHandler()
                 {
@@ -193,7 +201,7 @@ public class MetArtNetworkRipper : ISiteScraper, IYieldingScraper
                 client.DefaultRequestHeaders.Add("cookie", headers["cookie"]);
                 client.DefaultRequestHeaders.Add("user-agent", headers["user-agent"]);
 
-                var request = new HttpRequestMessage(HttpMethod.Head, bestVideo.Url);
+                var request = new HttpRequestMessage(HttpMethod.Head, selectedVideo.Url);
                 var response = await client.SendAsync(request);
                 
                 var actualMediaUrl = response.Headers?.Location?.ToString();
@@ -201,35 +209,84 @@ public class MetArtNetworkRipper : ISiteScraper, IYieldingScraper
                 var uri = new Uri(actualMediaUrl);
                 var query = HttpUtility.ParseQueryString(uri.Query);
                 var suggestedFileName = query["filename"];
+                var suffix = Path.GetExtension(suggestedFileName);
+
+                var performersStr = release.Performers.Count() > 1
+                    ? string.Join(", ", release.Performers.Take(release.Performers.Count() - 1).Select(p => p.Name)) + " & " + release.Performers.Last().Name
+                    : release.Performers.FirstOrDefault()?.Name ?? "Unknown";
+                var fileName = ReleaseNamer.Name(release, suffix, performersStr, selectedVideo.Variant);
                 
                 var fileInfo = await _downloader.DownloadFileAsync(
                     release,
                     response.Headers.Location.ToString(),
-                    suggestedFileName,
+                    fileName,
                     release.Url,
-                    convertedHeaders);                
+                    convertedHeaders);
+
 
                 var videoHashes = Hasher.Phash(@"""" + fileInfo.FullName + @"""");
-                yield return new Download(release, suggestedFileName, fileInfo.FullName, bestVideo as AvailableVideoFile, videoHashes);
+                yield return new Download(release, suggestedFileName, fileInfo.Name, selectedVideo as AvailableVideoFile, videoHashes);
             }
             
-            var bestTrailer = release.AvailableFiles
-                .FirstOrDefault(d => d is { FileType: "video", ContentType: "trailer" });
-
-            if (bestTrailer != null)
+            var availableTrailers = release.AvailableFiles.Where(d => d is { FileType: "video", ContentType: "trailer" });
+            var selectedTrailer = downloadOptions.BestQuality
+                ? availableTrailers.FirstOrDefault()
+                : availableTrailers.LastOrDefault();
+            if (selectedTrailer != null && NotDownloadedYet(existingDownloadEntities, selectedTrailer))
             {
+                var trailerPlaylistFileName = $"trailer_{selectedTrailer.Variant}.m3u8"; 
+                var trailerVideoFileName = $"trailer_{selectedTrailer.Variant}.mp4";
+                
                 // Note: we need to download the trailer without cookies because logged in users get the full scene
                 // from the same URL.
                 var fileInfo = await _downloader.DownloadFileAsync(
                     release,
-                    bestTrailer.Url, 
-                    "trailer.m3u8",
+                    selectedTrailer.Url, 
+                    trailerPlaylistFileName,
                     release.Url,
                     new WebHeaderCollection());
-            
-                var snippet = await FFmpeg.Conversions.New().Start($"-protocol_whitelist \"file,http,https,tcp,tls\" -i {fileInfo.FullName} -c copy {Path.Combine(fileInfo.DirectoryName, "trailer.mp4")}");
                 
-                yield return new Download(release, "trailer.m3u8", fileInfo.FullName, bestTrailer as AvailableVideoFile, null);
+                var trailerVideoFullPath = Path.Combine(fileInfo.DirectoryName, trailerVideoFileName);
+            
+                var snippet = await FFmpeg.Conversions.New().Start($"-protocol_whitelist \"file,http,https,tcp,tls\" -i {fileInfo.FullName} -c copy {trailerVideoFullPath}");
+                
+                var videoHashes = Hasher.Phash(@"""" + trailerVideoFullPath + @"""");
+                yield return new Download(release, "trailer.m3u8", trailerVideoFileName, selectedTrailer as AvailableVideoFile, videoHashes);
+            }
+            
+            var vtt = release.AvailableFiles
+                .FirstOrDefault(d => d is { FileType: "vtt", ContentType: "sprite" });
+            if (vtt != null && NotDownloadedYet(existingDownloadEntities, vtt))
+            {
+                var fileInfo = await _downloader.DownloadFileAsync(
+                    release,
+                    vtt.Url, 
+                    "sprite.vtt",
+                    release.Url,
+                    convertedHeaders);
+            
+                var sha256Sum = Downloader.CalculateSHA256(fileInfo.FullName);
+                var metadata = new VttFileMetadata(sha256Sum);
+                yield return new Download(release, "sprite.vtt", fileInfo.Name, vtt as AvailableVttFile, metadata);
+            }
+            
+            var imageFiles = release.AvailableFiles
+                .Where(d => d.FileType == "image");
+            foreach (var imageFile in imageFiles)
+            {
+                if (NotDownloadedYet(existingDownloadEntities, imageFile))
+                {
+                    var fileInfo = await _downloader.DownloadFileAsync(
+                        release,
+                        imageFile.Url,
+                        $"{imageFile.ContentType}.jpg",
+                        release.Url,
+                        convertedHeaders);
+
+                    var sha256Sum = Downloader.CalculateSHA256(fileInfo.FullName);
+                    var metadata = new ImageFileMetadata(sha256Sum);
+                    yield return new Download(release, $"{imageFile.ContentType}.jpg", fileInfo.Name, imageFile as AvailableImageFile, metadata);
+                }
             }
         }
 
@@ -281,7 +338,12 @@ public class MetArtNetworkRipper : ISiteScraper, IYieldingScraper
             await selectedDownload.ElementHandle.ClickAsync();
         }, name);*/
     }
-    
+
+    private static bool NotDownloadedYet(List<DownloadEntity> existingDownloadEntities, IAvailableFile bestVideo)
+    {
+        return !existingDownloadEntities.Exists(d => d.FileType == bestVideo.FileType && d.ContentType == bestVideo.ContentType && d.Variant == bestVideo.Variant);
+    }
+
     private static WebHeaderCollection ConvertHeaders(Dictionary<string, string> headers)
     {
         var convertedHeaders = new WebHeaderCollection();
@@ -509,9 +571,9 @@ public class MetArtNetworkRipper : ISiteScraper, IYieldingScraper
 
                 var trailerDownloads = new List<IAvailableFile>
                 {
-                    new AvailableVideoFile("video", "trailer", string.Empty,
+                    new AvailableVideoFile("video", "trailer", "720",
                         $"https://www.sexart.com/api/m3u8/{movieDetails.UUID}/720.m3u8", -1, 720, -1, -1, "h264"),
-                    new AvailableVideoFile("video", "trailer", string.Empty,
+                    new AvailableVideoFile("video", "trailer", "270",
                         $"https://www.sexart.com/api/m3u8/{movieDetails.UUID}/270.m3u8", -1, 270, -1, -1, "h264"),
                 };
 

@@ -247,7 +247,7 @@ public class NetworkRipper : INetworkRipper
 
     public async Task DownloadReleasesAsync(Site site, BrowserSettings browserSettings, DownloadConditions downloadConditions, DownloadOptions downloadOptions)
     {
-        var matchingReleases = await _repository.QueryReleasesAsync(site, downloadConditions);
+        /*var matchingReleases = await _repository.QueryReleasesAsync(site, downloadConditions);
 
         var furtherFilteredReleases = matchingReleases
             .Where(s =>
@@ -281,14 +281,14 @@ public class NetworkRipper : INetworkRipper
         else
         {
             furtherFilteredReleases = furtherFilteredReleases.OrderBy(s => s.ReleaseDate).ToList();
-        }
+        }*/
 
         await DownloadGivenReleasesAsync(
             site,
             browserSettings,
             downloadConditions,
             downloadOptions,
-            furtherFilteredReleases.ToList());
+            new List<Release>());
     }
 
     private async Task DownloadGivenReleasesAsync(Site site, BrowserSettings browserSettings,
@@ -301,20 +301,20 @@ public class NetworkRipper : INetworkRipper
 
         Log.Information($"Found {matchingReleases.Count} releases:{Environment.NewLine}    {matchingReleasesStr}");
 
-        if (!matchingReleases.Any())
-        {
-            Log.Information("Nothing to download.");
-            return;
-        }
-
         if (siteScraper is IYieldingScraper yieldingScraper)
         {
             await foreach (var download in yieldingScraper.DownloadReleasesAsync(site, browserSettings, downloadConditions, downloadOptions))
             {
-                Log.Information($"Downloaded {download.Release.Name} from {download.Release.Site.Name}.");
+                Log.Information($"Downloaded {download.AvailableFile.FileType} {download.AvailableFile.ContentType} {download.AvailableFile.Variant} of {download.Release.Name} from {download.Release.Site.Name}.");
                 await _repository.SaveDownloadAsync(download, downloadConditions.PreferredDownloadQuality);
             }
 
+            return;
+        }
+
+        if (!matchingReleases.Any())
+        {
+            Log.Information("Nothing to download.");
             return;
         }
         

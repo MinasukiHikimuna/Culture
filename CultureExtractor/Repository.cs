@@ -378,6 +378,7 @@ public class Repository : IRepository
     {
         var releaseEntity = await _cultureExtractorContext.Releases.FirstAsync(s => s.Uuid == download.Release.Uuid);
 
+        // TODO: split this into two columns
         var json = JsonSerializer.Serialize(new JsonSummary(download.AvailableFile, download.FileMetadata));
 
         _cultureExtractorContext.Downloads.Add(new DownloadEntity

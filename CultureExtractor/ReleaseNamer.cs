@@ -5,7 +5,7 @@ namespace CultureExtractor
 {
     public static class ReleaseNamer
     {
-        public static string Name(Release release, string suffix, string performers = "")
+        public static string Name(Release release, string suffix, string performers = "", string variant = "")
         {
             var performersStr = !string.IsNullOrEmpty(performers)
                 ? performers
@@ -16,7 +16,7 @@ namespace CultureExtractor
             var nameWithoutSuffix =
                 string.Concat(
                     Regex.Replace(
-                        $"{performersStr} - {release.Site.Name}{subSiteName} - {release.ReleaseDate.ToString("yyyy-MM-dd")} - {release.ShortName} - {release.Name}",
+                        $"{release.Site.Name}{subSiteName} - {release.ReleaseDate.ToString("yyyy-MM-dd")} - {release.ShortName} - {release.Name} - {performersStr} [{variant}]",
                         @"\s+",
                         " "
                     ).Split(Path.GetInvalidFileNameChars()));
