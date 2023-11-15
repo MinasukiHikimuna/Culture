@@ -54,28 +54,16 @@ public class MetArtNetworkRipper : IYieldingScraper
         $"https://cdn.metartnetwork.com/{gallery.siteUUID}/media/{gallery.UUID}/{image.id.Replace("-", "_")}_{gallery.UUID}.jpg";
     private static string MovieCdnImageUrl(MetArtMovieRequest.RootObject gallery, MetArtMovieRequest.RelatedPhotos image) =>
         $"https://cdn.metartnetwork.com/{gallery.siteUUID}/media/{gallery.UUID}/{image.id.Replace("-", "_")}_{gallery.UUID}.jpg";
-    
+
     public async IAsyncEnumerable<Release> ScrapeReleasesAsync(Site site, BrowserSettings browserSettings, ScrapeOptions scrapeOptions)
     {
         IPage page = await _playwrightFactory.CreatePageAsync(site, browserSettings);
 
         await LoginAsync(site, page);
-
-        var requests = new List<IRequest>();
-        await page.RouteAsync("**/*", async route =>
-        {
-            requests.Add(route.Request);
-            await route.ContinueAsync();
-        });
+        var requests = await CaptureRequests(site, page);
         
-        await page.GotoAsync(GalleriesUrl(site, 1));
-        await page.WaitForLoadStateAsync();
-        await Task.Delay(5000);
-
-        await page.UnrouteAsync("**/*");
-
         SetHeadersFromActualRequest(site, requests);
-        
+
         await foreach (var gallery in ScrapeGalleriesAsync(site, scrapeOptions))
         {
             yield return gallery;
@@ -91,28 +79,12 @@ public class MetArtNetworkRipper : IYieldingScraper
         IPage page = await _playwrightFactory.CreatePageAsync(site, browserSettings);
 
         await LoginAsync(site, page);
-        await CloseModalsIfVisibleAsync(page);
         var requests = await CaptureRequests(site, page);
 
         var headers = SetHeadersFromActualRequest(site, requests);
         var convertedHeaders = ConvertHeaders(headers);
 
-        var queryable = _context.Releases
-            .Where(r => r.SiteUuid == site.Uuid)
-            .Include(r => r.Downloads)
-            .Include(r => r.Performers)
-            .Include(r => r.Site)
-            .Include(r => r.Tags)
-            .OrderByDescending(r => r.ReleaseDate)
-            .AsNoTracking();
-
-        if (downloadConditions.PerformerNames != null && downloadConditions.PerformerNames.Any())
-        {
-            queryable = queryable.Where(r => r.Performers.Any(p => downloadConditions.PerformerNames.Contains(p.Name)));
-        }
-
-        var releasesOfSite = await queryable.ToListAsync();
-        var releases = releasesOfSite.Select(Repository.Convert);
+        var releases = await _repository.QueryReleasesAsync(site, downloadConditions);
         
         foreach (var release in releases)
         {
@@ -209,33 +181,12 @@ public class MetArtNetworkRipper : IYieldingScraper
                 var videoHashes = Hasher.Phash(@"""" + fileInfo.FullName + @"""");
                 yield return new Download(release, suggestedFileName, fileInfo.Name, selectedVideo as AvailableVideoFile, videoHashes);
             }
-            
-            var availableTrailers = release.AvailableFiles.Where(d => d is { FileType: "video", ContentType: "trailer" });
-            var selectedTrailer = downloadOptions.BestQuality
-                ? availableTrailers.FirstOrDefault()
-                : availableTrailers.LastOrDefault();
-            if (selectedTrailer != null && NotDownloadedYet(existingDownloadEntities, selectedTrailer))
+
+            await foreach (var trailerDownload in DownloadTrailersAsync(downloadOptions, release, existingDownloadEntities))
             {
-                var trailerPlaylistFileName = $"trailer_{selectedTrailer.Variant}.m3u8"; 
-                var trailerVideoFileName = $"trailer_{selectedTrailer.Variant}.mp4";
-                
-                // Note: we need to download the trailer without cookies because logged in users get the full scene
-                // from the same URL.
-                var fileInfo = await _downloader.DownloadFileAsync(
-                    release,
-                    selectedTrailer.Url, 
-                    trailerPlaylistFileName,
-                    release.Url,
-                    new WebHeaderCollection());
-                
-                var trailerVideoFullPath = Path.Combine(fileInfo.DirectoryName, trailerVideoFileName);
-            
-                var snippet = await FFmpeg.Conversions.New().Start($"-protocol_whitelist \"file,http,https,tcp,tls\" -i {fileInfo.FullName} -c copy {trailerVideoFullPath}");
-                
-                var videoHashes = Hasher.Phash(@"""" + trailerVideoFullPath + @"""");
-                yield return new Download(release, "trailer.m3u8", trailerVideoFileName, selectedTrailer as AvailableVideoFile, videoHashes);
+                yield return trailerDownload;
             }
-            
+
             var vtt = release.AvailableFiles
                 .FirstOrDefault(d => d is { FileType: "vtt", ContentType: "sprite" });
             if (vtt != null && NotDownloadedYet(existingDownloadEntities, vtt))
@@ -256,21 +207,77 @@ public class MetArtNetworkRipper : IYieldingScraper
                 .Where(d => d.FileType == "image");
             foreach (var imageFile in imageFiles)
             {
-                if (NotDownloadedYet(existingDownloadEntities, imageFile))
+                if (!NotDownloadedYet(existingDownloadEntities, imageFile))
                 {
-                    var fileInfo = await _downloader.DownloadFileAsync(
-                        release,
-                        imageFile.Url,
-                        $"{imageFile.ContentType}.jpg",
-                        release.Url,
-                        convertedHeaders);
-
-                    var sha256Sum = Downloader.CalculateSHA256(fileInfo.FullName);
-                    var metadata = new ImageFileMetadata(sha256Sum);
-                    yield return new Download(release, $"{imageFile.ContentType}.jpg", fileInfo.Name, imageFile as AvailableImageFile, metadata);
+                    continue;
                 }
+                
+                var fileInfo = await _downloader.DownloadFileAsync(
+                    release,
+                    imageFile.Url,
+                    $"{imageFile.ContentType}.jpg",
+                    release.Url,
+                    convertedHeaders);
+
+                var sha256Sum = Downloader.CalculateSHA256(fileInfo.FullName);
+                var metadata = new ImageFileMetadata(sha256Sum);
+                yield return new Download(release, $"{imageFile.ContentType}.jpg", fileInfo.Name, imageFile as AvailableImageFile, metadata);
             }
         }
+    }
+
+    private async IAsyncEnumerable<Download> DownloadTrailersAsync(DownloadOptions downloadOptions, Release release,
+        List<DownloadEntity> existingDownloadEntities)
+    {
+        var availableTrailers =
+            release.AvailableFiles.Where(d => d is { FileType: "video", ContentType: "trailer" });
+        var selectedTrailer = downloadOptions.BestQuality
+            ? availableTrailers.FirstOrDefault()
+            : availableTrailers.LastOrDefault();
+        if (selectedTrailer == null || !NotDownloadedYet(existingDownloadEntities, selectedTrailer))
+        {
+            yield break;
+        }
+
+        var trailerPlaylistFileName = $"trailer_{selectedTrailer.Variant}.m3u8";
+        var trailerVideoFileName = $"trailer_{selectedTrailer.Variant}.mp4";
+
+        // Note: we need to download the trailer without cookies because logged in users get the full scene
+        // from the same URL.
+        FileInfo fileInfo;
+        try
+        {
+            fileInfo = await _downloader.DownloadFileAsync(
+                release,
+                selectedTrailer.Url,
+                trailerPlaylistFileName,
+                release.Url,
+                new WebHeaderCollection());
+        }
+        catch (WebException ex)
+        {
+            if (!ex.Message.Contains("(404) Not Found."))
+            {
+                throw;
+            }
+            
+            Log.Warning("Could not find trailer playlist for {Release} from URL {Url}",
+                release.Uuid, selectedTrailer.Url);
+            yield break;
+        }
+
+        var trailerVideoFullPath = Path.Combine(fileInfo.DirectoryName, trailerVideoFileName);
+
+        var snippet = await FFmpeg.Conversions.New()
+            .Start(
+                $"-protocol_whitelist \"file,http,https,tcp,tls\" -i {fileInfo.FullName} -c copy {trailerVideoFullPath}");
+
+        var videoHashes = Hasher.Phash(@"""" + trailerVideoFullPath + @"""");
+        yield return new Download(release,
+            "trailer.m3u8",
+            trailerVideoFileName,
+            selectedTrailer as AvailableVideoFile,
+            videoHashes);
     }
 
     private static async Task<List<IRequest>> CaptureRequests(Site site, IPage page)
@@ -361,22 +368,25 @@ public class MetArtNetworkRipper : IYieldingScraper
                 using var galleryResponse = Client.GetAsync(galleryUrl);
                 var galleryJson = await galleryResponse.Result.Content.ReadAsStringAsync();
                 var galleryDetails = JsonSerializer.Deserialize<MetArtGalleryRequest.RootObject>(galleryJson);
-
+                if (galleryDetails == null)
+                {
+                    throw new InvalidOperationException("Could not read gallery API response: " + galleryJson);
+                }
+                
                 var commentsUrl = CommentsApiUrl(site, galleryDetails.UUID);
 
                 using var commentResponse = Client.GetAsync(commentsUrl);
                 var commentsJson = await commentResponse.Result.Content.ReadAsStringAsync();
-                var comments = JsonSerializer.Deserialize<MetArtCommentsRequest.RootObject>(commentsJson);
 
                 var galleryDownloads = galleryDetails.files.sizes.zips
-                    .Select(gallery => new AvailableGalleryZipFile(
+                    .Select(g => new AvailableGalleryZipFile(
                         "zip",
                         "gallery",
-                        gallery.quality,
-                        $"{site.Url}/api/download-media/{galleryDetails.UUID}/photos/{gallery.quality}",
+                        g.quality,
+                        $"{site.Url}/api/download-media/{galleryDetails.UUID}/photos/{g.quality}",
                         -1,
                         -1,
-                        HumanParser.ParseFileSizeMaybe(gallery.size).IsSome(out var fileSizeValue) ? fileSizeValue : -1
+                        HumanParser.ParseFileSizeMaybe(g.size).IsSome(out var fileSizeValue) ? fileSizeValue : -1
                     ))
                     .OrderByDescending(availableFile => availableFile.ResolutionHeight)
                     .ToList();
@@ -395,7 +405,7 @@ public class MetArtNetworkRipper : IYieldingScraper
 
                 var performers = galleryDetails.models.Where(a => a.gender == "female").ToList()
                     .Concat(galleryDetails.models.Where(a => a.gender != "female").ToList())
-                    .Select(m => new SitePerformer(m.path.Substring(m.path.LastIndexOf("/") + 1), m.name, m.path))
+                    .Select(m => new SitePerformer(m.path[(m.path.LastIndexOf("/", StringComparison.Ordinal) + 1)..], m.name, m.path))
                     .ToList();
 
                 var tags = galleryDetails.tags
@@ -473,12 +483,15 @@ public class MetArtNetworkRipper : IYieldingScraper
                 using var movieResponse = Client.GetAsync(movieUrl);
                 var movieJson = await movieResponse.Result.Content.ReadAsStringAsync();
                 var movieDetails = JsonSerializer.Deserialize<MetArtMovieRequest.RootObject>(movieJson);
+                if (movieDetails == null)
+                {
+                    throw new InvalidOperationException("Could not read movie API response: " + movieJson);
+                }
 
                 var commentsUrl = CommentsApiUrl(site, movieDetails.UUID);
 
                 using var commentResponse = Client.GetAsync(commentsUrl);
                 var commentsJson = await commentResponse.Result.Content.ReadAsStringAsync();
-                var comments = JsonSerializer.Deserialize<MetArtCommentsRequest.RootObject>(commentsJson);
 
                 var sceneDownloads = movieDetails.files.sizes.videos
                     .Select(video => new AvailableVideoFile(
@@ -539,7 +552,7 @@ public class MetArtNetworkRipper : IYieldingScraper
                 
                 var performers = movieDetails.models.Where(a => a.gender == "female").ToList()
                     .Concat(movieDetails.models.Where(a => a.gender != "female").ToList())
-                    .Select(m => new SitePerformer(m.path.Substring(m.path.LastIndexOf("/") + 1), m.name, m.path))
+                    .Select(m => new SitePerformer(m.path[(m.path.LastIndexOf("/", StringComparison.Ordinal) + 1)..], m.name, m.path))
                     .ToList();
 
                 var tags = movieDetails.tags
@@ -631,8 +644,8 @@ public class MetArtNetworkRipper : IYieldingScraper
         
         return movies;
     }
-    
-    public async Task LoginAsync(Site site, IPage page)
+
+    private static async Task LoginAsync(Site site, IPage page)
     {
         await Task.Delay(5000);
 
@@ -650,72 +663,6 @@ public class MetArtNetworkRipper : IYieldingScraper
             await page.Locator("[name='password']").FillAsync(site.Password);
             await page.Locator("button[type='submit']").ClickAsync();
             await page.WaitForLoadStateAsync();
-        }
-
-        // Close the modal dialog if one is shown.
-        try
-        {
-            await page.WaitForLoadStateAsync();
-            if (await page.Locator(".close-btn").IsVisibleAsync())
-            {
-                await page.Locator(".close-btn").ClickAsync();
-            }
-
-            var modalClose = page.Locator("div.modal-content a.alt-close");
-            if (await modalClose.IsVisibleAsync())
-            {
-                await modalClose.ClickAsync();
-            }
-        }
-        catch (Exception ex)
-        {
-        }
-
-        await Task.Delay(5000);
-        
-        var element = page.GetByRole(AriaRole.Link, new() { Name = "Continue to SexArt" }).Nth(1);
-        if (await element.IsVisibleAsync())
-        {
-            await element.ClickAsync();
-        }
-    }
-
-    private async Task CloseModalsIfVisibleAsync(IPage page)
-    {
-        // Close the modal dialog if one is shown.
-        try
-        {
-            await page.WaitForLoadStateAsync();
-            if (await page.Locator(".close-btn").IsVisibleAsync())
-            {
-                await page.Locator(".close-btn").ClickAsync();
-            }
-
-            var modalClose = page.Locator("div.modal-content a.alt-close");
-            if (await modalClose.IsVisibleAsync())
-            {
-                await modalClose.ClickAsync();
-            }
-        }
-        catch (Exception ex)
-        {
-        }
-
-        // Close the modal dialog if one is shown.
-        try
-        {
-            await page.WaitForLoadStateAsync();
-            if (await page.Locator(".close-btn").IsVisibleAsync())
-            {
-                await page.Locator(".close-btn").ClickAsync();
-            }
-            if (await page.Locator(".fa-times-circle").IsVisibleAsync())
-            {
-                await page.Locator(".fa-times-circle").ClickAsync();
-            }
-        }
-        catch (Exception ex)
-        {
         }
     }
 }
