@@ -13,7 +13,7 @@ public static class AppHostFactory
         return Host.CreateDefaultBuilder(args)
             .ConfigureServices(services =>
             {
-                services.AddDbContext<Interfaces.ICultureExtractorContext, CultureExtractorContext>(); // options => options.UseSqlite(@"Data Source=I:\Ripping\ripping.db"));
+                services.AddDbContext<ICultureExtractorContext, CultureExtractorContext>();
 
                 services.AddScoped<IPlaywrightFactory, PlaywrightFactory>();
                 services.AddScoped<ICaptchaSolver, CaptchaSolver>();

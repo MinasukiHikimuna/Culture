@@ -1,7 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Serilog;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using CultureExtractor.Interfaces;
 using CultureExtractor.Models;
 
@@ -9,9 +8,9 @@ namespace CultureExtractor;
 
 public class Repository : IRepository
 {
-    private readonly Interfaces.ICultureExtractorContext _cultureExtractorContext;
+    private readonly ICultureExtractorContext _cultureExtractorContext;
 
-    public Repository(Interfaces.ICultureExtractorContext cultureExtractorContext)
+    public Repository(ICultureExtractorContext cultureExtractorContext)
     {
         _cultureExtractorContext = cultureExtractorContext;
     }
