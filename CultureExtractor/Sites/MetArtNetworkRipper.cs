@@ -60,7 +60,7 @@ public class MetArtNetworkRipper : IYieldingScraper
         IPage page = await _playwrightFactory.CreatePageAsync(site, browserSettings);
 
         await LoginAsync(site, page);
-        var requests = await CaptureRequests(site, page);
+        var requests = await CaptureRequestsAsync(site, page);
         
         SetHeadersFromActualRequest(site, requests);
 
@@ -79,7 +79,7 @@ public class MetArtNetworkRipper : IYieldingScraper
         IPage page = await _playwrightFactory.CreatePageAsync(site, browserSettings);
 
         await LoginAsync(site, page);
-        var requests = await CaptureRequests(site, page);
+        var requests = await CaptureRequestsAsync(site, page);
 
         var headers = SetHeadersFromActualRequest(site, requests);
         var convertedHeaders = ConvertHeaders(headers);
@@ -88,153 +88,187 @@ public class MetArtNetworkRipper : IYieldingScraper
         
         foreach (var release in releases)
         {
+            Log.Information("Downloading {Site} {ReleaseDate} {Release}", release.Site.Name, release.ReleaseDate.ToString("yyyy-MM-dd"), release.Name);
             var existingDownloadEntities = await _context.Downloads.Where(d => d.ReleaseUuid == release.Uuid).ToListAsync();
-            
-            // switch based on FileType and ContentType
-            // if video, download video
-            var availableGalleries = release.AvailableFiles.Where(d => d is { FileType: "zip", ContentType: "gallery" }); 
-            var selectedGallery = downloadOptions.BestQuality 
-                ? availableGalleries.FirstOrDefault()
-                : availableGalleries.LastOrDefault();
-            if (selectedGallery != null && NotDownloadedYet(existingDownloadEntities, selectedGallery))
+            await foreach (var galleryDownload in DownloadGalleriesAsync(downloadOptions, release, existingDownloadEntities, headers, convertedHeaders))
             {
-                var handler = new HttpClientHandler()
-                {
-                    AllowAutoRedirect = false
-                };
-                var client = new HttpClient(handler);
-                client.DefaultRequestHeaders.Clear();
-                client.DefaultRequestHeaders.Add("cookie", headers["cookie"]);
-                client.DefaultRequestHeaders.Add("user-agent", headers["user-agent"]);
-
-                var request = new HttpRequestMessage(HttpMethod.Head, selectedGallery.Url);
-                var response = await client.SendAsync(request);
-
-                var actualMediaUrl = response.Headers.Location?.ToString();
-                if (string.IsNullOrEmpty(actualMediaUrl))
-                {
-                    throw new InvalidOperationException("actualMediaUrl is missing.");
-                }
-            
-                var uri = new Uri(actualMediaUrl);
-                var query = HttpUtility.ParseQueryString(uri.Query);
-                var suggestedFileName = query["filename"] ?? string.Empty;
-                var suffix = Path.GetExtension(suggestedFileName);
-
-                var performersStr = release.Performers.Count() > 1
-                    ? string.Join(", ", release.Performers.Take(release.Performers.Count() - 1).Select(p => p.Name)) + " & " + release.Performers.Last().Name
-                    : release.Performers.FirstOrDefault()?.Name ?? "Unknown";
-                var fileName = ReleaseNamer.Name(release, suffix, performersStr, selectedGallery.Variant);
-            
-                var fileInfo = await _downloader.DownloadFileAsync(
-                    release,
-                    actualMediaUrl,
-                    fileName,
-                    release.Url,
-                    convertedHeaders);
-
-                var sha256Sum = Downloader.CalculateSHA256(fileInfo.FullName);
-
-                var metadata = new GalleryZipFileMetadata(sha256Sum);
-            
-                yield return new Download(release, suggestedFileName, fileInfo.Name, selectedGallery as AvailableGalleryZipFile, metadata);
+                yield return galleryDownload;
             }
-            
-            var availableVideos = release.AvailableFiles.Where(d => d is { FileType: "video", ContentType: "scene" });
-            var selectedVideo = downloadOptions.BestQuality
-                ? availableVideos.FirstOrDefault()
-                : availableVideos.LastOrDefault();
-            if (selectedVideo != null && NotDownloadedYet(existingDownloadEntities, selectedVideo))
+            await foreach (var videoDownload in DownloadsVideosAsync(downloadOptions, release, existingDownloadEntities, headers, convertedHeaders))
             {
-                var handler = new HttpClientHandler()
-                {
-                    AllowAutoRedirect = false
-                };
-                var client = new HttpClient(handler);
-                client.DefaultRequestHeaders.Clear();
-                client.DefaultRequestHeaders.Add("cookie", headers["cookie"]);
-                client.DefaultRequestHeaders.Add("user-agent", headers["user-agent"]);
-
-                var request = new HttpRequestMessage(HttpMethod.Head, selectedVideo.Url);
-                var response = await client.SendAsync(request);
-                
-                var actualMediaUrl = response.Headers?.Location?.ToString();
-                
-                var uri = new Uri(actualMediaUrl);
-                var query = HttpUtility.ParseQueryString(uri.Query);
-                var suggestedFileName = query["filename"];
-                var suffix = Path.GetExtension(suggestedFileName);
-
-                var performersStr = release.Performers.Count() > 1
-                    ? string.Join(", ", release.Performers.Take(release.Performers.Count() - 1).Select(p => p.Name)) + " & " + release.Performers.Last().Name
-                    : release.Performers.FirstOrDefault()?.Name ?? "Unknown";
-                var fileName = ReleaseNamer.Name(release, suffix, performersStr, selectedVideo.Variant);
-                
-                var fileInfo = await _downloader.DownloadFileAsync(
-                    release,
-                    response.Headers.Location.ToString(),
-                    fileName,
-                    release.Url,
-                    convertedHeaders);
-
-
-                var videoHashes = Hasher.Phash(@"""" + fileInfo.FullName + @"""");
-                yield return new Download(release, suggestedFileName, fileInfo.Name, selectedVideo as AvailableVideoFile, videoHashes);
+                yield return videoDownload;
             }
-
             await foreach (var trailerDownload in DownloadTrailersAsync(downloadOptions, release, existingDownloadEntities))
             {
                 yield return trailerDownload;
             }
-
-            var vtt = release.AvailableFiles
-                .FirstOrDefault(d => d is { FileType: "vtt", ContentType: "sprite" });
-            if (vtt != null && NotDownloadedYet(existingDownloadEntities, vtt))
+            await foreach (var vttDownload in DownloadVttFilesAsync(release, existingDownloadEntities, convertedHeaders))
             {
-                var fileInfo = await _downloader.DownloadFileAsync(
-                    release,
-                    vtt.Url, 
-                    "sprite.vtt",
-                    release.Url,
-                    convertedHeaders);
-            
-                var sha256Sum = Downloader.CalculateSHA256(fileInfo.FullName);
-                var metadata = new VttFileMetadata(sha256Sum);
-                yield return new Download(release, "sprite.vtt", fileInfo.Name, vtt as AvailableVttFile, metadata);
+                yield return vttDownload;
             }
-            
-            var imageFiles = release.AvailableFiles
-                .Where(d => d.FileType == "image");
-            foreach (var imageFile in imageFiles)
+            await foreach (var imageDownload in DownloadImagesAsync(release, existingDownloadEntities, convertedHeaders))
             {
-                if (!NotDownloadedYet(existingDownloadEntities, imageFile))
-                {
-                    continue;
-                }
-                
-                var fileInfo = await _downloader.DownloadFileAsync(
-                    release,
-                    imageFile.Url,
-                    $"{imageFile.ContentType}.jpg",
-                    release.Url,
-                    convertedHeaders);
-
-                var sha256Sum = Downloader.CalculateSHA256(fileInfo.FullName);
-                var metadata = new ImageFileMetadata(sha256Sum);
-                yield return new Download(release, $"{imageFile.ContentType}.jpg", fileInfo.Name, imageFile as AvailableImageFile, metadata);
+                yield return imageDownload;
             }
         }
     }
 
-    private async IAsyncEnumerable<Download> DownloadTrailersAsync(DownloadOptions downloadOptions, Release release,
-        List<DownloadEntity> existingDownloadEntities)
+    private async IAsyncEnumerable<Download> DownloadGalleriesAsync(DownloadOptions downloadOptions, Release release,
+        List<DownloadEntity> existingDownloadEntities, IReadOnlyDictionary<string, string> headers, WebHeaderCollection convertedHeaders)
     {
-        var availableTrailers =
-            release.AvailableFiles.Where(d => d is { FileType: "video", ContentType: "trailer" });
+        var availableGalleries = release.AvailableFiles
+            .OfType<AvailableGalleryZipFile>()
+            .Where(d => d is { FileType: "zip", ContentType: "gallery" });
+        var selectedGallery = downloadOptions.BestQuality
+            ? availableGalleries.FirstOrDefault()
+            : availableGalleries.LastOrDefault();
+        if (selectedGallery == null || !NotDownloadedYet(existingDownloadEntities, selectedGallery))
+        {
+            yield break;
+        }
+        
+        var handler = new HttpClientHandler
+        {
+            AllowAutoRedirect = false
+        };
+        var client = new HttpClient(handler);
+        client.DefaultRequestHeaders.Clear();
+        client.DefaultRequestHeaders.Add("cookie", headers["cookie"]);
+        client.DefaultRequestHeaders.Add("user-agent", headers["user-agent"]);
+
+        var request = new HttpRequestMessage(HttpMethod.Head, selectedGallery.Url);
+        var response = await client.SendAsync(request);
+
+        var actualMediaUrl = response.Headers.Location?.ToString();
+        if (string.IsNullOrEmpty(actualMediaUrl))
+        {
+            throw new InvalidOperationException("actualMediaUrl is missing.");
+        }
+
+        var uri = new Uri(actualMediaUrl);
+        var query = HttpUtility.ParseQueryString(uri.Query);
+        var suggestedFileName = query["filename"] ?? string.Empty;
+        var suffix = Path.GetExtension(suggestedFileName);
+
+        var performersStr = release.Performers.Count() > 1
+            ? string.Join(", ", release.Performers.Take(release.Performers.Count() - 1).Select(p => p.Name)) + " & " +
+              release.Performers.Last().Name
+            : release.Performers.FirstOrDefault()?.Name ?? "Unknown";
+        var fileName = ReleaseNamer.Name(release, suffix, performersStr, selectedGallery.Variant);
+
+        var fileInfo = await TryDownloadAsync(release, selectedGallery, actualMediaUrl, fileName, convertedHeaders);
+        if (fileInfo == null)
+        {
+            yield break;
+        }
+
+        var sha256Sum = Downloader.CalculateSHA256(fileInfo.FullName);
+        var metadata = new GalleryZipFileMetadata(sha256Sum);
+        yield return new Download(release, suggestedFileName, fileInfo.Name, selectedGallery, metadata);
+    }
+
+    private async IAsyncEnumerable<Download> DownloadsVideosAsync(DownloadOptions downloadOptions, Release release,
+        List<DownloadEntity> existingDownloadEntities, IReadOnlyDictionary<string, string> headers, WebHeaderCollection convertedHeaders)
+    {
+        var availableVideos = release.AvailableFiles.OfType<AvailableVideoFile>().Where(d => d is { FileType: "video", ContentType: "scene" });
+        var selectedVideo = downloadOptions.BestQuality
+            ? availableVideos.FirstOrDefault()
+            : availableVideos.LastOrDefault();
+        if (selectedVideo == null || !NotDownloadedYet(existingDownloadEntities, selectedVideo))
+        {
+            yield break;
+        }
+        
+        var handler = new HttpClientHandler()
+        {
+            AllowAutoRedirect = false
+        };
+        var client = new HttpClient(handler);
+        client.DefaultRequestHeaders.Clear();
+        client.DefaultRequestHeaders.Add("cookie", headers["cookie"]);
+        client.DefaultRequestHeaders.Add("user-agent", headers["user-agent"]);
+
+        var request = new HttpRequestMessage(HttpMethod.Head, selectedVideo.Url);
+        var response = await client.SendAsync(request);
+
+        var actualMediaUrl = response.Headers?.Location?.ToString();
+
+        var uri = new Uri(actualMediaUrl);
+        var query = HttpUtility.ParseQueryString(uri.Query);
+        var suggestedFileName = query["filename"] ?? string.Empty;
+        var suffix = Path.GetExtension(suggestedFileName);
+
+        var performersStr = release.Performers.Count() > 1
+            ? string.Join(", ", release.Performers.Take(release.Performers.Count() - 1).Select(p => p.Name)) + " & " +
+              release.Performers.Last().Name
+            : release.Performers.FirstOrDefault()?.Name ?? "Unknown";
+        var fileName = ReleaseNamer.Name(release, suffix, performersStr, selectedVideo.Variant);
+
+        var fileInfo = await TryDownloadAsync(release, selectedVideo, response.Headers.Location.ToString(), fileName, convertedHeaders);
+        if (fileInfo == null)
+        {
+            yield break;
+        }
+
+        var videoHashes = Hasher.Phash(@"""" + fileInfo.FullName + @"""");
+        yield return new Download(release, suggestedFileName, fileInfo.Name, selectedVideo, videoHashes);
+    }
+
+    private async IAsyncEnumerable<Download> DownloadVttFilesAsync(Release release, List<DownloadEntity> existingDownloadEntities,
+        WebHeaderCollection convertedHeaders)
+    {
+        var vtt = release.AvailableFiles
+            .OfType<AvailableVttFile>()
+            .FirstOrDefault(d => d is { FileType: "vtt", ContentType: "sprite" });
+        if (vtt == null || !NotDownloadedYet(existingDownloadEntities, vtt))
+        {
+            yield break;
+        }
+        
+        const string fileName = "sprite.vtt";
+        var fileInfo = await TryDownloadAsync(release, vtt, vtt.Url, fileName, convertedHeaders);
+        if (fileInfo == null)
+        {
+            yield break;
+        }
+            
+        var sha256Sum = Downloader.CalculateSHA256(fileInfo.FullName);
+        var metadata = new VttFileMetadata(sha256Sum);
+        yield return new Download(release, fileName, fileInfo.Name, vtt, metadata);
+    }
+
+    private async IAsyncEnumerable<Download> DownloadImagesAsync(Release release, List<DownloadEntity> existingDownloadEntities, WebHeaderCollection convertedHeaders)
+    {
+        var imageFiles = release.AvailableFiles.OfType<AvailableImageFile>();
+        foreach (var imageFile in imageFiles)
+        {
+            if (!NotDownloadedYet(existingDownloadEntities, imageFile))
+            {
+                continue;
+            }
+            
+            var fileName = $"{imageFile.ContentType}.jpg";
+            var fileInfo = await TryDownloadAsync(release, imageFile, imageFile.Url, fileName, convertedHeaders);
+            if (fileInfo == null)
+            {
+                yield break;
+            }
+            
+            var sha256Sum = Downloader.CalculateSHA256(fileInfo.FullName);
+            var metadata = new ImageFileMetadata(sha256Sum);
+            yield return new Download(release, $"{imageFile.ContentType}.jpg", fileInfo.Name, imageFile, metadata);
+        }
+    }
+
+    private async IAsyncEnumerable<Download> DownloadTrailersAsync(DownloadOptions downloadOptions, Release release, List<DownloadEntity> existingDownloadEntities)
+    {
+        var availableTrailers = release.AvailableFiles
+            .OfType<AvailableVideoFile>()
+            .Where(d => d is { FileType: "video", ContentType: "trailer" });
         var selectedTrailer = downloadOptions.BestQuality
             ? availableTrailers.FirstOrDefault()
             : availableTrailers.LastOrDefault();
-        if (selectedTrailer == null || !NotDownloadedYet(existingDownloadEntities, selectedTrailer))
+        if (selectedTrailer == null  || !NotDownloadedYet(existingDownloadEntities, selectedTrailer))
         {
             yield break;
         }
@@ -244,43 +278,67 @@ public class MetArtNetworkRipper : IYieldingScraper
 
         // Note: we need to download the trailer without cookies because logged in users get the full scene
         // from the same URL.
-        FileInfo fileInfo;
-        try
+        var fileInfo = await TryDownloadAsync(release, selectedTrailer, selectedTrailer.Url, trailerPlaylistFileName, new WebHeaderCollection());
+        if (fileInfo == null)
         {
-            fileInfo = await _downloader.DownloadFileAsync(
-                release,
-                selectedTrailer.Url,
-                trailerPlaylistFileName,
-                release.Url,
-                new WebHeaderCollection());
-        }
-        catch (WebException ex)
-        {
-            if (!ex.Message.Contains("(404) Not Found."))
-            {
-                throw;
-            }
-            
-            Log.Warning("Could not find trailer playlist for {Release} from URL {Url}",
-                release.Uuid, selectedTrailer.Url);
             yield break;
         }
-
+        
         var trailerVideoFullPath = Path.Combine(fileInfo.DirectoryName, trailerVideoFileName);
 
         var snippet = await FFmpeg.Conversions.New()
             .Start(
-                $"-protocol_whitelist \"file,http,https,tcp,tls\" -i {fileInfo.FullName} -c copy {trailerVideoFullPath}");
+                $"-protocol_whitelist \"file,http,https,tcp,tls\" -i {fileInfo.FullName} -y -c copy {trailerVideoFullPath}");
 
         var videoHashes = Hasher.Phash(@"""" + trailerVideoFullPath + @"""");
         yield return new Download(release,
             "trailer.m3u8",
             trailerVideoFileName,
-            selectedTrailer as AvailableVideoFile,
+            selectedTrailer,
             videoHashes);
     }
 
-    private static async Task<List<IRequest>> CaptureRequests(Site site, IPage page)
+    private async Task<FileInfo?> TryDownloadAsync(Release release, IAvailableFile availableFile, string url, string fileName, WebHeaderCollection convertedHeaders)
+    {
+        const int maxRetryCount = 3; // Set the maximum number of retries
+        int retryCount = 0;
+
+        while (retryCount < maxRetryCount)
+        {
+            retryCount++;
+            try
+            {
+                return await _downloader.DownloadFileAsync(
+                    release,
+                    url,
+                    fileName,
+                    release.Url,
+                    convertedHeaders);
+            }
+            catch (WebException ex) when ((ex.Response as HttpWebResponse)?.StatusCode == HttpStatusCode.NotFound)
+            {
+                Log.Warning("Could not find {FileType} {ContentType} for {Release} from URL {Url}",
+                    availableFile.FileType, availableFile.ContentType, release.Uuid, url);
+                return null;
+            }
+            catch (WebException ex) when (ex.InnerException is IOException && ex.InnerException.Message.Contains("The response ended prematurely"))
+            {
+                if (retryCount >= maxRetryCount)
+                {
+                    Log.Error("Max retry attempts reached for {FileType} {ContentType} for {Release} from URL {Url}.",
+                        availableFile.FileType, availableFile.ContentType, release.Uuid, url);
+                    return null;
+                }
+
+                Log.Warning("Download ended prematurely for {FileType} {ContentType} for {Release} from URL {Url}. Retrying...",
+                    availableFile.FileType, availableFile.ContentType, release.Uuid, url);
+            }
+        }
+
+        return null; // Return null if all retries fail
+    }
+
+    private static async Task<List<IRequest>> CaptureRequestsAsync(Site site, IPage page)
     {
         var requests = new List<IRequest>();
         await page.RouteAsync("**/*", async route =>
