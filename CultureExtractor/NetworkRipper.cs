@@ -299,7 +299,6 @@ public class NetworkRipper : INetworkRipper
         IScraper scraper = (IScraper)_serviceProvider.GetService(typeof(IScraper));
         Log.Information($"Culture Extractor, using {scraper.GetType()}");
 
-        Log.Information($"Found {matchingReleases.Count} releases:{Environment.NewLine}    {matchingReleasesStr}");
 
         if (scraper is IYieldingScraper yieldingScraper)
         {
@@ -313,7 +312,8 @@ public class NetworkRipper : INetworkRipper
         }
 
         var siteScraper = (ISiteScraper)scraper;
-        
+        Log.Information($"Found {matchingReleases.Count} releases:{Environment.NewLine}    {matchingReleasesStr}");
+
         if (!matchingReleases.Any())
         {
             Log.Information("Nothing to download.");
