@@ -2,6 +2,15 @@ using System.Text.Json.Serialization;
 
 namespace CultureExtractor.Sites;
 
+public class AyloMovieRequest
+{
+    public class RootObject
+    {
+        public AyloMoviesRequest.Meta meta { get; set; }
+        public AyloMoviesRequest.Result result { get; set; }
+    }
+}
+
 public class AyloMoviesRequest
 {
     public class RootObject
@@ -25,7 +34,7 @@ public class AyloMoviesRequest
         public string type { get; set; }
         public string title { get; set; }
         public string dateReleased { get; set; }
-        public string description { get; set; }
+        public string? description { get; set; }
         public Parent parent { get; set; }
         public int position { get; set; }
         public bool isVR { get; set; }
@@ -83,7 +92,8 @@ public class AyloMoviesRequest
         public Images1 images { get; set; }
         public Tags1[] tags { get; set; }
         public object[] timeTags { get; set; }
-        public object[] videos { get; set; }
+        // This seems to cause deserialization issues and we have no need for this.
+        // public object[] videos { get; set; }
         public Groups1[] groups { get; set; }
     }
 
@@ -130,7 +140,7 @@ public class AyloMoviesRequest
         public object[] images { get; set; }
         public object[] tags { get; set; }
         public object[] timeTags { get; set; }
-        public Videos videos { get; set; }
+        public object videos { get; set; }
         public object[] groups { get; set; }
         public bool canPlay { get; set; }
     }
@@ -140,14 +150,14 @@ public class AyloMoviesRequest
         public string type { get; set; }
         public int part { get; set; }
         public int length { get; set; }
-        public Dictionary<string, File> files { get; set; }
+        public Dictionary<string, AyloFile> files { get; set; }
     }
 
-    public class File
+    public class AyloFile
     {
         public string format { get; set; }
         public string multiCdnId { get; set; }
-        public int sizeBytes { get; set; }
+        public long sizeBytes { get; set; }
         public string type { get; set; }
         public Urls urls { get; set; }
         public string label { get; set; }
@@ -159,88 +169,12 @@ public class AyloMoviesRequest
         public string download { get; set; }
     }
 
-    public class _20p1
-    {
-        public string format { get; set; }
-        public string multiCdnId { get; set; }
-        public int sizeBytes { get; set; }
-        public string type { get; set; }
-        public Urls1 urls { get; set; }
-        public string label { get; set; }
-    }
-
-    public class Urls1
-    {
-        public string view { get; set; }
-        public string download { get; set; }
-    }
-
     public class Full
     {
         public string type { get; set; }
         public int part { get; set; }
         public int length { get; set; }
-        public Dictionary<string, File> files { get; set; }
-    }
-
-    public class _080p
-    {
-        public string format { get; set; }
-        public string multiCdnId { get; set; }
-        public int sizeBytes { get; set; }
-        public string type { get; set; }
-        public Urls2 urls { get; set; }
-        public string label { get; set; }
-    }
-
-    public class Urls2
-    {
-        public string view { get; set; }
-    }
-
-    public class _20p2
-    {
-        public string format { get; set; }
-        public string multiCdnId { get; set; }
-        public int sizeBytes { get; set; }
-        public string type { get; set; }
-        public Urls3 urls { get; set; }
-        public string label { get; set; }
-    }
-
-    public class Urls3
-    {
-        public string view { get; set; }
-    }
-
-    public class _80p
-    {
-        public string format { get; set; }
-        public string multiCdnId { get; set; }
-        public int sizeBytes { get; set; }
-        public string type { get; set; }
-        public Urls4 urls { get; set; }
-        public string label { get; set; }
-    }
-
-    public class Urls4
-    {
-        public string view { get; set; }
-    }
-
-    public class _20p3
-    {
-        public string format { get; set; }
-        public string multiCdnId { get; set; }
-        public int sizeBytes { get; set; }
-        public string type { get; set; }
-        public Urls5 urls { get; set; }
-        public string label { get; set; }
-    }
-
-    public class Urls5
-    {
-        public string view { get; set; }
+        public Dictionary<string, AyloFile> files { get; set; }
     }
 
     public class Collections1
@@ -352,13 +286,7 @@ public class AyloMoviesRequest
         public int width { get; set; }
         public int height { get; set; }
         public string url { get; set; }
-        public Urls11 urls { get; set; }
-    }
-
-    public class Urls11
-    {
-        [JsonPropertyName("default")] public string default1 { get; set; }
-        public string webp { get; set; }
+        public Urls urls { get; set; }
     }
 
     public class Card_main_rect
@@ -552,42 +480,43 @@ public class AyloMoviesRequest
     public class Poster1
     {
         [JsonPropertyName("0")]
-        public _2 _0 { get; set; }
+        public PosterSizes _0 { get; set; }
         [JsonPropertyName("1")]
-        public _3 _1 { get; set; }
+        public PosterSizes _1 { get; set; }
         [JsonPropertyName("2")]
-        public _4 _2 { get; set; }
+        public PosterSizes _2 { get; set; }
         [JsonPropertyName("3")]
-        public _5 _3 { get; set; }
+        public PosterSizes _3 { get; set; }
         [JsonPropertyName("4")]
-        public _6 _4 { get; set; }
+        public PosterSizes _4 { get; set; }
         [JsonPropertyName("5")]
-        public _7 _5 { get; set; }
+        public PosterSizes _5 { get; set; }
         public string alternateText { get; set; }
         public int imageVersion { get; set; }
     }
 
-    public class _2
+    public class PosterSizes
     {
-        public Xs2 xs { get; set; }
-        public Sm2 sm { get; set; }
-        public Md2 md { get; set; }
-        public Lg2 lg { get; set; }
-        public Xl2 xl { get; set; }
-        public Xx1 xx { get; set; }
+        public PosterSize xs { get; set; }
+        public PosterSize sm { get; set; }
+        public PosterSize md { get; set; }
+        public PosterSize lg { get; set; }
+        public PosterSize xl { get; set; }
+        public PosterSize xx { get; set; }
     }
 
-    public class Xs2
+    public class PosterSize
     {
         public int width { get; set; }
         public int height { get; set; }
         public string url { get; set; }
-        public Urls18 urls { get; set; }
+        public PosterUrls urls { get; set; }
     }
 
-    public class Urls18
+    public class PosterUrls
     {
-        [JsonPropertyName("default")] public string default1 { get; set; }
+        [JsonPropertyName("default")]
+        public string default1 { get; set; }
         public string webp { get; set; }
     }
 
@@ -1655,7 +1584,7 @@ public class AyloMoviesRequest
         public int id { get; set; }
         public string format { get; set; }
         public string multiCdnId { get; set; }
-        public int sizeBytes { get; set; }
+        public long sizeBytes { get; set; }
         public string type { get; set; }
         public Urls84 urls { get; set; }
         public string label { get; set; }
@@ -1671,7 +1600,7 @@ public class AyloMoviesRequest
         public int id { get; set; }
         public string format { get; set; }
         public string multiCdnId { get; set; }
-        public int sizeBytes { get; set; }
+        public long sizeBytes { get; set; }
         public string type { get; set; }
         public Urls85 urls { get; set; }
         public string label { get; set; }
@@ -1687,7 +1616,7 @@ public class AyloMoviesRequest
         public int id { get; set; }
         public string format { get; set; }
         public string multiCdnId { get; set; }
-        public int sizeBytes { get; set; }
+        public long sizeBytes { get; set; }
         public string type { get; set; }
         public Urls86 urls { get; set; }
         public string label { get; set; }
@@ -1703,7 +1632,7 @@ public class AyloMoviesRequest
         public int id { get; set; }
         public string format { get; set; }
         public string multiCdnId { get; set; }
-        public int sizeBytes { get; set; }
+        public long sizeBytes { get; set; }
         public string type { get; set; }
         public Urls87 urls { get; set; }
         public string label { get; set; }
@@ -1719,7 +1648,7 @@ public class AyloMoviesRequest
         public int id { get; set; }
         public string format { get; set; }
         public string multiCdnId { get; set; }
-        public int sizeBytes { get; set; }
+        public long sizeBytes { get; set; }
         public string type { get; set; }
         public Urls88 urls { get; set; }
         public string label { get; set; }
@@ -1735,7 +1664,7 @@ public class AyloMoviesRequest
         public int id { get; set; }
         public string format { get; set; }
         public string multiCdnId { get; set; }
-        public int sizeBytes { get; set; }
+        public long sizeBytes { get; set; }
         public string type { get; set; }
         public Urls89 urls { get; set; }
         public string label { get; set; }
@@ -1751,7 +1680,7 @@ public class AyloMoviesRequest
         public int id { get; set; }
         public string format { get; set; }
         public string multiCdnId { get; set; }
-        public int sizeBytes { get; set; }
+        public long sizeBytes { get; set; }
         public string type { get; set; }
         public Urls90 urls { get; set; }
         public string label { get; set; }
@@ -1768,7 +1697,7 @@ public class AyloMoviesRequest
         public int id { get; set; }
         public string format { get; set; }
         public string multiCdnId { get; set; }
-        public int sizeBytes { get; set; }
+        public long sizeBytes { get; set; }
         public string type { get; set; }
         public Urls91 urls { get; set; }
         public string label { get; set; }
