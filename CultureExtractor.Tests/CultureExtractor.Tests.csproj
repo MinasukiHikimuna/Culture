@@ -26,4 +26,10 @@
     <ProjectReference Include="..\CultureExtractor\CultureExtractor.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="aylo.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

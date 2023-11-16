@@ -10,15 +10,18 @@ namespace CultureExtractor.Sites;
 
 [Site("brazzers")]
 [Site("digitalplayground")]
-public class AyloRipper : ISiteScraper
+public class AyloRipper : ISiteScraper, IYieldingScraper
 {
     private readonly IDownloader _downloader;
     private readonly ICaptchaSolver _captchaSolver;
+    private IPlaywrightFactory _playwrightFactory;
 
-    public AyloRipper(IDownloader downloader, ICaptchaSolver captchaSolver)
+    public AyloRipper(IDownloader downloader, ICaptchaSolver captchaSolver, IPlaywrightFactory playwrightFactory, IRepository repository)
     {
         _downloader = downloader;
         _captchaSolver = captchaSolver;
+        _playwrightFactory = playwrightFactory;
+        _repository = repository;
     }
 
     public async Task LoginAsync(Site site, IPage page)
@@ -139,7 +142,7 @@ public class AyloRipper : ISiteScraper
         var request = requests.FirstOrDefault(r => r.Url == "https://site-api.project1service.com/v2/releases/" + releaseShortName);
         var response = await request.ResponseAsync();
         var jsonContent = await response.BodyAsync();
-        var data = JsonSerializer.Deserialize<BrazzersRootobject>(jsonContent)!;
+        var data = JsonSerializer.Deserialize<AyloRootObject>(jsonContent)!;
 
 
         var sceneData = data.result;
@@ -211,7 +214,7 @@ public class AyloRipper : ISiteScraper
         var request = requests.FirstOrDefault(r => r.Url == "https://site-api.project1service.com/v2/releases/" + release.ShortName);
         var response = await request.ResponseAsync();
         var jsonContent = await response.TextAsync();
-        var data = JsonSerializer.Deserialize<BrazzersRootobject>(jsonContent)!;
+        var data = JsonSerializer.Deserialize<AyloRootObject>(jsonContent)!;
         var sceneData = data.result;
 
         sceneData.videos.full.files.Remove("hls");
@@ -274,7 +277,7 @@ public class AyloRipper : ISiteScraper
         return availableDownloads.OrderByDescending(d => d.AvailableVideoFile.FileSize).ToList();
     }
 
-    private class BrazzersRootobject
+    private class AyloRootObject
     {
         public Meta meta { get; set; }
         public BrazzersResult result { get; set; }
@@ -1587,5 +1590,241 @@ public class AyloRipper : ISiteScraper
         public int contentId { get; set; }
         public string listSlug { get; set; }
         public string createdTime { get; set; }
+    }
+
+    private static string ScenesUrl(Site site, int pageNumber) =>
+        $"{site.Url}/scenes?page={pageNumber}";
+    
+    public async IAsyncEnumerable<Release> ScrapeReleasesAsync(Site site, BrowserSettings browserSettings, ScrapeOptions scrapeOptions)
+    {
+        IPage page = await _playwrightFactory.CreatePageAsync(site, browserSettings);
+
+        await LoginAsync(site, page);
+
+        var requests = new List<IRequest>();
+        await page.RouteAsync("**/*", async route =>
+        {
+            requests.Add(route.Request);
+            await route.ContinueAsync();
+        });
+        
+        await page.GotoAsync(ScenesUrl(site, 1));
+        await page.WaitForLoadStateAsync();
+        await Task.Delay(5000);
+
+        await page.UnrouteAsync("**/*");
+
+        SetHeadersFromActualRequest(site, requests);
+        await foreach (var scene in ScrapeScenesAsync(site, scrapeOptions))
+        {
+            yield return scene;
+        }
+
+        throw new NotImplementedException();
+
+        yield break;
+    }
+
+    private async IAsyncEnumerable<Release> ScrapeScenesAsync(Site site, ScrapeOptions scrapeOptions)
+    {
+        var moviesInitialPage = await GetMoviesPageAsync(site, 1);
+
+        var pages = (int)Math.Ceiling((double)moviesInitialPage.meta.total / moviesInitialPage.meta.count);
+        for (var pageNumber = 1; pageNumber <= pages; pageNumber++)
+        {
+            await Task.Delay(5000);
+
+            var moviesPage = await GetMoviesPageAsync(site, pageNumber);
+
+            Log.Information($"Page {pageNumber}/{pages} contains {moviesPage.result} releases");
+
+            var movies = moviesPage.result
+                .ToDictionary(r => r.id.ToString(), r => r);
+
+            var existingReleases = await _repository
+                .GetReleasesAsync(site.ShortName, movies.Keys.ToList());
+
+            var existingReleasesDictionary = existingReleases.ToDictionary(r => r.ShortName, r => r);
+            
+            var moviesToBeScraped = movies
+                .Where(g => !existingReleasesDictionary.ContainsKey(g.Key) || existingReleasesDictionary[g.Key].LastUpdated < scrapeOptions.FullScrapeLastUpdated)
+                .Select(g => g.Value)
+                .ToList();
+
+            yield break;
+            
+            /*foreach (var movie in moviesToBeScraped)
+            {
+                await Task.Delay(1000);
+
+                var date = Regex.Match(movie.path, @"\/(\d{8})\/").Groups[1].Value;
+                var name = Regex.Match(movie.path, @"\/(\w+)$").Groups[1].Value;
+
+                var shortName = $"{date}/{name}";
+
+                var movieUrl = MovieApiUrl(site, date, name);
+
+                using var movieResponse = Client.GetAsync(movieUrl);
+                var movieJson = await movieResponse.Result.Content.ReadAsStringAsync();
+                var movieDetails = JsonSerializer.Deserialize<MetArtMovieRequest.RootObject>(movieJson);
+                if (movieDetails == null)
+                {
+                    throw new InvalidOperationException("Could not read movie API response: " + movieJson);
+                }
+
+                var commentsUrl = CommentsApiUrl(site, movieDetails.UUID);
+
+                using var commentResponse = Client.GetAsync(commentsUrl);
+                var commentsJson = await commentResponse.Result.Content.ReadAsStringAsync();
+
+                var sceneDownloads = movieDetails.files.sizes.videos
+                    .Select(video => new AvailableVideoFile(
+                        "video",
+                        "scene",
+                        video.id,
+                        $"{site.Url}/api/download-media/{movieDetails.UUID}/film/{video.id}",
+                        -1,
+                        HumanParser.ParseResolutionHeight(video.id),
+                        HumanParser.ParseFileSizeMaybe(video.size).IsSome(out var fileSizeValue) ? fileSizeValue : -1,
+                        -1,
+                        string.Empty
+                    ))
+                    .OrderByDescending(availableFile => availableFile.ResolutionHeight)
+                    .ToList();
+                
+                var galleryDownloads = movieDetails.files.sizes.zips
+                    .Select(gallery => new AvailableGalleryZipFile(
+                        "zip",
+                        "gallery",
+                        gallery.quality,
+                        $"{site.Url}/api/download-media/{movieDetails.UUID}/photos/{gallery.quality}",
+                        -1,
+                        -1,
+                        HumanParser.ParseFileSizeMaybe(gallery.size).IsSome(out var fileSizeValue) ? fileSizeValue : -1
+                    ))
+                    .OrderByDescending(availableFile => availableFile.ResolutionHeight)
+                    .ToList();
+
+                var imageDownloads = movieDetails.files.sizes.relatedPhotos
+                    .Select(image => new AvailableImageFile(
+                        "image",
+                        image.id,
+                        string.Empty,
+                        MovieCdnImageUrl(movieDetails, image),
+                        -1,
+                        -1,
+                        HumanParser.ParseFileSizeMaybe(image.size).IsSome(out var fileSizeValue) ? fileSizeValue : -1
+                    ))
+                    .ToList();
+
+                var trailerDownloads = movieDetails.files.teasers.Length > 0 
+                    ? new List<IAvailableFile>
+                        {
+                            new AvailableVideoFile("video", "trailer", "720",
+                                $"https://www.sexart.com/api/m3u8/{movieDetails.UUID}/720.m3u8", -1, 720, -1, -1, "h264"),
+                            new AvailableVideoFile("video", "trailer", "270",
+                                $"https://www.sexart.com/api/m3u8/{movieDetails.UUID}/270.m3u8", -1, 270, -1, -1, "h264"),
+                        }
+                    : new List<IAvailableFile>();
+
+                var spriteDownloads = new List<IAvailableFile>
+                {
+                    new AvailableImageFile("image", "sprite", string.Empty,
+                        $"https://cdn.metartnetwork.com/{movieDetails.siteUUID}/media/{movieDetails.UUID}/sprite_{movieDetails.UUID}-48.jpg",
+                        -1, -1, -1),
+                    new AvailableVttFile("vtt", "sprite", string.Empty,
+                        $"https://cdn.metartnetwork.com/{movieDetails.siteUUID}/media/{movieDetails.UUID}/member_{movieDetails.UUID}.vtt")
+                };
+                
+                var performers = movieDetails.models.Where(a => a.gender == "female").ToList()
+                    .Concat(movieDetails.models.Where(a => a.gender != "female").ToList())
+                    .Select(m => new SitePerformer(m.path[(m.path.LastIndexOf("/", StringComparison.Ordinal) + 1)..], m.name, m.path))
+                    .ToList();
+
+                var tags = movieDetails.tags
+                    .Select(t => new SiteTag(t.Replace(" ", "+"), t, "/tags/" + t.Replace(" ", "+")))
+                    .ToList();
+
+                var scene = new Release(
+                    existingReleasesDictionary.TryGetValue(shortName, out var existingRelease)
+                        ? existingRelease.Uuid
+                        : UuidGenerator.Generate(),
+                    site,
+                    null,
+                    DateOnly.FromDateTime(movieDetails.publishedAt),
+                    shortName,
+                    movieDetails.name,
+                    $"{site.Url}{movieDetails.path}",
+                    movieDetails.description,
+                    -1,
+                    performers,
+                    tags,
+                    new List<IAvailableFile>()
+                        .Concat(sceneDownloads)
+                        .Concat(galleryDownloads)
+                        .Concat(imageDownloads)
+                        .Concat(trailerDownloads)
+                        .Concat(spriteDownloads),
+                    $$"""{"gallery": """ + movieJson + """, "comments": """ + commentsJson + "}",
+                    DateTime.Now);
+
+                yield return scene;
+            }*/
+        }
+    }
+
+    private static string MoviesApiUrl(Site site, int pageNumber) =>
+        $"https://site-api.project1service.com/v2/releases?blockId=4126598482&blockName=SceneListBlock&pageType=EXPLORE_SCENES&dateReleased=%3C2023-11-16&orderBy=-dateReleased&type=scene&limit=20&offset={(pageNumber - 1) * 20}";
+    
+    private static async Task<AyloMoviesRequest.RootObject> GetMoviesPageAsync(Site site, int pageNumber)
+    {
+        var moviesApiUrl = MoviesApiUrl(site, pageNumber);
+
+        using var response = await Client.GetAsync(moviesApiUrl);
+        if (response.StatusCode != HttpStatusCode.OK)
+        {
+            throw new InvalidOperationException($"Could not read movies API response:{Environment.NewLine}Url={moviesApiUrl}{Environment.NewLine}StatusCode={response.StatusCode}{Environment.NewLine}ReasonPhrase={response.ReasonPhrase}");
+        }
+        
+        var json = await response.Content.ReadAsStringAsync();
+        var movies = JsonSerializer.Deserialize<AyloMoviesRequest.RootObject>(json);
+        if (movies == null)
+        {
+            throw new InvalidOperationException("Could not read movies API response: " + json);
+        }
+        
+        return movies;
+    }
+    
+    private static Dictionary<string, string> SetHeadersFromActualRequest(Site site, IList<IRequest> requests)
+    {
+        var galleriesRequest = requests.SingleOrDefault(r => r.Url.StartsWith("https://site-api.project1service.com/v2/releases?"));
+        if (galleriesRequest == null)
+        {
+            var requestUrls = requests.Select(r => r.Url + Environment.NewLine).ToList();
+            throw new InvalidOperationException($"Could not read galleries API request from following requests:{Environment.NewLine}{string.Join("", requestUrls)}");
+        }
+        
+        Client.DefaultRequestHeaders.Clear();
+        foreach (var key in galleriesRequest.Headers.Keys)
+        {
+            Client.DefaultRequestHeaders.Add(key, galleriesRequest.Headers[key]);
+        }
+        
+        return galleriesRequest.Headers;
+    }
+
+    private static readonly HttpClient Client = new();
+    private readonly IRepository _repository;
+
+    /*private async IAsyncEnumerable<Release> ScrapeScenesAsync(Site site, ScrapeOptions scrapeOptions)
+    {
+        throw new NotImplementedException();
+    }*/
+
+    public IAsyncEnumerable<Download> DownloadReleasesAsync(Site site, BrowserSettings browserSettings,
+        DownloadConditions downloadConditions, DownloadOptions downloadOptions)
+    {
+        throw new NotImplementedException();
     }
 }
