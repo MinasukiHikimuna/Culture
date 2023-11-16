@@ -59,22 +59,32 @@ public class Repository : IRepository
 
     public async Task<IEnumerable<Release>> QueryReleasesAsync(Site site, DownloadConditions downloadConditions)
     {
-        var siteEntities = await _cultureExtractorContext.Releases
-            .Include(s => s.Site)
-            .Include(s => s.SubSite)
-            .Include(s => s.Performers)
-            .Include(s => s.Tags)
-            .Where(s => s.SiteUuid == site.Uuid)
-            .Where(s => !downloadConditions.DownloadedFileNames.Any() || s.Downloads.Any(d => downloadConditions.DownloadedFileNames.Contains(d.SavedFilename)))
-            .Where(s => !s.Downloads.Any(d => d.Variant == Enum.GetName(downloadConditions.PreferredDownloadQuality)))
-            .OrderBy(s => s.Site.Name)
-            .ThenByDescending(s => s.ReleaseDate)
+        var queryable = _cultureExtractorContext.Releases
             .AsNoTracking()
-            .ToListAsync();
-
-        return siteEntities.Select(Convert).AsEnumerable();
+            // .Include(r => r.Downloads)
+            .Include(r => r.Site)
+            .Include(r => r.SubSite)
+            .Include(r => r.Performers)
+            .Include(r => r.Tags)
+            .OrderByDescending(r => r.ReleaseDate)
+            .Where(s => s.SiteUuid == site.Uuid);
+            
+        queryable = FilterByPerformers(queryable, downloadConditions);
+                
+        var releaseEntities = await queryable.ToListAsync();
+        return releaseEntities.Select(Convert).AsEnumerable();
     }
-
+    
+    private static IQueryable<ReleaseEntity> FilterByPerformers(IQueryable<ReleaseEntity> queryable, DownloadConditions downloadConditions)
+    {
+        if (downloadConditions.PerformerNames != null && !downloadConditions.PerformerNames.Any())
+        {
+            return queryable;
+        }
+        
+        return queryable.Where(s => s.Performers.Any(p => downloadConditions.PerformerNames.Contains(p.Name)));
+    }
+    
     public async Task<Release?> GetReleaseAsync(string siteShortName, string releaseShortName)
     {
         var releaseEntity = await _cultureExtractorContext.Releases
