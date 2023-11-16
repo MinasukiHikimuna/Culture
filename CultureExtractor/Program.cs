@@ -136,22 +136,22 @@ class Program
             var siteShortName = "sexart";
             // var subSiteShortName = "sex-and-submission";
 
-            args = new string[] {
-                /*
+            var scrapeArgs = new string[]
+            {
                 "scrape",
                 "--site-short-name", siteShortName,
                 // "--sub-site-short-name", subSiteShortName,
-                // "--full",
+                "--full",
                 // "--guest-mode",
-                "--reverse-order",
+                // "--reverse-order",
                 "--browser-mode", "Visible",
                 // "--max-scenes", "1000",
                 // "--from", "2020-01-01",
                 // "--to", "2020-12-31",
                 "--verbose",
-                */
-                    
-                // /*
+            };
+            var downloadArgs = new string[]
+            {
                 "download",
                 "--site-short-name", siteShortName,
                 // "--sub-site-short-name", subSiteShortName,
@@ -166,13 +166,14 @@ class Program
                 // "--to", "2020-12-31",
                 "--verbose",
                 // "--best",
-                // */
-                
-                /*
+            };
+            var migrateArgs = new string[]
+            {
                 "migrate",
                 "--site-short-name", siteShortName,
-                */
             };
+
+            args = downloadArgs;
         }
         
         // Use this for EF migrations:
