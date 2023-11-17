@@ -14,8 +14,8 @@ namespace CultureExtractor.Sites;
 public class AyloRipper : IYieldingScraper
 {
     private static readonly HttpClient Client = new();
-    
-    private readonly ILegacyDownloader _legacyDownloader;
+
+    private readonly IDownloader _downloader;
     private readonly ICaptchaSolver _captchaSolver;
     private readonly IPlaywrightFactory _playwrightFactory;
     private readonly IRepository _repository;
@@ -30,9 +30,9 @@ public class AyloRipper : IYieldingScraper
     private static string MovieApiUrl(string shortName) =>
         $"https://site-api.project1service.com/v2/releases/{shortName}?pageType=PLAYER";
 
-    public AyloRipper(ILegacyDownloader legacyDownloader, ICaptchaSolver captchaSolver, IPlaywrightFactory playwrightFactory, IRepository repository, ICultureExtractorContext context)
+    public AyloRipper(IDownloader downloader, ICaptchaSolver captchaSolver, IPlaywrightFactory playwrightFactory, IRepository repository, ICultureExtractorContext context)
     {
-        _legacyDownloader = legacyDownloader;
+        _downloader = downloader;
         _captchaSolver = captchaSolver;
         _playwrightFactory = playwrightFactory;
         _repository = repository;
@@ -311,7 +311,7 @@ public class AyloRipper : IYieldingScraper
             : release.Performers.FirstOrDefault()?.Name ?? "Unknown";
         var fileName = ReleaseNamer.Name(release, suffix, performersStr, selectedVideo.Variant);
 
-        var fileInfo = await TryDownloadAsync(release, selectedVideo, selectedVideo.Url, fileName, convertedHeaders);
+        var fileInfo = await _downloader.TryDownloadAsync(release, selectedVideo, selectedVideo.Url, fileName, convertedHeaders);
         if (fileInfo == null)
         {
             yield break;
@@ -339,7 +339,7 @@ public class AyloRipper : IYieldingScraper
 
         // Note: we need to download the trailer without cookies because logged in users get the full scene
         // from the same URL.
-        var fileInfo = await TryDownloadAsync(release, selectedTrailer, selectedTrailer.Url, trailerPlaylistFileName, new WebHeaderCollection());
+        var fileInfo = await _downloader.TryDownloadAsync(release, selectedTrailer, selectedTrailer.Url, trailerPlaylistFileName, new WebHeaderCollection());
         if (fileInfo == null)
         {
             yield break;
@@ -370,7 +370,7 @@ public class AyloRipper : IYieldingScraper
             }
             
             var fileName = $"{imageFile.ContentType}.jpg";
-            var fileInfo = await TryDownloadAsync(release, imageFile, imageFile.Url, fileName, convertedHeaders);
+            var fileInfo = await _downloader.TryDownloadAsync(release, imageFile, imageFile.Url, fileName, convertedHeaders);
             if (fileInfo == null)
             {
                 yield break;
@@ -380,54 +380,6 @@ public class AyloRipper : IYieldingScraper
             var metadata = new ImageFileMetadata(sha256Sum);
             yield return new Download(release, $"{imageFile.ContentType}.jpg", fileInfo.Name, imageFile, metadata);
         }
-    }
-    
-    private async Task<FileInfo?> TryDownloadAsync(Release release, IAvailableFile availableFile, string url, string fileName, WebHeaderCollection convertedHeaders)
-    {
-        const int maxRetryCount = 3; // Set the maximum number of retries
-        var retryCount = 0;
-
-        while (retryCount < maxRetryCount)
-        {
-            retryCount++;
-            try
-            {
-                return await _legacyDownloader.DownloadFileAsync(
-                    release,
-                    url,
-                    fileName,
-                    release.Url,
-                    convertedHeaders);
-            }
-            catch (WebException ex) when ((ex.Response as HttpWebResponse)?.StatusCode == HttpStatusCode.NotFound)
-            {
-                Log.Warning("Could not find {FileType} {ContentType} for {Release} from URL {Url}",
-                    availableFile.FileType, availableFile.ContentType, release.Uuid, url);
-                return null;
-            }
-            catch (WebException ex) when (ex.InnerException is IOException &&
-                                          ex.InnerException.Message.Contains("The response ended prematurely"))
-            {
-                if (retryCount >= maxRetryCount)
-                {
-                    Log.Error("Max retry attempts reached for {FileType} {ContentType} for {Release} from URL {Url}.",
-                        availableFile.FileType, availableFile.ContentType, release.Uuid, url);
-                    return null;
-                }
-
-                Log.Warning(
-                    "Download ended prematurely for {FileType} {ContentType} for {Release} from URL {Url}. Retrying...",
-                    availableFile.FileType, availableFile.ContentType, release.Uuid, url);
-            }
-            catch (WebException ex)
-            {
-                Log.Error(ex, "Error downloading {FileType} {ContentType} for {Release} from URL {Url}",
-                    availableFile.FileType, availableFile.ContentType, release.Uuid, url);
-                return null;
-            }
-        }
-
-        return null; // Return null if all retries fail
     }
     
     private static bool NotDownloadedYet(List<DownloadEntity> existingDownloadEntities, IAvailableFile bestVideo)

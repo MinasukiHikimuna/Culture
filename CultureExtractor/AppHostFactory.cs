@@ -19,6 +19,7 @@ public static class AppHostFactory
                 services.AddScoped<ICaptchaSolver, CaptchaSolver>();
                 services.AddScoped<IRepository, Repository>();
                 services.AddScoped<ILegacyDownloader, LegacyDownloader>();
+                services.AddScoped<IDownloader, Downloader>();
                 services.AddTransient<INetworkRipper, NetworkRipper>();
                 services.AddTransient<CultureExtractorConsoleApp>();
 
