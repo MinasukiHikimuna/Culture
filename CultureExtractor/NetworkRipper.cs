@@ -247,8 +247,22 @@ public class NetworkRipper : INetworkRipper
 
     public async Task DownloadReleasesAsync(Site site, BrowserSettings browserSettings, DownloadConditions downloadConditions, DownloadOptions downloadOptions)
     {
-        /*var matchingReleases = await _repository.QueryReleasesAsync(site, downloadConditions);
+        IScraper scraper = (IScraper)_serviceProvider.GetService(typeof(IScraper));
+        Log.Information($"Culture Extractor, using {scraper.GetType()}");
 
+
+        if (scraper is IYieldingScraper yieldingScraper)
+        {
+            await foreach (var download in yieldingScraper.DownloadReleasesAsync(site, browserSettings, downloadConditions, downloadOptions))
+            {
+                Log.Information($"Downloaded {download.AvailableFile.FileType} {download.AvailableFile.ContentType} {download.AvailableFile.Variant} of {download.Release.Name} from {download.Release.Site.Name}.");
+                await _repository.SaveDownloadAsync(download, downloadConditions.PreferredDownloadQuality);
+            }
+
+            return;
+        }
+
+        var matchingReleases = await _repository.QueryReleasesAsync(site, downloadConditions, downloadOptions);
         var furtherFilteredReleases = matchingReleases
             .Where(s =>
                 downloadConditions.DateRange.Start <= s.ReleaseDate &&
@@ -281,38 +295,13 @@ public class NetworkRipper : INetworkRipper
         else
         {
             furtherFilteredReleases = furtherFilteredReleases.OrderBy(s => s.ReleaseDate).ToList();
-        }*/
-
-        await DownloadGivenReleasesAsync(
-            site,
-            browserSettings,
-            downloadConditions,
-            downloadOptions,
-            new List<Release>());
-    }
-
-    private async Task DownloadGivenReleasesAsync(Site site, BrowserSettings browserSettings,
-        DownloadConditions downloadConditions, DownloadOptions downloadOptions, IList<Release> matchingReleases)
-    {
-        var matchingReleasesStr = string.Join($"{Environment.NewLine}    ", matchingReleases.Select(s => $"{s.Site.Name} - {s.ReleaseDate.ToString("yyyy-MM-dd")} - {s.Name}"));
-
-        IScraper scraper = (IScraper)_serviceProvider.GetService(typeof(IScraper));
-        Log.Information($"Culture Extractor, using {scraper.GetType()}");
-
-
-        if (scraper is IYieldingScraper yieldingScraper)
-        {
-            await foreach (var download in yieldingScraper.DownloadReleasesAsync(site, browserSettings, downloadConditions, downloadOptions))
-            {
-                Log.Information($"Downloaded {download.AvailableFile.FileType} {download.AvailableFile.ContentType} {download.AvailableFile.Variant} of {download.Release.Name} from {download.Release.Site.Name}.");
-                await _repository.SaveDownloadAsync(download, downloadConditions.PreferredDownloadQuality);
-            }
-
-            return;
         }
 
+        
+        var matchingReleasesStr = string.Join($"{Environment.NewLine}    ", matchingReleases.Select(s => $"{s.Site.Name} - {s.ReleaseDate.ToString("yyyy-MM-dd")} - {s.Name}"));
+        
         var siteScraper = (ISiteScraper)scraper;
-        Log.Information($"Found {matchingReleases.Count} releases:{Environment.NewLine}    {matchingReleasesStr}");
+        Log.Information($"Found {matchingReleases.Count()} releases:{Environment.NewLine}    {matchingReleasesStr}");
 
         if (!matchingReleases.Any())
         {
@@ -331,9 +320,9 @@ public class NetworkRipper : INetworkRipper
                 Log.Information($"Maximum release rip limit of {downloadConditions.MaxDownloads} reached. Stopping...");
                 break;
             }
-            if ((matchingReleases.Count - rippedReleases) % 10 == 0)
+            if ((matchingReleases.Count() - rippedReleases) % 10 == 0)
             {
-                Log.Information($"Remaining downloads {matchingReleases.Count - rippedReleases}/{matchingReleases.Count} releases.");
+                Log.Information($"Remaining downloads {matchingReleases.Count() - rippedReleases}/{matchingReleases.Count()} releases.");
             }
 
             // Ungh, throws exception

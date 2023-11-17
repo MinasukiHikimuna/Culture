@@ -263,8 +263,7 @@ public class AyloRipper : IYieldingScraper
         var headers = SetHeadersFromActualRequest(site, requests);
         var convertedHeaders = ConvertHeaders(headers);
 
-        var releases = await _repository.QueryReleasesAsync(site, downloadConditions);
-        
+        var releases = await _repository.QueryReleasesAsync(site, downloadConditions, downloadOptions);
         foreach (var release in releases)
         {
             Log.Information("Downloading {Site} {ReleaseDate} {Release}", release.Site.Name, release.ReleaseDate.ToString("yyyy-MM-dd"), release.Name);

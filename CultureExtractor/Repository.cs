@@ -57,7 +57,8 @@ public class Repository : IRepository
         return siteEntities.Select(Convert).AsEnumerable();
     }
 
-    public async Task<IEnumerable<Release>> QueryReleasesAsync(Site site, DownloadConditions downloadConditions)
+    public async Task<IEnumerable<Release>> QueryReleasesAsync(Site site, DownloadConditions downloadConditions,
+        DownloadOptions downloadOptions)
     {
         var queryable = _cultureExtractorContext.Releases
             .AsNoTracking()
@@ -70,6 +71,7 @@ public class Repository : IRepository
             .Where(s => s.SiteUuid == site.Uuid);
             
         queryable = FilterByPerformers(queryable, downloadConditions);
+        queryable = SortReleases(queryable, downloadOptions);
                 
         var releaseEntities = await queryable.ToListAsync();
         return releaseEntities.Select(Convert).AsEnumerable();
@@ -83,6 +85,13 @@ public class Repository : IRepository
         }
         
         return queryable.Where(s => s.Performers.Any(p => downloadConditions.PerformerNames.Contains(p.Name)));
+    }
+    
+    private static IQueryable<ReleaseEntity> SortReleases(IQueryable<ReleaseEntity> queryable, DownloadOptions downloadOptions)
+    {
+        return downloadOptions.ReverseOrder
+            ? queryable.OrderByDescending(r => r.ReleaseDate)
+            : queryable.OrderBy(r => r.ReleaseDate);
     }
     
     public async Task<Release?> GetReleaseAsync(string siteShortName, string releaseShortName)
