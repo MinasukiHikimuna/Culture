@@ -105,7 +105,9 @@ public class ReleaseEntity
     public required DateTime LastUpdated { get; set; }
     public required ICollection<SitePerformerEntity> Performers { get; set; }
     public required ICollection<SiteTagEntity> Tags { get; set; }
+    [Column(TypeName = "json")]
     public required string AvailableFiles { get; set; }
+    [Column(TypeName = "json")]
     public required string JsonDocument { get; set; }
 
     public required Guid SiteUuid { get; set; }
