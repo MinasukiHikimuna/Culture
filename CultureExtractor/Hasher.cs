@@ -27,7 +27,7 @@ public class VideoHashes : IFileMetadata
     }
 }
 
-public class Hasher
+public static class Hasher
 {
     public static VideoHashes? Phash(string path)
     {
@@ -49,29 +49,29 @@ public class Hasher
             throw new InvalidOperationException("Unknown operating system!");
         }
 
-        // The command to be executed
-        string command = commandPath;
-
-        // The argument to be passed to the command
-        string argument = path;
-
         // Start the process and set its start information
+        var arguments = $"-md5 -json {path}";
         ProcessStartInfo startInfo = new()
         {
-            FileName = command,
-            Arguments = $"-md5 -json {argument}",
+            FileName = commandPath,
+            Arguments = arguments,
             UseShellExecute = false,
             RedirectStandardOutput = true,
             CreateNoWindow = true
         };
 
         // Start the process and read its output
-        using Process process = Process.Start(startInfo);
-        string output = process.StandardOutput.ReadToEnd();
+        using var process = Process.Start(startInfo);
+        if (process == null)
+        {
+            throw new InvalidOperationException($"Could not start process {commandPath} {arguments}!");
+        }
+        
+        var output = process.StandardOutput.ReadToEnd();
 
         try
         {
-            VideoHashes videoHashes = JsonSerializer.Deserialize<VideoHashes>(output);
+            var videoHashes = JsonSerializer.Deserialize<VideoHashes>(output);
             return videoHashes;
         }
         catch (JsonException ex)
