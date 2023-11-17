@@ -3,8 +3,6 @@ using CultureExtractor.Interfaces;
 using Microsoft.Playwright;
 using Serilog;
 using System.Text.Json;
-using System.Text.RegularExpressions;
-using System.Web;
 using CultureExtractor.Models;
 using Microsoft.EntityFrameworkCore;
 using Xabe.FFmpeg;
@@ -15,20 +13,26 @@ namespace CultureExtractor.Sites;
 [Site("digitalplayground")]
 public class AyloRipper : IYieldingScraper
 {
-    private readonly IDownloader _downloader;
+    private static readonly HttpClient Client = new();
+    
+    private readonly ILegacyDownloader _legacyDownloader;
     private readonly ICaptchaSolver _captchaSolver;
     private readonly IPlaywrightFactory _playwrightFactory;
+    private readonly IRepository _repository;
+    private readonly ICultureExtractorContext _context;
 
     private static string ScenesUrl(Site site, int pageNumber) =>
         $"{site.Url}/scenes?page={pageNumber}";
+
     private static string MoviesApiUrl(int pageNumber) =>
         $"https://site-api.project1service.com/v2/releases?blockId=4126598482&blockName=SceneListBlock&pageType=EXPLORE_SCENES&dateReleased=%3C2023-11-16&orderBy=-dateReleased&type=scene&limit=20&offset={(pageNumber - 1) * 20}";
+
     private static string MovieApiUrl(string shortName) =>
         $"https://site-api.project1service.com/v2/releases/{shortName}?pageType=PLAYER";
 
-    public AyloRipper(IDownloader downloader, ICaptchaSolver captchaSolver, IPlaywrightFactory playwrightFactory, IRepository repository, ICultureExtractorContext context)
+    public AyloRipper(ILegacyDownloader legacyDownloader, ICaptchaSolver captchaSolver, IPlaywrightFactory playwrightFactory, IRepository repository, ICultureExtractorContext context)
     {
-        _downloader = downloader;
+        _legacyDownloader = legacyDownloader;
         _captchaSolver = captchaSolver;
         _playwrightFactory = playwrightFactory;
         _repository = repository;
@@ -62,6 +66,8 @@ public class AyloRipper : IYieldingScraper
             }
         }
 
+        // TODO: detect if login was successful
+        
         await Task.Delay(5000);
 
         await page.GotoAsync(site.Url);
@@ -77,7 +83,7 @@ public class AyloRipper : IYieldingScraper
 
         var requests = await CaptureRequestsAsync(site, page);
 
-        SetHeadersFromActualRequest(site, requests);
+        SetHeadersFromActualRequest(requests);
         await foreach (var scene in ScrapeScenesAsync(site, scrapeOptions))
         {
             yield return scene;
@@ -86,14 +92,14 @@ public class AyloRipper : IYieldingScraper
 
     private async IAsyncEnumerable<Release> ScrapeScenesAsync(Site site, ScrapeOptions scrapeOptions)
     {
-        var moviesInitialPage = await GetMoviesPageAsync(site, 1);
+        var moviesInitialPage = await GetMoviesPageAsync(1);
 
         var pages = (int)Math.Ceiling((double)moviesInitialPage.meta.total / moviesInitialPage.meta.count);
         for (var pageNumber = 1; pageNumber <= pages; pageNumber++)
         {
             await Task.Delay(5000);
 
-            var moviesPage = await GetMoviesPageAsync(site, pageNumber);
+            var moviesPage = await GetMoviesPageAsync(pageNumber);
 
             Log.Information($"Page {pageNumber}/{pages} contains {moviesPage.result.Length} releases");
 
@@ -210,7 +216,7 @@ public class AyloRipper : IYieldingScraper
         return scene;
     }
 
-    private static async Task<AyloMoviesRequest.RootObject> GetMoviesPageAsync(Site site, int pageNumber)
+    private static async Task<AyloMoviesRequest.RootObject> GetMoviesPageAsync(int pageNumber)
     {
         var moviesApiUrl = MoviesApiUrl(pageNumber);
 
@@ -229,8 +235,8 @@ public class AyloRipper : IYieldingScraper
         
         return movies;
     }
-    
-    private static Dictionary<string, string> SetHeadersFromActualRequest(Site site, IList<IRequest> requests)
+
+    private static Dictionary<string, string> SetHeadersFromActualRequest(IList<IRequest> requests)
     {
         var galleriesRequest = requests.SingleOrDefault(r => r.Url.StartsWith("https://site-api.project1service.com/v2/releases?"));
         if (galleriesRequest == null)
@@ -248,10 +254,6 @@ public class AyloRipper : IYieldingScraper
         return galleriesRequest.Headers;
     }
 
-    private static readonly HttpClient Client = new();
-    private readonly IRepository _repository;
-    private ICultureExtractorContext _context;
-
     public async IAsyncEnumerable<Download> DownloadReleasesAsync(Site site, BrowserSettings browserSettings,
         DownloadConditions downloadConditions, DownloadOptions downloadOptions)
     {
@@ -260,7 +262,7 @@ public class AyloRipper : IYieldingScraper
         await LoginAsync(site, page);
         var requests = await CaptureRequestsAsync(site, page);
 
-        var headers = SetHeadersFromActualRequest(site, requests);
+        var headers = SetHeadersFromActualRequest(requests);
         var convertedHeaders = ConvertHeaders(headers);
 
         var releases = await _repository.QueryReleasesAsync(site, downloadConditions, downloadOptions);
@@ -272,7 +274,7 @@ public class AyloRipper : IYieldingScraper
                 new Dictionary<string, Release> { { release.ShortName, release } });
             
             var existingDownloadEntities = await _context.Downloads.Where(d => d.ReleaseUuid == release.Uuid).ToListAsync();
-            await foreach (var videoDownload in DownloadsVideosAsync(downloadOptions, updatedScrape, existingDownloadEntities, headers, convertedHeaders))
+            await foreach (var videoDownload in DownloadsVideosAsync(downloadOptions, updatedScrape, existingDownloadEntities, convertedHeaders))
             {
                 yield return videoDownload;
             }
@@ -288,7 +290,7 @@ public class AyloRipper : IYieldingScraper
     }
     
     private async IAsyncEnumerable<Download> DownloadsVideosAsync(DownloadOptions downloadOptions, Release release,
-        List<DownloadEntity> existingDownloadEntities, IReadOnlyDictionary<string, string> headers, WebHeaderCollection convertedHeaders)
+        List<DownloadEntity> existingDownloadEntities, WebHeaderCollection convertedHeaders)
     {
         var availableVideos = release.AvailableFiles.OfType<AvailableVideoFile>().Where(d => d is { FileType: "video", ContentType: "scene" });
         var selectedVideo = downloadOptions.BestQuality
@@ -374,7 +376,7 @@ public class AyloRipper : IYieldingScraper
                 yield break;
             }
             
-            var sha256Sum = Downloader.CalculateSHA256(fileInfo.FullName);
+            var sha256Sum = LegacyDownloader.CalculateSHA256(fileInfo.FullName);
             var metadata = new ImageFileMetadata(sha256Sum);
             yield return new Download(release, $"{imageFile.ContentType}.jpg", fileInfo.Name, imageFile, metadata);
         }
@@ -383,14 +385,14 @@ public class AyloRipper : IYieldingScraper
     private async Task<FileInfo?> TryDownloadAsync(Release release, IAvailableFile availableFile, string url, string fileName, WebHeaderCollection convertedHeaders)
     {
         const int maxRetryCount = 3; // Set the maximum number of retries
-        int retryCount = 0;
+        var retryCount = 0;
 
         while (retryCount < maxRetryCount)
         {
             retryCount++;
             try
             {
-                return await _downloader.DownloadFileAsync(
+                return await _legacyDownloader.DownloadFileAsync(
                     release,
                     url,
                     fileName,

@@ -11,11 +11,11 @@ namespace CultureExtractor.Sites;
 [Site("ultrafilms")]
 public class WowNetworkRipper : ISiteScraper
 {
-    private readonly IDownloader _downloader;
+    private readonly ILegacyDownloader _legacyDownloader;
 
-    public WowNetworkRipper(IDownloader downloader)
+    public WowNetworkRipper(ILegacyDownloader legacyDownloader)
     {
-        _downloader = downloader;
+        _legacyDownloader = legacyDownloader;
     }
 
     public async Task LoginAsync(Site site, IPage page)
@@ -140,7 +140,7 @@ public class WowNetworkRipper : ISiteScraper
             "{}",
             DateTime.Now);
         
-        if (_downloader.SceneImageExists(scene))
+        if (_legacyDownloader.SceneImageExists(scene))
         {
             return scene;
         }
@@ -277,7 +277,7 @@ public class WowNetworkRipper : ISiteScraper
             _ => throw new InvalidOperationException("Could not find a download candidate!")
         };
 
-        return await _downloader.DownloadSceneAsync(release, page, selectedDownload.AvailableVideoFile, downloadConditions.PreferredDownloadQuality, async () =>
+        return await _legacyDownloader.DownloadSceneAsync(release, page, selectedDownload.AvailableVideoFile, downloadConditions.PreferredDownloadQuality, async () =>
             await selectedDownload.ElementHandle.ClickAsync()
 );
     }

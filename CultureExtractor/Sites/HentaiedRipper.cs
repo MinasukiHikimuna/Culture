@@ -27,11 +27,11 @@ public class FileSource
 [Site("hentaied")]
 public class HentaiedRipper : ISiteScraper
 {
-    private readonly IDownloader _downloader;
+    private readonly ILegacyDownloader _legacyDownloader;
 
-    public HentaiedRipper(IDownloader downloader)
+    public HentaiedRipper(ILegacyDownloader legacyDownloader)
     {
-        _downloader = downloader;
+        _legacyDownloader = legacyDownloader;
     }
 
     public async Task LoginAsync(Site site, IPage page)
@@ -165,7 +165,7 @@ public class HentaiedRipper : ISiteScraper
 
         try
         {
-            await _downloader.DownloadSceneImageAsync(scene, ogImageUrl, scene.Url);
+            await _legacyDownloader.DownloadSceneImageAsync(scene, ogImageUrl, scene.Url);
         }
         catch (Exception ex)
         {
@@ -283,6 +283,6 @@ public class HentaiedRipper : ISiteScraper
             { HttpRequestHeader.Cookie, cookieString }
         };
 
-        return await _downloader.DownloadSceneDirectAsync(release, selectedDownload.AvailableVideoFile, downloadConditions.PreferredDownloadQuality, headers, referer: page.Url);
+        return await _legacyDownloader.DownloadSceneDirectAsync(release, selectedDownload.AvailableVideoFile, downloadConditions.PreferredDownloadQuality, headers, referer: page.Url);
     }
 }

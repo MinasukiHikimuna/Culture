@@ -8,14 +8,14 @@ using CultureExtractor.Models;
 
 namespace CultureExtractor;
 
-public class Downloader : IDownloader
+public class LegacyDownloader : ILegacyDownloader
 {
     private static readonly WebClient WebClient = new();
 
     private readonly string _metadataPath;
     private readonly string _downloadPath;
 
-    public Downloader(IConfiguration configuration)
+    public LegacyDownloader(IConfiguration configuration)
     {
         var pathsOptions = new PathsOptions();
         configuration.GetSection(PathsOptions.Paths).Bind(pathsOptions);

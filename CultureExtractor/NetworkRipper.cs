@@ -13,14 +13,14 @@ public class NetworkRipper : INetworkRipper
 {
     private readonly IRepository _repository;
     private readonly IServiceProvider _serviceProvider;
-    private readonly IDownloader _downloader;
+    private readonly ILegacyDownloader _legacyDownloader;
     private readonly IPlaywrightFactory _playwrightFactory;
 
-    public NetworkRipper(IRepository repository, IServiceProvider serviceProvider, IDownloader downloader, IPlaywrightFactory playwrightFactory)
+    public NetworkRipper(IRepository repository, IServiceProvider serviceProvider, ILegacyDownloader legacyDownloader, IPlaywrightFactory playwrightFactory)
     {
         _repository = repository;
         _serviceProvider = serviceProvider;
-        _downloader = downloader;
+        _legacyDownloader = legacyDownloader;
         _playwrightFactory = playwrightFactory;
     }
 
@@ -326,7 +326,7 @@ public class NetworkRipper : INetworkRipper
             }
 
             // Ungh, throws exception
-            _downloader.CheckFreeSpace();
+            _legacyDownloader.CheckFreeSpace();
 
             IPage releasePage = null; 
             const int maxRetries = 3;

@@ -15,12 +15,12 @@ namespace CultureExtractor.Sites;
 [Site("kink")]
 public class KinkRipper : ISiteScraper, ISubSiteScraper
 {
-    private readonly IDownloader _downloader;
+    private readonly ILegacyDownloader _legacyDownloader;
     private readonly IRepository _repository;
 
-    public KinkRipper(IDownloader downloader, IRepository repository)
+    public KinkRipper(ILegacyDownloader legacyDownloader, IRepository repository)
     {
-        _downloader = downloader;
+        _legacyDownloader = legacyDownloader;
         _repository = repository;
     }
 
@@ -195,11 +195,11 @@ public class KinkRipper : ISiteScraper, ISubSiteScraper
 
         try
         {
-            await _downloader.DownloadSceneImageAsync(scene, fullSizeCandidateImageUrl, scene.Url);
+            await _legacyDownloader.DownloadSceneImageAsync(scene, fullSizeCandidateImageUrl, scene.Url);
         }
         catch (WebException)
         {
-            await _downloader.DownloadSceneImageAsync(scene, originalImageUrl, scene.Url);
+            await _legacyDownloader.DownloadSceneImageAsync(scene, originalImageUrl, scene.Url);
         }
         
         return scene;
@@ -233,7 +233,7 @@ public class KinkRipper : ISiteScraper, ISubSiteScraper
         var suffix = Path.GetExtension(suggestedFilename);
         var name = ReleaseNamer.Name(release, suffix);
 
-        return await _downloader.DownloadSceneDirectAsync(release, selectedDownload.AvailableVideoFile, downloadConditions.PreferredDownloadQuality, headers, referer: page.Url, fileName: name);
+        return await _legacyDownloader.DownloadSceneDirectAsync(release, selectedDownload.AvailableVideoFile, downloadConditions.PreferredDownloadQuality, headers, referer: page.Url, fileName: name);
     }
 
     private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloadsAsync(IPage page)

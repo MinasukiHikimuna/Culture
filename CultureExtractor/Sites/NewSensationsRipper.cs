@@ -8,11 +8,11 @@ namespace CultureExtractor.Sites;
 [Site("newsensations")]
 public class NewSensationsRipper : ISiteScraper
 {
-    private readonly IDownloader _downloader;
+    private readonly ILegacyDownloader _legacyDownloader;
 
-    public NewSensationsRipper(IDownloader downloader)
+    public NewSensationsRipper(ILegacyDownloader legacyDownloader)
     {
-        _downloader = downloader;
+        _legacyDownloader = legacyDownloader;
     }
 
     public async Task LoginAsync(Site site, IPage page)
@@ -146,7 +146,7 @@ public class NewSensationsRipper : ISiteScraper
             DateTime.Now);
         
         var sceneImageUrl = await page.GetAttributeAsync("img#default_poster", "src");
-        await _downloader.DownloadSceneImageAsync(scene, sceneImageUrl);
+        await _legacyDownloader.DownloadSceneImageAsync(scene, sceneImageUrl);
         
         return scene;
     }
@@ -169,7 +169,7 @@ public class NewSensationsRipper : ISiteScraper
             _ => throw new InvalidOperationException("Could not find a download candidate!")
         };
 
-        return await _downloader.DownloadSceneAsync(release, page, selectedDownload.AvailableVideoFile, downloadConditions.PreferredDownloadQuality, async () =>
+        return await _legacyDownloader.DownloadSceneAsync(release, page, selectedDownload.AvailableVideoFile, downloadConditions.PreferredDownloadQuality, async () =>
         {
             await page.Locator("div#download_select > a").ClickAsync();
             await selectedDownload.ElementHandle.ClickAsync();

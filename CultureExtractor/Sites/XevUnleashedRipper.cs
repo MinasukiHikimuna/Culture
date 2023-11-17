@@ -10,11 +10,11 @@ namespace CultureExtractor.Sites;
 [Site("xevunleashed")]
 public class XevUnleashedRipper : ISiteScraper
 {
-    private readonly IDownloader _downloader;
+    private readonly ILegacyDownloader _legacyDownloader;
 
-    public XevUnleashedRipper(IDownloader downloader)
+    public XevUnleashedRipper(ILegacyDownloader legacyDownloader)
     {
-        _downloader = downloader;
+        _legacyDownloader = legacyDownloader;
     }
 
     public async Task LoginAsync(Site site, IPage page)
@@ -151,11 +151,11 @@ public class XevUnleashedRipper : ISiteScraper
         var ogImageMeta = await page.QuerySelectorAsync("meta[property='og:image']");
         string ogImageUrl = await ogImageMeta.GetAttributeAsync("content");
 
-        await _downloader.DownloadSceneImageAsync(scene, ogImageUrl, scene.Url);
+        await _legacyDownloader.DownloadSceneImageAsync(scene, ogImageUrl, scene.Url);
 
         var videoElement = await page.QuerySelectorAsync("video");
         string trailerUrl = await videoElement.GetAttributeAsync("src");
-        await _downloader.DownloadTrailerAsync(scene, trailerUrl, scene.Url);
+        await _legacyDownloader.DownloadTrailerAsync(scene, trailerUrl, scene.Url);
         
         return scene;
     }
@@ -238,6 +238,6 @@ public class XevUnleashedRipper : ISiteScraper
             { HttpRequestHeader.Cookie, cookieString }
         };
 
-        return await _downloader.DownloadSceneDirectAsync(release, selectedDownload.AvailableVideoFile, downloadConditions.PreferredDownloadQuality, headers, referer: page.Url);
+        return await _legacyDownloader.DownloadSceneDirectAsync(release, selectedDownload.AvailableVideoFile, downloadConditions.PreferredDownloadQuality, headers, referer: page.Url);
     }
 }

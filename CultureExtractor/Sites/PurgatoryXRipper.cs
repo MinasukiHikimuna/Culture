@@ -8,11 +8,11 @@ namespace CultureExtractor.Sites;
 [Site("purgatoryx")]
 public class PurgatoryXRipper : ISiteScraper
 {
-    private readonly IDownloader _downloader;
+    private readonly ILegacyDownloader _legacyDownloader;
 
-    public PurgatoryXRipper(IDownloader downloader)
+    public PurgatoryXRipper(ILegacyDownloader legacyDownloader)
     {
-        _downloader = downloader;
+        _legacyDownloader = legacyDownloader;
     }
 
     public async Task LoginAsync(Site site, IPage page)
@@ -131,7 +131,7 @@ public class PurgatoryXRipper : ISiteScraper
         var previewElement = await page.Locator(".jw-preview").ElementHandleAsync();
         var style = await previewElement.GetAttributeAsync("style");
         var backgroundImageUrl = style.Replace("background-image: url(\"", "").Replace("\");", "").Replace(" background-size: cover;", "");
-        await _downloader.DownloadSceneImageAsync(scene, backgroundImageUrl, "https://members.purgatoryx.com");
+        await _legacyDownloader.DownloadSceneImageAsync(scene, backgroundImageUrl, "https://members.purgatoryx.com");
         
         return scene;
     }
@@ -156,7 +156,7 @@ public class PurgatoryXRipper : ISiteScraper
             _ => throw new InvalidOperationException("Could not find a download candidate!")
         };
 
-        return await _downloader.DownloadSceneAsync(release, page, selectedDownload.AvailableVideoFile, downloadConditions.PreferredDownloadQuality, async () =>
+        return await _legacyDownloader.DownloadSceneAsync(release, page, selectedDownload.AvailableVideoFile, downloadConditions.PreferredDownloadQuality, async () =>
             await selectedDownload.ElementHandle.ClickAsync()
 );
     }

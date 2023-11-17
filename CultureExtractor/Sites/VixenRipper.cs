@@ -13,11 +13,11 @@ namespace CultureExtractor.Sites;
 [Site("vixen")]
 public class VixenRipper : ISiteScraper
 {
-    private readonly IDownloader _downloader;
+    private readonly ILegacyDownloader _legacyDownloader;
 
-    public VixenRipper(IDownloader downloader)
+    public VixenRipper(ILegacyDownloader legacyDownloader)
     {
-        _downloader = downloader;
+        _legacyDownloader = legacyDownloader;
     }
 
     public async Task LoginAsync(Site site, IPage page)
@@ -172,7 +172,7 @@ public class VixenRipper : ISiteScraper
             .Select(i => i.src)
             .FirstOrDefault();
 
-        await _downloader.DownloadSceneImageAsync(scene, posterSource, scene.Url);
+        await _legacyDownloader.DownloadSceneImageAsync(scene, posterSource, scene.Url);
 
         return scene;
     }
@@ -205,7 +205,7 @@ public class VixenRipper : ISiteScraper
         var suffix = Path.GetExtension(suggestedFilename);
         var name = ReleaseNamer.Name(release, suffix);
 
-        return await _downloader.DownloadSceneDirectAsync(release, selectedDownload.AvailableVideoFile, downloadConditions.PreferredDownloadQuality, headers, referer: page.Url, fileName: name);
+        return await _legacyDownloader.DownloadSceneDirectAsync(release, selectedDownload.AvailableVideoFile, downloadConditions.PreferredDownloadQuality, headers, referer: page.Url, fileName: name);
     }
 
     private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloadsAsync(IPage page)

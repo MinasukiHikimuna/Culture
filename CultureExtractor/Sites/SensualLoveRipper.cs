@@ -8,11 +8,11 @@ namespace CultureExtractor.Sites;
 [Site("sensuallove")]
 public class SensualLoveRipper : ISiteScraper
 {
-    private readonly IDownloader _downloader;
+    private readonly ILegacyDownloader _legacyDownloader;
 
-    public SensualLoveRipper(IDownloader downloader)
+    public SensualLoveRipper(ILegacyDownloader legacyDownloader)
     {
-        _downloader = downloader;
+        _legacyDownloader = legacyDownloader;
     }
 
     public async Task LoginAsync(Site site, IPage page)
@@ -126,7 +126,7 @@ public class SensualLoveRipper : ISiteScraper
         var previewElement = await page.Locator(".jw-preview").ElementHandleAsync();
         var style = await previewElement.GetAttributeAsync("style");
         var backgroundImageUrl = style.Replace("background-image: url(\"", "").Replace("\");", "").Replace(" background-size: cover;", "");
-        await _downloader.DownloadSceneImageAsync(release, backgroundImageUrl, release.Site.Url);
+        await _legacyDownloader.DownloadSceneImageAsync(release, backgroundImageUrl, release.Site.Url);
         
         return release;
     }
@@ -151,7 +151,7 @@ public class SensualLoveRipper : ISiteScraper
             _ => throw new InvalidOperationException("Could not find a download candidate!")
         };
 
-        return await _downloader.DownloadSceneAsync(release, page, selectedDownload.AvailableVideoFile, downloadConditions.PreferredDownloadQuality, async () =>
+        return await _legacyDownloader.DownloadSceneAsync(release, page, selectedDownload.AvailableVideoFile, downloadConditions.PreferredDownloadQuality, async () =>
             await selectedDownload.ElementHandle.ClickAsync()
 );
     }

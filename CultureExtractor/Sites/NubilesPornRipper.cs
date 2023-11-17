@@ -10,11 +10,11 @@ namespace CultureExtractor.Sites;
 [Site("nubilesporn")]
 public class NubilesPornRipper : ISiteScraper
 {
-    private readonly IDownloader _downloader;
+    private readonly ILegacyDownloader _legacyDownloader;
 
-    public NubilesPornRipper(IDownloader downloader)
+    public NubilesPornRipper(ILegacyDownloader legacyDownloader)
     {
-        _downloader = downloader;
+        _legacyDownloader = legacyDownloader;
     }
 
     public async Task LoginAsync(Site site, IPage page)
@@ -177,7 +177,7 @@ public class NubilesPornRipper : ISiteScraper
         try
         {
             var candidate = backgroundImageUrl.Replace("1280", "1920");
-            await _downloader.DownloadSceneImageAsync(scene, candidate, scene.Url);
+            await _legacyDownloader.DownloadSceneImageAsync(scene, candidate, scene.Url);
         }
         catch (WebException ex)
         {
@@ -185,7 +185,7 @@ public class NubilesPornRipper : ISiteScraper
             {
                 try
                 {
-                    await _downloader.DownloadSceneImageAsync(scene, backgroundImageUrl, scene.Url);
+                    await _legacyDownloader.DownloadSceneImageAsync(scene, backgroundImageUrl, scene.Url);
                 }
                 catch (WebException ex2)
                 {
@@ -220,7 +220,7 @@ public class NubilesPornRipper : ISiteScraper
             _ => throw new InvalidOperationException("Could not find a download candidate!")
         };
 
-        return await _downloader.DownloadSceneAsync(release, page, selectedDownload.AvailableVideoFile, downloadConditions.PreferredDownloadQuality, async () =>
+        return await _legacyDownloader.DownloadSceneAsync(release, page, selectedDownload.AvailableVideoFile, downloadConditions.PreferredDownloadQuality, async () =>
         {
             await page.GetByRole(AriaRole.Button).Filter(new LocatorFilterOptions() { HasText = "Downloads" }).ClickAsync();
             await selectedDownload.ElementHandle.ClickAsync();

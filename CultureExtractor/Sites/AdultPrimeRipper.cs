@@ -9,12 +9,12 @@ namespace CultureExtractor.Sites;
 [Site("adultprime")]
 public class AdultPrimeRipper : ISiteScraper, ISubSiteScraper
 {
-    private readonly IDownloader _downloader;
+    private readonly ILegacyDownloader _legacyDownloader;
     private readonly IRepository _repository;
 
-    public AdultPrimeRipper(IDownloader downloader, IRepository repository)
+    public AdultPrimeRipper(ILegacyDownloader legacyDownloader, IRepository repository)
     {
-        _downloader = downloader;
+        _legacyDownloader = legacyDownloader;
         _repository = repository;
     }
 
@@ -176,7 +176,7 @@ public class AdultPrimeRipper : ISiteScraper, ISubSiteScraper
         var style = await previewElement.GetAttributeAsync("style");
         var backgroundImageUrl = style.Replace("background-image: url(\"", "").Replace("\");", "");
 
-        await _downloader.DownloadSceneImageAsync(release, backgroundImageUrl, release.Url);
+        await _legacyDownloader.DownloadSceneImageAsync(release, backgroundImageUrl, release.Url);
 
         return release;
     }
@@ -193,7 +193,7 @@ public class AdultPrimeRipper : ISiteScraper, ISubSiteScraper
             _ => throw new InvalidOperationException("Could not find a download candidate!")
         };
 
-        return await _downloader.DownloadSceneAsync(release, page, selectedDownload.AvailableVideoFile, downloadConditions.PreferredDownloadQuality, async () =>
+        return await _legacyDownloader.DownloadSceneAsync(release, page, selectedDownload.AvailableVideoFile, downloadConditions.PreferredDownloadQuality, async () =>
         {
             await selectedDownload.ElementHandle.ClickAsync();
         });

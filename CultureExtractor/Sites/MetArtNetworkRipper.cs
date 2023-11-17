@@ -23,16 +23,16 @@ namespace CultureExtractor.Sites;
 [Site("hustler")]
 public class MetArtNetworkRipper : IYieldingScraper
 {
-    private readonly IDownloader _downloader;
+    private readonly ILegacyDownloader _legacyDownloader;
     private readonly IPlaywrightFactory _playwrightFactory;
 
     private static readonly HttpClient Client = new();
     private readonly IRepository _repository;
     private readonly ICultureExtractorContext _context;
 
-    public MetArtNetworkRipper(IDownloader downloader, IPlaywrightFactory playwrightFactory, IRepository repository, ICultureExtractorContext context)
+    public MetArtNetworkRipper(ILegacyDownloader legacyDownloader, IPlaywrightFactory playwrightFactory, IRepository repository, ICultureExtractorContext context)
     {
-        _downloader = downloader;
+        _legacyDownloader = legacyDownloader;
         _playwrightFactory = playwrightFactory;
         _repository = repository;
         _context = context;
@@ -161,7 +161,7 @@ public class MetArtNetworkRipper : IYieldingScraper
             yield break;
         }
 
-        var sha256Sum = Downloader.CalculateSHA256(fileInfo.FullName);
+        var sha256Sum = LegacyDownloader.CalculateSHA256(fileInfo.FullName);
         var metadata = new GalleryZipFileMetadata(sha256Sum);
         yield return new Download(release, suggestedFileName, fileInfo.Name, selectedGallery, metadata);
     }
@@ -231,7 +231,7 @@ public class MetArtNetworkRipper : IYieldingScraper
             yield break;
         }
             
-        var sha256Sum = Downloader.CalculateSHA256(fileInfo.FullName);
+        var sha256Sum = LegacyDownloader.CalculateSHA256(fileInfo.FullName);
         var metadata = new VttFileMetadata(sha256Sum);
         yield return new Download(release, fileName, fileInfo.Name, vtt, metadata);
     }
@@ -253,7 +253,7 @@ public class MetArtNetworkRipper : IYieldingScraper
                 yield break;
             }
             
-            var sha256Sum = Downloader.CalculateSHA256(fileInfo.FullName);
+            var sha256Sum = LegacyDownloader.CalculateSHA256(fileInfo.FullName);
             var metadata = new ImageFileMetadata(sha256Sum);
             yield return new Download(release, $"{imageFile.ContentType}.jpg", fileInfo.Name, imageFile, metadata);
         }
@@ -307,7 +307,7 @@ public class MetArtNetworkRipper : IYieldingScraper
             retryCount++;
             try
             {
-                return await _downloader.DownloadFileAsync(
+                return await _legacyDownloader.DownloadFileAsync(
                     release,
                     url,
                     fileName,

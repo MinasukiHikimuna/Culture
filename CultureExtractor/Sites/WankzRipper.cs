@@ -15,12 +15,12 @@ namespace CultureExtractor.Sites;
 [Site("wankzvr")]
 public class WankzRipper : ISubSiteScraper
 {
-    private readonly IDownloader _downloader;
+    private readonly ILegacyDownloader _legacyDownloader;
     private IRepository _repository;
 
-    public WankzRipper(IDownloader downloader, IRepository repository)
+    public WankzRipper(ILegacyDownloader legacyDownloader, IRepository repository)
     {
-        _downloader = downloader;
+        _legacyDownloader = legacyDownloader;
         _repository = repository;
     }
 
@@ -160,7 +160,7 @@ public class WankzRipper : ISubSiteScraper
             { HttpRequestHeader.Cookie, cookieString }
         };
         
-        await _downloader.DownloadSceneImageAsync(scene, fullUrl, page.Url, headers);
+        await _legacyDownloader.DownloadSceneImageAsync(scene, fullUrl, page.Url, headers);
         
         return scene;
     }
@@ -188,7 +188,7 @@ public class WankzRipper : ISubSiteScraper
             { HttpRequestHeader.Cookie, cookieString }
         };
         
-        return await _downloader.DownloadSceneDirectAsync(release, selectedDownload.AvailableVideoFile, downloadConditions.PreferredDownloadQuality, headers, referer: page.Url);
+        return await _legacyDownloader.DownloadSceneDirectAsync(release, selectedDownload.AvailableVideoFile, downloadConditions.PreferredDownloadQuality, headers, referer: page.Url);
     }
 
     private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloadsAsync(IPage page)

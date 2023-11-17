@@ -9,12 +9,12 @@ namespace CultureExtractor.Sites;
 [Site("dorcelclub")]
 public class DorcelClubRipper : ISiteScraper
 {
-    private readonly IDownloader _downloader;
+    private readonly ILegacyDownloader _legacyDownloader;
     private readonly ICaptchaSolver _captchaSolver;
 
-    public DorcelClubRipper(IDownloader downloader, ICaptchaSolver captchaSolver)
+    public DorcelClubRipper(ILegacyDownloader legacyDownloader, ICaptchaSolver captchaSolver)
     {
-        _downloader = downloader;
+        _legacyDownloader = legacyDownloader;
         _captchaSolver = captchaSolver;
     }
 
@@ -175,7 +175,7 @@ public class DorcelClubRipper : ISiteScraper
 
         IPage newPage = await page.Context.NewPageAsync();
 
-        var download = await _downloader.DownloadSceneAsync(release, newPage, selectedDownload.AvailableVideoFile, downloadConditions.PreferredDownloadQuality, async () =>
+        var download = await _legacyDownloader.DownloadSceneAsync(release, newPage, selectedDownload.AvailableVideoFile, downloadConditions.PreferredDownloadQuality, async () =>
         {
             try
             {

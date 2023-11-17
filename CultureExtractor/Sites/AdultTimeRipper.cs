@@ -558,11 +558,11 @@ public enum AdultTimeRequestType {
 [Site("adulttime")]
 public class AdultTimeRipper : ISiteScraper
 {
-    private readonly IDownloader _downloader;
+    private readonly ILegacyDownloader _legacyDownloader;
 
-    public AdultTimeRipper(IDownloader downloader)
+    public AdultTimeRipper(ILegacyDownloader legacyDownloader)
     {
-        _downloader = downloader;
+        _legacyDownloader = legacyDownloader;
     }
 
     public async Task LoginAsync(Site site, IPage page)
@@ -718,7 +718,7 @@ public class AdultTimeRipper : ISiteScraper
         if (sceneData.subtitles?.full?.en != null)
         {
             var subtitleFilename = ReleaseNamer.Name(release, ".vtt");
-            await _downloader.DownloadSceneSubtitlesAsync(release, subtitleFilename, "https://subtitles.gammacdn.com/" + sceneData.subtitles.full.en, page.Url);
+            await _legacyDownloader.DownloadSceneSubtitlesAsync(release, subtitleFilename, "https://subtitles.gammacdn.com/" + sceneData.subtitles.full.en, page.Url);
         }
 
         var sceneImageUrl = await page.GetAttributeAsync("img.ScenePlayerHeaderPlus-PosterImage", "src");
@@ -731,7 +731,7 @@ public class AdultTimeRipper : ISiteScraper
         replacement = "${1}jpg";
         output = Regex.Replace(output, pattern, replacement);
 
-        await _downloader.DownloadSceneImageAsync(release, output, release.Url);
+        await _legacyDownloader.DownloadSceneImageAsync(release, output, release.Url);
 
         return release;
     }
@@ -768,7 +768,7 @@ public class AdultTimeRipper : ISiteScraper
         var name = ReleaseNamer.Name(release, suffix);
 
         // TODO: does download but Playwright won't detect when it finishes
-        var download = await _downloader.DownloadSceneAsync(release, newPage, selectedDownload.AvailableVideoFile, downloadConditions.PreferredDownloadQuality, async () =>
+        var download = await _legacyDownloader.DownloadSceneAsync(release, newPage, selectedDownload.AvailableVideoFile, downloadConditions.PreferredDownloadQuality, async () =>
         {
             try
             {

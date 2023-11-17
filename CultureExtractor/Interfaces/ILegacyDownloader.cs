@@ -4,7 +4,7 @@ using Microsoft.Playwright;
 
 namespace CultureExtractor.Interfaces;
 
-public interface IDownloader
+public interface ILegacyDownloader
 {
     void CheckFreeSpace();
     Task<Download> DownloadSceneAsync(Release release, IPage page, AvailableVideoFile downloadDetails, PreferredDownloadQuality downloadQuality, Func<Task> func, string? filename = null);

@@ -12,11 +12,11 @@ namespace CultureExtractor.Sites;
 [Site("czechvrintimacy")]
 public class CzechVRNetworkRipper : ISiteScraper
 {
-    private readonly IDownloader _downloader;
+    private readonly ILegacyDownloader _legacyDownloader;
 
-    public CzechVRNetworkRipper(IDownloader downloader)
+    public CzechVRNetworkRipper(ILegacyDownloader legacyDownloader)
     {
-        _downloader = downloader;
+        _legacyDownloader = legacyDownloader;
     }
 
     public async Task LoginAsync(Site site, IPage page)
@@ -159,7 +159,7 @@ public class CzechVRNetworkRipper : ISiteScraper
             DateTime.Now);
         
         // TODO: Fix this
-        if (!_downloader.SceneImageExists(scene))
+        if (!_legacyDownloader.SceneImageExists(scene))
         {
             /*var previewElement = await currentRelease.QuerySelectorAsync("img");
             var originalUrl = await previewElement.GetAttributeAsync("src");
@@ -186,7 +186,7 @@ public class CzechVRNetworkRipper : ISiteScraper
             _ => throw new InvalidOperationException("Could not find a download candidate!")
         };
 
-        return await _downloader.DownloadSceneAsync(release, page, selectedDownload.AvailableVideoFile, downloadConditions.PreferredDownloadQuality, async () =>
+        return await _legacyDownloader.DownloadSceneAsync(release, page, selectedDownload.AvailableVideoFile, downloadConditions.PreferredDownloadQuality, async () =>
         {
             await page.EvaluateAsync(
                 $"document.querySelector('a[href=\"{selectedDownload.AvailableVideoFile.Url}\"')" +

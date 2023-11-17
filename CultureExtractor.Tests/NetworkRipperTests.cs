@@ -12,7 +12,7 @@ namespace CultureExtractor.Tests
     {
         private Mock<IRepository> _repositoryMock;
         private Mock<IServiceProvider> _serviceProviderMock;
-        private Mock<IDownloader> _downloaderMock;
+        private Mock<ILegacyDownloader> _downloaderMock;
         private Mock<IPlaywrightFactory> _playwrightFactoryMock;
         private Mock<ISiteScraper> _siteScraperMock;
 
@@ -26,7 +26,7 @@ namespace CultureExtractor.Tests
 
             _repositoryMock = new Mock<IRepository>();
             _serviceProviderMock = new Mock<IServiceProvider>();
-            _downloaderMock = new Mock<IDownloader>();
+            _downloaderMock = new Mock<ILegacyDownloader>();
             _playwrightFactoryMock = new Mock<IPlaywrightFactory>();
             _siteScraperMock = new Mock<ISiteScraper>();
 

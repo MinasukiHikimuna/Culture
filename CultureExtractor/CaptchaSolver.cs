@@ -7,11 +7,11 @@ namespace CultureExtractor
 {
     public class CaptchaSolver : ICaptchaSolver
     {
-        private readonly IDownloader _downloader;
+        private readonly ILegacyDownloader _legacyDownloader;
 
-        public CaptchaSolver(IDownloader downloader)
+        public CaptchaSolver(ILegacyDownloader legacyDownloader)
         {
-            _downloader = downloader;
+            _legacyDownloader = legacyDownloader;
         }
 
         public async Task SolveCaptchaIfNeededAsync(IPage page)
@@ -42,7 +42,7 @@ namespace CultureExtractor
             await page.FrameLocator($"iframe[name=\"{innerIframeName}\"]").Locator("button#recaptcha-audio-button").ClickAsync();
             var audioUrl = await page.FrameLocator($"iframe[name=\"{innerIframeName}\"]").Locator("a.rc-audiochallenge-tdownload-link").GetAttributeAsync("href");
 
-            var audioPath = await _downloader.DownloadCaptchaAudioAsync(audioUrl);
+            var audioPath = await _legacyDownloader.DownloadCaptchaAudioAsync(audioUrl);
 
             var captchaBuster = new CaptchaBusterImplementation();
             var result = await captchaBuster.SolveCaptchaAsync(audioPath);
