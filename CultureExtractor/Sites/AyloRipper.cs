@@ -16,7 +16,6 @@ public class AyloRipper : IYieldingScraper
     private static readonly HttpClient Client = new();
 
     private readonly IDownloader _downloader;
-    private readonly ICaptchaSolver _captchaSolver;
     private readonly IPlaywrightFactory _playwrightFactory;
     private readonly IRepository _repository;
     private readonly ICultureExtractorContext _context;
@@ -30,10 +29,9 @@ public class AyloRipper : IYieldingScraper
     private static string MovieApiUrl(string shortName) =>
         $"https://site-api.project1service.com/v2/releases/{shortName}?pageType=PLAYER";
 
-    public AyloRipper(IDownloader downloader, ICaptchaSolver captchaSolver, IPlaywrightFactory playwrightFactory, IRepository repository, ICultureExtractorContext context)
+    public AyloRipper(IDownloader downloader, IPlaywrightFactory playwrightFactory, IRepository repository, ICultureExtractorContext context)
     {
         _downloader = downloader;
-        _captchaSolver = captchaSolver;
         _playwrightFactory = playwrightFactory;
         _repository = repository;
         _context = context;
@@ -57,13 +55,17 @@ public class AyloRipper : IYieldingScraper
 
             await Task.Delay(5000);
 
-            await _captchaSolver.SolveCaptchaIfNeededAsync(page);
-
             if (await page.GetByRole(AriaRole.Button, new() { NameString = "Login" }).IsVisibleAsync())
             {
                 await page.GetByRole(AriaRole.Button, new() { NameString = "Login" }).ClickAsync();
                 await page.WaitForLoadStateAsync();
             }
+        }
+        
+        if (page.Url.Contains("badlogin"))
+        {
+            Log.Warning("Could not log into {Site} due to badlogin error. Login manually!", site.Name);
+            Console.ReadLine();
         }
 
         // TODO: detect if login was successful
