@@ -125,6 +125,7 @@ public class DownloadEntity
     public required string FileType { get; set; }
     public required string ContentType { get; set; }
     public required string Variant { get; set; }
+    [Column(TypeName = "json")]
     public required string AvailableFile { get; set; }
     public string? OriginalFilename { get; set; }
     public string? SavedFilename { get; set; }
