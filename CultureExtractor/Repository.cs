@@ -396,16 +396,13 @@ public class Repository : IRepository
     public async Task SaveDownloadAsync(Download download, PreferredDownloadQuality preferredDownloadQuality)
     {
         var releaseEntity = await _cultureExtractorContext.Releases.FirstAsync(s => s.Uuid == download.Release.Uuid);
-
-        // TODO: split this into two columns
-        var json = JsonSerializer.Serialize(new JsonSummary(download.AvailableFile, download.FileMetadata));
-
         _cultureExtractorContext.Downloads.Add(new DownloadEntity
         {
             Uuid = UuidGenerator.Generate(),
             DownloadedAt = DateTime.Now,
-            AvailableFile = json,
-            
+            AvailableFile = JsonSerializer.Serialize(download.AvailableFile),
+            FileMetadata = JsonSerializer.Serialize(download.FileMetadata),
+
             FileType = download.AvailableFile.FileType,
             ContentType = download.AvailableFile.ContentType,
             Variant = download.AvailableFile.Variant, // Enum.GetName(preferredDownloadQuality),
@@ -417,6 +414,4 @@ public class Repository : IRepository
         });
         await _cultureExtractorContext.SaveChangesAsync();
     }
-
-    private record JsonSummary(IAvailableFile AvailableFile, IFileMetadata FileMetadata);
 }
