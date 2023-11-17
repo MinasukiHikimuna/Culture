@@ -480,29 +480,29 @@ public class AyloMoviesRequest
     public class Poster1
     {
         [JsonPropertyName("0")]
-        public PosterSizes _0 { get; set; }
+        public PosterSizes? _0 { get; set; }
         [JsonPropertyName("1")]
-        public PosterSizes _1 { get; set; }
+        public PosterSizes? _1 { get; set; }
         [JsonPropertyName("2")]
-        public PosterSizes _2 { get; set; }
+        public PosterSizes? _2 { get; set; }
         [JsonPropertyName("3")]
-        public PosterSizes _3 { get; set; }
+        public PosterSizes? _3 { get; set; }
         [JsonPropertyName("4")]
-        public PosterSizes _4 { get; set; }
+        public PosterSizes? _4 { get; set; }
         [JsonPropertyName("5")]
-        public PosterSizes _5 { get; set; }
+        public PosterSizes? _5 { get; set; }
         public string alternateText { get; set; }
         public int imageVersion { get; set; }
     }
 
     public class PosterSizes
     {
-        public PosterSize xs { get; set; }
-        public PosterSize sm { get; set; }
-        public PosterSize md { get; set; }
-        public PosterSize lg { get; set; }
-        public PosterSize xl { get; set; }
-        public PosterSize xx { get; set; }
+        public PosterSize? xs { get; set; }
+        public PosterSize? sm { get; set; }
+        public PosterSize? md { get; set; }
+        public PosterSize? lg { get; set; }
+        public PosterSize? xl { get; set; }
+        public PosterSize? xx { get; set; }
     }
 
     public class PosterSize

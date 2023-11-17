@@ -149,7 +149,7 @@ public class AyloRipper : IYieldingScraper
             .OrderByDescending(availableFile => availableFile.ResolutionHeight)
             .ToList();
 
-        var imageDownloads = new List<AyloMoviesRequest.PosterSizes>
+        var imageDownloads = new List<AyloMoviesRequest.PosterSizes?>
             {
                 movieDetails.images.poster._0,
                 movieDetails.images.poster._1,
@@ -158,6 +158,7 @@ public class AyloRipper : IYieldingScraper
                 movieDetails.images.poster._4,
                 movieDetails.images.poster._5
             }
+            .Where(posterSizes => posterSizes?.xx != null)
             .Select(posterSizes => posterSizes.xx)
             .Select((image, index) => new AvailableImageFile(
                 "image",
