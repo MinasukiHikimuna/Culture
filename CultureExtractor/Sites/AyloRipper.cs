@@ -262,7 +262,7 @@ public class AyloRipper : IYieldingScraper
     }
 
     public async IAsyncEnumerable<Download> DownloadReleasesAsync(Site site, BrowserSettings browserSettings,
-        DownloadConditions downloadConditions, DownloadOptions downloadOptions)
+        DownloadConditions downloadConditions)
     {
         IPage page = await _playwrightFactory.CreatePageAsync(site, browserSettings);
 
@@ -272,11 +272,13 @@ public class AyloRipper : IYieldingScraper
         var headers = SetHeadersFromActualRequest(requests);
         var convertedHeaders = ConvertHeaders(headers);
 
-        var releases = await _repository.QueryReleasesAsync(site, downloadConditions, downloadOptions);
+        var releases = await _repository.QueryReleasesAsync(site, downloadConditions);
         foreach (var release in releases)
         {
             Log.Information("Downloading {Site} {ReleaseDate} {Release}", release.Site.Name, release.ReleaseDate.ToString("yyyy-MM-dd"), release.Name);
 
+            // this is now done on every scene despite we might already have all files
+            // the reason for updated scrape is that the links are timebombed and we need to refresh those
             Release? updatedScrape;
             try
             {
@@ -290,11 +292,11 @@ public class AyloRipper : IYieldingScraper
             }
 
             var existingDownloadEntities = await _context.Downloads.Where(d => d.ReleaseUuid == release.Uuid).ToListAsync();
-            foreach (var videoDownload in await DownloadsVideosAsync(downloadOptions, updatedScrape, existingDownloadEntities, convertedHeaders))
+            foreach (var videoDownload in await DownloadsVideosAsync(downloadConditions, updatedScrape, existingDownloadEntities, convertedHeaders))
             {
                 yield return videoDownload;
             }
-            await foreach (var trailerDownload in DownloadTrailersAsync(downloadOptions, updatedScrape, existingDownloadEntities))
+            await foreach (var trailerDownload in DownloadTrailersAsync(downloadConditions, updatedScrape, existingDownloadEntities))
             {
                 yield return trailerDownload;
             }
@@ -305,11 +307,11 @@ public class AyloRipper : IYieldingScraper
         }
     }
     
-    private async Task<IList<Download>> DownloadsVideosAsync(DownloadOptions downloadOptions, Release release,
+    private async Task<IList<Download>> DownloadsVideosAsync(DownloadConditions downloadConditions, Release release,
         List<DownloadEntity> existingDownloadEntities, WebHeaderCollection convertedHeaders)
     {
         var availableVideos = release.AvailableFiles.OfType<AvailableVideoFile>().Where(d => d is { FileType: "video", ContentType: "scene" });
-        var selectedVideo = downloadOptions.BestQuality
+        var selectedVideo = downloadConditions.PreferredDownloadQuality == PreferredDownloadQuality.Best
             ? availableVideos.FirstOrDefault()
             : availableVideos.LastOrDefault();
         if (selectedVideo == null || !NotDownloadedYet(existingDownloadEntities, selectedVideo))
@@ -340,12 +342,12 @@ public class AyloRipper : IYieldingScraper
         };
     }
     
-    private async IAsyncEnumerable<Download> DownloadTrailersAsync(DownloadOptions downloadOptions, Release release, List<DownloadEntity> existingDownloadEntities)
+    private async IAsyncEnumerable<Download> DownloadTrailersAsync(DownloadConditions downloadConditions, Release release, List<DownloadEntity> existingDownloadEntities)
     {
         var availableTrailers = release.AvailableFiles
             .OfType<AvailableVideoFile>()
             .Where(d => d is { FileType: "video", ContentType: "trailer" });
-        var selectedTrailer = downloadOptions.BestQuality
+        var selectedTrailer = downloadConditions.PreferredDownloadQuality == PreferredDownloadQuality.Best
             ? availableTrailers.FirstOrDefault()
             : availableTrailers.LastOrDefault();
         if (selectedTrailer == null  || !NotDownloadedYet(existingDownloadEntities, selectedTrailer))

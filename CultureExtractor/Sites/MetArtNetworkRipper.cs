@@ -351,7 +351,7 @@ public class MetArtNetworkRipper : IYieldingScraper
         }
     }
 
-    public async IAsyncEnumerable<Download> DownloadReleasesAsync(Site site, BrowserSettings browserSettings, DownloadConditions downloadConditions, DownloadOptions downloadOptions)
+    public async IAsyncEnumerable<Download> DownloadReleasesAsync(Site site, BrowserSettings browserSettings, DownloadConditions downloadConditions)
     {
         IPage page = await _playwrightFactory.CreatePageAsync(site, browserSettings);
 
@@ -361,20 +361,20 @@ public class MetArtNetworkRipper : IYieldingScraper
         var headers = SetHeadersFromActualRequest(site, requests);
         var convertedHeaders = ConvertHeaders(headers);
 
-        var releases = await _repository.QueryReleasesAsync(site, downloadConditions, downloadOptions);
+        var releases = await _repository.QueryReleasesAsync(site, downloadConditions);
         foreach (var release in releases)
         {
             Log.Information("Downloading {Site} {ReleaseDate} {Release}", release.Site.Name, release.ReleaseDate.ToString("yyyy-MM-dd"), release.Name);
             var existingDownloadEntities = await _context.Downloads.Where(d => d.ReleaseUuid == release.Uuid).ToListAsync();
-            await foreach (var galleryDownload in DownloadGalleriesAsync(downloadOptions, release, existingDownloadEntities, headers, convertedHeaders))
+            await foreach (var galleryDownload in DownloadGalleriesAsync(downloadConditions, release, existingDownloadEntities, headers, convertedHeaders))
             {
                 yield return galleryDownload;
             }
-            await foreach (var videoDownload in DownloadsVideosAsync(downloadOptions, release, existingDownloadEntities, headers, convertedHeaders))
+            await foreach (var videoDownload in DownloadsVideosAsync(downloadConditions, release, existingDownloadEntities, headers, convertedHeaders))
             {
                 yield return videoDownload;
             }
-            await foreach (var trailerDownload in DownloadTrailersAsync(downloadOptions, release, existingDownloadEntities))
+            await foreach (var trailerDownload in DownloadTrailersAsync(downloadConditions, release, existingDownloadEntities))
             {
                 yield return trailerDownload;
             }
@@ -389,13 +389,13 @@ public class MetArtNetworkRipper : IYieldingScraper
         }
     }
 
-    private async IAsyncEnumerable<Download> DownloadGalleriesAsync(DownloadOptions downloadOptions, Release release,
+    private async IAsyncEnumerable<Download> DownloadGalleriesAsync(DownloadConditions downloadConditions, Release release,
         List<DownloadEntity> existingDownloadEntities, IReadOnlyDictionary<string, string> headers, WebHeaderCollection convertedHeaders)
     {
         var availableGalleries = release.AvailableFiles
             .OfType<AvailableGalleryZipFile>()
             .Where(d => d is { FileType: "zip", ContentType: "gallery" });
-        var selectedGallery = downloadOptions.BestQuality
+        var selectedGallery = downloadConditions.PreferredDownloadQuality == PreferredDownloadQuality.Best
             ? availableGalleries.FirstOrDefault()
             : availableGalleries.LastOrDefault();
         if (selectedGallery == null || !NotDownloadedYet(existingDownloadEntities, selectedGallery))
@@ -443,11 +443,11 @@ public class MetArtNetworkRipper : IYieldingScraper
         yield return new Download(release, suggestedFileName, fileInfo.Name, selectedGallery, metadata);
     }
 
-    private async IAsyncEnumerable<Download> DownloadsVideosAsync(DownloadOptions downloadOptions, Release release,
+    private async IAsyncEnumerable<Download> DownloadsVideosAsync(DownloadConditions downloadConditions, Release release,
         List<DownloadEntity> existingDownloadEntities, IReadOnlyDictionary<string, string> headers, WebHeaderCollection convertedHeaders)
     {
         var availableVideos = release.AvailableFiles.OfType<AvailableVideoFile>().Where(d => d is { FileType: "video", ContentType: "scene" });
-        var selectedVideo = downloadOptions.BestQuality
+        var selectedVideo = downloadConditions.PreferredDownloadQuality == PreferredDownloadQuality.Best
             ? availableVideos.FirstOrDefault()
             : availableVideos.LastOrDefault();
         if (selectedVideo == null || !NotDownloadedYet(existingDownloadEntities, selectedVideo))
@@ -540,12 +540,12 @@ public class MetArtNetworkRipper : IYieldingScraper
         }
     }
 
-    private async IAsyncEnumerable<Download> DownloadTrailersAsync(DownloadOptions downloadOptions, Release release, List<DownloadEntity> existingDownloadEntities)
+    private async IAsyncEnumerable<Download> DownloadTrailersAsync(DownloadConditions downloadConditions, Release release, List<DownloadEntity> existingDownloadEntities)
     {
         var availableTrailers = release.AvailableFiles
             .OfType<AvailableVideoFile>()
             .Where(d => d is { FileType: "video", ContentType: "trailer" });
-        var selectedTrailer = downloadOptions.BestQuality
+        var selectedTrailer = downloadConditions.PreferredDownloadQuality == PreferredDownloadQuality.Best
             ? availableTrailers.FirstOrDefault()
             : availableTrailers.LastOrDefault();
         if (selectedTrailer == null  || !NotDownloadedYet(existingDownloadEntities, selectedTrailer))

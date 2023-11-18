@@ -82,9 +82,9 @@ public class NetworkRipper : INetworkRipper
 
     private static IEnumerable<int> PageEnumeration(ScrapeOptions scrapeOptions, int totalPages)
     {
-        for (int currentPage = scrapeOptions.ReverseOrder ? 1 : totalPages;
-             scrapeOptions.ReverseOrder ? currentPage <= totalPages : currentPage >= 1;
-             currentPage += scrapeOptions.ReverseOrder ? 1 : -1)
+        for (int currentPage = scrapeOptions.Order == OrderEnum.Descending ? 1 : totalPages;
+             scrapeOptions.Order == OrderEnum.Descending ? currentPage <= totalPages : currentPage >= 1;
+             currentPage += scrapeOptions.Order == OrderEnum.Descending ? 1 : -1)
         {
             yield return currentPage;
         }
@@ -117,7 +117,7 @@ public class NetworkRipper : INetworkRipper
         var unscrapedListedReleases = scrapeOptions.FullScrape
             ? checkedListedReleases.Where(s => s.Release == null || s.Release.LastUpdated < scrapeOptions.FullScrapeLastUpdated)
             : checkedListedReleases.Where(s => s.Release == null).ToList();
-        if (scrapeOptions.ReverseOrder)
+        if (scrapeOptions.Order == OrderEnum.Descending)
         {
             unscrapedListedReleases = unscrapedListedReleases.Reverse();
         }
@@ -253,7 +253,7 @@ public class NetworkRipper : INetworkRipper
 
         if (scraper is IYieldingScraper yieldingScraper)
         {
-            await foreach (var download in yieldingScraper.DownloadReleasesAsync(site, browserSettings, downloadConditions, downloadOptions))
+            await foreach (var download in yieldingScraper.DownloadReleasesAsync(site, browserSettings, downloadConditions))
             {
                 Log.Information($"Downloaded {download.AvailableFile.FileType} {download.AvailableFile.ContentType} {download.AvailableFile.Variant} of {download.Release.Name} from {download.Release.Site.Name}.");
                 await _repository.SaveDownloadAsync(download, downloadConditions.PreferredDownloadQuality);
@@ -262,7 +262,7 @@ public class NetworkRipper : INetworkRipper
             return;
         }
 
-        var matchingReleases = await _repository.QueryReleasesAsync(site, downloadConditions, downloadOptions);
+        var matchingReleases = await _repository.QueryReleasesAsync(site, downloadConditions);
         var furtherFilteredReleases = matchingReleases
             .Where(s =>
                 downloadConditions.DateRange.Start <= s.ReleaseDate &&
@@ -288,7 +288,7 @@ public class NetworkRipper : INetworkRipper
                 .ToList();
         }
 
-        if (downloadOptions.ReverseOrder)
+        if (downloadOptions.Order == OrderEnum.Descending)
         {
             furtherFilteredReleases = furtherFilteredReleases.OrderByDescending(s => s.ReleaseDate).ToList();
         }
