@@ -45,7 +45,8 @@ public class Downloader : IDownloader
                 return null;
             }
             catch (WebException ex) when (ex.InnerException is IOException &&
-                                          ex.InnerException.Message.Contains("The response ended prematurely"))
+                                          (ex.InnerException.Message.Contains("The response ended prematurely") || 
+                                           ex.InnerException.Message.Contains("Received an unexpected EOF or 0 bytes from the transport stream.")))
             {
                 if (retryCount >= maxRetryCount)
                 {
