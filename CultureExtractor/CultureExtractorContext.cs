@@ -47,6 +47,8 @@ public class SubSiteEntity
     public required Guid Uuid { get; set; }
     public required string ShortName { get; set; }
     public required string Name { get; set; }
+    [Column(TypeName = "json")]
+    public required string JsonDocument { get; set; }
 
     public required Guid SiteUuid { get; set; }
     public required SiteEntity Site { get; set; }

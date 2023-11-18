@@ -269,7 +269,7 @@ public class AdultPrimeRipper : ISiteScraper, ISubSiteScraper
             var siteName = subsiteUrl.Replace("/studios/studio/", "");
 
             var uuid = existingSubSites.FirstOrDefault(s => s.ShortName == siteName)?.Uuid ?? UuidGenerator.Generate();
-            subSites.Add(new SubSite(uuid, siteName, siteName, site));
+            subSites.Add(new SubSite(uuid, siteName, siteName, "{}", site));
         }
 
         var uniqueSubSites = subSites

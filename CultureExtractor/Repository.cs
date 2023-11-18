@@ -134,6 +134,7 @@ public class Repository : IRepository
             if (existingSubSiteEntity.Name != subSite.Name)
             {
                 existingSubSiteEntity.Name = subSite.Name;
+                existingSubSiteEntity.JsonDocument = subSite.JsonDocument;
                 await _cultureExtractorContext.SaveChangesAsync();
             }
 
@@ -146,6 +147,7 @@ public class Repository : IRepository
             Uuid = UuidGenerator.Generate(),
             ShortName = subSite.ShortName,
             Name = subSite.Name,
+            JsonDocument = subSite.JsonDocument,
             SiteUuid = siteEntity.Uuid,
             Site = siteEntity
         };
@@ -170,6 +172,7 @@ public class Repository : IRepository
                     Uuid = UuidGenerator.Generate(),
                     ShortName = release.SubSite.ShortName,
                     Name = release.SubSite.Name,
+                    JsonDocument = release.SubSite.JsonDocument,
                     SiteUuid = siteEntity.Uuid,
                     Site = siteEntity
                 };
@@ -347,6 +350,7 @@ public class Repository : IRepository
                 subSiteEntity.Uuid,
                 subSiteEntity.ShortName,
                 subSiteEntity.Name,
+                subSiteEntity.JsonDocument,
                 Convert(subSiteEntity.Site)
               )
             : null;

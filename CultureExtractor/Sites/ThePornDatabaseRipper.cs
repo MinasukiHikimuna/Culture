@@ -20,7 +20,7 @@ public class ThePornDatabaseRipper : IYieldingScraper
         using HttpClient client = new();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", site.Password);
         
-        var sitesResponse = await client.GetAsync($"{site.Url}/sites?q=slayed");
+        var sitesResponse = await client.GetAsync($"{site.Url}/sites?q=digital+playground");
         var sitesJson = await sitesResponse.Content.ReadAsStringAsync();
         var sites = JsonSerializer.Deserialize<ThePornDatabaseSitesResponse.RootObject>(sitesJson);
 
@@ -34,6 +34,7 @@ public class ThePornDatabaseRipper : IYieldingScraper
                 : UuidGenerator.Generate(),
             siteObj.uuid,
             siteObj.name,
+            JsonSerializer.Serialize(siteObj),
             site);
 
         await _repository.UpsertSubSite(subSite);

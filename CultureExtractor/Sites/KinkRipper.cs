@@ -317,7 +317,7 @@ public class KinkRipper : ISiteScraper, ISubSiteScraper
             var name = await h3Handle.TextContentAsync();
 
             var uuid = existingSubSites.FirstOrDefault(s => s.ShortName == siteName)?.Uuid ?? UuidGenerator.Generate();
-            subSites.Add(new SubSite(uuid, siteName, name, site));
+            subSites.Add(new SubSite(uuid, siteName, name, "{}", site));
         }
 
         var uniqueSubSites = subSites

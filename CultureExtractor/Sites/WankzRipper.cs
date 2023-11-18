@@ -270,7 +270,7 @@ public class WankzRipper : ISubSiteScraper
             
             var name = await link.TextContentAsync();
             var uuid = existingSubSites.FirstOrDefault(s => s.ShortName == shortName)?.Uuid ?? UuidGenerator.Generate();
-            subSites.Add(new SubSite(uuid, shortName, name, site));
+            subSites.Add(new SubSite(uuid, shortName, name, "{}", site));
         }
 
         return subSites;
