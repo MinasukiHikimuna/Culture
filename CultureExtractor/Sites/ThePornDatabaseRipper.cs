@@ -20,16 +20,29 @@ public class ThePornDatabaseRipper : IYieldingScraper
         using HttpClient client = new();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", site.Password);
         
-        var sitesResponse = await client.GetAsync($"{site.Url}/sites?q=tushy");
+        var sitesResponse = await client.GetAsync($"{site.Url}/sites?q=slayed");
         var sitesJson = await sitesResponse.Content.ReadAsStringAsync();
         var sites = JsonSerializer.Deserialize<ThePornDatabaseSitesResponse.RootObject>(sitesJson);
 
         var siteObj = sites.data[0];
+        
+        var existingSubSites = await _repository.GetSubSitesAsync(site.Uuid);
+        var existingSubSitesDictionary = existingSubSites.ToDictionary(s => s.ShortName, s => s);
+        var subSite = new SubSite(
+            existingSubSitesDictionary.TryGetValue(siteObj.uuid, out var existingSubSite)
+                ? existingSubSite.Uuid
+                : UuidGenerator.Generate(),
+            siteObj.uuid,
+            siteObj.name,
+            site);
+
+        await _repository.UpsertSubSite(subSite);
 
         int currentPage = 1;
         int totalPages = 0;
         do
         {
+            await Task.Delay(5000);
             var scenesResponse = await client.GetAsync($"{site.Url}/scenes?site_id={siteObj.id}&page={currentPage}");
             var scenesJson = await scenesResponse.Content.ReadAsStringAsync();
             var scenes = JsonSerializer.Deserialize<ThePornDatabaseScenesResponse.RootObject>(scenesJson);
@@ -49,22 +62,30 @@ public class ThePornDatabaseRipper : IYieldingScraper
 
             foreach (var scene in toBeScraped)
             {
-                /*var release = new Release(
+                var release = new Release(
                     existingReleasesDictionary.TryGetValue(scene.id, out var existingRelease)
                         ? existingRelease.Uuid
                         : UuidGenerator.Generate(),
-                    site.Uuid,
+                    site,
+                    subSite,
+                    DateOnly.ParseExact(scene.date, "yyyy-MM-dd"),
+                    scene.id,
                     scene.title,
+                    scene.url,
                     scene.description,
+                    scene.duration ?? -1,
+                    scene.performers.Select(p => new SitePerformer(p.id, p.name, $"{site.Url}/performers/{p.id}")),
+                    scene.tags.Select(t => new SiteTag(t.id.ToString(), t.name, string.Empty)),
+                    new List<IAvailableFile>(),
+                    JsonSerializer.Serialize(scene),
+                    DateTime.Now
+                );
                     
-                    
-                yield return release;*/
+                yield return release;
             }
 
             currentPage++;
         } while (currentPage <= totalPages);
-        
-        yield break;
     }
 
     public IAsyncEnumerable<Download> DownloadReleasesAsync(Site site, BrowserSettings browserSettings,
