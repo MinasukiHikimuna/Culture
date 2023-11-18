@@ -133,6 +133,11 @@ public class AyloRipper : IYieldingScraper
         var movieUrl = MovieApiUrl(shortName);
 
         using var movieResponse = Client.GetAsync(movieUrl);
+        if (movieResponse.Result.StatusCode != HttpStatusCode.OK)
+        {
+            throw new InvalidOperationException($"Could not read movie API response:{Environment.NewLine}Url={movieUrl}{Environment.NewLine}StatusCode={movieResponse.Result.StatusCode}{Environment.NewLine}ReasonPhrase={movieResponse.Result.ReasonPhrase}");
+        }
+
         var movieJson = await movieResponse.Result.Content.ReadAsStringAsync();
         var movieDetailsContainer = JsonSerializer.Deserialize<AyloMovieRequest.RootObject>(movieJson);
         if (movieDetailsContainer == null)
@@ -272,11 +277,20 @@ public class AyloRipper : IYieldingScraper
         {
             Log.Information("Downloading {Site} {ReleaseDate} {Release}", release.Site.Name, release.ReleaseDate.ToString("yyyy-MM-dd"), release.Name);
 
-            var updatedScrape = await ScrapeSceneAsync(site, release.ShortName,
-                new Dictionary<string, Release> { { release.ShortName, release } });
-            
+            Release? updatedScrape;
+            try
+            {
+                updatedScrape = await ScrapeSceneAsync(site, release.ShortName,
+                    new Dictionary<string, Release> { { release.ShortName, release } });
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "Could not scrape {Site} {ReleaseDate} {Release}", release.Site.Name, release.ReleaseDate.ToString("yyyy-MM-dd"), release.Name);
+                continue;
+            }
+
             var existingDownloadEntities = await _context.Downloads.Where(d => d.ReleaseUuid == release.Uuid).ToListAsync();
-            await foreach (var videoDownload in DownloadsVideosAsync(downloadOptions, updatedScrape, existingDownloadEntities, convertedHeaders))
+            foreach (var videoDownload in await DownloadsVideosAsync(downloadOptions, updatedScrape, existingDownloadEntities, convertedHeaders))
             {
                 yield return videoDownload;
             }
@@ -291,7 +305,7 @@ public class AyloRipper : IYieldingScraper
         }
     }
     
-    private async IAsyncEnumerable<Download> DownloadsVideosAsync(DownloadOptions downloadOptions, Release release,
+    private async Task<IList<Download>> DownloadsVideosAsync(DownloadOptions downloadOptions, Release release,
         List<DownloadEntity> existingDownloadEntities, WebHeaderCollection convertedHeaders)
     {
         var availableVideos = release.AvailableFiles.OfType<AvailableVideoFile>().Where(d => d is { FileType: "video", ContentType: "scene" });
@@ -300,7 +314,7 @@ public class AyloRipper : IYieldingScraper
             : availableVideos.LastOrDefault();
         if (selectedVideo == null || !NotDownloadedYet(existingDownloadEntities, selectedVideo))
         {
-            yield break;
+            return new List<Download>();
         }
 
         var uri = new Uri(selectedVideo.Url);
@@ -316,11 +330,14 @@ public class AyloRipper : IYieldingScraper
         var fileInfo = await _downloader.TryDownloadAsync(release, selectedVideo, selectedVideo.Url, fileName, convertedHeaders);
         if (fileInfo == null)
         {
-            yield break;
+            return new List<Download>();
         }
 
         var videoHashes = Hasher.Phash(@"""" + fileInfo.FullName + @"""");
-        yield return new Download(release, suggestedFileName, fileInfo.Name, selectedVideo, videoHashes);
+        return new List<Download>
+        {
+            new(release, suggestedFileName, fileInfo.Name, selectedVideo, videoHashes)
+        };
     }
     
     private async IAsyncEnumerable<Download> DownloadTrailersAsync(DownloadOptions downloadOptions, Release release, List<DownloadEntity> existingDownloadEntities)
