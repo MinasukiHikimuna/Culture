@@ -134,7 +134,7 @@ class Program
     {
         if (System.Diagnostics.Debugger.IsAttached)
         {
-            var siteShortName = "digitalplayground";
+            var siteShortName = "tpdb";
             // var subSiteShortName = "sex-and-submission";
 
             var scrapeArgs = new string[]
@@ -175,7 +175,7 @@ class Program
                 "--site-short-name", siteShortName,
             };
 
-            args = downloadArgs;
+            args = scrapeArgs;
         }
         
         // Use this for EF migrations:
