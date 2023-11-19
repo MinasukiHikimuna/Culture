@@ -23,10 +23,10 @@ namespace CultureExtractor.Sites;
 [Site("hustler")]
 public class MetArtNetworkRipper : IYieldingScraper
 {
+    private static readonly HttpClient Client = new();
+    
     private readonly IDownloader _downloader;
     private readonly IPlaywrightFactory _playwrightFactory;
-
-    private static readonly HttpClient Client = new();
     private readonly IRepository _repository;
     private readonly ICultureExtractorContext _context;
 
@@ -668,7 +668,7 @@ public class MetArtNetworkRipper : IYieldingScraper
         return movies;
     }
 
-    private static async Task LoginAsync(Site site, IPage page)
+    private async Task LoginAsync(Site site, IPage page)
     {
         await Task.Delay(5000);
 
@@ -687,5 +687,7 @@ public class MetArtNetworkRipper : IYieldingScraper
             await page.Locator("button[type='submit']").ClickAsync();
             await page.WaitForLoadStateAsync();
         }
+        
+        await _repository.UpdateStorageStateAsync(site, await page.Context.StorageStateAsync());
     }
 }
