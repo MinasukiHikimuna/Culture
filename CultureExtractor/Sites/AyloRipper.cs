@@ -38,46 +38,6 @@ public class AyloRipper : IYieldingScraper
         _context = context;
     }
 
-    public async Task LoginAsync(Site site, IPage page)
-    {
-        await Task.Delay(5000);
-
-        var usernameInput = page.GetByPlaceholder("Username or Email");
-        if (await usernameInput.IsVisibleAsync())
-        {
-            await page.GetByPlaceholder("Username or Email").ClickAsync();
-            await page.GetByPlaceholder("Username or Email").FillAsync(site.Username);
-
-            await page.GetByPlaceholder("Password").ClickAsync();
-            await page.GetByPlaceholder("Password").FillAsync(site.Password);
-
-            await page.GetByRole(AriaRole.Button, new() { NameString = "Login" }).ClickAsync();
-            await page.WaitForLoadStateAsync();
-
-            await Task.Delay(5000);
-
-            if (await page.GetByRole(AriaRole.Button, new() { NameString = "Login" }).IsVisibleAsync())
-            {
-                await page.GetByRole(AriaRole.Button, new() { NameString = "Login" }).ClickAsync();
-                await page.WaitForLoadStateAsync();
-            }
-        }
-        
-        if (page.Url.Contains("badlogin"))
-        {
-            Log.Warning("Could not log into {Site} due to badlogin error. Login manually!", site.Name);
-            Console.ReadLine();
-        }
-
-        // TODO: detect if login was successful
-        
-        await Task.Delay(5000);
-
-        await page.GotoAsync(site.Url);
-
-        Log.Information($"Logged into {site.Name}.");
-    }
-
     public async IAsyncEnumerable<Release> ScrapeReleasesAsync(Site site, BrowserSettings browserSettings, ScrapeOptions scrapeOptions)
     {
         IPage page = await _playwrightFactory.CreatePageAsync(site, browserSettings);
