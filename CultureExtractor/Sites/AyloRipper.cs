@@ -146,6 +146,11 @@ public class AyloRipper : IYieldingScraper
         }
 
         var movieDetails = movieDetailsContainer.result;
+        if (movieDetails.videos.full == null)
+        {
+            throw new InvalidOperationException("Login required.");
+        }
+        
         var sceneDownloads = movieDetails.videos.full.files
             .Where(keyValuePair => keyValuePair.Key != "dash" && keyValuePair.Key != "hls")
             .Select(keyValuePair => new AvailableVideoFile(

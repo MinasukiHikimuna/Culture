@@ -1576,7 +1576,7 @@ public class AyloMoviesRequest
 
     public class Videos
     {
-        public Full full { get; set; }
+        public Full? full { get; set; }
         public Mediabook mediabook { get; set; }
     }
 
