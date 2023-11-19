@@ -46,10 +46,10 @@ public class AyloMoviesRequest
         public Children[] children { get; set; }
         public Collections[] collections { get; set; }
         public Galleries[] galleries { get; set; }
-        public Images images { get; set; }
+        public Images? images { get; set; }
         public Tags[] tags { get; set; }
         public TimeTags[] timeTags { get; set; }
-        public Videos videos { get; set; }
+        public Videos? videos { get; set; }
         public Groups[] groups { get; set; }
         public bool isMemberUnlocked { get; set; }
         public bool isFreeScene { get; set; }

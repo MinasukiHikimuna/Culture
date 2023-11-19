@@ -55,25 +55,43 @@ public class AyloRipper : IYieldingScraper
 
     private async IAsyncEnumerable<Release> ScrapeScenesAsync(Site site, ScrapeOptions scrapeOptions)
     {
-        var moviesInitialPage = await GetMoviesPageAsync(1);
+        int pageNumber = 0;
+        int pages = 0;
 
-        var pages = (int)Math.Ceiling((double)moviesInitialPage.meta.total / moviesInitialPage.meta.count);
-        for (var pageNumber = 1; pageNumber <= pages; pageNumber++)
+        do
         {
+            pageNumber++;
             await Task.Delay(5000);
 
-            var moviesPage = await GetMoviesPageAsync(pageNumber);
+            AyloMoviesRequest.RootObject moviesPage;
+            try
+            {
+                moviesPage = await GetMoviesPageAsync(pageNumber);                
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, $"Error while fetching page {pageNumber}");
+                continue;
+            }
+
+            // Only calculate the total number of pages after fetching the first page
+            if (pages == 0)
+            {
+                if (moviesPage.meta.count == 0)
+                {
+                    throw new InvalidOperationException($"No movies found on page {pageNumber}.");
+                }
+                
+                pages = (int)Math.Ceiling((double)moviesPage.meta.total / moviesPage.meta.count);
+            }
 
             Log.Information($"Page {pageNumber}/{pages} contains {moviesPage.result.Length} releases");
 
             var movies = moviesPage.result
                 .ToDictionary(r => r.id.ToString(), r => r);
-
             var existingReleases = await _repository
                 .GetReleasesAsync(site.ShortName, movies.Keys.ToList());
-
             var existingReleasesDictionary = existingReleases.ToDictionary(r => r.ShortName, r => r);
-            
             var moviesToBeScraped = movies
                 .Where(g => !existingReleasesDictionary.ContainsKey(g.Key) || existingReleasesDictionary[g.Key].LastUpdated < scrapeOptions.FullScrapeLastUpdated)
                 .Select(g => g.Value)
@@ -83,13 +101,35 @@ public class AyloRipper : IYieldingScraper
             {
                 await Task.Delay(1000);
                 var shortName = movie.id.ToString();
-                var scene = await ScrapeSceneAsync(site, shortName, existingReleasesDictionary);
-                yield return scene;
+
+                Release? scene = null;
+                try
+                {
+                    var releaseGuid = existingReleasesDictionary.TryGetValue(shortName, out var existingRelease)
+                        ? existingRelease.Uuid
+                        : UuidGenerator.Generate();
+                    scene = await ScrapeSceneAsync(site, shortName, releaseGuid);
+                }
+                catch (Exception ex)
+                {
+                    Log.Error(ex, $"Error while scraping scene: {shortName}");
+                    // Handling the exception by logging it and continuing with the next iteration
+                }
+
+                if (scene != null)
+                {
+                    yield return scene;
+                }
+                else
+                {
+                    Log.Error("Unable to scrape {Site} scene {ShortName} on page {Page}", 
+                        site.Name, shortName, pageNumber);   
+                }
             }
-        }
+        } while (pageNumber < pages); // Continue while the current page number is less than the total number of pages
     }
 
-    private static async Task<Release> ScrapeSceneAsync(Site site, string shortName, Dictionary<string, Release> existingReleasesDictionary)
+    private static async Task<Release> ScrapeSceneAsync(Site site, string shortName, Guid releaseGuid)
     {
         var movieUrl = MovieApiUrl(shortName);
 
@@ -128,27 +168,29 @@ public class AyloRipper : IYieldingScraper
             .OrderByDescending(availableFile => availableFile.ResolutionHeight)
             .ToList();
 
-        var imageDownloads = new List<AyloMoviesRequest.PosterSizes?>
-            {
-                movieDetails.images.poster._0,
-                movieDetails.images.poster._1,
-                movieDetails.images.poster._2,
-                movieDetails.images.poster._3,
-                movieDetails.images.poster._4,
-                movieDetails.images.poster._5
-            }
-            .Where(posterSizes => posterSizes?.xx != null)
-            .Select(posterSizes => posterSizes.xx)
-            .Select((image, index) => new AvailableImageFile(
-                "image",
-                $"poster_xx_{index}",
-                string.Empty,
-                image.urls.default1,
-                image.width,
-                image.height,
-                -1
-            ))
-            .ToList();
+        var imageDownloads = movieDetails.images != null
+            ? new List<AyloMoviesRequest.PosterSizes?>
+                {
+                    movieDetails.images.poster._0,
+                    movieDetails.images.poster._1,
+                    movieDetails.images.poster._2,
+                    movieDetails.images.poster._3,
+                    movieDetails.images.poster._4,
+                    movieDetails.images.poster._5
+                }
+                .Where(posterSizes => posterSizes?.xx != null)
+                .Select(posterSizes => posterSizes.xx)
+                .Select((image, index) => new AvailableImageFile(
+                    "image",
+                    $"poster_xx_{index}",
+                    string.Empty,
+                    image.urls.default1,
+                    image.width,
+                    image.height,
+                    -1
+                ))
+                .ToList()
+            : new List<AvailableImageFile>();
 
         var trailerDownloads = movieDetails.videos.mediabook.files
             .Select(keyValuePair =>
@@ -167,9 +209,7 @@ public class AyloRipper : IYieldingScraper
             .ToList();
 
         var scene = new Release(
-            existingReleasesDictionary.TryGetValue(shortName, out var existingRelease)
-                ? existingRelease.Uuid
-                : UuidGenerator.Generate(),
+            releaseGuid,
             site,
             null,
             DateOnly.FromDateTime(DateTime.Parse(movieDetails.dateReleased)),
@@ -200,6 +240,11 @@ public class AyloRipper : IYieldingScraper
         }
         
         var json = await response.Content.ReadAsStringAsync();
+        // Aylo sites return empty array instead of object with size-specific images when data is not available.
+        // This is bad for strict deserialization, so we replace empty array with null.
+        json = json.Replace("\"images\":[]", "\"images\":null");
+        json = json.Replace("\"videos\":[]", "\"videos\":null");
+        
         var movies = JsonSerializer.Deserialize<AyloMoviesRequest.RootObject>(json);
         if (movies == null)
         {
@@ -248,8 +293,7 @@ public class AyloRipper : IYieldingScraper
             Release? updatedScrape;
             try
             {
-                updatedScrape = await ScrapeSceneAsync(site, release.ShortName,
-                    new Dictionary<string, Release> { { release.ShortName, release } });
+                updatedScrape = await ScrapeSceneAsync(site, release.ShortName, release.Uuid);
             }
             catch (Exception ex)
             {
