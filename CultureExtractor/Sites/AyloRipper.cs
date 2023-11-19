@@ -312,7 +312,7 @@ public class AyloRipper : IYieldingScraper
             }
         }
     }
-    
+
     private async Task<IList<Download>> DownloadsVideosAsync(DownloadConditions downloadConditions, Release release,
         List<DownloadEntity> existingDownloadEntities, WebHeaderCollection convertedHeaders)
     {
@@ -413,7 +413,47 @@ public class AyloRipper : IYieldingScraper
     {
         return !existingDownloadEntities.Exists(d => d.FileType == bestVideo.FileType && d.ContentType == bestVideo.ContentType && d.Variant == bestVideo.Variant);
     }
-    
+
+    private async Task LoginAsync(Site site, IPage page)
+    {
+        await Task.Delay(5000);
+
+        var usernameInput = page.GetByPlaceholder("Username or Email");
+        if (await usernameInput.IsVisibleAsync())
+        {
+            await page.GetByPlaceholder("Username or Email").ClickAsync();
+            await page.GetByPlaceholder("Username or Email").FillAsync(site.Username);
+
+            await page.GetByPlaceholder("Password").ClickAsync();
+            await page.GetByPlaceholder("Password").FillAsync(site.Password);
+
+            await page.GetByRole(AriaRole.Button, new() { NameString = "Login" }).ClickAsync();
+            await page.WaitForLoadStateAsync();
+
+            await Task.Delay(5000);
+
+            if (await page.GetByRole(AriaRole.Button, new() { NameString = "Login" }).IsVisibleAsync())
+            {
+                await page.GetByRole(AriaRole.Button, new() { NameString = "Login" }).ClickAsync();
+                await page.WaitForLoadStateAsync();
+            }
+        }
+        
+        if (page.Url.Contains("badlogin"))
+        {
+            Log.Warning("Could not log into {Site} due to badlogin error. Login manually!", site.Name);
+            Console.ReadLine();
+        }
+        
+        await Task.Delay(5000);
+
+        await page.GotoAsync(site.Url);
+
+        Log.Information($"Logged into {site.Name}.");
+        
+        await _repository.UpdateStorageStateAsync(site, await page.Context.StorageStateAsync());
+    }
+
     private static async Task<List<IRequest>> CaptureRequestsAsync(Site site, IPage page)
     {
         var requests = new List<IRequest>();
