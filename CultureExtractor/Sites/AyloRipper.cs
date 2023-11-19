@@ -11,6 +11,7 @@ namespace CultureExtractor.Sites;
 
 [Site("brazzers")]
 [Site("digitalplayground")]
+[Site("realitykings")]
 public class AyloRipper : IYieldingScraper
 {
     private static readonly HttpClient Client = new();
