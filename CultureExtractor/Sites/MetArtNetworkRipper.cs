@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿using System.Collections.Immutable;
+using System.Net;
 using Microsoft.Playwright;
 using CultureExtractor.Interfaces;
 using System.Text.Json;
@@ -364,7 +365,15 @@ public class MetArtNetworkRipper : IYieldingScraper
         var releases = await _repository.QueryReleasesAsync(site, downloadConditions);
         foreach (var release in releases)
         {
-            Log.Information("Downloading {Site} {ReleaseDate} {Release}", release.Site.Name, release.ReleaseDate.ToString("yyyy-MM-dd"), release.Name);
+            var releaseDownloadPlan = PlanDownloads(release, downloadConditions);
+            var releaseMissingDownloadsPlan = PlanMissingDownloads(releaseDownloadPlan);
+
+            if (!releaseMissingDownloadsPlan.AvailableFiles.Any())
+            {
+                continue;
+            }
+            
+            Log.Information("Downloading: {Site} - {ReleaseDate} - {Release} [{Uuid}]", release.Site.Name, release.ReleaseDate.ToString("yyyy-MM-dd"), release.Name, release.Uuid);
             var existingDownloadEntities = await _context.Downloads.Where(d => d.ReleaseUuid == release.Uuid).ToListAsync();
             await foreach (var galleryDownload in DownloadGalleriesAsync(downloadConditions, release, existingDownloadEntities, headers, convertedHeaders))
             {
@@ -441,6 +450,48 @@ public class MetArtNetworkRipper : IYieldingScraper
         var sha256Sum = LegacyDownloader.CalculateSHA256(fileInfo.FullName);
         var metadata = new GalleryZipFileMetadata(sha256Sum);
         yield return new Download(release, suggestedFileName, fileInfo.Name, selectedGallery, metadata);
+    }
+
+    private static ReleaseDownloadPlan PlanDownloads(Release release, DownloadConditions downloadConditions)
+    {
+        var sceneFiles = release.AvailableFiles.OfType<AvailableVideoFile>().Where(f => f.ContentType == "scene").ToList();
+        var galleryFiles = release.AvailableFiles.OfType<AvailableGalleryZipFile>().Where(f => f.ContentType == "gallery").ToList();
+        var trailerFiles = release.AvailableFiles.OfType<AvailableVideoFile>().Where(f => f.ContentType == "trailer").ToList();
+
+        var selectedSceneFiles = downloadConditions.PreferredDownloadQuality == PreferredDownloadQuality.Best
+            ? sceneFiles.Take(1)
+            : sceneFiles.TakeLast(1);
+        var selectedGalleryFiles = downloadConditions.PreferredDownloadQuality == PreferredDownloadQuality.Best
+            ? galleryFiles.Take(1)
+            : galleryFiles.TakeLast(1);
+        var selectedTrailerFiles = downloadConditions.PreferredDownloadQuality == PreferredDownloadQuality.Best
+            ? trailerFiles.Take(1)
+            : trailerFiles.TakeLast(1);
+        var otherFiles = release.AvailableFiles
+            .Except(trailerFiles)
+            .Except(sceneFiles)
+            .Except(galleryFiles)
+            .ToList();
+
+        var availableFiles = new List<IAvailableFile>()
+            .Concat(selectedSceneFiles)
+            .Concat(selectedGalleryFiles)
+            .Concat(selectedTrailerFiles)
+            .Concat(otherFiles)
+            .ToImmutableList();
+        
+        return new ReleaseDownloadPlan(release, availableFiles);
+    }
+
+    private ReleaseDownloadPlan PlanMissingDownloads(ReleaseDownloadPlan releaseDownloadPlan)
+    {
+        var existingDownloads = _context.Downloads.Where(d => d.ReleaseUuid == releaseDownloadPlan.Release.Uuid).ToList();
+        var notYetDownloaded = releaseDownloadPlan.AvailableFiles
+            .Where(f => !existingDownloads.Exists(d =>
+                d.FileType == f.FileType && d.ContentType == f.ContentType && d.Variant == f.Variant))
+            .ToImmutableList();
+
+        return releaseDownloadPlan with { AvailableFiles = notYetDownloaded };
     }
 
     private async IAsyncEnumerable<Download> DownloadsVideosAsync(DownloadConditions downloadConditions, Release release,

@@ -17,8 +17,6 @@ public class DownloadPlanner
     }
 }
 
-public record ReleaseDownloadPlan(Release Release, IReadOnlyList<IAvailableFile> AvailableFiles);
-
 [TestFixture]
 public class DownloadPlannerTests
 {
