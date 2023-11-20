@@ -18,8 +18,8 @@ namespace CultureExtractor
         {
             await Task.Delay(3000);
 
-            var blocked = await page.IsVisibleAsync("div#g-recaptcha");
-            if (!blocked)
+            var innerIframe = await page.EvaluateAsync<object?>("document.querySelector(\"iframe[title='recaptcha challenge expires in two minutes']\")");
+            if (innerIframe == null)
             {
                 Log.Verbose("No CAPTCHA found.");
                 return;
@@ -27,18 +27,13 @@ namespace CultureExtractor
 
             Log.Information("CAPTCHA found. Solving...");
 
-            var iframeName = await page.EvaluateAsync<string>("document.querySelector(\"iframe[title='reCAPTCHA']\").name");
-
-            await Task.Delay(1000);
-
-            await page.FrameLocator($"iframe[name=\"{iframeName}\"]").GetByRole(AriaRole.Checkbox, new() { NameString = "I'm not a robot" }).ClickAsync();
-
-            await Task.Delay(1000);
+            // var iframeName = await page.EvaluateAsync<string>("document.querySelector(\"iframe[title='reCAPTCHA']\").name");
+            // await Task.Delay(1000);
+            // await page.FrameLocator($"iframe[name=\"{iframeName}\"]").GetByRole(AriaRole.Checkbox, new() { NameString = "I'm not a robot" }).ClickAsync();
+            // await Task.Delay(1000);
+            // await Task.Delay(2000);
 
             var innerIframeName = await page.EvaluateAsync<string>("document.querySelector(\"iframe[title='recaptcha challenge expires in two minutes']\").name");
-
-            await Task.Delay(2000);
-
             await page.FrameLocator($"iframe[name=\"{innerIframeName}\"]").Locator("button#recaptcha-audio-button").ClickAsync();
             var audioUrl = await page.FrameLocator($"iframe[name=\"{innerIframeName}\"]").Locator("a.rc-audiochallenge-tdownload-link").GetAttributeAsync("href");
 
@@ -63,7 +58,7 @@ namespace CultureExtractor
                 .GetByRole(AriaRole.Button, new() { NameString = "Verify" })
                 .ClickAsync();
 
-            await Task.Delay(3000);
+            // await Task.Delay(3000);
 
             /*await page
                 .Locator($"div#blocked input[type=\"submit\"]")
