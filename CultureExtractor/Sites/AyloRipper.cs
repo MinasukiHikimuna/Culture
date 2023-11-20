@@ -426,10 +426,10 @@ public class AyloRipper : IYieldingScraper
         if (await usernameInput.IsVisibleAsync())
         {
             await page.GetByPlaceholder("Username or Email").ClickAsync();
-            await page.GetByPlaceholder("Username or Email").FillAsync(site.Username);
+            await page.GetByPlaceholder("Username or Email").PressSequentiallyAsync(site.Username);
 
             await page.GetByPlaceholder("Password").ClickAsync();
-            await page.GetByPlaceholder("Password").FillAsync(site.Password);
+            await page.GetByPlaceholder("Password").PressSequentiallyAsync(site.Password);
 
             await page.GetByRole(AriaRole.Button, new() { NameString = "Login" }).ClickAsync();
             await page.WaitForLoadStateAsync();
