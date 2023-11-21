@@ -83,7 +83,8 @@ public class CultureExtractorConsoleApp
                 DateRange = dateRange,
                 ReleaseUuids = opts.ReleaseUuids.ToList() ?? new List<string>(),
                 PerformerNames = opts.Performers.ToList() ?? new List<string>(),
-                DownloadedFileNames = opts.DownloadedFileNames.ToList() ?? new List<string>()
+                DownloadedFileNames = opts.DownloadedFileNames.ToList() ?? new List<string>(),
+                DownloadOrder = opts.Order
             };
 
             var site = await _repository.GetSiteAsync(shortName);
