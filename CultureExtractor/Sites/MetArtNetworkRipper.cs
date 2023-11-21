@@ -296,15 +296,25 @@ public class MetArtNetworkRipper : IYieldingScraper
                     ))
                     .ToList();
 
-                var trailerDownloads = movieDetails.files.teasers.Length > 0 
-                    ? new List<IAvailableFile>
+                IList<IAvailableFile> trailerDownloads = new List<IAvailableFile>();
+                if (movieDetails.files.teasers.Contains("m3u8"))
+                {
+                    trailerDownloads = new List<IAvailableFile>
                     {
                         new AvailableVideoFile("video", "trailer", "720",
                             $"https://www.sexart.com/api/m3u8/{movieDetails.UUID}/720.m3u8", -1, 720, -1, -1, "h264"),
                         new AvailableVideoFile("video", "trailer", "270",
-                            $"https://www.sexart.com/api/m3u8/{movieDetails.UUID}/270.m3u8", -1, 270, -1, -1, "h264"),
-                    }
-                    : new List<IAvailableFile>();
+                            $"https://www.sexart.com/api/m3u8/{movieDetails.UUID}/270.m3u8", -1, 270, -1, -1, "h264")
+                    };
+                }
+                else if (movieDetails.files.teasers.Contains("mp4"))
+                {
+                    trailerDownloads = new List<IAvailableFile>
+                    {
+                        new AvailableVideoFile("video", "trailer", "720",
+                            $"https://cdn.metartnetwork.com/{movieDetails.siteUUID}/media/{movieDetails.UUID}/tease_{movieDetails.UUID}.mp4", -1, 720, -1, -1, "h264"),
+                    };
+                }
 
                 var spriteDownloads = new List<IAvailableFile>
                 {
@@ -604,29 +614,48 @@ public class MetArtNetworkRipper : IYieldingScraper
             yield break;
         }
 
-        var trailerPlaylistFileName = $"trailer_{selectedTrailer.Variant}.m3u8";
-        var trailerVideoFileName = $"trailer_{selectedTrailer.Variant}.mp4";
-
-        // Note: we need to download the trailer without cookies because logged in users get the full scene
-        // from the same URL.
-        var fileInfo = await _downloader.TryDownloadAsync(release, selectedTrailer, selectedTrailer.Url, trailerPlaylistFileName, new WebHeaderCollection());
-        if (fileInfo == null)
+        if (selectedTrailer.Url.Contains("m3u8"))
         {
-            yield break;
-        }
+            var trailerPlaylistFileName = $"trailer_{selectedTrailer.Variant}.m3u8";
+            var trailerVideoFileName = $"trailer_{selectedTrailer.Variant}.mp4";
+
+            // Note: we need to download the trailer without cookies because logged in users get the full scene
+            // from the same URL.
+            var fileInfo = await _downloader.TryDownloadAsync(release, selectedTrailer, selectedTrailer.Url, trailerPlaylistFileName, new WebHeaderCollection());
+            if (fileInfo == null)
+            {
+                yield break;
+            }
         
-        var trailerVideoFullPath = Path.Combine(fileInfo.DirectoryName, trailerVideoFileName);
+            var trailerVideoFullPath = Path.Combine(fileInfo.DirectoryName, trailerVideoFileName);
 
-        var snippet = await FFmpeg.Conversions.New()
-            .Start(
-                $"-protocol_whitelist \"file,http,https,tcp,tls\" -i {fileInfo.FullName} -y -c copy {trailerVideoFullPath}");
+            var snippet = await FFmpeg.Conversions.New()
+                .Start(
+                    $"-protocol_whitelist \"file,http,https,tcp,tls\" -i {fileInfo.FullName} -y -c copy {trailerVideoFullPath}");
 
-        var videoHashes = Hasher.Phash(@"""" + trailerVideoFullPath + @"""");
-        yield return new Download(release,
-            "trailer.m3u8",
-            trailerVideoFileName,
-            selectedTrailer,
-            videoHashes);
+            var videoHashes = Hasher.Phash(@"""" + trailerVideoFullPath + @"""");
+            yield return new Download(release,
+                "trailer.m3u8",
+                trailerVideoFileName,
+                selectedTrailer,
+                videoHashes);
+        }
+        else
+        {
+            var uri = new Uri(selectedTrailer.Url);
+            var query = HttpUtility.ParseQueryString(uri.Query);
+            var suggestedFileName = query["filename"] ?? string.Empty;
+            var suffix = Path.GetExtension(suggestedFileName);
+            
+            var fileInfo = await _downloader.TryDownloadAsync(release, selectedTrailer, selectedTrailer.Url, $"trailer_720{suffix}", new WebHeaderCollection());
+            if (fileInfo == null)
+            {
+                yield break;
+            }
+            
+            var videoHashes = Hasher.Phash(@"""" + fileInfo.FullName + @"""");
+            yield return new Download(release, suggestedFileName, fileInfo.Name, selectedTrailer, videoHashes);
+        }
     }
 
     private static async Task<List<IRequest>> CaptureRequestsAsync(Site site, IPage page)
