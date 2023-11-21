@@ -3,6 +3,7 @@ using CultureExtractor.Interfaces;
 using Microsoft.Playwright;
 using Serilog;
 using System.Text.Json;
+using CultureExtractor.Exceptions;
 using CultureExtractor.Models;
 using Microsoft.EntityFrameworkCore;
 using Xabe.FFmpeg;
@@ -110,10 +111,20 @@ public class AyloRipper : IYieldingScraper
                         : UuidGenerator.Generate();
                     scene = await ScrapeSceneAsync(site, shortName, releaseGuid);
                 }
-                catch (Exception ex)
+                catch (ExtractorException ex)
                 {
-                    Log.Error(ex, $"Error while scraping scene: {shortName}");
-                    // Handling the exception by logging it and continuing with the next iteration
+                    switch (ex.ExtractorRetryMode)
+                    {
+                        // TODO: implement retry properly
+                        case ExtractorRetryMode.Retry:
+                            continue;
+                        case ExtractorRetryMode.Skip:
+                            Log.Error(ex, $"Error while scraping scene, skipping: {shortName}");
+                            continue;
+                        default:
+                        case ExtractorRetryMode.Abort:
+                            throw;
+                    }
                 }
 
                 if (scene != null)
@@ -131,102 +142,109 @@ public class AyloRipper : IYieldingScraper
 
     private static async Task<Release> ScrapeSceneAsync(Site site, string shortName, Guid releaseGuid)
     {
-        var movieUrl = MovieApiUrl(shortName);
-
-        using var movieResponse = Client.GetAsync(movieUrl);
-        if (movieResponse.Result.StatusCode != HttpStatusCode.OK)
+        try
         {
-            throw new InvalidOperationException($"Could not read movie API response:{Environment.NewLine}Url={movieUrl}{Environment.NewLine}StatusCode={movieResponse.Result.StatusCode}{Environment.NewLine}ReasonPhrase={movieResponse.Result.ReasonPhrase}");
-        }
+            var movieUrl = MovieApiUrl(shortName);
 
-        var movieJson = await movieResponse.Result.Content.ReadAsStringAsync();
-        var movieDetailsContainer = JsonSerializer.Deserialize<AyloMovieRequest.RootObject>(movieJson);
-        if (movieDetailsContainer == null)
-        {
-            throw new InvalidOperationException("Could not read movie API response: " + movieJson);
-        }
+            using var movieResponse = Client.GetAsync(movieUrl);
+            if (movieResponse.Result.StatusCode != HttpStatusCode.OK)
+            {
+                throw new ExtractorException(ExtractorRetryMode.Retry, $"Could not read movie API response:{Environment.NewLine}Url={movieUrl}{Environment.NewLine}StatusCode={movieResponse.Result.StatusCode}{Environment.NewLine}ReasonPhrase={movieResponse.Result.ReasonPhrase}");
+            }
 
-        var movieDetails = movieDetailsContainer.result;
-        if (movieDetails.videos.full == null)
-        {
-            throw new InvalidOperationException("Login required.");
-        }
-        
-        var sceneDownloads = movieDetails.videos.full.files
-            .Where(keyValuePair => keyValuePair.Key != "dash" && keyValuePair.Key != "hls")
-            .Select(keyValuePair => new AvailableVideoFile(
-                "video",
-                "scene",
-                keyValuePair.Key,
-                keyValuePair.Value.urls.view,
-                -1,
-                HumanParser.ParseResolutionHeight(keyValuePair.Key),
-                keyValuePair.Value.sizeBytes,
-                -1,
-                string.Empty
-            ))
-            .OrderByDescending(availableFile => availableFile.ResolutionHeight)
-            .ToList();
+            var movieJson = await movieResponse.Result.Content.ReadAsStringAsync();
+            var movieDetailsContainer = JsonSerializer.Deserialize<AyloMovieRequest.RootObject>(movieJson);
+            if (movieDetailsContainer == null)
+            {
+                throw new ExtractorException(ExtractorRetryMode.Retry, "Could not read movie API response: " + movieJson);
+            }
 
-        var imageDownloads = movieDetails.images != null
-            ? new List<AyloMoviesRequest.PosterSizes?>
-                {
-                    movieDetails.images.poster._0,
-                    movieDetails.images.poster._1,
-                    movieDetails.images.poster._2,
-                    movieDetails.images.poster._3,
-                    movieDetails.images.poster._4,
-                    movieDetails.images.poster._5
-                }
-                .Where(posterSizes => posterSizes?.xx != null)
-                .Select(posterSizes => posterSizes.xx)
-                .Select((image, index) => new AvailableImageFile(
-                    "image",
-                    $"poster_xx_{index}",
-                    string.Empty,
-                    image.urls.default1,
-                    image.width,
-                    image.height,
-                    -1
+            var movieDetails = movieDetailsContainer.result;
+            if (movieDetails.videos.full == null)
+            {
+                throw new ExtractorException(ExtractorRetryMode.Abort, "Login required.");
+            }
+            
+            var sceneDownloads = movieDetails.videos.full.files
+                .Where(keyValuePair => keyValuePair.Key != "dash" && keyValuePair.Key != "hls")
+                .Select(keyValuePair => new AvailableVideoFile(
+                    "video",
+                    "scene",
+                    keyValuePair.Key,
+                    keyValuePair.Value.urls.view,
+                    -1,
+                    HumanParser.ParseResolutionHeight(keyValuePair.Key),
+                    keyValuePair.Value.sizeBytes,
+                    -1,
+                    string.Empty
                 ))
-                .ToList()
-            : new List<AvailableImageFile>();
+                .OrderByDescending(availableFile => availableFile.ResolutionHeight)
+                .ToList();
 
-        var trailerDownloads = movieDetails.videos.mediabook.files
-            .Select(keyValuePair =>
-                new AvailableVideoFile("video", "trailer", keyValuePair.Key, keyValuePair.Value.urls.view, -1,
-                    HumanParser.ParseResolutionHeight(keyValuePair.Value.format), keyValuePair.Value.sizeBytes, -1,
-                    string.Empty)
-            );
+            var imageDownloads = movieDetails.images != null
+                ? new List<AyloMoviesRequest.PosterSizes?>
+                    {
+                        movieDetails.images.poster._0,
+                        movieDetails.images.poster._1,
+                        movieDetails.images.poster._2,
+                        movieDetails.images.poster._3,
+                        movieDetails.images.poster._4,
+                        movieDetails.images.poster._5
+                    }
+                    .Where(posterSizes => posterSizes?.xx != null)
+                    .Select(posterSizes => posterSizes.xx)
+                    .Select((image, index) => new AvailableImageFile(
+                        "image",
+                        $"poster_xx_{index}",
+                        string.Empty,
+                        image.urls.default1,
+                        image.width,
+                        image.height,
+                        -1
+                    ))
+                    .ToList()
+                : new List<AvailableImageFile>();
 
-        var performers = movieDetails.actors.Where(a => a.gender == "female").ToList()
-            .Concat(movieDetails.actors.Where(a => a.gender != "female").ToList())
-            .Select(m => new SitePerformer(m.id.ToString(), m.name, string.Empty))
-            .ToList();
+            var trailerDownloads = movieDetails.videos.mediabook.files
+                .Select(keyValuePair =>
+                    new AvailableVideoFile("video", "trailer", keyValuePair.Key, keyValuePair.Value.urls.view, -1,
+                        HumanParser.ParseResolutionHeight(keyValuePair.Value.format), keyValuePair.Value.sizeBytes, -1,
+                        string.Empty)
+                );
 
-        var tags = movieDetails.tags
-            .Select(t => new SiteTag(t.id.ToString(), t.name, string.Empty))
-            .ToList();
+            var performers = movieDetails.actors.Where(a => a.gender == "female").ToList()
+                .Concat(movieDetails.actors.Where(a => a.gender != "female").ToList())
+                .Select(m => new SitePerformer(m.id.ToString(), m.name, string.Empty))
+                .ToList();
 
-        var scene = new Release(
-            releaseGuid,
-            site,
-            null,
-            DateOnly.FromDateTime(DateTime.Parse(movieDetails.dateReleased)),
-            shortName,
-            movieDetails.title,
-            $"{site.Url}/scene/{movieDetails.id}",
-            movieDetails.description ?? string.Empty,
-            -1,
-            performers,
-            tags,
-            new List<IAvailableFile>()
-                .Concat(sceneDownloads)
-                .Concat(imageDownloads)
-                .Concat(trailerDownloads),
-            movieJson,
-            DateTime.Now);
-        return scene;
+            var tags = movieDetails.tags
+                .Select(t => new SiteTag(t.id.ToString(), t.name, string.Empty))
+                .ToList();
+
+            var scene = new Release(
+                releaseGuid,
+                site,
+                null,
+                DateOnly.FromDateTime(DateTime.Parse(movieDetails.dateReleased)),
+                shortName,
+                movieDetails.title,
+                $"{site.Url}/scene/{movieDetails.id}",
+                movieDetails.description ?? string.Empty,
+                -1,
+                performers,
+                tags,
+                new List<IAvailableFile>()
+                    .Concat(sceneDownloads)
+                    .Concat(imageDownloads)
+                    .Concat(trailerDownloads),
+                movieJson,
+                DateTime.Now);
+            return scene;
+        }
+        catch (Exception ex)
+        {
+            throw new ExtractorException(ExtractorRetryMode.Abort, "Unhandled exception while scraping scene.", ex);
+        }
     }
 
     private static async Task<AyloMoviesRequest.RootObject> GetMoviesPageAsync(int pageNumber)
@@ -295,6 +313,7 @@ public class AyloRipper : IYieldingScraper
             {
                 updatedScrape = await ScrapeSceneAsync(site, release.ShortName, release.Uuid);
             }
+            
             catch (Exception ex)
             {
                 Log.Warning(ex, "Could not scrape {Site} {ReleaseDate} {Release}", release.Site.Name, release.ReleaseDate.ToString("yyyy-MM-dd"), release.Name);
@@ -421,6 +440,7 @@ public class AyloRipper : IYieldingScraper
     private async Task LoginAsync(Site site, IPage page)
     {
         await Task.Delay(5000);
+        await page.PauseAsync();
 
         var usernameInput = page.GetByPlaceholder("Username or Email");
         if (await usernameInput.IsVisibleAsync())

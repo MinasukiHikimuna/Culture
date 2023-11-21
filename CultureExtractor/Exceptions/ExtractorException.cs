@@ -1,10 +1,15 @@
-﻿using System;
+﻿namespace CultureExtractor.Exceptions;
 
-namespace CultureExtractor.Exceptions;
+public enum ExtractorRetryMode
+{
+    Retry,
+    Skip,
+    Abort
+}
 
 public class ExtractorException : Exception
 {
-    public bool ShouldRetry { get; }
+    public ExtractorRetryMode ExtractorRetryMode { get; }
 
     public ExtractorException()
     {
@@ -20,15 +25,15 @@ public class ExtractorException : Exception
     {
     }
 
-    public ExtractorException(bool shouldRetry, string message)
+    public ExtractorException(ExtractorRetryMode extractorRetryMode, string message)
     : this(message)
     {
-        ShouldRetry = shouldRetry;
+        ExtractorRetryMode = extractorRetryMode;
     }
 
-    public ExtractorException(bool shouldRetry, string message, Exception inner)
+    public ExtractorException(ExtractorRetryMode extractorRetryMode, string message, Exception inner)
         : this(message, inner)
     {
-        ShouldRetry = shouldRetry;
+        ExtractorRetryMode = extractorRetryMode;
     }
 }

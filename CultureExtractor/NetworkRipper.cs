@@ -402,7 +402,7 @@ public class NetworkRipper : INetworkRipper
                 catch (ExtractorException ex)
                 {
                     Log.Error(ex.Message, ex);
-                    if (ex.ShouldRetry)
+                    if (ex.ExtractorRetryMode == ExtractorRetryMode.Retry)
                     {
                         continue;
                     }
