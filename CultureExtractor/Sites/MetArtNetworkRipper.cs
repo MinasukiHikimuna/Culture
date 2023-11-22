@@ -22,6 +22,7 @@ namespace CultureExtractor.Sites;
 [Site("eternaldesire")]
 [Site("straplez")]
 [Site("hustler")]
+[Site("domai")]
 public class MetArtNetworkRipper : IYieldingScraper
 {
     private static readonly HttpClient Client = new();
