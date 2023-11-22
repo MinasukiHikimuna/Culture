@@ -143,19 +143,19 @@ public class NetworkRipper : INetworkRipper
 
     private async Task<Release?> ScrapeReleaseWithRetryAsync(Site site, SubSite subSite, ScrapeOptions scrapeOptions, ISiteScraper siteScraper, IPage page, ListedRelease? currentRelease)
     {
-        var strategy = new ResilienceStrategyBuilder<Release?>()
+        var strategy = new ResiliencePipelineBuilder<Release?>()
             .AddFallback(new FallbackStrategyOptions<Release?>
             {
-                FallbackAction = _ => Outcome.FromResultAsTask<Release?>(null)
+                FallbackAction = _ => Outcome.FromResultAsValueTask<Release?>(null)
             })
-            .AddRetry(new RetryStrategyOptions<Release?>()
+            .AddRetry(new ()
             {
-                RetryCount = 3,
-                BaseDelay = TimeSpan.FromSeconds(3),
+                MaxRetryAttempts = 3,
+                Delay = TimeSpan.FromSeconds(3),
                 OnRetry = args =>
                 {
-                    Log.Error($"Caught following exception while scraping {currentRelease.Url}: " + args.Exception?.ToString(),
-                        args.Exception);
+                    var ex = args.Outcome.Exception;
+                    Log.Error($"Caught following exception while scraping {currentRelease.Url}: " + ex, ex);
                     return default;
                 }
             })
@@ -169,15 +169,16 @@ public class NetworkRipper : INetworkRipper
 
     private static async Task<IReadOnlyList<ListedRelease>> ScrapePageListedReleasesAsync(Site site, SubSite subSite, ISiteScraper siteScraper, IPage page, int currentPage)
     {
-        var indexRetryStrategy = new ResilienceStrategyBuilder<IReadOnlyList<ListedRelease>>()
-            .AddRetry(new RetryStrategyOptions<IReadOnlyList<ListedRelease>>()
+        var indexRetryStrategy = new ResiliencePipelineBuilder<IReadOnlyList<ListedRelease>>()
+            .AddRetry(new RetryStrategyOptions<IReadOnlyList<ListedRelease>>
             {
-                RetryCount = 3,
-                BaseDelay = TimeSpan.FromSeconds(3),
+                MaxRetryAttempts = 3,
+                Delay = TimeSpan.FromSeconds(3),
                 OnRetry = args =>
                 {
-                    Log.Error($"Caught following exception while scraping index page {currentPage}: " + args.Exception,
-                        args.Exception);
+                    var ex = args.Outcome.Exception;
+                    Log.Error($"Caught following exception while scraping index page {currentPage}: " + ex,
+                        ex);
                     return default;
                 }
             })
