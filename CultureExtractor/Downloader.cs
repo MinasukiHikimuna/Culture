@@ -9,6 +9,7 @@ namespace CultureExtractor;
 public class Downloader : IDownloader
 {
     private static readonly WebClient WebClient = new();
+    private static readonly HttpClient HttpClient = new();
 
     private readonly string _metadataPath;
 
@@ -95,22 +96,57 @@ public class Downloader : IDownloader
             tempPath = Path.Combine(rippingPath, $"{Guid.NewGuid()}");
             var finalPath = Path.Combine(rippingPath, fileName);
 
-            WebClient.Headers.Clear();
+            HttpClient.DefaultRequestHeaders.Clear();
             if (headers != null && headers.Count > 0)
             {
                 foreach (var key in headers.AllKeys)
                 {
-                    WebClient.Headers[key] = headers[key];
+                    HttpClient.DefaultRequestHeaders.Add(key, headers[key]);
                 }
             }
             else
             {
-                WebClient.Headers[HttpRequestHeader.Referer] = referer;
+                HttpClient.DefaultRequestHeaders.Add("referer", referer);
             }
 
-            WebClient.DownloadProgressChanged += DownloadProgressCallback4;
+            using var response = await HttpClient.SendAsync(new HttpRequestMessage(HttpMethod.Get, url), HttpCompletionOption.ResponseHeadersRead);
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new Exception($"Error {response.StatusCode} downloading {url}");
+            }
 
-            await WebClient.DownloadFileTaskAsync(new Uri(url), tempPath);
+            var totalBytes = response.Content.Headers.ContentLength;
+
+            {
+                await using var contentStream = await response.Content.ReadAsStreamAsync();
+                await using var fileStream = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None,
+                    8192, true);
+                var totalRead = 0L;
+                var buffer = new byte[8192];
+                var isMoreToRead = true;
+
+                do
+                {
+                    var read = await contentStream.ReadAsync(buffer, 0, buffer.Length);
+                    if (read == 0)
+                    {
+                        isMoreToRead = false;
+                    }
+                    else
+                    {
+                        await fileStream.WriteAsync(buffer, 0, read);
+
+                        totalRead += read;
+                        var percentage = totalBytes.HasValue ? (totalRead * 1d) / (totalBytes.Value * 1d) * 100 : -1;
+                        // Displays the operation identifier, and the transfer progress.
+                        Console.Write("\rDownloaded {0}/{1} bytes. {2:0.00}% complete...",
+                            totalRead,
+                            totalBytes, percentage);
+                    }
+                } while (isMoreToRead);
+            }
+
+            Console.Write("\n");
             File.Move(tempPath, finalPath, true);
         }
         catch
@@ -122,14 +158,5 @@ public class Downloader : IDownloader
 
             throw;
         }
-    }
-    
-    private static void DownloadProgressCallback4(object sender, DownloadProgressChangedEventArgs e)
-    {
-        // Displays the operation identifier, and the transfer progress.
-        Console.Write("\rDownloaded {0}/{1} bytes. {2}% complete...",
-            e.BytesReceived,
-            e.TotalBytesToReceive,
-            e.ProgressPercentage);
     }
 }
