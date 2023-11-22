@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿using System.Collections.Immutable;
+using System.Net;
 using CultureExtractor.Interfaces;
 using Microsoft.Playwright;
 using Serilog;
@@ -295,15 +296,27 @@ public class AyloRipper : IYieldingScraper
     {
         IPage page = await _playwrightFactory.CreatePageAsync(site, browserSettings);
 
-        await LoginAsync(site, page);
-        var requests = await CaptureRequestsAsync(site, page);
-
-        var headers = SetHeadersFromActualRequest(requests);
-        var convertedHeaders = ConvertHeaders(headers);
-
         var releases = await _repository.QueryReleasesAsync(site, downloadConditions);
+        var downloadedReleases = 0;
         foreach (var release in releases)
         {
+            var releaseDownloadPlan = PlanDownloads(release, downloadConditions);
+            var releaseMissingDownloadsPlan = PlanMissingDownloads(releaseDownloadPlan);
+
+            if (!releaseMissingDownloadsPlan.AvailableFiles.Any())
+            {
+                continue;
+            }
+            
+            WebHeaderCollection? convertedHeaders = null;
+            if (downloadedReleases % 30 == 0) {
+                await LoginAsync(site, page);
+                var requests = await CaptureRequestsAsync(site, page);
+
+                var headers = SetHeadersFromActualRequest(requests);
+                convertedHeaders = ConvertHeaders(headers);
+            }
+            
             Log.Information("Downloading {Site} {ReleaseDate} {Release}", release.Site.Name, release.ReleaseDate.ToString("yyyy-MM-dd"), release.Name);
 
             // this is now done on every scene despite we might already have all files
@@ -320,9 +333,12 @@ public class AyloRipper : IYieldingScraper
                 continue;
             }
 
+            await Task.Delay(10000);
+            
             var existingDownloadEntities = await _context.Downloads.Where(d => d.ReleaseUuid == release.Uuid).ToListAsync();
             foreach (var videoDownload in await DownloadsVideosAsync(downloadConditions, updatedScrape, existingDownloadEntities, convertedHeaders))
             {
+                downloadedReleases++;
                 yield return videoDownload;
             }
             await foreach (var trailerDownload in DownloadTrailersAsync(downloadConditions, updatedScrape, existingDownloadEntities))
@@ -333,9 +349,47 @@ public class AyloRipper : IYieldingScraper
             {
                 yield return imageDownload;
             }
+            
+            Log.Information($"{downloadedReleases} releases downloaded in this session.");
         }
     }
 
+    private static ReleaseDownloadPlan PlanDownloads(Release release, DownloadConditions downloadConditions)
+    {
+        var sceneFiles = release.AvailableFiles.OfType<AvailableVideoFile>().Where(f => f.ContentType == "scene").ToList();
+        var trailerFiles = release.AvailableFiles.OfType<AvailableVideoFile>().Where(f => f.ContentType == "trailer").ToList();
+
+        var selectedSceneFiles = downloadConditions.PreferredDownloadQuality == PreferredDownloadQuality.Best
+            ? sceneFiles.Take(1)
+            : sceneFiles.TakeLast(1);
+        var selectedTrailerFiles = downloadConditions.PreferredDownloadQuality == PreferredDownloadQuality.Best
+            ? trailerFiles.Take(1)
+            : trailerFiles.TakeLast(1);
+        var otherFiles = release.AvailableFiles
+            .Except(trailerFiles)
+            .Except(sceneFiles)
+            .ToList();
+
+        var availableFiles = new List<IAvailableFile>()
+            .Concat(selectedSceneFiles)
+            .Concat(selectedTrailerFiles)
+            .Concat(otherFiles)
+            .ToImmutableList();
+        
+        return new ReleaseDownloadPlan(release, availableFiles);
+    }
+
+    private ReleaseDownloadPlan PlanMissingDownloads(ReleaseDownloadPlan releaseDownloadPlan)
+    {
+        var existingDownloads = _context.Downloads.Where(d => d.ReleaseUuid == releaseDownloadPlan.Release.Uuid).ToList();
+        var notYetDownloaded = releaseDownloadPlan.AvailableFiles
+            .Where(f => !existingDownloads.Exists(d =>
+                d.FileType == f.FileType && d.ContentType == f.ContentType && d.Variant == f.Variant))
+            .ToImmutableList();
+
+        return releaseDownloadPlan with { AvailableFiles = notYetDownloaded };
+    }
+    
     private async Task<IList<Download>> DownloadsVideosAsync(DownloadConditions downloadConditions, Release release,
         List<DownloadEntity> existingDownloadEntities, WebHeaderCollection convertedHeaders)
     {
@@ -439,28 +493,24 @@ public class AyloRipper : IYieldingScraper
 
     private async Task LoginAsync(Site site, IPage page)
     {
+        await page.GotoAsync(site.Url + "/login");
         await Task.Delay(5000);
-        await page.PauseAsync();
-
         var usernameInput = page.GetByPlaceholder("Username or Email");
         if (await usernameInput.IsVisibleAsync())
         {
             await page.GetByPlaceholder("Username or Email").ClickAsync();
-            await page.GetByPlaceholder("Username or Email").PressSequentiallyAsync(site.Username);
-
-            await page.GetByPlaceholder("Password").ClickAsync();
-            await page.GetByPlaceholder("Password").PressSequentiallyAsync(site.Password);
-
-            await page.GetByRole(AriaRole.Button, new() { NameString = "Login" }).ClickAsync();
-            await page.WaitForLoadStateAsync();
+            await page.GetByPlaceholder("Username or Email").PressSequentiallyAsync(site.Username, new LocatorPressSequentiallyOptions { Delay = 52 });
 
             await Task.Delay(5000);
 
-            if (await page.GetByRole(AriaRole.Button, new() { NameString = "Login" }).IsVisibleAsync())
-            {
-                await page.GetByRole(AriaRole.Button, new() { NameString = "Login" }).ClickAsync();
-                await page.WaitForLoadStateAsync();
-            }
+            await page.GetByPlaceholder("Password").ClickAsync();
+            await page.GetByPlaceholder("Password").PressSequentiallyAsync(site.Password, new LocatorPressSequentiallyOptions { Delay = 52 });
+            
+            await Task.Delay(5000);
+
+            await page.GetByRole(AriaRole.Button, new() { NameString = "Login" }).ClickAsync();
+            await page.WaitForLoadStateAsync();
+            await Task.Delay(5000);
         }
         
         if (page.Url.Contains("badlogin"))
@@ -468,8 +518,6 @@ public class AyloRipper : IYieldingScraper
             Log.Warning("Could not log into {Site} due to badlogin error. Login manually!", site.Name);
             Console.ReadLine();
         }
-        
-        await Task.Delay(5000);
 
         await page.GotoAsync(site.Url);
 
