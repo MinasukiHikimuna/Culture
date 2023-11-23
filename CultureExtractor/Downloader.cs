@@ -2,13 +2,14 @@ using System.Net;
 using CultureExtractor.Interfaces;
 using CultureExtractor.Models;
 using Microsoft.Extensions.Configuration;
+using Polly;
+using Polly.Fallback;
 using Serilog;
 
 namespace CultureExtractor;
 
 public class Downloader : IDownloader
 {
-    private static readonly WebClient WebClient = new();
     private static readonly HttpClient HttpClient = new();
 
     private readonly string _metadataPath;
@@ -24,72 +25,43 @@ public class Downloader : IDownloader
     public async Task<FileInfo?> TryDownloadAsync(Release release, IAvailableFile availableFile, string url,
         string fileName, WebHeaderCollection convertedHeaders)
     {
-        const int maxRetryCount = 3; // Set the maximum number of retries
-        var retryCount = 0;
-
-        while (retryCount < maxRetryCount)
-        {
-            retryCount++;
-            try
+        var strategy = new ResiliencePipelineBuilder<FileInfo?>()
+            .AddFallback(new FallbackStrategyOptions<FileInfo?>
             {
-                return await DownloadFileAsync(
-                    release,
-                    url,
-                    fileName,
-                    release.Url,
-                    convertedHeaders);
-            }
-            catch (WebException ex) when ((ex.Response as HttpWebResponse)?.StatusCode == HttpStatusCode.NotFound)
+                FallbackAction = _ => Outcome.FromResultAsValueTask<FileInfo?>(null)
+            })
+            .AddRetry(new ()
             {
-                Log.Warning("Could not find {FileType} {ContentType} for {Release} from URL {Url}",
-                    availableFile.FileType, availableFile.ContentType, release.Uuid, url);
-                return null;
-            }
-            catch (WebException ex) when (ex.InnerException is IOException &&
-                                          (ex.InnerException.Message.Contains("The response ended prematurely") || 
-                                           ex.InnerException.Message.Contains("Received an unexpected EOF or 0 bytes from the transport stream.")))
-            {
-                if (retryCount >= maxRetryCount)
+                MaxRetryAttempts = 3,
+                Delay = TimeSpan.FromSeconds(10),
+                OnRetry = args =>
                 {
-                    Log.Error("Max retry attempts reached for {FileType} {ContentType} for {Release} from URL {Url}.",
-                        availableFile.FileType, availableFile.ContentType, release.Uuid, url);
-                    return null;
+                    var ex = args.Outcome.Exception;
+                    Log.Error($"Caught following exception while downloading {url}: " + ex, ex);
+                    return default;
                 }
+            })
+            .Build();
 
-                Log.Warning(
-                    "Download ended prematurely for {FileType} {ContentType} for {Release} from URL {Url}. Retrying...",
-                    availableFile.FileType, availableFile.ContentType, release.Uuid, url);
-            }
-            catch (WebException ex)
-            {
-                Log.Error(ex, "Error downloading {FileType} {ContentType} for {Release} from URL {Url}",
-                    availableFile.FileType, availableFile.ContentType, release.Uuid, url);
-                return null;
-            }
-        }
-
-        return null;
+        var fileInfo = await strategy.ExecuteAsync(async token =>
+            await DownloadFileAsync(
+                release,
+                url,
+                fileName,
+                convertedHeaders,
+                release.Url,
+                token)
+        );
+        return fileInfo;
     }
 
-    private async Task<FileInfo> DownloadFileAsync(Release release, string url, string fileName, string referer = "",
-        WebHeaderCollection? headers = null)
+    private async Task<FileInfo> DownloadFileAsync(Release release, string url, string fileName,
+        WebHeaderCollection headers, string referer,
+        CancellationToken cancellationToken)
     {
         var rippingPath = Path.Combine(_metadataPath, $@"{release.Site.Name}\Metadata\{release.Uuid}\");
         Directory.CreateDirectory(rippingPath);
 
-        await DownloadFileAsync(
-            url,
-            fileName,
-            rippingPath,
-            referer: referer,
-            headers: headers);
-
-        return new FileInfo(Path.Combine(rippingPath, fileName));
-    }
-
-    private static async Task DownloadFileAsync(string url, string fileName, string rippingPath,
-        WebHeaderCollection? headers = null, string referer = "")
-    {
         string? tempPath = null;
         try
         {
@@ -109,7 +81,7 @@ public class Downloader : IDownloader
                 HttpClient.DefaultRequestHeaders.Add("referer", referer);
             }
 
-            using var response = await HttpClient.SendAsync(new HttpRequestMessage(HttpMethod.Get, url), HttpCompletionOption.ResponseHeadersRead);
+            using var response = await HttpClient.SendAsync(new HttpRequestMessage(HttpMethod.Get, url), HttpCompletionOption.ResponseHeadersRead, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
                 throw new Exception($"Error {response.StatusCode} downloading {url}");
@@ -118,23 +90,23 @@ public class Downloader : IDownloader
             var totalBytes = response.Content.Headers.ContentLength;
 
             {
-                await using var contentStream = await response.Content.ReadAsStreamAsync();
+                await using var contentStream = await response.Content.ReadAsStreamAsync(cancellationToken);
                 await using var fileStream = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None,
-                    8192, true);
+                    16384, true);
                 var totalRead = 0L;
-                var buffer = new byte[8192];
+                var buffer = new byte[16384];
                 var isMoreToRead = true;
 
                 do
                 {
-                    var read = await contentStream.ReadAsync(buffer, 0, buffer.Length);
+                    var read = await contentStream.ReadAsync(buffer, cancellationToken);
                     if (read == 0)
                     {
                         isMoreToRead = false;
                     }
                     else
                     {
-                        await fileStream.WriteAsync(buffer, 0, read);
+                        await fileStream.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
 
                         totalRead += read;
                         var percentage = totalBytes.HasValue ? (totalRead * 1d) / (totalBytes.Value * 1d) * 100 : -1;
@@ -146,7 +118,7 @@ public class Downloader : IDownloader
                 } while (isMoreToRead);
             }
 
-            Console.Write("\n");
+            Console.Write("\r");
             File.Move(tempPath, finalPath, true);
         }
         catch
@@ -158,5 +130,7 @@ public class Downloader : IDownloader
 
             throw;
         }
+
+        return new FileInfo(Path.Combine(rippingPath, fileName));
     }
 }
