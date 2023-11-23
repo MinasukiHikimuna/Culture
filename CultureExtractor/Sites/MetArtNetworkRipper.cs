@@ -5,6 +5,7 @@ using CultureExtractor.Interfaces;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Web;
+using CultureExtractor.Exceptions;
 using CultureExtractor.Models;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
@@ -434,7 +435,11 @@ public class MetArtNetworkRipper : IYieldingScraper
 
         var request = new HttpRequestMessage(HttpMethod.Head, selectedGallery.Url);
         var response = await client.SendAsync(request);
-
+        if (response.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            throw new ExtractorException(ExtractorRetryMode.Abort, "Unauthorized to read URL. Please check your credentials.");
+        }
+        
         var actualMediaUrl = response.Headers.Location?.ToString();
         if (string.IsNullOrEmpty(actualMediaUrl))
         {
