@@ -317,8 +317,6 @@ public class AyloRipper : IYieldingScraper
                 convertedHeaders = ConvertHeaders(headers);
             }
             
-            Log.Information("Downloading {Site} {ReleaseDate} {Release}", release.Site.Name, release.ReleaseDate.ToString("yyyy-MM-dd"), release.Name);
-
             // this is now done on every scene despite we might already have all files
             // the reason for updated scrape is that the links are timebombed and we need to refresh those
             Release? updatedScrape;
@@ -336,6 +334,7 @@ public class AyloRipper : IYieldingScraper
             await Task.Delay(10000);
             
             var existingDownloadEntities = await _context.Downloads.Where(d => d.ReleaseUuid == release.Uuid).ToListAsync();
+            Log.Information("Downloading: {Site} - {ReleaseDate} - {Release} [{Uuid}]", release.Site.Name, release.ReleaseDate.ToString("yyyy-MM-dd"), release.Name, release.Uuid);
             foreach (var videoDownload in await DownloadsVideosAsync(downloadConditions, updatedScrape, existingDownloadEntities, convertedHeaders))
             {
                 downloadedReleases++;
