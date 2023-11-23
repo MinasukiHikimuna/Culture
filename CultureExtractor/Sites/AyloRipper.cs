@@ -308,7 +308,7 @@ public class AyloRipper : IYieldingScraper
                 continue;
             }
             
-            WebHeaderCollection? convertedHeaders = null;
+            var convertedHeaders = new WebHeaderCollection();
             if (downloadedReleases % 30 == 0) {
                 await LoginAsync(site, page);
                 var requests = await CaptureRequestsAsync(site, page);
@@ -324,7 +324,6 @@ public class AyloRipper : IYieldingScraper
             {
                 updatedScrape = await ScrapeSceneAsync(site, release.ShortName, release.Uuid);
             }
-            
             catch (Exception ex)
             {
                 Log.Warning(ex, "Could not scrape {Site} {ReleaseDate} {Release}", release.Site.Name, release.ReleaseDate.ToString("yyyy-MM-dd"), release.Name);
@@ -332,12 +331,11 @@ public class AyloRipper : IYieldingScraper
             }
 
             await Task.Delay(10000);
-            
+
             var existingDownloadEntities = await _context.Downloads.Where(d => d.ReleaseUuid == release.Uuid).ToListAsync();
             Log.Information("Downloading: {Site} - {ReleaseDate} - {Release} [{Uuid}]", release.Site.Name, release.ReleaseDate.ToString("yyyy-MM-dd"), release.Name, release.Uuid);
             foreach (var videoDownload in await DownloadsVideosAsync(downloadConditions, updatedScrape, existingDownloadEntities, convertedHeaders))
             {
-                downloadedReleases++;
                 yield return videoDownload;
             }
             await foreach (var trailerDownload in DownloadTrailersAsync(downloadConditions, updatedScrape, existingDownloadEntities))
@@ -348,7 +346,8 @@ public class AyloRipper : IYieldingScraper
             {
                 yield return imageDownload;
             }
-            
+
+            downloadedReleases++;
             Log.Information($"{downloadedReleases} releases downloaded in this session.");
         }
     }
