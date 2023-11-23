@@ -256,7 +256,8 @@ public class NetworkRipper : INetworkRipper
         {
             await foreach (var download in yieldingScraper.DownloadReleasesAsync(site, browserSettings, downloadConditions))
             {
-                Log.Information($"Downloaded {download.AvailableFile.FileType} {download.AvailableFile.ContentType} {download.AvailableFile.Variant} of {download.Release.Name} from {download.Release.Site.Name}.");
+                // TODO: this is strange because now the indentended logging is done here at the higher level and lower level logging in the rippers themselves
+                Log.Information("    [x] FileType={FileType} ContentType={ContentType} Variant={Variant}", download.AvailableFile.FileType, download.AvailableFile.ContentType, download.AvailableFile.Variant);
                 await _repository.SaveDownloadAsync(download, downloadConditions.PreferredDownloadQuality);
             }
 
