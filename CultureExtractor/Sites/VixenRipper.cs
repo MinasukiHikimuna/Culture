@@ -76,7 +76,7 @@ public class VixenRipper : IYieldingScraper
 
             var variables = new
             {
-                site = "TUSHY",
+                site = site.ShortName.ToUpperInvariant(),
                 skip = (pageNumber - 1) * 12,
                 first = 12,
                 order = new { field = "releaseDate", desc = true },
@@ -152,7 +152,7 @@ public class VixenRipper : IYieldingScraper
             query = GetVideoQuery,
             variables = new
             {
-                site = "TUSHY",
+                site = site.ShortName.ToUpperInvariant(),
                 relatedCount = 6,
                 videoSlug = shortName
             }
@@ -184,7 +184,7 @@ public class VixenRipper : IYieldingScraper
             query = GetPictureSetQuery,
             variables = new
             {
-                site = "TUSHY",
+                site = site.ShortName.ToUpperInvariant(),
                 videoSlug = shortName
             }
         };
