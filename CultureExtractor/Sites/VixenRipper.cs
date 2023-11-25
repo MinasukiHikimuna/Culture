@@ -1,541 +1,1026 @@
-﻿using CultureExtractor.Interfaces;
+using System.Collections.Immutable;
+using System.Net;
+using System.Text;
+using System.Text.Json;
+using CultureExtractor.Interfaces;
+using CultureExtractor.Models;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Playwright;
 using Serilog;
-using System.Net;
-using System.Text.Json;
-using System.Text.RegularExpressions;
-using CultureExtractor.Models;
 
 namespace CultureExtractor.Sites;
 
-[Site("milfy")]
+[Site("blacked")]
+[Site("blackedraw")]
 [Site("deeper")]
+[Site("milfy")]
+[Site("slayed")]
+[Site("tushy")]
+[Site("tushyraw")]
 [Site("vixen")]
-public class VixenRipper : ISiteScraper
+public class VixenRipper : IYieldingScraper
 {
-    private readonly ILegacyDownloader _legacyDownloader;
+    private static readonly HttpClient Client = new();
 
-    public VixenRipper(ILegacyDownloader legacyDownloader)
+    private static string VideosUrl(Site site, int pageNumber) =>
+        $"{site.Url}/videos?page={pageNumber}";
+
+    private readonly IPlaywrightFactory _playwrightFactory;
+    private readonly ICaptchaSolver _captchaSolver;
+    private readonly IRepository _repository;
+    private readonly ICultureExtractorContext _context;
+    private readonly IDownloader _downloader;
+
+    public VixenRipper(IPlaywrightFactory playwrightFactory, ICaptchaSolver captchaSolver, IRepository repository, ICultureExtractorContext context, IDownloader downloader)
     {
-        _legacyDownloader = legacyDownloader;
+        _playwrightFactory = playwrightFactory;
+        _captchaSolver = captchaSolver;
+        _repository = repository;
+        _context = context;
+        _downloader = downloader;
     }
 
-    public async Task LoginAsync(Site site, IPage page)
+    public async IAsyncEnumerable<Release> ScrapeReleasesAsync(Site site, BrowserSettings browserSettings, ScrapeOptions scrapeOptions)
+    {
+        IPage page = await _playwrightFactory.CreatePageAsync(site, browserSettings);
+
+        await LoginAsync(site, page);
+        var requests = await CaptureRequestsAsync(site, page);
+        
+        SetHeadersFromActualRequest(site, requests);
+
+        await foreach (var scene in ScrapeScenesAsync(site, scrapeOptions))
+        {
+            yield return scene;
+        }
+    }
+
+    private async IAsyncEnumerable<Release> ScrapeScenesAsync(Site site, ScrapeOptions scrapeOptions)
+    {
+        var pageNumber = 1;
+        var pages = -1;
+        VixenFindVideosOnSitesResponse.FindVideosOnSites? findVideosOnSites = null;
+        do
+        {
+            await Task.Delay(5000);
+
+            var variables = new
+            {
+                site = "TUSHY",
+                skip = (pageNumber - 1) * 12,
+                first = 12,
+                order = new { field = "releaseDate", desc = true },
+                filter = new object[]
+                {
+                    new { field = "unlisted", op = "NE", value = true },
+                    new { field = "channelInfo.isThirdPartyChannel", op = "NE", value = true },
+                    new { field = "channelInfo.isAvailable", op = "NE", value = false }
+                }
+            };
+            var requestObj = new
+            {
+                operationName = "getFilteredVideos",
+                query = GetFilteredVideosQuery,
+                variables = variables
+            };
+
+            var requestJson = JsonSerializer.Serialize(requestObj);
+            var requestContent = new StringContent(requestJson, Encoding.UTF8, "application/json");
+            var request = new HttpRequestMessage(HttpMethod.Post, $"{site.Url}/graphql")
+            {
+                Content = requestContent
+            };
+            var response = await Client.SendAsync(request);
+            var responseContent = await response.Content.ReadAsStringAsync();
+
+
+            var videosResponse = JsonSerializer.Deserialize<VixenFindVideosOnSitesResponse.RootObject>(responseContent);
+            findVideosOnSites = videosResponse.data.findVideosOnSites;
+            if (pages == -1)
+            {
+                pages = (int)Math.Ceiling(findVideosOnSites.totalCount / 12.0);
+            }
+
+            Log.Information($"Page {pageNumber}/{pages} contains {findVideosOnSites.edges.Length} releases");
+
+            pageNumber++;
+
+            var movies = findVideosOnSites.edges
+                .ToDictionary(
+                    edge => edge.node.id,
+                    edge => edge.node);
+
+            var existingReleases = await _repository
+                .GetReleasesAsync(site.ShortName, movies.Keys.ToList());
+
+            var existingReleasesDictionary = existingReleases.ToDictionary(r => r.ShortName, r => r);
+
+            var moviesToBeScraped = movies
+                .Where(g => !existingReleasesDictionary.ContainsKey(g.Key) || existingReleasesDictionary[g.Key].LastUpdated < scrapeOptions.FullScrapeLastUpdated)
+                .Select(g => g.Value)
+                .ToList();
+
+            foreach (var movie in moviesToBeScraped)
+            {
+                var releaseGuid = existingReleasesDictionary.TryGetValue(movie.slug, out var existingRelease)
+                    ? existingRelease.Uuid
+                    : UuidGenerator.Generate();
+                var scene = await ScrapeSceneAsync(site, movie.slug, releaseGuid);
+
+                yield return scene;
+            }
+        } while (findVideosOnSites.pageInfo.hasNextPage);
+    }
+
+    private static async Task<Release> ScrapeSceneAsync(Site site, string shortName, Guid releaseGuid)
+    {
+        await Task.Delay(1000);
+
+        var videoRequestObj = new
+        {
+            operationName = "getVideo",
+            query = GetVideoQuery,
+            variables = new
+            {
+                site = "TUSHY",
+                relatedCount = 6,
+                videoSlug = shortName
+            }
+        };
+
+        var videoRequestJson = JsonSerializer.Serialize(videoRequestObj);
+        var videoRequestContent = new StringContent(videoRequestJson, Encoding.UTF8, "application/json");
+        var videoRequest = new HttpRequestMessage(HttpMethod.Post, $"{site.Url}/graphql")
+        {
+            Content = videoRequestContent
+        };
+        var videoResponse = await Client.SendAsync(videoRequest);
+        var videoResponseContent = await videoResponse.Content.ReadAsStringAsync();
+
+        var videoResponseFoo = JsonSerializer.Deserialize<VixenFindOneVideoResponse.RootObject>(videoResponseContent);
+
+
+        var dataFindOneVideo = videoResponseFoo.data.findOneVideo;
+        var videoTokenResponseFoo = await GetSceneVideoToken(
+            site,
+            dataFindOneVideo.videoId);
+        var trailerTokenResponseFoo = await GetTrailerVideoToken(
+            site,
+            dataFindOneVideo.videoId);
+
+        var pictureSetRequestObj = new
+        {
+            operationName = "getPictureSet",
+            query = GetPictureSetQuery,
+            variables = new
+            {
+                site = "TUSHY",
+                videoSlug = shortName
+            }
+        };
+        var pictureSetRequestJson = JsonSerializer.Serialize(pictureSetRequestObj);
+        var pictureSetRequestContent = new StringContent(pictureSetRequestJson, Encoding.UTF8, "application/json");
+        var pictureSetRequest = new HttpRequestMessage(HttpMethod.Post, $"{site.Url}/graphql")
+        {
+            Content = pictureSetRequestContent
+        };
+        var pictureSetResponse = await Client.SendAsync(pictureSetRequest);
+        var pictureSetResponseContent = await pictureSetResponse.Content.ReadAsStringAsync();
+
+        var pictureSetResponseFoo =
+            JsonSerializer.Deserialize<VixenGetPictureSetResponse.RootObject>(pictureSetResponseContent);
+
+
+        var videoTokens = GetAvailableVideos(videoTokenResponseFoo);
+
+        var sceneDownloads = dataFindOneVideo.downloadResolutions
+            .Select(video => new AvailableVideoFile(
+                "video",
+                "scene",
+                video.label,
+                videoTokens.First(t => t.token.Contains($"{video.width}P")).token,
+                -1,
+                // Note: This is an error on the API side. They report values such as 2160 and 1080 as width
+                // while they are clearly height values.
+                int.Parse(video.width.Replace("l", "")),
+                HumanParser.ParseFileSizeMaybe(video.size).IsSome(out var fileSizeValue) ? fileSizeValue : -1,
+                -1,
+                "H.264"
+            ))
+            .OrderByDescending(availableFile => availableFile.ResolutionHeight)
+            .ToList();
+
+        var galleryDownloads = new List<IAvailableFile>()
+        {
+            new AvailableGalleryZipFile(
+                "zip",
+                "gallery",
+                string.Empty,
+                pictureSetResponseFoo.data.findOnePictureSet.zip,
+                pictureSetResponseFoo.data.findOnePictureSet.images[0].main[0].width,
+                pictureSetResponseFoo.data.findOnePictureSet.images[0].main[0].height,
+                -1
+            )
+        };
+
+        var carouselDownloads = dataFindOneVideo.carousel
+            .Select((carousel, index) => new AvailableImageFile(
+                "image",
+                "carousel",
+                (index + 1) + "",
+                carousel.main[0].src,
+                carousel.main[0].width,
+                carousel.main[0].height,
+                -1
+            ))
+            .ToList();
+
+        var posterDownloads = dataFindOneVideo.images.poster
+            .OrderByDescending(p => p.height)
+            .Select(poster => new AvailableImageFile(
+                "image",
+                "poster",
+                string.Empty,
+                poster.src,
+                poster.width,
+                poster.height,
+                -1
+            ))
+            .Take(1)
+            .ToList();
+
+        var imageDownloads = new List<IAvailableFile>()
+            .Concat(carouselDownloads)
+            .Concat(posterDownloads);
+
+        var trailerTokens = GetAvailableVideos(trailerTokenResponseFoo);
+        var trailerDownloads = trailerTokens
+            .Select(video =>
+            {
+                var uri = new Uri(video.token);
+                var suggestedFileName = Path.GetFileName(uri.LocalPath);
+                var suffix = Path.GetExtension(suggestedFileName);
+
+                // get width from filename e.g. TUSHY_104252_270P.mp4 to 270
+                var width = int.Parse(suggestedFileName.Split("_")[2].Replace(suffix, "").Replace("l", "")
+                    .Replace("P", ""));
+
+                return new AvailableVideoFile(
+                    "video",
+                    "trailer",
+                    width + "",
+                    video.token,
+                    -1,
+                    // Note: This is an error on the API side. They report values such as 2160 and 1080 as width
+                    // while they are clearly height values.
+                    width,
+                    -1,
+                    -1,
+                    "H.264"
+                );
+            })
+            .OrderByDescending(availableFile => availableFile.ResolutionHeight)
+            .ToList();
+
+        var performers = dataFindOneVideo.modelsSlugged
+            .Select(m => new SitePerformer(m.slugged, m.name, $"{site.Url}/performers/{m.slugged}"))
+            .ToList();
+
+        var tags = dataFindOneVideo.categories
+            .Select(t => new SiteTag(t.slug, t.name, $"{site.Url}/videos?search={t.slug}"))
+            .ToList();
+
+        var scene = new Release(
+            releaseGuid,
+            site,
+            null,
+            DateOnly.FromDateTime(DateTime.Parse(dataFindOneVideo.releaseDate)),
+            shortName,
+            dataFindOneVideo.title,
+            $"{site.Url}/videos/{dataFindOneVideo.slug}",
+            dataFindOneVideo.description,
+            HumanParser.ParseDuration(dataFindOneVideo.runLengthFormatted).TotalSeconds,
+            performers,
+            tags,
+            new List<IAvailableFile>()
+                .Concat(sceneDownloads)
+                .Concat(galleryDownloads)
+                .Concat(imageDownloads)
+                .Concat(trailerDownloads),
+            videoResponseContent,
+            DateTime.Now);
+        return scene;
+    }
+
+    private static Task<VixenGetTokenResponse.RootObject?> GetSceneVideoToken(Site site, string videoId)
+    {
+        return GetVideoToken(site, videoId, "desktop");
+    }
+    
+    private static Task<VixenGetTokenResponse.RootObject?> GetTrailerVideoToken(Site site, string videoId)
+    {
+        return GetVideoToken(site, videoId, "trailer");
+    }
+    
+    private static async Task<VixenGetTokenResponse.RootObject?> GetVideoToken(Site site, string videoId, string device)
+    {
+        var requestObject = new
+        {
+            operationName = "getToken",
+            query = GenerateVideoTokenQuery,
+            variables = new
+            {
+                videoId, device
+            }
+        };
+        var requestJson = JsonSerializer.Serialize(requestObject);
+        var requestContent = new StringContent(requestJson, Encoding.UTF8, "application/json");
+        var request = new HttpRequestMessage(HttpMethod.Post, $"{site.Url}/graphql")
+        {
+            Content = requestContent
+        };
+        var response = await Client.SendAsync(request);
+        var responseContent = await response.Content.ReadAsStringAsync();
+
+        var deserialized = JsonSerializer.Deserialize<VixenGetTokenResponse.RootObject>(responseContent);
+        return deserialized;
+    }
+
+    private static List<VixenGetTokenResponse.VideoToken> GetAvailableVideos(VixenGetTokenResponse.RootObject? videoTokenResponseFoo)
+    {
+        var tokens = new List<VixenGetTokenResponse.VideoToken>();
+
+        if (videoTokenResponseFoo.data.generateVideoToken.p2160 != null)
+        {
+            tokens.Add(videoTokenResponseFoo.data.generateVideoToken.p2160);
+        }
+
+        if (videoTokenResponseFoo.data.generateVideoToken.p1080 != null)
+        {
+            tokens.Add(videoTokenResponseFoo.data.generateVideoToken.p1080);
+        }
+
+        if (videoTokenResponseFoo.data.generateVideoToken.p720 != null)
+        {
+            tokens.Add(videoTokenResponseFoo.data.generateVideoToken.p720);
+        }
+
+        if (videoTokenResponseFoo.data.generateVideoToken.p480 != null)
+        {
+            tokens.Add(videoTokenResponseFoo.data.generateVideoToken.p480);
+        }
+
+        if (videoTokenResponseFoo.data.generateVideoToken.p480l != null)
+        {
+            tokens.Add(videoTokenResponseFoo.data.generateVideoToken.p480l);
+        }
+
+        if (videoTokenResponseFoo.data.generateVideoToken.p360 != null)
+        {
+            tokens.Add(videoTokenResponseFoo.data.generateVideoToken.p360);
+        }
+
+        if (videoTokenResponseFoo.data.generateVideoToken.p270 != null)
+        {
+            tokens.Add(videoTokenResponseFoo.data.generateVideoToken.p270);
+        }
+
+        return tokens;
+    }
+
+    private static Dictionary<string, string> SetHeadersFromActualRequest(Site site, IList<IRequest> requests)
+    {
+        var videosRequest = requests.FirstOrDefault(r => r.Url.StartsWith(site.Url + "/graphql"));
+        if (videosRequest == null)
+        {
+            var requestUrls = requests.Select(r => r.Url + Environment.NewLine).ToList();
+            throw new InvalidOperationException($"Could not read GraphQL API request from following requests:{Environment.NewLine}{string.Join("", requestUrls)}");
+        }
+        
+        Client.DefaultRequestHeaders.Clear();
+        foreach (var key in videosRequest.Headers.Keys)
+        {
+            if (key != "content-type")
+            {
+                Client.DefaultRequestHeaders.Add(key, videosRequest.Headers[key]);
+            }
+        }
+        
+        return videosRequest.Headers;
+    }
+
+    private static async Task<List<IRequest>> CaptureRequestsAsync(Site site, IPage page)
+    {
+        var requests = new List<IRequest>();
+        await page.RouteAsync("**/*", async route =>
+        {
+            requests.Add(route.Request);
+            await route.ContinueAsync();
+        });
+
+        await page.GotoAsync(VideosUrl(site, 1));
+        await page.WaitForLoadStateAsync();
+        await Task.Delay(5000);
+
+        await page.UnrouteAsync("**/*");
+        return requests;
+    }
+
+    public async IAsyncEnumerable<Download> DownloadReleasesAsync(Site site, BrowserSettings browserSettings,
+        DownloadConditions downloadConditions)
+    {
+        IPage page = await _playwrightFactory.CreatePageAsync(site, browserSettings);
+        await LoginAsync(site, page);
+
+        var releases = await _repository.QueryReleasesAsync(site, downloadConditions);
+        var downloadedReleases = 0;
+        foreach (var release in releases)
+        {
+            var releaseDownloadPlan = PlanDownloads(release, downloadConditions);
+            var releaseMissingDownloadsPlan = PlanMissingDownloads(releaseDownloadPlan);
+
+            if (!releaseMissingDownloadsPlan.AvailableFiles.Any())
+            {
+                continue;
+            }
+            
+            // TODO: Refresh token when JWT token has expired
+            var convertedHeaders = new WebHeaderCollection();
+            if (downloadedReleases % 30 == 0) {
+                var requests = await CaptureRequestsAsync(site, page);
+
+                var headers = SetHeadersFromActualRequest(site, requests);
+                convertedHeaders = ConvertHeaders(headers);
+            }
+            
+            // this is now done on every scene despite we might already have all files
+            // the reason for updated scrape is that the links are timebombed and we need to refresh those
+            Release? updatedScrape;
+            try
+            {
+                updatedScrape = await ScrapeSceneAsync(site, release.ShortName, release.Uuid);
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "Could not scrape {Site} {ReleaseDate} {Release}", release.Site.Name, release.ReleaseDate.ToString("yyyy-MM-dd"), release.Name);
+                continue;
+            }
+
+            await Task.Delay(10000);
+
+            var existingDownloadEntities = await _context.Downloads.Where(d => d.ReleaseUuid == release.Uuid).ToListAsync();
+            Log.Information("Downloading: {Site} - {ReleaseDate} - {Release} [{Uuid}]", release.Site.Name, release.ReleaseDate.ToString("yyyy-MM-dd"), release.Name, release.Uuid);
+            foreach (var videoDownload in await DownloadVideosAsync(downloadConditions, updatedScrape, existingDownloadEntities, convertedHeaders))
+            {
+                yield return videoDownload;
+            }
+            foreach (var trailerDownload in await DownloadTrailersAsync(downloadConditions, updatedScrape, existingDownloadEntities, convertedHeaders))
+            {
+                yield return trailerDownload;
+            }
+            await foreach (var imageDownload in DownloadImagesAsync(updatedScrape, existingDownloadEntities, convertedHeaders))
+            {
+                yield return imageDownload;
+            }
+
+            downloadedReleases++;
+            Log.Information($"{downloadedReleases} releases downloaded in this session.");
+        }
+    }
+    
+    private async Task<IList<Download>> DownloadVideosAsync(DownloadConditions downloadConditions, Release release,
+        List<DownloadEntity> existingDownloadEntities, WebHeaderCollection convertedHeaders)
+    {
+        var availableVideos = release.AvailableFiles
+            .OfType<AvailableVideoFile>()
+            .Where(d => d is { FileType: "video", ContentType: "scene" });
+        var selectedVideo = downloadConditions.PreferredDownloadQuality == PreferredDownloadQuality.Best
+            ? availableVideos.FirstOrDefault()
+            : availableVideos.LastOrDefault();
+        if (selectedVideo == null || !NotDownloadedYet(existingDownloadEntities, selectedVideo))
+        {
+            return new List<Download>();
+        }
+
+        var uri = new Uri(selectedVideo.Url);
+        var suggestedFileName = Path.GetFileName(uri.LocalPath);
+        var suffix = Path.GetExtension(suggestedFileName);
+
+        var performersStr = release.Performers.Count() > 1
+            ? string.Join(", ", release.Performers.Take(release.Performers.Count() - 1).Select(p => p.Name)) + " & " +
+              release.Performers.Last().Name
+            : release.Performers.FirstOrDefault()?.Name ?? "Unknown";
+        var fileName = ReleaseNamer.Name(release, suffix, performersStr, selectedVideo.Variant);
+
+        var fileInfo = await _downloader.TryDownloadAsync(release, selectedVideo, selectedVideo.Url, fileName, convertedHeaders);
+        if (fileInfo == null)
+        {
+            return new List<Download>();
+        }
+
+        var videoHashes = Hasher.Phash(@"""" + fileInfo.FullName + @"""");
+        return new List<Download>
+        {
+            new(release, suggestedFileName, fileInfo.Name, selectedVideo, videoHashes)
+        };
+    }
+
+    private async Task<IList<Download>> DownloadTrailersAsync(DownloadConditions downloadConditions, Release release,
+        List<DownloadEntity> existingDownloadEntities, WebHeaderCollection convertedHeaders)
+    {
+        var availableVideos = release.AvailableFiles
+            .OfType<AvailableVideoFile>()
+            .Where(d => d is { FileType: "video", ContentType: "trailer" });
+        var selectedVideo = downloadConditions.PreferredDownloadQuality == PreferredDownloadQuality.Best
+            ? availableVideos.FirstOrDefault()
+            : availableVideos.LastOrDefault();
+        if (selectedVideo == null || !NotDownloadedYet(existingDownloadEntities, selectedVideo))
+        {
+            return new List<Download>();
+        }
+
+        var uri = new Uri(selectedVideo.Url);
+        var suggestedFileName = Path.GetFileName(uri.LocalPath);
+        var suffix = Path.GetExtension(suggestedFileName);
+
+        var fileName = $"trailer_{selectedVideo.Variant}{suffix}";
+
+        var fileInfo = await _downloader.TryDownloadAsync(release, selectedVideo, selectedVideo.Url, fileName, convertedHeaders);
+        if (fileInfo == null)
+        {
+            return new List<Download>();
+        }
+
+        var videoHashes = Hasher.Phash(@"""" + fileInfo.FullName + @"""");
+        return new List<Download>
+        {
+            new(release, suggestedFileName, fileInfo.Name, selectedVideo, videoHashes)
+        };
+    }
+    
+    private async IAsyncEnumerable<Download> DownloadImagesAsync(Release release, List<DownloadEntity> existingDownloadEntities, WebHeaderCollection convertedHeaders)
+    {
+        var imageFiles = release.AvailableFiles.OfType<AvailableImageFile>();
+        foreach (var imageFile in imageFiles)
+        {
+            if (!NotDownloadedYet(existingDownloadEntities, imageFile))
+            {
+                continue;
+            }
+            
+            var uri = new Uri(imageFile.Url);
+            var suggestedFileName = Path.GetFileName(uri.LocalPath);
+            var suffix = Path.GetExtension(suggestedFileName);
+            
+            
+            var fileName = string.IsNullOrWhiteSpace(imageFile.Variant) ? $"{imageFile.ContentType}{suffix}" : $"{imageFile.ContentType}_{imageFile.Variant}{suffix}";
+            var fileInfo = await _downloader.TryDownloadAsync(release, imageFile, imageFile.Url, fileName, convertedHeaders);
+            if (fileInfo == null)
+            {
+                yield break;
+            }
+            
+            var sha256Sum = LegacyDownloader.CalculateSHA256(fileInfo.FullName);
+            var metadata = new ImageFileMetadata(sha256Sum);
+            yield return new Download(release, $"{imageFile.ContentType}.jpg", fileInfo.Name, imageFile, metadata);
+        }
+    }
+    
+    private static bool NotDownloadedYet(List<DownloadEntity> existingDownloadEntities, IAvailableFile bestVideo)
+    {
+        return !existingDownloadEntities.Exists(d => d.FileType == bestVideo.FileType && d.ContentType == bestVideo.ContentType && d.Variant == bestVideo.Variant);
+    }
+    
+    private static WebHeaderCollection ConvertHeaders(Dictionary<string, string> headers)
+    {
+        var convertedHeaders = new WebHeaderCollection();
+        foreach (var header in headers)
+        {
+            if (header.Key.ToLower() != "content-type")
+            {
+                convertedHeaders.Add(header.Key, header.Value);   
+            }
+        }
+        return convertedHeaders;
+    }
+    
+    private ReleaseDownloadPlan PlanMissingDownloads(ReleaseDownloadPlan releaseDownloadPlan)
+    {
+        var existingDownloads = _context.Downloads.Where(d => d.ReleaseUuid == releaseDownloadPlan.Release.Uuid).ToList();
+        var notYetDownloaded = releaseDownloadPlan.AvailableFiles
+            .Where(f => !existingDownloads.Exists(d =>
+                d.FileType == f.FileType && d.ContentType == f.ContentType && d.Variant == f.Variant))
+            .ToImmutableList();
+
+        return releaseDownloadPlan with { AvailableFiles = notYetDownloaded };
+    }
+    
+    private static ReleaseDownloadPlan PlanDownloads(Release release, DownloadConditions downloadConditions)
+    {
+        var sceneFiles = release.AvailableFiles.OfType<AvailableVideoFile>().Where(f => f.ContentType == "scene").ToList();
+        var trailerFiles = release.AvailableFiles.OfType<AvailableVideoFile>().Where(f => f.ContentType == "trailer").ToList();
+
+        var selectedSceneFiles = downloadConditions.PreferredDownloadQuality == PreferredDownloadQuality.Best
+            ? sceneFiles.Take(1)
+            : sceneFiles.TakeLast(1);
+        var selectedTrailerFiles = downloadConditions.PreferredDownloadQuality == PreferredDownloadQuality.Best
+            ? trailerFiles.Take(1)
+            : trailerFiles.TakeLast(1);
+        var otherFiles = release.AvailableFiles
+            .Except(trailerFiles)
+            .Except(sceneFiles)
+            .ToList();
+
+        var availableFiles = new List<IAvailableFile>()
+            .Concat(selectedSceneFiles)
+            .Concat(selectedTrailerFiles)
+            .Concat(otherFiles)
+            .ToImmutableList();
+        
+        return new ReleaseDownloadPlan(release, availableFiles);
+    }
+
+
+    private async Task LoginAsync(Site site, IPage page)
     {
         var usernameInput = page.GetByRole(AriaRole.Textbox, new() { NameString = "Email" });
         if (await usernameInput.IsVisibleAsync())
         {
             await usernameInput.ClickAsync();
-            await usernameInput.FillAsync(site.Username);
+            await usernameInput.PressSequentiallyAsync(site.Username, new() { Delay = 100 });
 
             var passwordInput = page.GetByRole(AriaRole.Textbox, new() { NameString = "Password" });
             await passwordInput.ClickAsync();
-            await passwordInput.FillAsync(site.Password);
+            await passwordInput.PressSequentiallyAsync(site.Password, new() { Delay = 100 });
 
             await page.GetByRole(AriaRole.Button, new() { NameString = "Login" }).ClickAsync();
             await page.WaitForLoadStateAsync();
 
             await Task.Delay(5000);
 
-            await page.WaitForLoadStateAsync();
-            var continueButton = await page.QuerySelectorAsync("button[data-test-component='ContinueButton']");
-            if (continueButton != null)
-            {
-                await continueButton.ClickAsync();
-                await page.WaitForLoadStateAsync();
-            }
+            await _captchaSolver.SolveCaptchaIfNeededAsync(page);
 
             await page.WaitForLoadStateAsync();
-            var hideForeverButton = await page.QuerySelectorAsync("p[data-test-component='HideForeverButton']");
-            if (hideForeverButton != null)
-            {
-                await hideForeverButton.ClickAsync();
-                await page.WaitForLoadStateAsync();
+        }
+        
+        await _repository.UpdateStorageStateAsync(site, await page.Context.StorageStateAsync());
+    }
+
+    private const string GetFilteredVideosQuery =
+        """
+        query getFilteredVideos($order: ListOrderInput!, $filter: [ListFilterInput!], $site: [Site!]!, $first: Int!, $skip: Int!) {
+            findVideosOnSites(
+                input: {filter: $filter, order: $order, first: $first, skip: $skip, site: $site}
+            ) {
+                edges {
+                    node {
+                        id: uuid
+                        videoId
+                        title
+                        slug
+                        site
+                        rating
+                        expertReview {
+                            global
+                            __typename
+                        }
+                        releaseDate
+                        isExclusive
+                        freeVideo
+                        isFreeLimitedTrial
+                        modelsSlugged: models {
+                            name
+                            slugged: slug
+                            __typename
+                        }
+                        previews {
+                            listing {
+                                ...PreviewInfo
+                                __typename
+                            }
+                            __typename
+                        }
+                        images {
+                            listing {
+                                ...ImageInfo
+                                __typename
+                            }
+                            __typename
+                        }
+                        __typename
+                    }
+                    cursor
+                    __typename
+                }
+                pageInfo {
+                    hasNextPage
+                    hasPreviousPage
+                    __typename
+                }
+                totalCount
+                __typename
             }
         }
-    }
 
-    public async Task<int> NavigateToReleasesAndReturnPageCountAsync(Site site, IPage page)
-    {
-        await page.GotoAsync("/videos");
-        await page.WaitForLoadStateAsync();
-
-        var lastPageElement = await page.QuerySelectorAsync("div[data-test-component='Pagination'] a:has-text('Last')");
-        var lastPageLink = await lastPageElement.GetAttributeAsync("href");
-        if (string.IsNullOrEmpty(lastPageLink))
-        {
-            Log.Warning("Could not find 'Last' page link in pagination");
-            return -1;
+        fragment ImageInfo on Image {
+            src
+            placeholder
+            width
+            height
+            highdpi {
+                double
+                triple
+                __typename
+            }
+            __typename
         }
 
-        var lastPage = Regex.Match(lastPageLink, @"page=(\d+)").Groups[1].Value;
-        if (string.IsNullOrEmpty(lastPage))
-        {
-            Log.Warning("Could not parse page number from url: {Url}", lastPageLink);
-            return -1;
+        fragment PreviewInfo on Preview {
+            src
+            width
+            height
+            type
+            __typename
+        }
+        """;
+
+    private const string GetVideoQuery =
+        """
+        query getVideo($videoSlug: String, $site: Site, $relatedCount: Int!) {
+          findOneVideo(input: {slug: $videoSlug, site: $site}) {
+            id: uuid
+            videoId
+            newId: videoId
+            uuid
+            slug
+            site
+            title
+            description
+            descriptionHtml
+            absoluteUrl
+            denied: isDenied
+            isUpcoming
+            releaseDate
+            runLength
+            directors {
+              name
+              __typename
+            }
+            categories {
+              slug
+              name
+              __typename
+            }
+            channel {
+              channelId
+              isThirdPartyChannel
+              __typename
+            }
+            chapters {
+              trailerThumbPattern
+              videoThumbPattern
+              video {
+                title
+                seconds
+                _id: videoChapterId
+                __typename
+              }
+              __typename
+            }
+            showcase {
+              showcaseId
+              title
+              itsupId {
+                mobile
+                desktop
+                __typename
+              }
+              __typename
+            }
+            tour {
+              views
+              __typename
+            }
+            modelsSlugged: models {
+              name
+              slugged: slug
+              __typename
+            }
+            rating
+            expertReview {
+              global
+              properties {
+                name
+                slug
+                rating
+                __typename
+              }
+              models {
+                slug
+                rating
+                name
+                __typename
+              }
+              __typename
+            }
+            runLengthFormatted: runLength
+            releaseDate
+            videoUrl1080P: videoTokenId
+            trailerTokenId
+            picturesInSet
+            carousel {
+              listing {
+                ...PictureSetInfo
+                __typename
+              }
+              main {
+                ...PictureSetInfo
+                __typename
+              }
+              __typename
+            }
+            images {
+              poster {
+                ...ImageInfo
+                __typename
+              }
+              __typename
+            }
+            tags
+            downloadResolutions {
+              label
+              size
+              width
+              res
+              __typename
+            }
+            related(count: $relatedCount) {
+              title
+              uuid
+              id: videoId
+              slug
+              absoluteUrl
+              site
+              freeVideo
+              isFreeLimitedTrial
+              models {
+                absoluteUrl
+                name
+                slug
+                __typename
+              }
+              releaseDate
+              rating
+              expertReview {
+                global
+                __typename
+              }
+              channel {
+                channelId
+                __typename
+              }
+              images {
+                listing {
+                  ...ImageInfo
+                  __typename
+                }
+                __typename
+              }
+              previews {
+                listing {
+                  ...PreviewInfo
+                  __typename
+                }
+                __typename
+              }
+              __typename
+            }
+            freeVideo
+            isFreeLimitedTrial
+            userVideoReview {
+              slug
+              rating
+              __typename
+            }
+            __typename
+          }
         }
 
-        return int.Parse(lastPage);
-    }
-
-    public async Task<IReadOnlyList<ListedRelease>> GetCurrentReleasesAsync(Site site, SubSite subSite, IPage page, IReadOnlyList<IRequest> requests, int pageNumber)
-    {
-        await GoToPageAsync(page, pageNumber);
-        
-        var releaseHandles = await page.Locator("div[data-test-component='VideoThumbnailContainer']").ElementHandlesAsync();
-
-        var listedReleases = new List<ListedRelease>();
-        foreach (var releaseHandle in releaseHandles.Reverse())
-        {
-            var releaseIdAndUrl = await GetReleaseIdAsync(releaseHandle);
-            listedReleases.Add(new ListedRelease(null, releaseIdAndUrl.Id, releaseIdAndUrl.Url, releaseHandle));
+        fragment PictureSetInfo on PictureSetImage {
+          src
+          width
+          height
+          name
+          __typename
         }
 
-        return listedReleases.AsReadOnly();
-    }
-
-    private static async Task GoToPageAsync(IPage page, int pageNumber)
-    {
-        await page.GotoAsync($"/videos?page={pageNumber}");
-        await Task.Delay(1000);
-    }
-
-    private static async Task<ReleaseIdAndUrl> GetReleaseIdAsync(IElementHandle currentRelease)
-    {
-        var videoElement = await currentRelease.QuerySelectorAsync("video");
-        var videoSrc = await videoElement.GetAttributeAsync("src");
-
-        var releaseId = Regex.Match(videoSrc, @"videos/(\d+)/").Groups[1].Value;
-
-        var aElement = await currentRelease.QuerySelectorAsync("a");
-        var url = await aElement.GetAttributeAsync("href");
-
-        return new ReleaseIdAndUrl(releaseId, url);
-    }
-
-    public async Task<Release> ScrapeReleaseAsync(Guid releaseUuid, Site site, SubSite subSite, string url, string releaseShortName, IPage page, IReadOnlyList<IRequest> requests)
-    {
-        var releaseMetadataRequest = requests
-            .Where(r => r.Method == "POST")
-            .Where(r => r.Url == $"{site.Url}/graphql")
-            .FirstOrDefault();
-        var response = await releaseMetadataRequest.ResponseAsync();
-        var bodyBuffer = await response.BodyAsync();
-        var jsonContent = System.Text.Encoding.UTF8.GetString(bodyBuffer);
-        var data = JsonSerializer.Deserialize<VixenSceneRootObject>(jsonContent)!;
-
-        var releaseDate = DateOnly.FromDateTime(data.data.findOneVideo.releaseDate);
-        var duration = HumanParser.ParseDuration(data.data.findOneVideo.runLength);
-        var title = data.data.findOneVideo.title;
-
-        var performers = new List<SitePerformer>();
-        foreach (var modelSlug in data.data.findOneVideo.modelsSlugged)
-        {
-            var slug = modelSlug.slugged;
-            var name = modelSlug.name;
-
-            performers.Add(new SitePerformer(slug, name, $"/models/{slug}"));
+        fragment ImageInfo on Image {
+          src
+          placeholder
+          width
+          height
+          highdpi {
+            double
+            triple
+            __typename
+          }
+          __typename
         }
 
-        string description = data.data.findOneVideo.description;
-
-        var tags = new List<SiteTag>();
-        foreach (var category in data.data.findOneVideo.categories)
-        {
-            var slug = category.slug;
-            var tagName = category.name;
-            tags.Add(new SiteTag(slug, tagName, $"/videos?search={category.name}"));
+        fragment PreviewInfo on Preview {
+          src
+          width
+          height
+          type
+          __typename
         }
+        """;
 
-        var downloadOptionsAndHandles = await ParseAvailableDownloadsAsync(page);
-
-        var metadataJson = JsonSerializer.Serialize(data.data.findOneVideo);
-
-        var scene = new Release(
-            releaseUuid,
-            site,
-            subSite,
-            releaseDate,
-            releaseShortName,
-            title,
-            url,
-            description,
-            duration.TotalSeconds,
-            performers,
-            tags,
-            downloadOptionsAndHandles.Select(f => f.AvailableVideoFile).ToList(),
-            metadataJson,
-            DateTime.Now);
-        
-        var posterSource = data.data.findOneVideo.images.poster
-            .OrderByDescending(i => i.width)
-            .Select(i => i.src)
-            .FirstOrDefault();
-
-        await _legacyDownloader.DownloadSceneImageAsync(scene, posterSource, scene.Url);
-
-        return scene;
-    }
-
-    public async Task<Download> DownloadReleaseAsync(Release release, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)
-    {
-        var availableDownloads = await ParseAvailableDownloadsAsync(page);
-
-        DownloadDetailsAndElementHandle selectedDownload = downloadConditions.PreferredDownloadQuality switch
-        {
-            PreferredDownloadQuality.Phash => availableDownloads.Last(),
-            PreferredDownloadQuality.Best => availableDownloads.First(),
-            PreferredDownloadQuality.Worst => availableDownloads.Last(),
-            _ => throw new InvalidOperationException("Could not find a download candidate!")
-        };
-
-        var userAgent = await page.EvaluateAsync<string>("() => navigator.userAgent");
-        var cookieString = await page.EvaluateAsync<string>("() => document.cookie");
-
-        var headers = new WebHeaderCollection()
-        {
-            { HttpRequestHeader.Referer, page.Url },
-            { HttpRequestHeader.Accept, "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7" },
-            { HttpRequestHeader.UserAgent, userAgent },
-            { HttpRequestHeader.Cookie, cookieString }
-        };
-
-        var suggestedFilename = selectedDownload.AvailableVideoFile.Url[(selectedDownload.AvailableVideoFile.Url.LastIndexOf("/", StringComparison.Ordinal) + 1)..];
-        suggestedFilename = suggestedFilename[..suggestedFilename.IndexOf("?", StringComparison.Ordinal)];
-        var suffix = Path.GetExtension(suggestedFilename);
-        var name = ReleaseNamer.Name(release, suffix);
-
-        return await _legacyDownloader.DownloadSceneDirectAsync(release, selectedDownload.AvailableVideoFile, downloadConditions.PreferredDownloadQuality, headers, referer: page.Url, fileName: name);
-    }
-
-    private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloadsAsync(IPage page)
-    {
-        await page.ReloadAsync();
-
-        var playButton = await page.QuerySelectorAsync("div[data-test-component='PlayButton']");
-        
-        await page.WaitForLoadStateAsync();
-        await page.WaitForTimeoutAsync(10000);
-
-        if (await playButton.IsVisibleAsync())
-        {
-            await playButton.ClickAsync();
+    private const string GenerateVideoTokenQuery =
+        """
+        query getToken($videoId: ID!, $device: Device!) {
+          generateVideoToken(input: {videoId: $videoId, device: $device}) {
+            p270 {
+              token
+              cdn
+              __typename
+            }
+            p360 {
+              token
+              cdn
+              __typename
+            }
+            p480 {
+              token
+              cdn
+              __typename
+            }
+            p480l {
+              token
+              cdn
+              __typename
+            }
+            p720 {
+              token
+              cdn
+              __typename
+            }
+            p1080 {
+              token
+              cdn
+              __typename
+            }
+            p2160 {
+              token
+              cdn
+              __typename
+            }
+            hls {
+              token
+              cdn
+              __typename
+            }
+            __typename
+          }
         }
+        """;
 
-        var videoElement = await page.QuerySelectorAsync("video");
-        await videoElement.HoverAsync();
-
-        var resolutionButton = await page.QuerySelectorAsync(".vjs-resolution-button");
-        await resolutionButton.ClickAsync();
-
-        var resolutionMenuItems = await page.QuerySelectorAllAsync(".vjs-resolution .vjs-menu-item");
-        var sources = new List<string>();
-
-        await videoElement.HoverAsync();
-        await resolutionButton.HoverAsync();
-        await resolutionMenuItems[0].ClickAsync();
-
-        var source = await videoElement.GetAttributeAsync("src");
-
-        var availableDownloads = new List<DownloadDetailsAndElementHandle>();
-
-        var userAgent = await page.EvaluateAsync<string>("() => navigator.userAgent");
-        var cookieString = await page.EvaluateAsync<string>("() => document.cookie");
-
-        HttpWebRequest request = WebRequest.Create(source) as HttpWebRequest;
-        request.AllowAutoRedirect = false;
-        request.Headers.Add(HttpRequestHeader.Referer, page.Url);
-        request.Headers.Add(HttpRequestHeader.Accept, "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7");
-        request.Headers.Add(HttpRequestHeader.UserAgent, userAgent);
-        request.Headers.Add(HttpRequestHeader.Cookie, cookieString);
-        HttpWebResponse response = request.GetResponse() as HttpWebResponse;
-        if (response.StatusCode == HttpStatusCode.RedirectKeepVerb)
-        {
-            // Do something here...
-            source = response.Headers["Location"];
+    private const string GetPictureSetQuery =
+        """
+        query getPictureSet($videoSlug: String, $site: Site!) {
+          findOnePictureSet(input: {slug: $videoSlug, site: $site}) {
+            pictureSetId
+            zip
+            video {
+              id: uuid
+              videoId
+              freeVideo
+              isFreeLimitedTrial
+              site
+              categories {
+                slug
+                name
+                __typename
+              }
+              __typename
+            }
+            images {
+              listing {
+                src
+                width
+                height
+                __typename
+              }
+              main {
+                src
+                width
+                height
+                __typename
+              }
+              __typename
+            }
+            __typename
+          }
         }
-
-        var resolution = Regex.Match(source, @"(\d+)P.mp4").Groups[1].Value;
-
-        availableDownloads.Add(
-            new DownloadDetailsAndElementHandle(
-                new AvailableVideoFile(
-                    "video",
-                    "scene",
-                    resolution,
-                    source,
-                    -1,
-                    int.Parse(resolution),
-                    -1,
-                    -1,
-                    string.Empty),
-                null));
-
-        return availableDownloads.OrderByDescending(d => d.AvailableVideoFile.ResolutionHeight).ToList();
-    }
-
-    public async Task<int> NavigateToSubSiteAndReturnPageCountAsync(Site site, SubSite subSite, IPage page)
-    {
-        await page.GotoAsync($"/channel/{subSite.ShortName}");
-        await page.GetByRole(AriaRole.Heading, new() { NameString = "Recently Added\nview all" }).GetByRole(AriaRole.Link, new()
-        {
-            NameString = "view all"
-        }).ClickAsync();
-
-        var pageLinkHandles = await page.QuerySelectorAllAsync("nav.paginated-nav ul li:not(.disabled) a");
-        if (pageLinkHandles.Count == 0)
-        {
-            throw new InvalidOperationException($"Could not find page links for subsite {subSite.Name}.");
-        }
-
-        // take second to last page link, because the last one is "next"
-        var lastPageLinkHandle = pageLinkHandles[pageLinkHandles.Count - 2];
-        var lastPageLinkText = await lastPageLinkHandle.TextContentAsync();
-        return int.Parse(lastPageLinkText);
-    }
-
-
-    public class VixenSceneRootObject
-    {
-        public Data data { get; set; }
-    }
-
-    public class Data
-    {
-        public Findonevideo findOneVideo { get; set; }
-    }
-
-    public class Findonevideo
-    {
-        public string id { get; set; }
-        public string videoId { get; set; }
-        public string newId { get; set; }
-        public string uuid { get; set; }
-        public string slug { get; set; }
-        public string site { get; set; }
-        public string title { get; set; }
-        public string description { get; set; }
-        public string descriptionHtml { get; set; }
-        public object absoluteUrl { get; set; }
-        public bool denied { get; set; }
-        public bool isUpcoming { get; set; }
-        public DateTime releaseDate { get; set; }
-        public string runLength { get; set; }
-        public Director[] directors { get; set; }
-        public Category[] categories { get; set; }
-        public object channel { get; set; }
-        public Chapters chapters { get; set; }
-        public object showcase { get; set; }
-        public Tour tour { get; set; }
-        public Modelsslugged[] modelsSlugged { get; set; }
-        public double rating { get; set; }
-        public Expertreview expertReview { get; set; }
-        public string runLengthFormatted { get; set; }
-        public string videoUrl1080P { get; set; }
-        public object trailerTokenId { get; set; }
-        public int picturesInSet { get; set; }
-        public Carousel[] carousel { get; set; }
-        public Images images { get; set; }
-        public object[] tags { get; set; }
-        public Downloadresolution[] downloadResolutions { get; set; }
-        public Related[] related { get; set; }
-        public object freeVideo { get; set; }
-        public object[] userVideoReview { get; set; }
-        public string __typename { get; set; }
-    }
-
-    public class Chapters
-    {
-        public string trailerThumbPattern { get; set; }
-        public string videoThumbPattern { get; set; }
-        public Video[] video { get; set; }
-        public string __typename { get; set; }
-    }
-
-    public class Video
-    {
-        public string title { get; set; }
-        public int seconds { get; set; }
-        public string _id { get; set; }
-        public string __typename { get; set; }
-    }
-
-    public class Tour
-    {
-        public int views { get; set; }
-        public string __typename { get; set; }
-    }
-
-    public class Expertreview
-    {
-        public float global { get; set; }
-        public Property1[] properties { get; set; }
-        public Model[] models { get; set; }
-        public string __typename { get; set; }
-    }
-
-    public class Property1
-    {
-        public string name { get; set; }
-        public string slug { get; set; }
-        public float rating { get; set; }
-        public string __typename { get; set; }
-    }
-
-    public class Model
-    {
-        public string slug { get; set; }
-        public float rating { get; set; }
-        public string name { get; set; }
-        public string __typename { get; set; }
-    }
-
-    public class Images
-    {
-        public Poster[] poster { get; set; }
-        public string __typename { get; set; }
-    }
-
-    public class Poster
-    {
-        public string src { get; set; }
-        public string placeholder { get; set; }
-        public int width { get; set; }
-        public int height { get; set; }
-        public Highdpi highdpi { get; set; }
-        public string __typename { get; set; }
-    }
-
-    public class Highdpi
-    {
-        public string _double { get; set; }
-        public string triple { get; set; }
-        public string __typename { get; set; }
-    }
-
-    public class Director
-    {
-        public string name { get; set; }
-        public string __typename { get; set; }
-    }
-
-    public class Category
-    {
-        public string slug { get; set; }
-        public string name { get; set; }
-        public string __typename { get; set; }
-    }
-
-    public class Modelsslugged
-    {
-        public string name { get; set; }
-        public string slugged { get; set; }
-        public string __typename { get; set; }
-    }
-
-    public class Carousel
-    {
-        public Listing[] listing { get; set; }
-        public Main[] main { get; set; }
-        public string __typename { get; set; }
-    }
-
-    public class Listing
-    {
-        public string src { get; set; }
-        public int width { get; set; }
-        public int height { get; set; }
-        public string name { get; set; }
-        public string __typename { get; set; }
-    }
-
-    public class Main
-    {
-        public string src { get; set; }
-        public int width { get; set; }
-        public int height { get; set; }
-        public string name { get; set; }
-        public string __typename { get; set; }
-    }
-
-    public class Downloadresolution
-    {
-        public string label { get; set; }
-        public string size { get; set; }
-        public string width { get; set; }
-        public string res { get; set; }
-        public string __typename { get; set; }
-    }
-
-    public class Related
-    {
-        public string title { get; set; }
-        public string uuid { get; set; }
-        public string id { get; set; }
-        public string slug { get; set; }
-        public object absoluteUrl { get; set; }
-        public string site { get; set; }
-        public object freeVideo { get; set; }
-        public Model1[] models { get; set; }
-        public DateTime releaseDate { get; set; }
-        public double rating { get; set; }
-        public Expertreview1 expertReview { get; set; }
-        public object channel { get; set; }
-        public Images1 images { get; set; }
-        public Previews previews { get; set; }
-        public string __typename { get; set; }
-    }
-
-    public class Expertreview1
-    {
-        public float global { get; set; }
-        public string __typename { get; set; }
-    }
-
-    public class Images1
-    {
-        public Listing1[] listing { get; set; }
-        public string __typename { get; set; }
-    }
-
-    public class Listing1
-    {
-        public string src { get; set; }
-        public string placeholder { get; set; }
-        public int width { get; set; }
-        public int height { get; set; }
-        public Highdpi1 highdpi { get; set; }
-        public string __typename { get; set; }
-    }
-
-    public class Highdpi1
-    {
-        public string _double { get; set; }
-        public string triple { get; set; }
-        public string __typename { get; set; }
-    }
-
-    public class Previews
-    {
-        public Listing2[] listing { get; set; }
-        public string __typename { get; set; }
-    }
-
-    public class Listing2
-    {
-        public string src { get; set; }
-        public int width { get; set; }
-        public int height { get; set; }
-        public string type { get; set; }
-        public string __typename { get; set; }
-    }
-
-    public class Model1
-    {
-        public object absoluteUrl { get; set; }
-        public string name { get; set; }
-        public string slug { get; set; }
-        public string __typename { get; set; }
-    }
-
+        """;
 }
