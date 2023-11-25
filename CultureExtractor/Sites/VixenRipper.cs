@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.IdentityModel.Tokens.Jwt;
 using System.Net;
 using System.Text;
 using System.Text.Json;
@@ -47,8 +48,8 @@ public class VixenRipper : IYieldingScraper
         await LoginAsync(site, page);
         var requests = await CaptureRequestsAsync(site, page);
         
-        SetHeadersFromActualRequest(site, requests);
-
+        var graphQlRequest = SetHeadersFromActualRequest(site, requests);
+        
         await foreach (var scene in ScrapeScenesAsync(site, scrapeOptions))
         {
             yield return scene;
@@ -62,7 +63,16 @@ public class VixenRipper : IYieldingScraper
         VixenFindVideosOnSitesResponse.FindVideosOnSites? findVideosOnSites = null;
         do
         {
-            await Task.Delay(5000);
+            /*var cookie = Client.DefaultRequestHeaders.GetValues("cookie").FirstOrDefault();
+            var accessToken = ExtractAccessTokenFromCookie(cookie);
+            var expiryDate = DecodeTokenAndGetExpiry(accessToken);
+            
+            if (expiryDate != null && expiryDate.Value.AddMinutes(-2) < DateTime.Now.ToUniversalTime())
+            {
+                await RefreshAccessToken(site);
+            }*/
+            
+            await Task.Delay(5123);
 
             var variables = new
             {
@@ -107,7 +117,7 @@ public class VixenRipper : IYieldingScraper
 
             var movies = findVideosOnSites.edges
                 .ToDictionary(
-                    edge => edge.node.id,
+                    edge => edge.node.slug,
                     edge => edge.node);
 
             var existingReleases = await _repository
@@ -134,7 +144,7 @@ public class VixenRipper : IYieldingScraper
 
     private static async Task<Release> ScrapeSceneAsync(Site site, string shortName, Guid releaseGuid)
     {
-        await Task.Delay(1000);
+        await Task.Delay(1211);
 
         var videoRequestObj = new
         {
@@ -261,9 +271,13 @@ public class VixenRipper : IYieldingScraper
                 var suggestedFileName = Path.GetFileName(uri.LocalPath);
                 var suffix = Path.GetExtension(suggestedFileName);
 
-                // get width from filename e.g. TUSHY_104252_270P.mp4 to 270
-                var width = int.Parse(suggestedFileName.Split("_")[2].Replace(suffix, "").Replace("l", "")
-                    .Replace("P", ""));
+                var parts = suggestedFileName.Split("_");
+                var resolutionPart = parts.FirstOrDefault(part => part.EndsWith("P.mp4"));
+                if (resolutionPart == null)
+                {
+                    throw new FormatException($"Could not find resolution in filename {suggestedFileName}");
+                }
+                var width = int.Parse(resolutionPart.Replace(suffix, "").Replace("l", "").Replace("P", ""));
 
                 return new AvailableVideoFile(
                     "video",
@@ -409,6 +423,46 @@ public class VixenRipper : IYieldingScraper
         return videosRequest.Headers;
     }
 
+    private static string ExtractAccessTokenFromCookie(string cookieString)
+    {
+        // The cookie string format is usually "key=value; key2=value2"
+        var cookies = cookieString.Split(';');
+        foreach (var cookie in cookies)
+        {
+            var cookieParts = cookie.Trim().Split('=');
+            if (cookieParts[0] == "access_token")
+            {
+                return cookieParts[1];
+            }
+        }
+        return null;
+    }
+
+    private static DateTime? DecodeTokenAndGetExpiry(string token)
+    {
+        var handler = new JwtSecurityTokenHandler();
+        var jsonToken = handler.ReadJwtToken(token);
+        var expClaim = jsonToken.Claims.FirstOrDefault(claim => claim.Type == "exp");
+        if (expClaim != null && long.TryParse(expClaim.Value, out var expValue))
+        {
+            // The exp claim is the number of seconds since epoch
+            var expiryDate = DateTimeOffset.FromUnixTimeSeconds(expValue).DateTime;
+            return expiryDate;
+        }
+        return null;
+    }
+    
+    private static async Task RefreshAccessToken(Site site)
+    {
+        var refreshUrl = $"{site.Url}/api/refresh";
+        var refreshRequest = new HttpRequestMessage(HttpMethod.Post, "https://members.tushy.com/api/refresh");
+        var refreshResponse = await Client.SendAsync(refreshRequest);
+        
+        var newAccessToken = refreshResponse.Headers.GetValues("Set-Cookie")
+            .Select(ExtractAccessTokenFromCookie)
+            .FirstOrDefault(token => token != null);
+    }
+    
     private static async Task<List<IRequest>> CaptureRequestsAsync(Site site, IPage page)
     {
         var requests = new List<IRequest>();
