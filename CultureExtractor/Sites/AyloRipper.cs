@@ -334,7 +334,7 @@ public class AyloRipper : IYieldingScraper
 
             var existingDownloadEntities = await _context.Downloads.Where(d => d.ReleaseUuid == release.Uuid).ToListAsync();
             Log.Information("Downloading: {Site} - {ReleaseDate} - {Release} [{Uuid}]", release.Site.Name, release.ReleaseDate.ToString("yyyy-MM-dd"), release.Name, release.Uuid);
-            foreach (var videoDownload in await DownloadsVideosAsync(downloadConditions, updatedScrape, existingDownloadEntities, convertedHeaders))
+            foreach (var videoDownload in await DownloadVideosAsync(downloadConditions, updatedScrape, existingDownloadEntities, convertedHeaders))
             {
                 yield return videoDownload;
             }
@@ -388,7 +388,7 @@ public class AyloRipper : IYieldingScraper
         return releaseDownloadPlan with { AvailableFiles = notYetDownloaded };
     }
     
-    private async Task<IList<Download>> DownloadsVideosAsync(DownloadConditions downloadConditions, Release release,
+    private async Task<IList<Download>> DownloadVideosAsync(DownloadConditions downloadConditions, Release release,
         List<DownloadEntity> existingDownloadEntities, WebHeaderCollection convertedHeaders)
     {
         var availableVideos = release.AvailableFiles.OfType<AvailableVideoFile>().Where(d => d is { FileType: "video", ContentType: "scene" });
