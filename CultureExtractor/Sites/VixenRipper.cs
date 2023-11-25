@@ -364,37 +364,37 @@ public class VixenRipper : IYieldingScraper
     {
         var tokens = new List<VixenGetTokenResponse.VideoToken>();
 
-        if (videoTokenResponseFoo.data.generateVideoToken.p2160 != null)
+        if (videoTokenResponseFoo.data.generateVideoToken.p2160 != null && !string.IsNullOrWhiteSpace(videoTokenResponseFoo.data.generateVideoToken.p2160.token))
         {
             tokens.Add(videoTokenResponseFoo.data.generateVideoToken.p2160);
         }
 
-        if (videoTokenResponseFoo.data.generateVideoToken.p1080 != null)
+        if (videoTokenResponseFoo.data.generateVideoToken.p1080 != null && !string.IsNullOrWhiteSpace(videoTokenResponseFoo.data.generateVideoToken.p1080.token))
         {
             tokens.Add(videoTokenResponseFoo.data.generateVideoToken.p1080);
         }
 
-        if (videoTokenResponseFoo.data.generateVideoToken.p720 != null)
+        if (videoTokenResponseFoo.data.generateVideoToken.p720 != null && !string.IsNullOrWhiteSpace(videoTokenResponseFoo.data.generateVideoToken.p720.token))
         {
             tokens.Add(videoTokenResponseFoo.data.generateVideoToken.p720);
         }
 
-        if (videoTokenResponseFoo.data.generateVideoToken.p480 != null)
+        if (videoTokenResponseFoo.data.generateVideoToken.p480 != null && !string.IsNullOrWhiteSpace(videoTokenResponseFoo.data.generateVideoToken.p480.token))
         {
             tokens.Add(videoTokenResponseFoo.data.generateVideoToken.p480);
         }
 
-        if (videoTokenResponseFoo.data.generateVideoToken.p480l != null)
+        if (videoTokenResponseFoo.data.generateVideoToken.p480l != null && !string.IsNullOrWhiteSpace(videoTokenResponseFoo.data.generateVideoToken.p480l.token))
         {
             tokens.Add(videoTokenResponseFoo.data.generateVideoToken.p480l);
         }
 
-        if (videoTokenResponseFoo.data.generateVideoToken.p360 != null)
+        if (videoTokenResponseFoo.data.generateVideoToken.p360 != null && !string.IsNullOrWhiteSpace(videoTokenResponseFoo.data.generateVideoToken.p360.token))
         {
             tokens.Add(videoTokenResponseFoo.data.generateVideoToken.p360);
         }
 
-        if (videoTokenResponseFoo.data.generateVideoToken.p270 != null)
+        if (videoTokenResponseFoo.data.generateVideoToken.p270 != null && !string.IsNullOrWhiteSpace(videoTokenResponseFoo.data.generateVideoToken.p270.token))
         {
             tokens.Add(videoTokenResponseFoo.data.generateVideoToken.p270);
         }
