@@ -13,6 +13,8 @@ namespace CultureExtractor.Sites;
 
 [Site("brazzers")]
 [Site("digitalplayground")]
+[Site("fakehub")]
+[Site("milehighmedia")]
 [Site("realitykings")]
 public class AyloRipper : IYieldingScraper
 {
