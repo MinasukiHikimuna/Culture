@@ -11,6 +11,11 @@ using Serilog;
 
 namespace CultureExtractor.Sites;
 
+/**
+ * TODO:
+ * - Scrape preview videos
+ * - Fix refreshing of access token as it expires every 10 minutes
+ */
 [Site("blacked")]
 [Site("blackedraw")]
 [Site("deeper")]
@@ -50,62 +55,57 @@ public class VixenRipper : IYieldingScraper
         
         var graphQlRequest = SetHeadersFromActualRequest(site, requests);
         
-        await foreach (var scene in ScrapeScenesAsync(site, scrapeOptions))
+        await foreach (var scene in ScrapeScenesAsync(site, page, scrapeOptions))
         {
             yield return scene;
         }
     }
 
-    private async IAsyncEnumerable<Release> ScrapeScenesAsync(Site site, ScrapeOptions scrapeOptions)
+    private async IAsyncEnumerable<Release> ScrapeScenesAsync(Site site, IPage page, ScrapeOptions scrapeOptions)
     {
         var pageNumber = 1;
         var pages = -1;
         VixenFindVideosOnSitesResponse.FindVideosOnSites? findVideosOnSites = null;
         do
         {
-            /*var cookie = Client.DefaultRequestHeaders.GetValues("cookie").FirstOrDefault();
+            var cookie = Client.DefaultRequestHeaders.GetValues("cookie").FirstOrDefault();
             var accessToken = ExtractAccessTokenFromCookie(cookie);
             var expiryDate = DecodeTokenAndGetExpiry(accessToken);
-            
-            if (expiryDate != null && expiryDate.Value.AddMinutes(-2) < DateTime.Now.ToUniversalTime())
+            if (expiryDate != null && expiryDate.Value.AddMinutes(-5) < DateTime.Now.ToUniversalTime())
             {
-                await RefreshAccessToken(site);
-            }*/
+                var requests = await CaptureRequestsAsync(site, page);
+        
+                SetHeadersFromActualRequest(site, requests);
+                
+                var newCookie = Client.DefaultRequestHeaders.GetValues("cookie").FirstOrDefault();
+                var newAccessToken = ExtractAccessTokenFromCookie(newCookie);
+                
+                Log.Debug($"Refresh access token.{Environment.NewLine}Old: {accessToken}{Environment.NewLine}New: {newAccessToken}");
+            }
             
             await Task.Delay(5123);
 
-            var variables = new
-            {
-                site = site.ShortName.ToUpperInvariant(),
-                skip = (pageNumber - 1) * 12,
-                first = 12,
-                order = new { field = "releaseDate", desc = true },
-                filter = new object[]
-                {
-                    new { field = "unlisted", op = "NE", value = true },
-                    new { field = "channelInfo.isThirdPartyChannel", op = "NE", value = true },
-                    new { field = "channelInfo.isAvailable", op = "NE", value = false }
-                }
-            };
-            var requestObj = new
+            var requestObject = new
             {
                 operationName = "getFilteredVideos",
                 query = GetFilteredVideosQuery,
-                variables = variables
+                variables = new
+                {
+                    site = site.ShortName.ToUpperInvariant(),
+                    skip = (pageNumber - 1) * 12,
+                    first = 12,
+                    order = new { field = "releaseDate", desc = true },
+                    filter = new object[]
+                    {
+                        new { field = "unlisted", op = "NE", value = true },
+                        new { field = "channelInfo.isThirdPartyChannel", op = "NE", value = true },
+                        new { field = "channelInfo.isAvailable", op = "NE", value = false }
+                    }
+                }
             };
-
-            var requestJson = JsonSerializer.Serialize(requestObj);
-            var requestContent = new StringContent(requestJson, Encoding.UTF8, "application/json");
-            var request = new HttpRequestMessage(HttpMethod.Post, $"{site.Url}/graphql")
-            {
-                Content = requestContent
-            };
-            var response = await Client.SendAsync(request);
-            var responseContent = await response.Content.ReadAsStringAsync();
-
-
-            var videosResponse = JsonSerializer.Deserialize<VixenFindVideosOnSitesResponse.RootObject>(responseContent);
-            findVideosOnSites = videosResponse.data.findVideosOnSites;
+            var videosResponse =
+                await GraphQLQuery<VixenFindVideosOnSitesResponse.RootObject>($"{site.Url}/graphql", requestObject);
+            findVideosOnSites = videosResponse.Deserialized.data.findVideosOnSites;
             if (pages == -1)
             {
                 pages = (int)Math.Ceiling(findVideosOnSites.totalCount / 12.0);
@@ -157,20 +157,11 @@ public class VixenRipper : IYieldingScraper
                 videoSlug = shortName
             }
         };
+        var videoResponse = await GraphQLQuery<VixenFindOneVideoResponse.RootObject>(
+            $"{site.Url}/graphql",
+            videoRequestObj);
 
-        var videoRequestJson = JsonSerializer.Serialize(videoRequestObj);
-        var videoRequestContent = new StringContent(videoRequestJson, Encoding.UTF8, "application/json");
-        var videoRequest = new HttpRequestMessage(HttpMethod.Post, $"{site.Url}/graphql")
-        {
-            Content = videoRequestContent
-        };
-        var videoResponse = await Client.SendAsync(videoRequest);
-        var videoResponseContent = await videoResponse.Content.ReadAsStringAsync();
-
-        var videoResponseFoo = JsonSerializer.Deserialize<VixenFindOneVideoResponse.RootObject>(videoResponseContent);
-
-
-        var dataFindOneVideo = videoResponseFoo.data.findOneVideo;
+        var dataFindOneVideo = videoResponse.Deserialized.data.findOneVideo;
         var videoTokenResponseFoo = await GetSceneVideoToken(
             site,
             dataFindOneVideo.videoId);
@@ -188,17 +179,7 @@ public class VixenRipper : IYieldingScraper
                 videoSlug = shortName
             }
         };
-        var pictureSetRequestJson = JsonSerializer.Serialize(pictureSetRequestObj);
-        var pictureSetRequestContent = new StringContent(pictureSetRequestJson, Encoding.UTF8, "application/json");
-        var pictureSetRequest = new HttpRequestMessage(HttpMethod.Post, $"{site.Url}/graphql")
-        {
-            Content = pictureSetRequestContent
-        };
-        var pictureSetResponse = await Client.SendAsync(pictureSetRequest);
-        var pictureSetResponseContent = await pictureSetResponse.Content.ReadAsStringAsync();
-
-        var pictureSetResponseFoo =
-            JsonSerializer.Deserialize<VixenGetPictureSetResponse.RootObject>(pictureSetResponseContent);
+        var pictureSetResponse = await GraphQLQuery<VixenGetPictureSetResponse.RootObject>($"{site.Url}/graphql", pictureSetRequestObj);
 
 
         var videoTokens = GetAvailableVideos(videoTokenResponseFoo);
@@ -226,9 +207,9 @@ public class VixenRipper : IYieldingScraper
                 "zip",
                 "gallery",
                 string.Empty,
-                pictureSetResponseFoo.data.findOnePictureSet.zip,
-                pictureSetResponseFoo.data.findOnePictureSet.images[0].main[0].width,
-                pictureSetResponseFoo.data.findOnePictureSet.images[0].main[0].height,
+                pictureSetResponse.Deserialized.data.findOnePictureSet.zip,
+                pictureSetResponse.Deserialized.data.findOnePictureSet.images[0].main[0].width,
+                pictureSetResponse.Deserialized.data.findOnePictureSet.images[0].main[0].height,
                 -1
             )
         };
@@ -321,22 +302,22 @@ public class VixenRipper : IYieldingScraper
                 .Concat(galleryDownloads)
                 .Concat(imageDownloads)
                 .Concat(trailerDownloads),
-            videoResponseContent,
+            videoResponse.Raw,
             DateTime.Now);
         return scene;
     }
 
-    private static Task<VixenGetTokenResponse.RootObject?> GetSceneVideoToken(Site site, string videoId)
+    private static Task<VixenGetTokenResponse.RootObject> GetSceneVideoToken(Site site, string videoId)
     {
         return GetVideoToken(site, videoId, "desktop");
     }
-    
-    private static Task<VixenGetTokenResponse.RootObject?> GetTrailerVideoToken(Site site, string videoId)
+
+    private static Task<VixenGetTokenResponse.RootObject> GetTrailerVideoToken(Site site, string videoId)
     {
         return GetVideoToken(site, videoId, "trailer");
     }
-    
-    private static async Task<VixenGetTokenResponse.RootObject?> GetVideoToken(Site site, string videoId, string device)
+
+    private static async Task<VixenGetTokenResponse.RootObject> GetVideoToken(Site site, string videoId, string device)
     {
         var requestObject = new
         {
@@ -347,56 +328,48 @@ public class VixenRipper : IYieldingScraper
                 videoId, device
             }
         };
-        var requestJson = JsonSerializer.Serialize(requestObject);
-        var requestContent = new StringContent(requestJson, Encoding.UTF8, "application/json");
-        var request = new HttpRequestMessage(HttpMethod.Post, $"{site.Url}/graphql")
-        {
-            Content = requestContent
-        };
-        var response = await Client.SendAsync(request);
-        var responseContent = await response.Content.ReadAsStringAsync();
 
-        var deserialized = JsonSerializer.Deserialize<VixenGetTokenResponse.RootObject>(responseContent);
-        return deserialized;
+        var response = await GraphQLQuery<VixenGetTokenResponse.RootObject>($"{site.Url}/graphql", requestObject);
+        return response.Deserialized;
     }
 
-    private static List<VixenGetTokenResponse.VideoToken> GetAvailableVideos(VixenGetTokenResponse.RootObject? videoTokenResponseFoo)
+    private static List<VixenGetTokenResponse.VideoToken> GetAvailableVideos(VixenGetTokenResponse.RootObject? videoGetTokenResponse)
     {
         var tokens = new List<VixenGetTokenResponse.VideoToken>();
 
-        if (videoTokenResponseFoo.data.generateVideoToken.p2160 != null && !string.IsNullOrWhiteSpace(videoTokenResponseFoo.data.generateVideoToken.p2160.token))
+        if (videoGetTokenResponse.data.generateVideoToken.p2160 != null && !string.IsNullOrWhiteSpace(videoGetTokenResponse.data.generateVideoToken.p2160.token))
         {
-            tokens.Add(videoTokenResponseFoo.data.generateVideoToken.p2160);
+            tokens.Add(videoGetTokenResponse.data.generateVideoToken.p2160);
         }
 
-        if (videoTokenResponseFoo.data.generateVideoToken.p1080 != null && !string.IsNullOrWhiteSpace(videoTokenResponseFoo.data.generateVideoToken.p1080.token))
+        if (videoGetTokenResponse.data.generateVideoToken.p1080 != null && !string.IsNullOrWhiteSpace(videoGetTokenResponse.data.generateVideoToken.p1080.token))
         {
-            tokens.Add(videoTokenResponseFoo.data.generateVideoToken.p1080);
+            tokens.Add(videoGetTokenResponse.data.generateVideoToken.p1080);
         }
 
-        if (videoTokenResponseFoo.data.generateVideoToken.p720 != null && !string.IsNullOrWhiteSpace(videoTokenResponseFoo.data.generateVideoToken.p720.token))
+        if (videoGetTokenResponse.data.generateVideoToken.p720 != null && !string.IsNullOrWhiteSpace(videoGetTokenResponse.data.generateVideoToken.p720.token))
         {
-            tokens.Add(videoTokenResponseFoo.data.generateVideoToken.p720);
+            tokens.Add(videoGetTokenResponse.data.generateVideoToken.p720);
         }
 
-        if (videoTokenResponseFoo.data.generateVideoToken.p480 != null && !string.IsNullOrWhiteSpace(videoTokenResponseFoo.data.generateVideoToken.p480.token))
+        if (videoGetTokenResponse.data.generateVideoToken.p480 != null && !string.IsNullOrWhiteSpace(videoGetTokenResponse.data.generateVideoToken.p480.token))
         {
-            tokens.Add(videoTokenResponseFoo.data.generateVideoToken.p480);
+            tokens.Add(videoGetTokenResponse.data.generateVideoToken.p480);
         }
 
-        if (videoTokenResponseFoo.data.generateVideoToken.p480l != null && !string.IsNullOrWhiteSpace(videoTokenResponseFoo.data.generateVideoToken.p480l.token))
+        if (videoGetTokenResponse.data.generateVideoToken.p480l != null && !string.IsNullOrWhiteSpace(videoGetTokenResponse.data.generateVideoToken.p480l.token))
         {
-            tokens.Add(videoTokenResponseFoo.data.generateVideoToken.p480l);
+            tokens.Add(videoGetTokenResponse.data.generateVideoToken.p480l);
         }
 
-        if (videoTokenResponseFoo.data.generateVideoToken.p360 != null && !string.IsNullOrWhiteSpace(videoTokenResponseFoo.data.generateVideoToken.p360.token))
+        if (videoGetTokenResponse.data.generateVideoToken.p360 != null && !string.IsNullOrWhiteSpace(videoGetTokenResponse.data.generateVideoToken.p360.token))
         {
-            tokens.Add(videoTokenResponseFoo.data.generateVideoToken.p360);
+            tokens.Add(videoGetTokenResponse.data.generateVideoToken.p360);
         }
 
-        if (videoTokenResponseFoo.data.generateVideoToken.p270 != null && !string.IsNullOrWhiteSpace(videoTokenResponseFoo.data.generateVideoToken.p270.token))
+        if (videoGetTokenResponse.data.generateVideoToken.p270 != null && !string.IsNullOrWhiteSpace(videoGetTokenResponse.data.generateVideoToken.p270.token))
         {
-            tokens.Add(videoTokenResponseFoo.data.generateVideoToken.p270);
+            tokens.Add(videoGetTokenResponse.data.generateVideoToken.p270);
         }
 
         return tokens;
@@ -451,18 +424,7 @@ public class VixenRipper : IYieldingScraper
         }
         return null;
     }
-    
-    private static async Task RefreshAccessToken(Site site)
-    {
-        var refreshUrl = $"{site.Url}/api/refresh";
-        var refreshRequest = new HttpRequestMessage(HttpMethod.Post, "https://members.tushy.com/api/refresh");
-        var refreshResponse = await Client.SendAsync(refreshRequest);
-        
-        var newAccessToken = refreshResponse.Headers.GetValues("Set-Cookie")
-            .Select(ExtractAccessTokenFromCookie)
-            .FirstOrDefault(token => token != null);
-    }
-    
+
     private static async Task<List<IRequest>> CaptureRequestsAsync(Site site, IPage page)
     {
         var requests = new List<IRequest>();
@@ -541,7 +503,7 @@ public class VixenRipper : IYieldingScraper
             Log.Information($"{downloadedReleases} releases downloaded in this session.");
         }
     }
-    
+
     private async Task<IList<Download>> DownloadVideosAsync(DownloadConditions downloadConditions, Release release,
         List<DownloadEntity> existingDownloadEntities, WebHeaderCollection convertedHeaders)
     {
@@ -611,7 +573,7 @@ public class VixenRipper : IYieldingScraper
             new(release, suggestedFileName, fileInfo.Name, selectedVideo, videoHashes)
         };
     }
-    
+
     private async IAsyncEnumerable<Download> DownloadImagesAsync(Release release, List<DownloadEntity> existingDownloadEntities, WebHeaderCollection convertedHeaders)
     {
         var imageFiles = release.AvailableFiles.OfType<AvailableImageFile>();
@@ -639,12 +601,12 @@ public class VixenRipper : IYieldingScraper
             yield return new Download(release, $"{imageFile.ContentType}.jpg", fileInfo.Name, imageFile, metadata);
         }
     }
-    
+
     private static bool NotDownloadedYet(List<DownloadEntity> existingDownloadEntities, IAvailableFile bestVideo)
     {
         return !existingDownloadEntities.Exists(d => d.FileType == bestVideo.FileType && d.ContentType == bestVideo.ContentType && d.Variant == bestVideo.Variant);
     }
-    
+
     private static WebHeaderCollection ConvertHeaders(Dictionary<string, string> headers)
     {
         var convertedHeaders = new WebHeaderCollection();
@@ -657,7 +619,7 @@ public class VixenRipper : IYieldingScraper
         }
         return convertedHeaders;
     }
-    
+
     private ReleaseDownloadPlan PlanMissingDownloads(ReleaseDownloadPlan releaseDownloadPlan)
     {
         var existingDownloads = _context.Downloads.Where(d => d.ReleaseUuid == releaseDownloadPlan.Release.Uuid).ToList();
@@ -668,7 +630,7 @@ public class VixenRipper : IYieldingScraper
 
         return releaseDownloadPlan with { AvailableFiles = notYetDownloaded };
     }
-    
+
     private static ReleaseDownloadPlan PlanDownloads(Release release, DownloadConditions downloadConditions)
     {
         var sceneFiles = release.AvailableFiles.OfType<AvailableVideoFile>().Where(f => f.ContentType == "scene").ToList();
@@ -1077,4 +1039,35 @@ public class VixenRipper : IYieldingScraper
           }
         }
         """;
+
+    private record ResponseDeserializedAndRaw<T>(T Deserialized, string Raw);
+    
+    private static async Task<ResponseDeserializedAndRaw<T>> GraphQLQuery<T>(string url, object requestObject)
+    {
+        var requestJson = JsonSerializer.Serialize(requestObject);
+        PrettyLogJson(requestJson);
+        var requestContent = new StringContent(requestJson, Encoding.UTF8, "application/json");
+        var request = new HttpRequestMessage(HttpMethod.Post, url)
+        {
+            Content = requestContent
+        };
+        
+        var response = await Client.SendAsync(request);
+        var responseJson = await response.Content.ReadAsStringAsync();
+        PrettyLogJson(responseJson);
+        var responseDeserialized = JsonSerializer.Deserialize<T>(responseJson);
+        if (responseDeserialized == null)
+        {
+            throw new InvalidOperationException($"Could not deserialize response from {url} to {typeof(T).Name}.{Environment.NewLine}JSON:{Environment.NewLine}{responseJson}");
+        }
+
+        return new ResponseDeserializedAndRaw<T>(responseDeserialized, responseJson);
+    }
+
+    private static void PrettyLogJson(string json)
+    {
+        var requestPrettyJson = JsonSerializer.Serialize(
+            JsonDocument.Parse(json), new JsonSerializerOptions { WriteIndented = true });
+        Log.Debug(requestPrettyJson);
+    }
 }
