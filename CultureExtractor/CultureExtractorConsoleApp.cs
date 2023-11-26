@@ -6,6 +6,7 @@ using CultureExtractor.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Serilog;
+using Serilog.Events;
 
 namespace CultureExtractor;
 
@@ -270,8 +271,8 @@ public class CultureExtractorConsoleApp
     private void InitializeLogger(BaseOptions opts)
     {
         var minimumLogLevel = opts.Verbose
-            ? Serilog.Events.LogEventLevel.Verbose
-            : Serilog.Events.LogEventLevel.Information;
+            ? LogEventLevel.Verbose
+            : LogEventLevel.Information;
 
         var pathsOptions = new PathsOptions();
         _configuration.GetSection(PathsOptions.Paths).Bind(pathsOptions);
@@ -282,8 +283,7 @@ public class CultureExtractorConsoleApp
         
         var logger = new LoggerConfiguration()
                         .WriteTo.Console(restrictedToMinimumLevel: minimumLogLevel)
-                        .WriteTo.File(fullPath)
-                        .MinimumLevel.Debug()
+                        .WriteTo.File(fullPath, restrictedToMinimumLevel: LogEventLevel.Debug)
                         .CreateLogger();
         Log.Logger = logger;
     }
