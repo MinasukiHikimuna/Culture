@@ -267,12 +267,18 @@ public class CultureExtractorConsoleApp
             writer.WriteStringValue(value.ToString("yyyy-MM-dd"));
         }
     }
-        
+    
+    /**
+     * Use following log levels:
+     * - Verbose: For JSON responses
+     * - Debug: For all other debugging information
+     * - Information: For general information
+     * - Warning: For warnings
+     * - Error: For errors
+     */
     private void InitializeLogger(BaseOptions opts)
     {
-        var minimumLogLevel = opts.Verbose
-            ? LogEventLevel.Verbose
-            : LogEventLevel.Information;
+        var minimumLogLevel = opts.LogLevel;
 
         var pathsOptions = new PathsOptions();
         _configuration.GetSection(PathsOptions.Paths).Bind(pathsOptions);
@@ -282,8 +288,9 @@ public class CultureExtractorConsoleApp
         var fullPath = Path.Combine(path, fileName);
         
         var logger = new LoggerConfiguration()
+                        .MinimumLevel.Verbose()
+                        .WriteTo.File(fullPath)
                         .WriteTo.Console(restrictedToMinimumLevel: minimumLogLevel)
-                        .WriteTo.File(fullPath, restrictedToMinimumLevel: LogEventLevel.Debug)
                         .CreateLogger();
         Log.Logger = logger;
     }

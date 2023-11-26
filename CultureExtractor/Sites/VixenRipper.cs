@@ -1068,6 +1068,6 @@ public class VixenRipper : IYieldingScraper
     {
         var requestPrettyJson = JsonSerializer.Serialize(
             JsonDocument.Parse(json), new JsonSerializerOptions { WriteIndented = true });
-        Log.Debug(requestPrettyJson);
+        Log.Verbose(requestPrettyJson);
     }
 }

@@ -167,14 +167,14 @@ public class WowNetworkRipper : ISiteScraper
             {
 
                 await _downloader.DownloadSceneImageAsync(scene, candidate);
-                Log.Verbose($"Successfully downloaded preview from {candidate}.");
+                Log.Debug($"Successfully downloaded preview from {candidate}.");
                 break;
             }
             catch (WebException ex)
             {
                 if (ex.Status == WebExceptionStatus.ProtocolError && (ex.Response as HttpWebResponse)?.StatusCode == HttpStatusCode.NotFound)
                 {
-                    Log.Verbose($"Got 404 for preview from {candidate}.");
+                    Log.Debug($"Got 404 for preview from {candidate}.");
                     continue;
                 }
 

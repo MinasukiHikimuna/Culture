@@ -47,7 +47,7 @@ public class CzechVRNetworkRipper : ISiteScraper
         }
         else
         {
-            Log.Verbose("Login was not necessary.");
+            Log.Debug("Login was not necessary.");
         }
     }
 

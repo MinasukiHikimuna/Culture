@@ -21,7 +21,7 @@ namespace CultureExtractor
             var innerIframe = await page.EvaluateAsync<object?>("document.querySelector(\"iframe[title='recaptcha challenge expires in two minutes']\")");
             if (innerIframe == null)
             {
-                Log.Verbose("No CAPTCHA found.");
+                Log.Debug("No CAPTCHA found.");
                 return;
             }
 
@@ -42,7 +42,7 @@ namespace CultureExtractor
             var captchaBuster = new CaptchaBusterImplementation();
             var result = await captchaBuster.SolveCaptchaAsync(audioPath);
 
-            Log.Verbose($"CAPTCHA challenge text transcriped: {result.Text}");
+            Log.Debug($"CAPTCHA challenge text transcriped: {result.Text}");
 
             await Task.Delay(5000);
 

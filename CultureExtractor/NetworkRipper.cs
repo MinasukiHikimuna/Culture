@@ -369,7 +369,7 @@ public class NetworkRipper : INetworkRipper
                             : existingRelease.Site.Url + existingRelease.Url,
                         Quality = downloadConditions.PreferredDownloadQuality
                     };
-                    Log.Verbose("Downloading: {@Release}", releaseDescription);
+                    Log.Debug("Downloading: {@Release}", releaseDescription);
 
                     var download = await siteScraper.DownloadReleaseAsync(existingRelease, releasePage, downloadConditions, requests);
                     await _repository.SaveDownloadAsync(download, downloadConditions.PreferredDownloadQuality);
