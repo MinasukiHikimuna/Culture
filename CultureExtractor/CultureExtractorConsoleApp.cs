@@ -4,6 +4,7 @@ using CommandLine;
 using CultureExtractor.Interfaces;
 using CultureExtractor.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Serilog;
 
 namespace CultureExtractor;
@@ -12,13 +13,15 @@ public class CultureExtractorConsoleApp
 {
     private readonly INetworkRipper _networkRipper;
     private readonly IRepository _repository;
-    private readonly Interfaces.ICultureExtractorContext _cultureExtractorContext;
+    private readonly ICultureExtractorContext _cultureExtractorContext;
+    private readonly IConfiguration _configuration;
 
-    public CultureExtractorConsoleApp(IRepository repository, INetworkRipper networkRipper, Interfaces.ICultureExtractorContext cultureExtractorContext)
+    public CultureExtractorConsoleApp(IRepository repository, INetworkRipper networkRipper, ICultureExtractorContext cultureExtractorContext, IConfiguration configuration)
     {
         _networkRipper = networkRipper;
         _repository = repository;
         _cultureExtractorContext = cultureExtractorContext;
+        _configuration = configuration;
     }
 
     public void ExecuteConsoleApp(string[] args)
@@ -106,7 +109,7 @@ public class CultureExtractorConsoleApp
         return await MigrateDownloads(opts);
     }
 
-    private static async Task<int> MigrateDownloads(MigrateOptions opts)
+    private async Task<int> MigrateDownloads(MigrateOptions opts)
     {
         try
         {
@@ -176,7 +179,7 @@ public class CultureExtractorConsoleApp
         }
     }
     
-    private static async Task<int> MigrateReleases(MigrateOptions opts)
+    private async Task<int> MigrateReleases(MigrateOptions opts)
     {
         try
         {
@@ -264,15 +267,24 @@ public class CultureExtractorConsoleApp
         }
     }
         
-    private static void InitializeLogger(BaseOptions opts)
+    private void InitializeLogger(BaseOptions opts)
     {
         var minimumLogLevel = opts.Verbose
             ? Serilog.Events.LogEventLevel.Verbose
             : Serilog.Events.LogEventLevel.Information;
 
-        var log = new LoggerConfiguration()
-                        .WriteTo.Console().MinimumLevel.Is(minimumLogLevel)
+        var pathsOptions = new PathsOptions();
+        _configuration.GetSection(PathsOptions.Paths).Bind(pathsOptions);
+        
+        var path = pathsOptions.MetadataPath;
+        var fileName = $"{DateTime.Now:yyyy-MM-dd HH-mm-ss} - {opts.SiteShortName}.txt";
+        var fullPath = Path.Combine(path, fileName);
+        
+        var logger = new LoggerConfiguration()
+                        .WriteTo.Console(restrictedToMinimumLevel: minimumLogLevel)
+                        .WriteTo.File(fullPath)
+                        .MinimumLevel.Debug()
                         .CreateLogger();
-        Log.Logger = log;
+        Log.Logger = logger;
     }
 }
