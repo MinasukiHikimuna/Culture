@@ -202,6 +202,7 @@ class Program
 public class BaseOptions
 {
     [Option(
+        "log-level",
         Default = false,
         HelpText = "Serilog log level. (Verbose, Debug, Information, Warning, Error, Fatal)")]
     public LogEventLevel LogLevel { get; set; }
