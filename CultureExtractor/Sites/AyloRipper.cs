@@ -156,18 +156,32 @@ public class AyloRipper : IYieldingScraper
             }
 
             var movieJson = await movieResponse.Result.Content.ReadAsStringAsync();
-            var movieDetailsContainer = JsonSerializer.Deserialize<AyloMovieRequest.RootObject>(movieJson);
+            AyloMovieRequest.RootObject? movieDetailsContainer;
+            try
+            {
+
+                movieDetailsContainer = JsonSerializer.Deserialize<AyloMovieRequest.RootObject>(movieJson);
+            }
+            catch (JsonException ex)
+            {
+                throw new ExtractorException(ExtractorRetryMode.Skip, "Could not deserialize movie API response.", ex);
+            }
+            
             if (movieDetailsContainer == null)
             {
                 throw new ExtractorException(ExtractorRetryMode.Retry, "Could not read movie API response: " + movieJson);
             }
 
             var movieDetails = movieDetailsContainer.result;
+            if (movieDetails.videos == null)
+            {
+                throw new ExtractorException(ExtractorRetryMode.Skip, "Movie has no videos.");
+            }
             if (movieDetails.videos.full == null)
             {
                 throw new ExtractorException(ExtractorRetryMode.Abort, "Login required.");
-            }
-            
+            }                
+
             var sceneDownloads = movieDetails.videos.full.files
                 .Where(keyValuePair => keyValuePair.Key != "dash" && keyValuePair.Key != "hls")
                 .Select(keyValuePair => new AvailableVideoFile(
@@ -246,6 +260,11 @@ public class AyloRipper : IYieldingScraper
         }
         catch (Exception ex)
         {
+            if (ex is ExtractorException)
+            {
+                throw;
+            }
+            
             throw new ExtractorException(ExtractorRetryMode.Abort, "Unhandled exception while scraping scene.", ex);
         }
     }
