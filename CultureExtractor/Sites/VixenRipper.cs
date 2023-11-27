@@ -448,6 +448,10 @@ public class VixenRipper : IYieldingScraper
         IPage page = await _playwrightFactory.CreatePageAsync(site, browserSettings);
         await LoginAsync(site, page);
 
+        var requests1 = await CaptureRequestsAsync(site, page);
+        
+        var graphQlRequest = SetHeadersFromActualRequest(site, requests1);
+        
         var releases = await _repository.QueryReleasesAsync(site, downloadConditions);
         var downloadedReleases = 0;
         foreach (var release in releases)
@@ -460,11 +464,21 @@ public class VixenRipper : IYieldingScraper
                 continue;
             }
             
-            // TODO: Refresh token when JWT token has expired
+            var cookie = Client.DefaultRequestHeaders.GetValues("cookie").FirstOrDefault();
+            var accessToken = ExtractAccessTokenFromCookie(cookie);
+            var expiryDate = DecodeTokenAndGetExpiry(accessToken);
             var convertedHeaders = new WebHeaderCollection();
-            if (downloadedReleases % 30 == 0) {
+            if (expiryDate != null && expiryDate.Value.AddMinutes(-5) < DateTime.Now.ToUniversalTime())
+            {
                 var requests = await CaptureRequestsAsync(site, page);
-
+        
+                SetHeadersFromActualRequest(site, requests);
+                
+                var newCookie = Client.DefaultRequestHeaders.GetValues("cookie").FirstOrDefault();
+                var newAccessToken = ExtractAccessTokenFromCookie(newCookie);
+                
+                Log.Debug($"Refresh access token.{Environment.NewLine}Old: {accessToken}{Environment.NewLine}New: {newAccessToken}");
+                
                 var headers = SetHeadersFromActualRequest(site, requests);
                 convertedHeaders = ConvertHeaders(headers);
             }
@@ -490,6 +504,10 @@ public class VixenRipper : IYieldingScraper
             {
                 yield return videoDownload;
             }
+            await foreach (var galleryDownload in DownloadGalleryAsync(downloadConditions, updatedScrape, existingDownloadEntities, convertedHeaders))
+            {
+                yield return galleryDownload;
+            }
             foreach (var trailerDownload in await DownloadTrailersAsync(downloadConditions, updatedScrape, existingDownloadEntities, convertedHeaders))
             {
                 yield return trailerDownload;
@@ -504,6 +522,40 @@ public class VixenRipper : IYieldingScraper
         }
     }
 
+    private async IAsyncEnumerable<Download> DownloadGalleryAsync(DownloadConditions downloadConditions, Release release,
+        List<DownloadEntity> existingDownloadEntities, WebHeaderCollection convertedHeaders)
+    {
+        var availableGalleries = release.AvailableFiles
+            .OfType<AvailableGalleryZipFile>()
+            .Where(d => d is { FileType: "zip", ContentType: "gallery" });
+        // Only 0-1 galleries are available. No quality selection.
+        var selectedGallery = availableGalleries.FirstOrDefault();
+        if (selectedGallery == null || !NotDownloadedYet(existingDownloadEntities, selectedGallery))
+        {
+            yield break;
+        }
+        
+        var uri = new Uri(selectedGallery.Url);
+        var suggestedFileName = Path.GetFileName(uri.LocalPath);
+        var suffix = Path.GetExtension(suggestedFileName);
+
+        var performersStr = release.Performers.Count() > 1
+            ? string.Join(", ", release.Performers.Take(release.Performers.Count() - 1).Select(p => p.Name)) + " & " +
+              release.Performers.Last().Name
+            : release.Performers.FirstOrDefault()?.Name ?? "Unknown";
+        var fileName = ReleaseNamer.Name(release, suffix, performersStr, selectedGallery.Variant);
+
+        var fileInfo = await _downloader.TryDownloadAsync(release, selectedGallery, selectedGallery.Url, fileName, convertedHeaders);
+        if (fileInfo == null)
+        {
+            yield break;
+        }
+
+        var sha256Sum = LegacyDownloader.CalculateSHA256(fileInfo.FullName);
+        var metadata = new GalleryZipFileMetadata(sha256Sum);
+        yield return new Download(release, suggestedFileName, fileInfo.Name, selectedGallery, metadata);
+    }
+    
     private async Task<IList<Download>> DownloadVideosAsync(DownloadConditions downloadConditions, Release release,
         List<DownloadEntity> existingDownloadEntities, WebHeaderCollection convertedHeaders)
     {
