@@ -161,16 +161,28 @@ public class HentaiedRipper : ISiteScraper
             "{}",
             DateTime.Now);
         
+        // TODO: There are other ways to get the preview image as sometimes the og:image is missing.
+        // - playerInstance configuration contains image property for some scenes
+        // - jw-preview has background-image at least for some scenes
+        // However these are not typically very high quality images so it is fine for now if we aren't able to download
+        // them.
         var ogImageMeta = await page.QuerySelectorAsync("meta[property='og:image']");
-        string ogImageUrl = await ogImageMeta.GetAttributeAsync("content");
-
-        try
+        if (ogImageMeta == null)
         {
-            await _legacyDownloader.DownloadSceneImageAsync(scene, ogImageUrl, scene.Url);
+            Log.Warning("Could not find og:image meta tag");
         }
-        catch (Exception ex)
+        else
         {
-            Log.Warning($"Could not download preview image: {ex}" );
+            string ogImageUrl = await ogImageMeta.GetAttributeAsync("content");
+
+            try
+            {
+                await _legacyDownloader.DownloadSceneImageAsync(scene, ogImageUrl, scene.Url);
+            }
+            catch (Exception ex)
+            {
+                Log.Warning($"Could not download preview image: {ex}" );
+            }
         }
         
         return scene;
