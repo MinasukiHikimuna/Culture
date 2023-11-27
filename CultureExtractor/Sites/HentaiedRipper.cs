@@ -24,6 +24,7 @@ public class FileSource
 }
 
 
+[Site("futanari")]
 [Site("hentaied")]
 public class HentaiedRipper : ISiteScraper
 {
@@ -106,7 +107,7 @@ public class HentaiedRipper : ISiteScraper
 
     public async Task<Release> ScrapeReleaseAsync(Guid releaseUuid, Site site, SubSite subSite, string url, string releaseShortName, IPage page, IReadOnlyList<IRequest> requests)
     {
-        var releaseDateElement = await page.QuerySelectorAsync("div.durationandtime > div.entry-date");
+        var releaseDateElement = await page.QuerySelectorAsync("div.left-top-part > div.entry-date");
         string releaseDateRaw = await releaseDateElement.TextContentAsync();
         releaseDateRaw = releaseDateRaw.Trim();
         DateOnly releaseDate = DateOnly.Parse(releaseDateRaw);
@@ -117,7 +118,7 @@ public class HentaiedRipper : ISiteScraper
         var titleRaw = await page.Locator("div.left-top-part h1").TextContentAsync();
         var title = titleRaw.Replace("\n", "").Trim();
 
-        var castElements = await page.Locator("div.tagsmodels > a").ElementHandlesAsync();
+        var castElements = await page.Locator("div.taglist > a").ElementHandlesAsync();
         var performers = new List<SitePerformer>();
         foreach (var castElement in castElements)
         {
@@ -254,6 +255,23 @@ public class HentaiedRipper : ISiteScraper
             return JsonSerializer.Deserialize<Sources>(sourcesJson);
         }
 
+        var fileSourceRegex = new Regex(@"file:\s*""(.*?)""", RegexOptions.Singleline);
+        var fileSourceMatch = fileSourceRegex.Match(input);
+        if (fileSourceMatch.Success)
+        {
+            return new Sources
+            {
+                FileSources = new List<FileSource>
+                {
+                    new()
+                    {
+                        Url = fileSourceMatch.Groups[1].Value,
+                        Resolution = "FULL HD"
+                    }
+                }
+            };
+        }
+        
         return new Sources { FileSources = new List<FileSource>() };
     }
 
