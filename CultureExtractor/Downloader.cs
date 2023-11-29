@@ -99,27 +99,34 @@ public class Downloader : IDownloader
 
                 do
                 {
-                    var read = await contentStream.ReadAsync(buffer, cancellationToken);
+                    using var innerCancellationSource = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+                    using var linkedCancellationSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, innerCancellationSource.Token);
+                    
+                    var read = await contentStream.ReadAsync(buffer, linkedCancellationSource.Token);
                     if (read == 0)
                     {
                         isMoreToRead = false;
                     }
                     else
                     {
-                        await fileStream.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+                        await fileStream.WriteAsync(buffer.AsMemory(0, read), linkedCancellationSource.Token);
 
                         totalRead += read;
-                        var percentage = totalBytes.HasValue ? (totalRead * 1d) / (totalBytes.Value * 1d) * 100 : -1;
+                        var percentage = totalBytes.HasValue ? totalRead * 1d / (totalBytes.Value * 1d) * 100 : -1;
                         // Displays the operation identifier, and the transfer progress.
-                        Console.Write("\rDownloaded {0}/{1} bytes. {2:0.00}% complete...",
+                        Console.Write("\r{3:HH:mm:ss} Downloaded {0}/{1} bytes. {2:0.00}% complete...",
                             totalRead,
-                            totalBytes, percentage);
+                            totalBytes,
+                            percentage,
+                            DateTime.Now);
                     }
                 } while (isMoreToRead);
             }
 
             Console.Write("\r");
             File.Move(tempPath, finalPath, true);
+            
+            return new FileInfo(Path.Combine(rippingPath, fileName));
         }
         catch
         {
@@ -130,7 +137,5 @@ public class Downloader : IDownloader
 
             throw;
         }
-
-        return new FileInfo(Path.Combine(rippingPath, fileName));
     }
 }
