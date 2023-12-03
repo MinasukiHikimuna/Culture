@@ -99,33 +99,56 @@ public class Downloader : IDownloader
 
                 do
                 {
-                    using var innerCancellationSource = new CancellationTokenSource(TimeSpan.FromSeconds(60));
-                    using var linkedCancellationSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, innerCancellationSource.Token);
-                    
-                    var read = await contentStream.ReadAsync(buffer, linkedCancellationSource.Token);
-                    if (read == 0)
-                    {
-                        isMoreToRead = false;
-                    }
-                    else
-                    {
-                        await fileStream.WriteAsync(buffer.AsMemory(0, read), linkedCancellationSource.Token);
+                    var innerCancellationSource = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+                    var linkedCancellationSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, innerCancellationSource.Token);
 
-                        totalRead += read;
-                        var percentage = totalBytes.HasValue ? totalRead * 1d / (totalBytes.Value * 1d) * 100 : -1;
-                        // Displays the operation identifier, and the transfer progress.
-                        Console.Write("\r{3:HH:mm:ss} Downloaded {0}/{1} bytes. {2:0.00}% complete...",
-                            totalRead,
-                            totalBytes,
-                            percentage,
-                            DateTime.Now);
+                    try
+                    {
+                        var read = await contentStream.ReadAsync(buffer, linkedCancellationSource.Token);
+                        if (read == 0)
+                        {
+                            isMoreToRead = false;
+                        }
+                        else
+                        {
+                            await fileStream.WriteAsync(buffer.AsMemory(0, read), linkedCancellationSource.Token);
+
+                            totalRead += read;
+                            var percentage = totalBytes.HasValue ? totalRead * 1d / (totalBytes.Value * 1d) * 100 : -1;
+                            // Displays the operation identifier, and the transfer progress.
+                            Console.Write("\r{3:HH:mm:ss} Downloaded {0}/{1} bytes. {2:0.00}% complete...",
+                                totalRead,
+                                totalBytes,
+                                percentage,
+                                DateTime.Now);
+                        }
+                    }
+                    catch (OperationCanceledException ex)
+                    {
+                        if (ex.CancellationToken == cancellationToken)
+                        {
+                            throw; // Rethrow the exception to cancel the operation
+                        }
+
+                        if (ex.CancellationToken == innerCancellationSource.Token)
+                        {
+                            // Restart the download
+                            Log.Information("Downloading stalled for release {Name} [{Uuid}]", release.Name, release.Uuid);
+                            totalRead = 0;
+                            fileStream.Position = 0;
+                        }
+                    }
+                    finally
+                    {
+                        innerCancellationSource.Dispose();
+                        linkedCancellationSource.Dispose();
                     }
                 } while (isMoreToRead);
             }
 
             Console.Write("\r");
             File.Move(tempPath, finalPath, true);
-            
+
             return new FileInfo(Path.Combine(rippingPath, fileName));
         }
         catch
