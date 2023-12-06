@@ -1,3 +1,5 @@
+using System.Text;
+using System.Text.Json;
 using CultureExtractor.Interfaces;
 using CultureExtractor.Models;
 using Microsoft.Playwright;
@@ -40,11 +42,54 @@ public class DigiGammaRipper : IYieldingScraper
         var algoliaRequest = requests.First(r => r.Url.Contains("algolia.net"));
         var algoliaResponse = await algoliaRequest.ResponseAsync();
         var algoliaBody = await algoliaResponse.BodyAsync();
-        var jsonContent = System.Text.Encoding.UTF8.GetString(algoliaBody);
+        var jsonContent = Encoding.UTF8.GetString(algoliaBody);
+        
+        SetHeadersFromActualRequest(requests);
+        
+
+        var json = """
+                   {
+                        "requests": [
+                            {
+                                "indexName":"all_scenes_latest_desc",
+                                "params":"query=&hitsPerPage=60&maxValuesPerFacet=1000&page=0&analytics=true&analyticsTags=%5B%22component%3Asearchlisting%22%2C%22section%3Amembers%22%2C%22site%3Agirlfriendsfilms%22%2C%22context%3Avideos%22%2C%22device%3Adesktop%22%5D&highlightPreTag=%3Cais-highlight-0000000000%3E&highlightPostTag=%3C%2Fais-highlight-0000000000%3E&facetingAfterDistinct=true&clickAnalytics=true&filters=&facets=%5B%22channels.name%22%2C%22categories.name%22%2C%22actors.name%22%2C%22video_formats.format%22%2C%22availableOnSite%22%2C%22upcoming%22%5D&tagFilters=&facetFilters=%5B%5B%22upcoming%3A0%22%5D%5D"},{"indexName":"all_scenes_latest_desc","params":"query=&hitsPerPage=1&maxValuesPerFacet=1000&page=0&analytics=false&analyticsTags=%5B%22component%3Asearchlisting%22%2C%22section%3Amembers%22%2C%22site%3Agirlfriendsfilms%22%2C%22context%3Avideos%22%2C%22device%3Adesktop%22%5D&highlightPreTag=%3Cais-highlight-0000000000%3E&highlightPostTag=%3C%2Fais-highlight-0000000000%3E&facetingAfterDistinct=true&clickAnalytics=false&filters=&attributesToRetrieve=%5B%5D&attributesToHighlight=%5B%5D&attributesToSnippet=%5B%5D&tagFilters=&facets=upcoming"
+                            }
+                        ]
+                   }
+                   """;
+        var request = new HttpRequestMessage
+        {
+            Method = HttpMethod.Post,
+            RequestUri = new Uri(algoliaRequest.Url),
+            Content = new StringContent(json, Encoding.UTF8, "application/x-www-form-urlencoded")
+        };
+        var response = await Client.SendAsync(request);
+        var responseContent = await response.Content.ReadAsStringAsync();
+        
+        var scenes = JsonSerializer.Deserialize<DigiGammaModels.RootObject>(responseContent);
+        
         
         yield break;
     }
 
+    private static Dictionary<string, string> SetHeadersFromActualRequest(IList<IRequest> requests)
+    {
+        var algoliaRequest = requests.FirstOrDefault(r => r.Url.Contains("algolia.net"));
+        if (algoliaRequest == null)
+        {
+            var requestUrls = requests.Select(r => r.Url + Environment.NewLine).ToList();
+            throw new InvalidOperationException($"Could not read galleries API request from following requests:{Environment.NewLine}{string.Join("", requestUrls)}");
+        }
+        
+        Client.DefaultRequestHeaders.Clear();
+        foreach (var key in algoliaRequest.Headers.Keys.Where(key => key != "content-type"))
+        {
+            Client.DefaultRequestHeaders.Add(key, algoliaRequest.Headers[key]);
+        }
+        
+        return algoliaRequest.Headers;
+    }
+    
     public IAsyncEnumerable<Download> DownloadReleasesAsync(Site site, BrowserSettings browserSettings,
         DownloadConditions downloadConditions)
     {
