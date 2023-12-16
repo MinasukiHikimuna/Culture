@@ -1,20 +1,67 @@
 ﻿using System.Collections.Immutable;
+using System.Globalization;
 using System.Net;
 using CultureExtractor.Interfaces;
 using Microsoft.Playwright;
 using Serilog;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using CultureExtractor.Exceptions;
 using CultureExtractor.Models;
 using Microsoft.EntityFrameworkCore;
+using Polly;
+using Polly.Fallback;
 using Xabe.FFmpeg;
 
 namespace CultureExtractor.Sites;
 
+/**
+ * TODO:
+ * [16:08:32 ERR] System.Threading.Tasks.TaskCanceledException: The request was canceled due to the configured HttpClient.Timeout of 100 seconds elapsing.
+ ---> System.TimeoutException: The operation was canceled.
+ ---> System.Threading.Tasks.TaskCanceledException: The operation was canceled.
+ ---> System.IO.IOException: Unable to read data from the transport connection: The I/O operation has been aborted because of either a thread exit or an application request..
+ ---> System.Net.Sockets.SocketException (995): The I/O operation has been aborted because of either a thread exit or an application request.
+   --- End of inner exception stack trace ---
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+   at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource<System.Int32>.GetResult(Int16 token)
+   at System.Net.Security.SslStream.EnsureFullTlsFrameAsync[TIOAdapter](CancellationToken cancellationToken)
+   at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource<TResult>.GetResult(Int16 token)
+   at System.Net.Security.SslStream.ReadAsyncInternal[TIOAdapter](Memory`1 buffer, CancellationToken cancellationToken)
+   at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource<TResult>.GetResult(Int16 token)
+   at System.Net.Http.HttpConnection.InitialFillAsync(Boolean async)
+   at System.Net.Http.HttpConnection.SendAsyncCore(HttpRequestMessage request, Boolean async, CancellationToken cancellationToken)
+   --- End of inner exception stack trace ---
+   at System.Net.Http.HttpConnection.SendAsyncCore(HttpRequestMessage request, Boolean async, CancellationToken cancellationToken)
+   at System.Net.Http.HttpConnectionPool.SendWithVersionDetectionAndRetryAsync(HttpRequestMessage request, Boolean async, Boolean doRequestAuth, CancellationToken cancellationToken)
+   at System.Net.Http.RedirectHandler.SendAsync(HttpRequestMessage request, Boolean async, CancellationToken cancellationToken)
+   at System.Net.Http.HttpClient.<SendAsync>g__Core|83_0(HttpRequestMessage request, HttpCompletionOption completionOption, CancellationTokenSource cts, Boolean disposeCts, CancellationTokenSource pendingRequestsCts, CancellationToken originalCancellationToken)
+   --- End of inner exception stack trace ---
+   --- End of inner exception stack trace ---
+   at System.Net.Http.HttpClient.HandleFailure(Exception e, Boolean telemetryStarted, HttpResponseMessage response, CancellationTokenSource cts, CancellationToken cancellationToken, CancellationTokenSource pendingRequestsCts)
+   at System.Net.Http.HttpClient.<SendAsync>g__Core|83_0(HttpRequestMessage request, HttpCompletionOption completionOption, CancellationTokenSource cts, Boolean disposeCts, CancellationTokenSource pendingRequestsCts, CancellationToken originalCancellationToken)
+   at CultureExtractor.Downloader.DownloadFileAsync(Release release, String url, String fileName, WebHeaderCollection headers, String referer, CancellationToken cancellationToken) in C:\Github\CultureExtractor\CultureExtractor\Downloader.cs:line 84
+   at CultureExtractor.Downloader.<>c__DisplayClass3_0.<<TryDownloadAsync>b__2>d.MoveNext() in C:\Github\CultureExtractor\CultureExtractor\Downloader.cs:line 47
+--- End of stack trace from previous location ---
+   at Polly.ResiliencePipeline.<>c__10`1.<<ExecuteAsync>b__10_0>d.MoveNext()
+--- End of stack trace from previous location ---
+   at Polly.Outcome`1.GetResultOrRethrow()
+   at Polly.ResiliencePipeline.ExecuteAsync[TResult](Func`2 callback, CancellationToken cancellationToken)
+   at CultureExtractor.Downloader.TryDownloadAsync(Release release, IAvailableFile availableFile, String url, String fileName, WebHeaderCollection convertedHeaders) in C:\Github\CultureExtractor\CultureExtractor\Downloader.cs:line 46
+   at CultureExtractor.Sites.AyloRipper.DownloadVideosAsync(DownloadConditions downloadConditions, Release release, List`1 existingDownloadEntities, WebHeaderCollection convertedHeaders) in C:\Github\CultureExtractor\CultureExtractor\Sites\AyloRipper.cs:line 434
+   at CultureExtractor.Sites.AyloRipper.DownloadReleasesAsync(Site site, BrowserSettings browserSettings, DownloadConditions downloadConditions)+MoveNext() in C:\Github\CultureExtractor\CultureExtractor\Sites\AyloRipper.cs:line 358
+   at CultureExtractor.Sites.AyloRipper.DownloadReleasesAsync(Site site, BrowserSettings browserSettings, DownloadConditions downloadConditions)+System.Threading.Tasks.Sources.IValueTaskSource<System.Boolean>.GetResult()
+   at CultureExtractor.NetworkRipper.DownloadReleasesAsync(Site site, BrowserSettings browserSettings, DownloadConditions downloadConditions, DownloadOptions downloadOptions) in C:\Github\CultureExtractor\CultureExtractor\NetworkRipper.cs:line 257
+   at CultureExtractor.NetworkRipper.DownloadReleasesAsync(Site site, BrowserSettings browserSettings, DownloadConditions downloadConditions, DownloadOptions downloadOptions) in C:\Github\CultureExtractor\CultureExtractor\NetworkRipper.cs:line 257
+   at CultureExtractor.CultureExtractorConsoleApp.RunDownloadAndReturnExitCode(DownloadOptions opts) in C:\Github\CultureExtractor\CultureExtractor\CultureExtractorConsoleApp.cs:line 95
+   */
+
+[Site("babes")]
 [Site("brazzers")]
 [Site("digitalplayground")]
 [Site("fakehub")]
 [Site("milehighmedia")]
+[Site("mofos")]
 [Site("realitykings")]
 public class AyloRipper : IYieldingScraper
 {
@@ -42,14 +89,108 @@ public class AyloRipper : IYieldingScraper
         _context = context;
     }
 
+    private class TitleLinkPairs
+    {
+        [JsonPropertyName("title")]
+        public string Title { get; set; }
+        [JsonPropertyName("link")]
+        public string Link { get; set; }
+    }
+    
     public async IAsyncEnumerable<Release> ScrapeReleasesAsync(Site site, BrowserSettings browserSettings, ScrapeOptions scrapeOptions)
     {
         IPage page = await _playwrightFactory.CreatePageAsync(site, browserSettings);
 
         await LoginAsync(site, page);
 
-        var requests = await CaptureRequestsAsync(site, page);
+        await page.GotoAsync("/sites");
+        await Task.Delay(5000);
 
+        var existingSubSites = await _repository.GetSubSitesAsync(site.Uuid);
+
+        int scrollY = await page.EvaluateAsync<int>("() => window.scrollY");
+        int previousScrollY = -1;
+        do
+        {
+            await page.EvaluateAsync("window.scrollBy(0, 100);");
+            previousScrollY = scrollY;
+            scrollY = await page.EvaluateAsync<int>("() => window.scrollY");
+            await Task.Delay(100);
+        } while (scrollY != previousScrollY);
+
+        var fakeHubJs = """
+                         () => JSON.stringify(
+                             Array.from(document.querySelectorAll('a[href^="/scenes?site="]'))
+                                 .filter(link => link.target === '_self')
+                                 .map(link => {
+                                     const span = link.querySelector('span');
+                                     return {
+                                         "title": span ? span.textContent : '',
+                                         "link": link.href
+                                     };
+                                 })
+                                 .filter(pair => pair.title !== ''));
+                         """;
+        var babesJs = """
+                      () => JSON.stringify(
+                          Array.from(document.querySelectorAll('[id^="List-container"]'))
+                              .map(section => {
+                                  // Find the h2 element for the title within each section
+                                  const titleElement = section.querySelector('h2');
+                                  const title = titleElement ? titleElement.textContent : '';
+                      
+                                  // Find the first link within each section
+                                  const linkElement = section.querySelector('a[href^="/scenes?site="]');
+                                  const link = linkElement ? linkElement.href : '';
+                      
+                                  return { title, link };
+                              })
+                              .filter(pair => pair.title !== '' && pair.link !== '')
+                      );
+                      """;
+
+        var js = site.ShortName switch
+        {
+            "babes" => babesJs,
+            "fakehub" => fakeHubJs,
+            "mofos" => null, // Mofos has subsites but their names can't be parsed
+            "brazzers" => null, // Brazzers has subsites but their names can't be parsed
+            _ => throw new ArgumentOutOfRangeException("No JS for site " + site.ShortName)
+        };
+            
+        if (js != null) {
+            var titleLinkPairsJson = await page.EvaluateAsync<string>(js);
+
+            var pairs = JsonSerializer.Deserialize<List<TitleLinkPairs>>(titleLinkPairsJson);
+            pairs = pairs.Select(p => new TitleLinkPairs { Title = p.Title.Replace(" - Fake Hub", ""), Link = p.Link }).ToList();
+        
+            TextInfo textInfo = new CultureInfo("en-US", false).TextInfo;
+            List<SubSite> subSites = (
+                from pair in pairs
+                let id = pair.Link[(pair.Link.LastIndexOf('=') + 1)..]
+                let name = textInfo.ToTitleCase(pair.Title.Trim().ToLowerInvariant().Replace(" scenes", ""))
+                select new SubSite(
+                    existingSubSites.FirstOrDefault(s => s.ShortName == id)?.Uuid ?? UuidGenerator.Generate(),
+                    id,
+                    name,
+                    "{}",
+                    site
+                )
+            ).ToList();
+
+            var uniqueSubSites = subSites
+                .GroupBy(s => s.Name)
+                .Select(g => g.First())
+                .OrderBy(s => s.Name)
+                .ToList();
+            foreach (var subSite in uniqueSubSites)
+            {
+                Log.Debug("Upserting sub site {ShortName} {Name} [{Uuid}]", subSite.ShortName, subSite.Name, subSite.Uuid);
+                await _repository.UpsertSubSite(subSite);
+            }
+        }
+        
+        var requests = await CaptureRequestsAsync(site, page);
         SetHeadersFromActualRequest(requests);
         await foreach (var scene in ScrapeScenesAsync(site, scrapeOptions))
         {
@@ -100,7 +241,7 @@ public class AyloRipper : IYieldingScraper
                 .Where(g => !existingReleasesDictionary.ContainsKey(g.Key) || existingReleasesDictionary[g.Key].LastUpdated < scrapeOptions.FullScrapeLastUpdated)
                 .Select(g => g.Value)
                 .ToList();
-
+            
             foreach (var movie in moviesToBeScraped)
             {
                 await Task.Delay(1000);
@@ -143,7 +284,7 @@ public class AyloRipper : IYieldingScraper
         } while (pageNumber < pages); // Continue while the current page number is less than the total number of pages
     }
 
-    private static async Task<Release> ScrapeSceneAsync(Site site, string shortName, Guid releaseGuid)
+    private async Task<Release> ScrapeSceneAsync(Site site, string shortName, Guid releaseGuid)
     {
         try
         {
@@ -180,8 +321,14 @@ public class AyloRipper : IYieldingScraper
             if (movieDetails.videos.full == null)
             {
                 throw new ExtractorException(ExtractorRetryMode.Abort, "Login required.");
-            }                
+            }
 
+            var movieCollection = movieDetails.collections.FirstOrDefault();
+            var subSites = await _repository.GetSubSitesAsync(site.Uuid);
+            SubSite? subSite = movieCollection != null
+                ? subSites.FirstOrDefault(s => s.ShortName == movieCollection.id.ToString())
+                : null;
+            
             var sceneDownloads = movieDetails.videos.full.files
                 .Where(keyValuePair => keyValuePair.Key != "dash" && keyValuePair.Key != "hls")
                 .Select(keyValuePair => new AvailableVideoFile(
@@ -222,12 +369,14 @@ public class AyloRipper : IYieldingScraper
                     .ToList()
                 : new List<AvailableImageFile>();
 
-            var trailerDownloads = movieDetails.videos.mediabook.files
+            var trailerDownloads = movieDetails.videos?.mediabook?.files != null
+             ? movieDetails.videos.mediabook.files
                 .Select(keyValuePair =>
                     new AvailableVideoFile("video", "trailer", keyValuePair.Key, keyValuePair.Value.urls.view, -1,
                         HumanParser.ParseResolutionHeight(keyValuePair.Value.format), keyValuePair.Value.sizeBytes, -1,
                         string.Empty)
-                );
+                )
+             : new List<AvailableVideoFile>();
 
             var performers = movieDetails.actors.Where(a => a.gender == "female").ToList()
                 .Concat(movieDetails.actors.Where(a => a.gender != "female").ToList())
@@ -241,7 +390,7 @@ public class AyloRipper : IYieldingScraper
             var scene = new Release(
                 releaseGuid,
                 site,
-                null,
+                subSite,
                 DateOnly.FromDateTime(DateTime.Parse(movieDetails.dateReleased)),
                 shortName,
                 movieDetails.title,
@@ -344,6 +493,11 @@ public class AyloRipper : IYieldingScraper
             try
             {
                 updatedScrape = await ScrapeSceneAsync(site, release.ShortName, release.Uuid);
+            }
+            catch (ExtractorException ex) when (ex.ExtractorRetryMode == ExtractorRetryMode.Abort)
+            {
+                Log.Error(ex, "Aborting the whole scrape {Site} {ReleaseDate} {Release}", release.Site.Name, release.ReleaseDate.ToString("yyyy-MM-dd"), release.Name);
+                break;
             }
             catch (Exception ex)
             {
@@ -470,9 +624,17 @@ public class AyloRipper : IYieldingScraper
         
         var trailerVideoFullPath = Path.Combine(fileInfo.DirectoryName, trailerVideoFileName);
 
-        var snippet = await FFmpeg.Conversions.New()
-            .Start(
-                $"-protocol_whitelist \"file,http,https,tcp,tls\" -i \"{fileInfo.FullName}\" -y -c copy \"{trailerVideoFullPath}\"");
+        try
+        {
+            var conversionResult = await FFmpeg.Conversions.New()
+                .Start(
+                    $"-protocol_whitelist \"file,http,https,tcp,tls\" -i \"{fileInfo.FullName}\" -y -c copy \"{trailerVideoFullPath}\"");
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Could not convert trailer {Site} {ReleaseDate} {Release}", release.Site.Name, release.ReleaseDate.ToString("yyyy-MM-dd"), release.Name);
+            yield break;
+        }
 
         var videoHashes = Hasher.Phash(@"""" + trailerVideoFullPath + @"""");
         yield return new Download(release,
@@ -512,37 +674,86 @@ public class AyloRipper : IYieldingScraper
 
     private async Task LoginAsync(Site site, IPage page)
     {
-        await page.GotoAsync(site.Url + "/login");
-        await Task.Delay(5000);
-        var usernameInput = page.GetByPlaceholder("Username or Email");
-        if (await usernameInput.IsVisibleAsync())
+        /**
+         * Manual workaround
+         **/
+        var accountLink = await page.EvaluateAsync<bool>("""document.querySelectorAll('a[href="/account"]').length > 0""");
+        if (accountLink)
         {
-            await page.GetByPlaceholder("Username or Email").ClickAsync();
-            await page.GetByPlaceholder("Username or Email").PressSequentiallyAsync(site.Username, new LocatorPressSequentiallyOptions { Delay = 52 });
-
-            await Task.Delay(5000);
-
-            await page.GetByPlaceholder("Password").ClickAsync();
-            await page.GetByPlaceholder("Password").PressSequentiallyAsync(site.Password, new LocatorPressSequentiallyOptions { Delay = 52 });
-            
-            await Task.Delay(5000);
-
-            await page.GetByRole(AriaRole.Button, new() { NameString = "Login" }).ClickAsync();
-            await page.WaitForLoadStateAsync();
-            await Task.Delay(5000);
+            // Already logged in
+            return;
         }
+
+        Console.WriteLine($"Please login manually to {site.Name} and press Enter.");
+        Console.ReadLine();
         
-        if (page.Url.Contains("badlogin"))
-        {
-            Log.Warning("Could not log into {Site} due to badlogin error. Login manually!", site.Name);
-            Console.ReadLine();
-        }
+        await page.GotoAsync(site.Url);
+        Log.Information($"Logged into {site.Name}.");
+        await _repository.UpdateStorageStateAsync(site, await page.Context.StorageStateAsync());
+        
+        /*
+        var strategy = new ResiliencePipelineBuilder<bool>()
+            .AddRetry(new ()
+            {
+                MaxRetryAttempts = 3,
+                Delay = TimeSpan.FromSeconds(30),
+                OnRetry = args =>
+                {
+                    var ex = args.Outcome.Exception;
+                    Log.Error($"Caught following exception while logging into {site.Name}: " + ex, ex);
+                    return default;
+                }
+            })
+            .Build();
 
+        await strategy.ExecuteAsync(async cancellationToken =>
+        {
+            var accountLink = await page.EvaluateAsync<bool>("""document.querySelectorAll('a[href="/account"]').length > 0""");
+            if (accountLink)
+            {
+                // Already logged in
+                return true;
+            }
+
+            var loginUrl = site.Url + "/login";
+            if (page.Url != loginUrl)
+            {
+                await page.GotoAsync(loginUrl);
+                await Task.Delay(5000, cancellationToken);            
+            }
+        
+            var usernameInput = page.GetByPlaceholder("Username or Email");
+            if (await usernameInput.IsVisibleAsync())
+            {
+                await page.GetByPlaceholder("Username or Email").ClickAsync();
+                await page.GetByPlaceholder("Username or Email").PressSequentiallyAsync(site.Username, new LocatorPressSequentiallyOptions { Delay = 52 });
+
+                await Task.Delay(5000, cancellationToken);
+
+                await page.GetByPlaceholder("Password").ClickAsync();
+                await page.GetByPlaceholder("Password").PressSequentiallyAsync(site.Password, new LocatorPressSequentiallyOptions { Delay = 52 });
+            
+                await Task.Delay(5000, cancellationToken);
+
+                await page.GetByRole(AriaRole.Button, new() { NameString = "Login" }).ClickAsync();
+                await page.WaitForLoadStateAsync();
+                await Task.Delay(5000, cancellationToken);
+            }
+        
+            if (page.Url.Contains("badlogin"))
+            {
+                throw new Exception($"Could not log into {site.Name} due to badlogin error.");
+            }
+
+            return true;
+        });
+        
         await page.GotoAsync(site.Url);
 
         Log.Information($"Logged into {site.Name}.");
         
         await _repository.UpdateStorageStateAsync(site, await page.Context.StorageStateAsync());
+        */
     }
 
     private static async Task<List<IRequest>> CaptureRequestsAsync(Site site, IPage page)
