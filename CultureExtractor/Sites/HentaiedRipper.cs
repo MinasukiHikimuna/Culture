@@ -85,7 +85,11 @@ public class HentaiedRipper : ISiteScraper
         foreach (var releaseHandle in releaseHandles.Reverse())
         {
             var releaseIdAndUrl = await GetReleaseIdAsync(site, releaseHandle);
-            listedReleases.Add(new ListedRelease(null, releaseIdAndUrl.Id, releaseIdAndUrl.Url, releaseHandle));
+            // These sites seem to contain ads linking to other sites of the network. We don't want to scrape those.
+            if (releaseIdAndUrl.Url.StartsWith(site.Url))
+            {
+                listedReleases.Add(new ListedRelease(null, releaseIdAndUrl.Id, releaseIdAndUrl.Url, releaseHandle));   
+            }
         }
 
         return listedReleases.AsReadOnly();
