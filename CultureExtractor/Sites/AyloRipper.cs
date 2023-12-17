@@ -192,13 +192,13 @@ public class AyloRipper : IYieldingScraper
         
         var requests = await CaptureRequestsAsync(site, page);
         SetHeadersFromActualRequest(requests);
-        await foreach (var scene in ScrapeScenesAsync(site, scrapeOptions))
+        await foreach (var scene in ScrapeScenesAsync(site, page, scrapeOptions))
         {
             yield return scene;
         }
     }
 
-    private async IAsyncEnumerable<Release> ScrapeScenesAsync(Site site, ScrapeOptions scrapeOptions)
+    private async IAsyncEnumerable<Release> ScrapeScenesAsync(Site site, IPage page, ScrapeOptions scrapeOptions)
     {
         int pageNumber = 0;
         int pages = 0;
@@ -259,7 +259,9 @@ public class AyloRipper : IYieldingScraper
                 {
                     switch (ex.ExtractorRetryMode)
                     {
-                        // TODO: implement retry properly
+                        case ExtractorRetryMode.RetryLogin:
+                            await LoginAsync(site, page);
+                            continue;
                         case ExtractorRetryMode.Retry:
                             continue;
                         case ExtractorRetryMode.Skip:
@@ -320,14 +322,21 @@ public class AyloRipper : IYieldingScraper
             }
             if (movieDetails.videos.full == null)
             {
-                throw new ExtractorException(ExtractorRetryMode.Abort, "Login required.");
+                throw new ExtractorException(ExtractorRetryMode.RetryLogin, "Login required.");
             }
 
             var movieCollection = movieDetails.collections.FirstOrDefault();
             var subSites = await _repository.GetSubSitesAsync(site.Uuid);
-            SubSite? subSite = movieCollection != null
-                ? subSites.FirstOrDefault(s => s.ShortName == movieCollection.id.ToString())
-                : null;
+            SubSite? subSite = null;
+            if (movieCollection != null)
+            {
+                subSite = subSites.FirstOrDefault(s => s.ShortName == movieCollection.id.ToString());
+                if (subSite == null)
+                {
+                    subSite = new SubSite(UuidGenerator.Generate(), movieCollection.id.ToString(), movieCollection.name, "{}", site);
+                    await _repository.UpsertSubSite(subSite);
+                }                
+            }
             
             var sceneDownloads = movieDetails.videos.full.files
                 .Where(keyValuePair => keyValuePair.Key != "dash" && keyValuePair.Key != "hls")
@@ -674,33 +683,30 @@ public class AyloRipper : IYieldingScraper
 
     private async Task LoginAsync(Site site, IPage page)
     {
-        /**
-         * Manual workaround
-         **/
-        var accountLink = await page.EvaluateAsync<bool>("""document.querySelectorAll('a[href="/account"]').length > 0""");
-        if (accountLink)
-        {
-            // Already logged in
-            return;
-        }
-
-        Console.WriteLine($"Please login manually to {site.Name} and press Enter.");
-        Console.ReadLine();
-        
-        await page.GotoAsync(site.Url);
-        Log.Information($"Logged into {site.Name}.");
-        await _repository.UpdateStorageStateAsync(site, await page.Context.StorageStateAsync());
-        
-        /*
         var strategy = new ResiliencePipelineBuilder<bool>()
             .AddRetry(new ()
             {
                 MaxRetryAttempts = 3,
-                Delay = TimeSpan.FromSeconds(30),
+                Delay = TimeSpan.FromSeconds(5),
+                ShouldHandle = new PredicateBuilder<bool>()
+                    .Handle<Exception>()
+                    .HandleResult(r => r == false),
                 OnRetry = args =>
                 {
                     var ex = args.Outcome.Exception;
                     Log.Error($"Caught following exception while logging into {site.Name}: " + ex, ex);
+                    return default;
+                }
+            })
+            .AddFallback(new ()
+            {
+                ShouldHandle = new PredicateBuilder<bool>()
+                    .Handle<Exception>()
+                    .HandleResult(r => r == false),
+                FallbackAction = args =>
+                {
+                    Console.WriteLine($"Please login manually to {site.Name} and press Enter.");
+                    Console.ReadLine();
                     return default;
                 }
             })
@@ -721,28 +727,37 @@ public class AyloRipper : IYieldingScraper
                 await page.GotoAsync(loginUrl);
                 await Task.Delay(5000, cancellationToken);            
             }
-        
+
             var usernameInput = page.GetByPlaceholder("Username or Email");
             if (await usernameInput.IsVisibleAsync())
             {
-                await page.GetByPlaceholder("Username or Email").ClickAsync();
-                await page.GetByPlaceholder("Username or Email").PressSequentiallyAsync(site.Username, new LocatorPressSequentiallyOptions { Delay = 52 });
+                var passwordInput = page.GetByPlaceholder("Password");
+                var loginButton = page.GetByRole(AriaRole.Button, new() { NameString = "Login" });
 
-                await Task.Delay(5000, cancellationToken);
+                await HumanMime.TypeLikeHumanAsync(usernameInput, site.Username);
+                await HumanMime.TypeLikeHumanAsync(passwordInput, site.Password);
 
-                await page.GetByPlaceholder("Password").ClickAsync();
-                await page.GetByPlaceholder("Password").PressSequentiallyAsync(site.Password, new LocatorPressSequentiallyOptions { Delay = 52 });
-            
-                await Task.Delay(5000, cancellationToken);
-
-                await page.GetByRole(AriaRole.Button, new() { NameString = "Login" }).ClickAsync();
+                await loginButton.HoverAsync();
+                await loginButton.ClickAsync();
+                
                 await page.WaitForLoadStateAsync();
-                await Task.Delay(5000, cancellationToken);
+                await HumanMime.DelayRandomlyAsync(2000, 5000, cancellationToken);
             }
         
             if (page.Url.Contains("badlogin"))
             {
-                throw new Exception($"Could not log into {site.Name} due to badlogin error.");
+                try
+                {
+                    await HumanMime.DelayRandomlyAsync(2000, 5000, cancellationToken);
+                    await page.EvaluateAsync($"() => document.querySelectorAll('a[href=\"{site.Url}/login\"]')[0].click()");
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning(ex, "Could not click login link.");
+                }
+
+                await page.WaitForLoadStateAsync();
+                return false;
             }
 
             return true;
@@ -753,7 +768,6 @@ public class AyloRipper : IYieldingScraper
         Log.Information($"Logged into {site.Name}.");
         
         await _repository.UpdateStorageStateAsync(site, await page.Context.StorageStateAsync());
-        */
     }
 
     private static async Task<List<IRequest>> CaptureRequestsAsync(Site site, IPage page)

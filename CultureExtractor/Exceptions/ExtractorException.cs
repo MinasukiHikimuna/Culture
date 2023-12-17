@@ -3,6 +3,7 @@
 public enum ExtractorRetryMode
 {
     Retry,
+    RetryLogin,
     Skip,
     Abort
 }
