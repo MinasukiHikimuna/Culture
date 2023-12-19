@@ -76,7 +76,7 @@ public class AyloRipper : IYieldingScraper
         $"{site.Url}/scenes?page={pageNumber}";
 
     private static string MoviesApiUrl(int pageNumber) =>
-        $"https://site-api.project1service.com/v2/releases?blockId=4126598482&blockName=SceneListBlock&pageType=EXPLORE_SCENES&dateReleased=%3C2023-11-16&orderBy=-dateReleased&type=scene&limit=20&offset={(pageNumber - 1) * 20}";
+        $"https://site-api.project1service.com/v2/releases?blockId=4126598482&blockName=SceneListBlock&pageType=EXPLORE_SCENES&orderBy=-dateReleased&type=scene&limit=20&offset={(pageNumber - 1) * 20}";
 
     private static string MovieApiUrl(string shortName) =>
         $"https://site-api.project1service.com/v2/releases/{shortName}?pageType=PLAYER";
