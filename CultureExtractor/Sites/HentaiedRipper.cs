@@ -5,6 +5,7 @@ using System.Net;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using CultureExtractor.Exceptions;
 using CultureExtractor.Models;
 
 namespace CultureExtractor.Sites;
@@ -199,6 +200,11 @@ public class HentaiedRipper : ISiteScraper
             .map(script => script.innerHTML)
             .find(content => content && content.includes('var playerInstance_'))
         ");
+        if (input == null)
+        {
+            throw new ExtractorException(ExtractorRetryMode.RetryLogin, "Could not find playerInstance from DOM!");
+        }
+        
         var sources = ParseSources(input);
 
         var availableDownloads = new List<DownloadDetailsAndElementHandle>();
