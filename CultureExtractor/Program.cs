@@ -265,7 +265,7 @@ public class DownloadOptions : SiteOptions
     [Option("best", Required = false, HelpText = "Use best quality")]
     public bool BestQuality { get; set; }
 
-    [Option("releases", Required = false, HelpText = "One or more release UUIDs to download")]
+    [Option("release-uuids", Required = false, HelpText = "One or more release UUIDs to download")]
     public IEnumerable<string> ReleaseUuids { get; set; }
 
     [Option("release-short-names", Required = false, HelpText = "One or more release short names to download")]
