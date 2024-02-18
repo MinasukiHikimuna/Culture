@@ -2,6 +2,8 @@
 using Microsoft.Playwright;
 using System.Text.RegularExpressions;
 using CultureExtractor.Models;
+using Serilog;
+using Polly;
 
 namespace CultureExtractor.Sites;
 
@@ -9,13 +11,140 @@ namespace CultureExtractor.Sites;
 [Site("wowgirls")]
 [Site("wowporn")]
 [Site("ultrafilms")]
-public class WowNetworkRipper : ISiteScraper
+public class WowNetworkRipper : ISiteScraper, IYieldingScraper
 {
     private readonly ILegacyDownloader _legacyDownloader;
+    private readonly IPlaywrightFactory _playwrightFactory;
+    private readonly IRepository _repository;
 
-    public WowNetworkRipper(ILegacyDownloader legacyDownloader)
+    public WowNetworkRipper(ILegacyDownloader legacyDownloader, IPlaywrightFactory playwrightFactory, IRepository repository)
     {
         _legacyDownloader = legacyDownloader;
+        _playwrightFactory = playwrightFactory;
+        _repository = repository;
+    }
+
+    public async IAsyncEnumerable<Release> ScrapeReleasesAsync(Site site, BrowserSettings browserSettings, ScrapeOptions scrapeOptions)
+    {
+        IPage page = await _playwrightFactory.CreatePageAsync(site, browserSettings);
+        await LoginAsync(site, page);
+
+        await foreach (var release in ScrapeScenesAsync(site, page, scrapeOptions))
+        {
+            yield return release;
+        }
+    }
+
+    private async IAsyncEnumerable<Release> ScrapeScenesAsync(Site site, IPage page, ScrapeOptions scrapeOptions)
+    {
+        await page.GotoAsync(site.Url + "/films/");
+        await page.WaitForLoadStateAsync();
+
+        await SetSiteFilter(site, page);
+        var totalPages = await GetTotalPagesAsync(page);
+
+        for (var pageNumber = 1; pageNumber <= totalPages; pageNumber++)
+        {
+            await GoToPageAsync(page, site, pageNumber);
+
+            var releaseHandles = await page.Locator("section.cf_content > ul > li > div.content_item > a.icon").ElementHandlesAsync();
+
+            var listedReleases = new List<ListedRelease>();
+            foreach (var releaseHandle in releaseHandles)
+            {
+                var releaseIdAndUrl = await GetReleaseIdAsync(site, releaseHandle);
+                listedReleases.Add(new ListedRelease(null, releaseIdAndUrl.Id, releaseIdAndUrl.Url, releaseHandle));
+            }
+
+            var listedReleasesDict = listedReleases
+                .ToDictionary(
+                    listedRelease => listedRelease.ShortName,
+                    listedRelease => listedRelease);
+
+            Log.Information($"Page {pageNumber}/{totalPages} contains {releaseHandles.Count} releases");
+
+            var existingReleases = await _repository
+                .GetReleasesAsync(site.ShortName, listedReleasesDict.Keys.ToList());
+
+
+            var existingReleasesDictionary = existingReleases.ToDictionary(r => r.ShortName, r => r);
+
+            var scenesToBeScraped = listedReleasesDict
+                .Where(g => !existingReleasesDictionary.ContainsKey(g.Key) || existingReleasesDictionary[g.Key].LastUpdated < scrapeOptions.FullScrapeLastUpdated)
+                .Select(g => g.Value)
+                .ToList();
+
+            foreach (var sceneToBeScraped in scenesToBeScraped)
+            {
+                var releaseGuid = existingReleasesDictionary.TryGetValue(sceneToBeScraped.ShortName, out var existingRelease)
+                    ? existingRelease.Uuid
+                    : UuidGenerator.Generate();
+
+                Release? scene = null;
+                IPage? scenePage = null;
+
+                try
+                {
+                    scenePage = await page.Context.NewPageAsync();
+                    await scenePage.GotoAsync(sceneToBeScraped.Url);
+                    scene = await ScrapeSceneAsync(scenePage, site, sceneToBeScraped, releaseGuid);
+                }
+                catch (Exception ex)
+                {
+                    Log.Error(ex, $"Failed to scrape scene {sceneToBeScraped.Url}");
+                }
+                finally
+                {
+                    scenePage?.CloseAsync();
+                }
+
+                if (scene != null)
+                {
+                    yield return scene;
+                }
+            }
+        }
+    }
+
+    private async Task<Release> ScrapeSceneAsync(IPage scenePage, Site site, ListedRelease listedRelease, Guid releaseGuid)
+    {
+        await scenePage.WaitForLoadStateAsync();
+
+        var releaseDate = await ScrapeReleaseDateAsync(scenePage);
+        var duration = await ScrapeDurationAsync(scenePage);
+        var description = await ScrapeDescriptionAsync(scenePage);
+        var title = await ScrapeTitleAsync(scenePage);
+        var performers = await ScrapePerformersAsync(scenePage);
+        var tags = await ScrapeTagsAsync(scenePage);
+        var availableVideoFiles = await ParseAvailableDownloadsAsync(scenePage);
+
+        var previewElement = await scenePage.Locator(".jw-preview").ElementHandleAsync();
+        var style = await previewElement.GetAttributeAsync("style");
+        var backgroundImageUrl = style.Replace("background-image: url(\"", "").Replace("\");", "").Replace(" background-size: cover;", "");
+        var availableImageFile = new AvailableImageFile("image", "scene", "preview", backgroundImageUrl, null, null, null);
+
+        var scene = new Release(
+            releaseGuid,
+            site,
+            null,
+            releaseDate,
+            listedRelease.ShortName,
+            title,
+            listedRelease.Url,
+            description,
+            duration.TotalSeconds,
+            performers,
+            tags,
+            availableVideoFiles.Concat(new List<IAvailableFile> { availableImageFile }).ToList(),
+            "{}",
+            DateTime.Now);
+
+        return scene;
+    }
+
+    public IAsyncEnumerable<Download> DownloadReleasesAsync(Site site, BrowserSettings browserSettings, DownloadConditions downloadConditions)
+    {
+        throw new NotImplementedException();
     }
 
     public async Task LoginAsync(Site site, IPage page)
@@ -33,8 +162,8 @@ public class WowNetworkRipper : ISiteScraper
 
         if (await getInsideButton.IsVisibleAsync())
         {
-            await emailInput.TypeAsync(site.Username);
-            await passwordInput.TypeAsync(site.Password);
+            await emailInput.FillAsync(site.Username);
+            await passwordInput.FillAsync(site.Password);
             await getInsideButton.ClickAsync();
             await page.WaitForLoadStateAsync();
         }
@@ -76,6 +205,43 @@ public class WowNetworkRipper : ISiteScraper
         return totalPages;
     }
 
+    private async Task SetSiteFilter(Site site, IPage page)
+    {
+        // Unselect existing site filters
+        while ((await page.Locator(".cf_s_site").ElementHandlesAsync()).Count > 0)
+        {
+            var elementHandles = await page.Locator(".cf_s_site").ElementHandlesAsync();
+            var elementHandle = elementHandles[0];
+
+            await elementHandle.ClickAsync();
+            await elementHandle.IsHiddenAsync();
+            await page.WaitForLoadStateAsync();
+            await Task.Delay(5000);
+        }
+
+        var siteName = site.ShortName switch
+        {
+            "allfinegirls" => "All Fine Girls",
+            "wowgirls" => "Wow Girls",
+            "wowporn" => "Wow Porn",
+            _ => string.Empty
+        };
+
+        if (!string.IsNullOrWhiteSpace(siteName))
+        {
+            await page.GetByRole(AriaRole.Complementary).GetByText(siteName).ClickAsync();
+            await page.WaitForSelectorAsync(".cf_s_site");
+            await page.WaitForLoadStateAsync();
+        }
+    }
+
+    private async Task<int> GetTotalPagesAsync(IPage page)
+    {
+        var totalPagesStr = await page.Locator("div.pages > span").Last.TextContentAsync();
+        var totalPages = int.Parse(totalPagesStr);
+        return totalPages;
+    }
+
     public async Task<IReadOnlyList<ListedRelease>> GetCurrentReleasesAsync(Site site, SubSite subSite, IPage page, IReadOnlyList<IRequest> requests, int pageNumber)
     {
         await GoToPageAsync(page, site, subSite, pageNumber);
@@ -92,6 +258,84 @@ public class WowNetworkRipper : ISiteScraper
         return listedReleases.AsReadOnly();
     }
 
+    private async Task GoToPageAsync(IPage page, Site site, int targetPageNumber)
+    {
+        await page.WaitForLoadStateAsync();
+
+        // Parse the initial state of the paginator
+        var (currentPage, visiblePages, hasNext, hasPrevious) = await ParseVisiblePagesAndNavigation(page);
+        if (currentPage == targetPageNumber)
+        {
+            return;
+        }
+
+        while (!visiblePages.Contains(targetPageNumber))
+        {
+            if (currentPage == targetPageNumber)
+            {
+                break;
+            }
+
+            var distances = visiblePages.Select(p => Math.Abs(p - targetPageNumber));
+            var closestPageNumber = visiblePages[distances.ToList().IndexOf(distances.Min())];
+            await ClickPageNumberAsync(page, closestPageNumber);
+
+            (currentPage, visiblePages, hasNext, hasPrevious) = await ParseVisiblePagesAndNavigation(page);
+        }
+
+        // Click on the target page number
+        await ClickPageNumberAsync(page, targetPageNumber);
+    }
+
+    private static async Task ClickPageNumberAsync(IPage page, int pageNumber)
+    {
+        var retryPolicy = Policy
+            .Handle<PlaywrightException>()
+            .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
+
+        await retryPolicy.ExecuteAsync(async () =>
+        {
+            var pageElement = await page.QuerySelectorAsync($".paginator .pages .page[data-ca-state='paginator.page={pageNumber}']");
+            if (pageElement != null)
+            {
+                await pageElement.ClickAsync();
+            }
+        });
+    }
+
+    private async Task<(int currentPage, int[] visiblePages, bool hasNext, bool hasPrevious)> ParseVisiblePagesAndNavigation(IPage page)
+    {
+        // Get the list of visible page elements
+        var pageElements = await page.QuerySelectorAllAsync(".pages .page");
+
+        // Parse the visible pages and find the active one
+        List<int> visiblePages = new List<int>();
+        int currentPage = 0;
+        foreach (var pageElement in pageElements)
+        {
+            string pageText = await pageElement.InnerTextAsync();
+            if (int.TryParse(pageText, out int pageNumber))
+            {
+                visiblePages.Add(pageNumber);
+                // Check if the class 'active' is present
+                bool isActive = await pageElement.EvaluateAsync<bool>("el => el.classList.contains('active')");
+                if (isActive)
+                {
+                    currentPage = pageNumber;
+                }
+            }
+        }
+
+        // Determine the presence of the "next" navigation button
+        bool hasNext = await page.QuerySelectorAsync(".nav.next.enabled") != null;
+
+        // Determine the presence of the "prev" navigation button
+        bool hasPrevious = await page.QuerySelectorAsync(".nav.prev.enabled") != null;
+
+        return (currentPage, visiblePages.ToArray(), hasNext, hasPrevious);
+    }
+
+    // LEGACY
     private Task GoToPageAsync(IPage page, Site site, SubSite subSite, int pageNumber)
     {
         throw new NotImplementedException();
@@ -122,7 +366,7 @@ public class WowNetworkRipper : ISiteScraper
         var title = await ScrapeTitleAsync(page);
         var performers = await ScrapePerformersAsync(page);
         var tags = await ScrapeTagsAsync(page);
-        var downloadOptionsAndHandles = await ParseAvailableDownloadsAsync(page);
+        var downloadOptionsAndHandles = await ParseAvailableDownloadsAsyncLegacy(page);
 
         var scene = new Release(
             releaseUuid,
@@ -267,7 +511,7 @@ public class WowNetworkRipper : ISiteScraper
         var performerNames = release.Performers.Select(p => p.Name).ToList();
         var performersStr = performerNames.Count() > 1 ? string.Join(", ", performerNames.Take(performerNames.Count() - 1)) + " & " + performerNames.Last() : performerNames.FirstOrDefault();
 
-        var availableDownloads = await ParseAvailableDownloadsAsync(page);
+        var availableDownloads = await ParseAvailableDownloadsAsyncLegacy(page);
 
         DownloadDetailsAndElementHandle selectedDownload = downloadConditions.PreferredDownloadQuality switch
         {
@@ -282,7 +526,46 @@ public class WowNetworkRipper : ISiteScraper
 );
     }
 
-    private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloadsAsync(IPage page)
+    private static async Task<IList<IAvailableFile>> ParseAvailableDownloadsAsync(IPage page)
+    {
+        var downloadItems = await page.Locator("div.ct_dl_items > ul > li").ElementHandlesAsync();
+        var availableFiles = new List<IAvailableFile>();
+        foreach (var downloadItem in downloadItems)
+        {
+            var downloadLinkElement = await downloadItem.QuerySelectorAsync("a");
+            var downloadUrl = await downloadLinkElement.GetAttributeAsync("href");
+            var resolutionRaw = await downloadLinkElement.TextContentAsync();
+            resolutionRaw = resolutionRaw.Replace("\n", "").Trim();
+            var resolutionWidth = HumanParser.ParseResolutionWidth(resolutionRaw);
+            var resolutionHeight = HumanParser.ParseResolutionHeight(resolutionRaw);
+            var codecElement = await downloadItem.QuerySelectorAsync("span.format");
+            var codecRaw = await codecElement.InnerTextAsync();
+            var codec = HumanParser.ParseCodec(codecRaw);
+            var fpsElement = await downloadItem.QuerySelectorAsync("span.fps");
+            var fpsRaw = await fpsElement.InnerTextAsync();
+            var sizeElement = await downloadItem.QuerySelectorAsync("span.size");
+            var sizeRaw = await sizeElement.InnerTextAsync();
+            var size = HumanParser.ParseFileSize(sizeRaw);
+
+            var description = $"{codec.ToUpperInvariant()} {resolutionWidth}x{resolutionHeight} {fpsRaw}";
+
+            availableFiles.Add(
+                new AvailableVideoFile(
+                    "video",
+                    "scene",
+                    description,
+                    downloadUrl,
+                    resolutionWidth,
+                    resolutionHeight,
+                    size,
+                    double.Parse(fpsRaw.Replace("fps", "")),
+                    codec)
+            );
+        }
+        return availableFiles;
+    }
+
+    private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloadsAsyncLegacy(IPage page)
     {
         var downloadItems = await page.Locator("div.ct_dl_items > ul > li").ElementHandlesAsync();
         var availableDownloads = new List<DownloadDetailsAndElementHandle>();
@@ -303,8 +586,7 @@ public class WowNetworkRipper : ISiteScraper
             var sizeRaw = await sizeElement.InnerTextAsync();
             var size = HumanParser.ParseFileSize(sizeRaw);
 
-            var descriptionRaw = await downloadItem.TextContentAsync();
-            var description = descriptionRaw.Replace("\n", "").Trim();
+            var description = $"{codec.ToUpperInvariant()} {resolutionWidth}x{resolutionHeight} {fpsRaw}";
 
             availableDownloads.Add(
                 new DownloadDetailsAndElementHandle(
