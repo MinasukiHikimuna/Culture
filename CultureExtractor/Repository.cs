@@ -68,14 +68,47 @@ public class Repository : IRepository
             .Include(r => r.Tags)
             .OrderByDescending(r => r.ReleaseDate)
             .Where(s => s.SiteUuid == site.Uuid);
-            
+
+        // queryable = FilterByDownloadedFileNames(queryable, downloadConditions);
+        queryable = FilterByReleaseUuids(queryable, downloadConditions);
+        queryable = FilterByReleaseShortNames(queryable, downloadConditions);
         queryable = FilterByPerformers(queryable, downloadConditions);
         queryable = SortReleases(queryable, downloadConditions);
                 
         var releaseEntities = await queryable.ToListAsync();
         return releaseEntities.Select(Convert).AsEnumerable();
     }
-    
+
+    private static IQueryable<ReleaseEntity> FilterByReleaseShortNames(IQueryable<ReleaseEntity> queryable, DownloadConditions downloadConditions)
+    {
+        if (downloadConditions.ReleaseShortNames != null && !downloadConditions.ReleaseShortNames.Any())
+        {
+            return queryable;
+        }
+        
+        return queryable.Where(s => downloadConditions.ReleaseShortNames.Contains(s.ShortName));
+    }
+
+    private static IQueryable<ReleaseEntity> FilterByReleaseUuids(IQueryable<ReleaseEntity> queryable, DownloadConditions downloadConditions)
+    {
+        if (downloadConditions.ReleaseUuids != null && !downloadConditions.ReleaseUuids.Any())
+        {
+            return queryable;
+        }
+        
+        return queryable.Where(s => downloadConditions.ReleaseUuids.Contains(s.Uuid.ToString()));
+    }
+
+    /*private static IQueryable<ReleaseEntity> FilterByDownloadedFileNames(IQueryable<ReleaseEntity> queryable, DownloadConditions downloadConditions)
+    {
+        if (downloadConditions.DownloadedFileNames != null && !downloadConditions.DownloadedFileNames.Any())
+        {
+            return queryable;
+        }
+        
+        return queryable.Where(s => s.Downloads.Any(d => downloadConditions.DownloadedFileNames.Contains(d.SavedFilename)));
+    }*/
+
     private static IQueryable<ReleaseEntity> FilterByPerformers(IQueryable<ReleaseEntity> queryable, DownloadConditions downloadConditions)
     {
         if (downloadConditions.PerformerNames != null && !downloadConditions.PerformerNames.Any())
@@ -362,6 +395,12 @@ public class Repository : IRepository
             ? "[]"
             : releaseEntity.AvailableFiles;
         var availableFiles = JsonSerializer.Deserialize<List<IAvailableFile>>(availableFilesJson).AsReadOnly();
+
+        // TODO: why is this needed?
+        if (releaseEntity.SubSite != null && releaseEntity.SubSite is { Site: null })
+        {
+            releaseEntity.SubSite.Site = releaseEntity.Site;
+        }
         
         return new Release(
             releaseEntity.Uuid,

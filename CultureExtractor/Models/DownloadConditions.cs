@@ -7,6 +7,7 @@ public record DownloadConditions(
     int? MaxDownloads,
     IList<string>? PerformerNames,
     IList<string>? ReleaseUuids,
+    IList<string>? ReleaseShortNames,
     IList<string>? DownloadedFileNames)
 {
     public static DownloadConditions All(PreferredDownloadQuality preferredDownloadQuality) =>
@@ -14,6 +15,7 @@ public record DownloadConditions(
             DateRange.All, 
             OrderEnum.Ascending,
             preferredDownloadQuality,
+            null,
             null,
             null,
             null,

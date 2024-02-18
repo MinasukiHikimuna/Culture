@@ -268,6 +268,9 @@ public class DownloadOptions : SiteOptions
     [Option("releases", Required = false, HelpText = "One or more release UUIDs to download")]
     public IEnumerable<string> ReleaseUuids { get; set; }
 
+    [Option("release-short-names", Required = false, HelpText = "One or more release short names to download")]
+    public IEnumerable<string> ReleaseShortNames { get; set; }
+    
     [Option("performers", Required = false, HelpText = "One or more performers to download")]
     public IEnumerable<string> Performers { get; set; }
 
