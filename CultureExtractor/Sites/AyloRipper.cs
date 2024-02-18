@@ -1,6 +1,7 @@
 ﻿using System.Collections.Immutable;
 using System.Globalization;
 using System.Net;
+using System.Net.Sockets;
 using CultureExtractor.Interfaces;
 using Microsoft.Playwright;
 using Serilog;
@@ -106,7 +107,8 @@ public class AyloRipper : IYieldingScraper
         await page.GotoAsync("/sites");
         await Task.Delay(5000);
 
-        var existingSubSites = await _repository.GetSubSitesAsync(site.Uuid);
+        // TODO: this is very like not needed anymore
+        /*var existingSubSites = await _repository.GetSubSitesAsync(site.Uuid);
 
         int scrollY = await page.EvaluateAsync<int>("() => window.scrollY");
         int previousScrollY = -1;
@@ -155,6 +157,7 @@ public class AyloRipper : IYieldingScraper
             "fakehub" => fakeHubJs,
             "mofos" => null, // Mofos has subsites but their names can't be parsed
             "brazzers" => null, // Brazzers has subsites but their names can't be parsed
+            "realitykings" => null, // Brazzers has subsites but their names can't be parsed
             _ => throw new ArgumentOutOfRangeException("No JS for site " + site.ShortName)
         };
             
@@ -188,7 +191,7 @@ public class AyloRipper : IYieldingScraper
                 Log.Debug("Upserting sub site {ShortName} {Name} [{Uuid}]", subSite.ShortName, subSite.Name, subSite.Uuid);
                 await _repository.UpsertSubSite(subSite);
             }
-        }
+        }*/
         
         var requests = await CaptureRequestsAsync(site, page);
         SetHeadersFromActualRequest(requests);
@@ -422,6 +425,16 @@ public class AyloRipper : IYieldingScraper
             {
                 throw;
             }
+
+            var innermostException = ex;
+            while (innermostException.InnerException != null)
+            {
+                innermostException = innermostException.InnerException;
+            }
+            if (innermostException is SocketException)
+            {
+                throw new ExtractorException(ExtractorRetryMode.Retry, "Socket exception while scraping scene.", ex);
+            }
             
             throw new ExtractorException(ExtractorRetryMode.Abort, "Unhandled exception while scraping scene.", ex);
         }
@@ -475,7 +488,8 @@ public class AyloRipper : IYieldingScraper
     {
         IPage page = await _playwrightFactory.CreatePageAsync(site, browserSettings);
 
-        var releases = await _repository.QueryReleasesAsync(site, downloadConditions);
+        var releases = (await _repository.QueryReleasesAsync(site, downloadConditions)).ToList();
+        Log.Debug("Found {Count} releases to download.", releases.Count);
         var downloadedReleases = 0;
         foreach (var release in releases)
         {
@@ -503,10 +517,22 @@ public class AyloRipper : IYieldingScraper
             {
                 updatedScrape = await ScrapeSceneAsync(site, release.ShortName, release.Uuid);
             }
-            catch (ExtractorException ex) when (ex.ExtractorRetryMode == ExtractorRetryMode.Abort)
+            catch (ExtractorException ex)
             {
-                Log.Error(ex, "Aborting the whole scrape {Site} {ReleaseDate} {Release}", release.Site.Name, release.ReleaseDate.ToString("yyyy-MM-dd"), release.Name);
-                break;
+                switch (ex.ExtractorRetryMode)
+                {
+                    case ExtractorRetryMode.RetryLogin:
+                        await LoginAsync(site, page);
+                        continue;
+                    case ExtractorRetryMode.Retry:
+                        continue;
+                    case ExtractorRetryMode.Skip:
+                        Log.Error(ex, $"Error while scraping scene, skipping: {release.ShortName}");
+                        continue;
+                    default:
+                    case ExtractorRetryMode.Abort:
+                        throw;
+                }
             }
             catch (Exception ex)
             {
@@ -683,85 +709,8 @@ public class AyloRipper : IYieldingScraper
 
     private async Task LoginAsync(Site site, IPage page)
     {
-        var strategy = new ResiliencePipelineBuilder<bool>()
-            .AddRetry(new ()
-            {
-                MaxRetryAttempts = 3,
-                Delay = TimeSpan.FromSeconds(5),
-                ShouldHandle = new PredicateBuilder<bool>()
-                    .Handle<Exception>()
-                    .HandleResult(r => r == false),
-                OnRetry = args =>
-                {
-                    var ex = args.Outcome.Exception;
-                    Log.Error($"Caught following exception while logging into {site.Name}: " + ex, ex);
-                    return default;
-                }
-            })
-            .AddFallback(new ()
-            {
-                ShouldHandle = new PredicateBuilder<bool>()
-                    .Handle<Exception>()
-                    .HandleResult(r => r == false),
-                FallbackAction = args =>
-                {
-                    Console.WriteLine($"Please login manually to {site.Name} and press Enter.");
-                    Console.ReadLine();
-                    return default;
-                }
-            })
-            .Build();
-
-        await strategy.ExecuteAsync(async cancellationToken =>
-        {
-            var accountLink = await page.EvaluateAsync<bool>("""document.querySelectorAll('a[href="/account"]').length > 0""");
-            if (accountLink)
-            {
-                // Already logged in
-                return true;
-            }
-
-            var loginUrl = site.Url + "/login";
-            if (page.Url != loginUrl)
-            {
-                await page.GotoAsync(loginUrl);
-                await Task.Delay(5000, cancellationToken);            
-            }
-
-            var usernameInput = page.GetByPlaceholder("Username or Email");
-            if (await usernameInput.IsVisibleAsync())
-            {
-                var passwordInput = page.GetByPlaceholder("Password");
-                var loginButton = page.GetByRole(AriaRole.Button, new() { NameString = "Login" });
-
-                await HumanMime.TypeLikeHumanAsync(usernameInput, site.Username);
-                await HumanMime.TypeLikeHumanAsync(passwordInput, site.Password);
-
-                await loginButton.HoverAsync();
-                await loginButton.ClickAsync();
-                
-                await page.WaitForLoadStateAsync();
-                await HumanMime.DelayRandomlyAsync(2000, 5000, cancellationToken);
-            }
-        
-            if (page.Url.Contains("badlogin"))
-            {
-                try
-                {
-                    await HumanMime.DelayRandomlyAsync(2000, 5000, cancellationToken);
-                    await page.EvaluateAsync($"() => document.querySelectorAll('a[href=\"{site.Url}/login\"]')[0].click()");
-                }
-                catch (Exception ex)
-                {
-                    Log.Warning(ex, "Could not click login link.");
-                }
-
-                await page.WaitForLoadStateAsync();
-                return false;
-            }
-
-            return true;
-        });
+        Console.WriteLine($"Please login manually to {site.Name} and press Enter. Beware of automatically checked offers to buy some bundles!");
+        Console.ReadLine();
         
         await page.GotoAsync(site.Url);
 
