@@ -33,6 +33,8 @@ public class Downloader : IDownloader
             .AddRetry(new ()
             {
                 MaxRetryAttempts = 3,
+                ShouldHandle = new PredicateBuilder<FileInfo?>()
+                    .Handle<Exception>(),
                 Delay = TimeSpan.FromSeconds(10),
                 OnRetry = args =>
                 {
