@@ -119,7 +119,7 @@ public class WowNetworkRipper : IYieldingScraper
         }
     }
 
-    private async Task<Release> ScrapeSceneAsync(IPage releasePage, Site site, string releaseShortName, string releaseUrl, Guid releaseGuid)
+    private static async Task<Release> ScrapeSceneAsync(IPage releasePage, Site site, string releaseShortName, string releaseUrl, Guid releaseGuid)
     {
         await releasePage.WaitForLoadStateAsync();
 
@@ -226,7 +226,7 @@ public class WowNetworkRipper : IYieldingScraper
         }
     }
 
-    private async Task<Release> ScrapeGalleryAsync(IPage releasePage, Site site, string releaseShortName, string releaseUrl, Guid releaseGuid)
+    private static async Task<Release> ScrapeGalleryAsync(IPage releasePage, Site site, string releaseShortName, string releaseUrl, Guid releaseGuid)
     {
         await releasePage.WaitForLoadStateAsync();
 
@@ -469,7 +469,7 @@ public class WowNetworkRipper : IYieldingScraper
         return new ReleaseDownloadPlan(release, availableFiles);
     }
 
-    private async Task LoginAsync(Site site, IPage page)
+    private static async Task LoginAsync(Site site, IPage page)
     {
         var signInButton = page.GetByRole(AriaRole.Link, new() { NameString = "Sign in" });
         var emailInput = page.GetByPlaceholder("E-Mail");
@@ -521,7 +521,7 @@ public class WowNetworkRipper : IYieldingScraper
         }
     }
 
-    private async Task<int> GetTotalPagesAsync(IPage page)
+    private static async Task<int> GetTotalPagesAsync(IPage page)
     {
         var totalPagesStr = await page.Locator("div.pages > span").Last.TextContentAsync();
         var totalPages = int.Parse(totalPagesStr);
@@ -573,7 +573,7 @@ public class WowNetworkRipper : IYieldingScraper
         });
     }
 
-    private async Task<(int currentPage, int[] visiblePages, bool hasNext, bool hasPrevious)> ParseVisiblePagesAndNavigation(IPage page)
+    private static async Task<(int currentPage, int[] visiblePages, bool hasNext, bool hasPrevious)> ParseVisiblePagesAndNavigation(IPage page)
     {
         // Get the list of visible page elements
         var pageElements = await page.QuerySelectorAllAsync(".pages .page");
@@ -603,12 +603,6 @@ public class WowNetworkRipper : IYieldingScraper
         bool hasPrevious = await page.QuerySelectorAsync(".nav.prev.enabled") != null;
 
         return (currentPage, visiblePages.ToArray(), hasNext, hasPrevious);
-    }
-
-    // LEGACY
-    private Task GoToPageAsync(IPage page, Site site, SubSite subSite, int pageNumber)
-    {
-        throw new NotImplementedException();
     }
     
     private static async Task<ReleaseIdAndUrl> GetReleaseIdAsync(Site site, IElementHandle currentRelease)
