@@ -6,7 +6,6 @@ using Serilog;
 using Polly;
 using Microsoft.EntityFrameworkCore;
 using System.Net;
-using uhttpsharp.Clients;
 using System.Collections.Immutable;
 using System.Web;
 
@@ -282,8 +281,6 @@ public class WowNetworkRipper : IYieldingScraper
 
             await retryPolicy.ExecuteAsync(async () => await releasePage.GotoAsync(release.Url));
 
-            // this is now done on every scene despite we might already have all files
-            // the reason for updated scrape is that the links are timebombed and we need to refresh those
             Release? updatedScrape;
             try
             {
@@ -454,7 +451,7 @@ public class WowNetworkRipper : IYieldingScraper
         }
     }
 
-    private static async Task LoginAsync(Site site, IPage page)
+    private async Task LoginAsync(Site site, IPage page)
     {
         var signInButton = page.GetByRole(AriaRole.Link, new() { NameString = "Sign in" });
         var emailInput = page.GetByPlaceholder("E-Mail");
@@ -473,6 +470,9 @@ public class WowNetworkRipper : IYieldingScraper
             await passwordInput.FillAsync(site.Password);
             await getInsideButton.ClickAsync();
             await page.WaitForLoadStateAsync();
+
+            await page.WaitForLoadStateAsync();
+            await _repository.UpdateStorageStateAsync(site, await page.Context.StorageStateAsync());
         }
     }
 
@@ -495,7 +495,7 @@ public class WowNetworkRipper : IYieldingScraper
             "allfinegirls" => "All Fine Girls",
             "wowgirls" => "Wow Girls",
             "wowporn" => "Wow Porn",
-            _ => string.Empty
+            _ => throw new ArgumentException($"Site {site.ShortName} not supported.")
         };
 
         if (!string.IsNullOrWhiteSpace(siteName))
