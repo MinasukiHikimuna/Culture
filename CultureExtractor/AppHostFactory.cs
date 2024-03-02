@@ -1,6 +1,5 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.EntityFrameworkCore;
 using CultureExtractor.Interfaces;
 using System.Reflection;
 
@@ -20,6 +19,7 @@ public static class AppHostFactory
                 services.AddScoped<IRepository, Repository>();
                 services.AddScoped<ILegacyDownloader, LegacyDownloader>();
                 services.AddScoped<IDownloader, Downloader>();
+                services.AddScoped<IDownloadPlanner, DownloadPlanner>();
                 services.AddTransient<INetworkRipper, NetworkRipper>();
                 services.AddTransient<CultureExtractorConsoleApp>();
 
