@@ -18,19 +18,24 @@ namespace CultureExtractor.Sites;
 [Site("ultrafilms")]
 public class WowNetworkRipper : IYieldingScraper
 {
-    private readonly ILegacyDownloader _legacyDownloader;
     private readonly IPlaywrightFactory _playwrightFactory;
     private readonly IRepository _repository;
     private readonly ICultureExtractorContext _context;
     private readonly IDownloader _downloader;
+    private readonly IDownloadPlanner _downloadPlanner;
 
-    public WowNetworkRipper(ILegacyDownloader legacyDownloader, IPlaywrightFactory playwrightFactory, IRepository repository, ICultureExtractorContext context, IDownloader downloader)
+    public WowNetworkRipper(
+        IPlaywrightFactory playwrightFactory,
+        IRepository repository,
+        ICultureExtractorContext context,
+        IDownloader downloader,
+        IDownloadPlanner downloadPlanner)
     {
-        _legacyDownloader = legacyDownloader;
         _playwrightFactory = playwrightFactory;
         _repository = repository;
         _context = context;
         _downloader = downloader;
+        _downloadPlanner = downloadPlanner;
     }
 
     public async IAsyncEnumerable<Release> ScrapeReleasesAsync(Site site, BrowserSettings browserSettings, ScrapeOptions scrapeOptions)
@@ -266,7 +271,7 @@ public class WowNetworkRipper : IYieldingScraper
         foreach (var release in releases)
         {
             var releaseDownloadPlan = PlanDownloads(release, downloadConditions);
-            var releaseMissingDownloadsPlan = PlanMissingDownloads(releaseDownloadPlan);
+            var releaseMissingDownloadsPlan = await _downloadPlanner.PlanMissingDownloadsAsync(releaseDownloadPlan);
 
             if (!releaseMissingDownloadsPlan.AvailableFiles.Any())
             {
@@ -274,7 +279,11 @@ public class WowNetworkRipper : IYieldingScraper
             }
 
             IPage releasePage = await page.Context.NewPageAsync();
-            await releasePage.GotoAsync(release.Url);
+            var retryPolicy = Policy
+                .Handle<PlaywrightException>()
+                .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
+
+            await retryPolicy.ExecuteAsync(async () => await releasePage.GotoAsync(release.Url));
 
             // this is now done on every scene despite we might already have all files
             // the reason for updated scrape is that the links are timebombed and we need to refresh those
@@ -292,7 +301,7 @@ public class WowNetworkRipper : IYieldingScraper
             }
             await Task.Delay(10000);
 
-            var existingDownloadEntities = await _context.Downloads.Where(d => d.ReleaseUuid == release.Uuid).ToListAsync();
+            var existingDownloadEntities = await _downloadPlanner.GetExistingDownloadsAsync(release);
             Log.Information("Downloading: {Site} - {ReleaseDate} - {Release} [{Uuid}]", release.Site.Name, release.ReleaseDate.ToString("yyyy-MM-dd"), release.Name, release.Uuid);
             foreach (var videoDownload in await DownloadVideosAsync(downloadConditions, updatedScrape, existingDownloadEntities))
             {
@@ -312,10 +321,31 @@ public class WowNetworkRipper : IYieldingScraper
 
             await releasePage.CloseAsync();
         }
-
     }
 
-    private async Task<IEnumerable<Download>> DownloadVideosAsync(DownloadConditions downloadConditions, Release release, List<DownloadEntity> existingDownloadEntities)
+    private static ReleaseDownloadPlan PlanDownloads(Release release, DownloadConditions downloadConditions)
+    {
+        var sceneFiles = release.AvailableFiles.OfType<AvailableVideoFile>().Where(f => f.ContentType == "scene").ToList();
+        var galleryFiles = release.AvailableFiles.OfType<AvailableGalleryZipFile>().ToList();
+        var imageFiles = release.AvailableFiles.OfType<AvailableImageFile>().ToList();
+
+        var selectedSceneFiles = downloadConditions.PreferredDownloadQuality == PreferredDownloadQuality.Best
+            ? sceneFiles.Take(1)
+            : sceneFiles.TakeLast(1);
+        var selectedGalleryFiles = downloadConditions.PreferredDownloadQuality == PreferredDownloadQuality.Best
+            ? galleryFiles.Take(1)
+            : galleryFiles.TakeLast(1);
+
+        var availableFiles = new List<IAvailableFile>()
+            .Concat(selectedSceneFiles)
+            .Concat(selectedGalleryFiles)
+            .Concat(imageFiles)
+            .ToImmutableList();
+
+        return new ReleaseDownloadPlan(release, availableFiles);
+    }
+
+    private async Task<IEnumerable<Download>> DownloadVideosAsync(DownloadConditions downloadConditions, Release release, IReadOnlyList<DownloadEntity> existingDownloadEntities)
     {
         var availableVideos = release.AvailableFiles
             .OfType<AvailableVideoFile>()
@@ -323,11 +353,10 @@ public class WowNetworkRipper : IYieldingScraper
         var selectedVideo = downloadConditions.PreferredDownloadQuality == PreferredDownloadQuality.Best
             ? availableVideos.FirstOrDefault()
             : availableVideos.LastOrDefault();
-        if (selectedVideo == null || !NotDownloadedYet(existingDownloadEntities, selectedVideo))
+        if (selectedVideo == null || !_downloadPlanner.NotDownloadedYet(existingDownloadEntities, selectedVideo))
         {
             return new List<Download>();
         }
-
 
         var uri = new Uri(selectedVideo.Url);
         var queryParameters = HttpUtility.ParseQueryString(uri.Query);
@@ -358,7 +387,7 @@ public class WowNetworkRipper : IYieldingScraper
     }
 
     private async IAsyncEnumerable<Download> DownloadGalleryAsync(DownloadConditions downloadConditions, Release release,
-        List<DownloadEntity> existingDownloadEntities)
+        IReadOnlyList<DownloadEntity> existingDownloadEntities)
     {
         var availableGalleries = release.AvailableFiles
             .OfType<AvailableGalleryZipFile>()
@@ -366,7 +395,7 @@ public class WowNetworkRipper : IYieldingScraper
         var selectedGallery = downloadConditions.PreferredDownloadQuality == PreferredDownloadQuality.Best
             ? availableGalleries.FirstOrDefault()
             : availableGalleries.LastOrDefault();
-        if (selectedGallery == null || !NotDownloadedYet(existingDownloadEntities, selectedGallery))
+        if (selectedGallery == null || !_downloadPlanner.NotDownloadedYet(existingDownloadEntities, selectedGallery))
         {
             yield break;
         }
@@ -397,12 +426,12 @@ public class WowNetworkRipper : IYieldingScraper
         yield return new Download(release, suggestedFileName, fileInfo.Name, selectedGallery, metadata);
     }
 
-    private async IAsyncEnumerable<Download> DownloadImagesAsync(Release release, List<DownloadEntity> existingDownloadEntities)
+    private async IAsyncEnumerable<Download> DownloadImagesAsync(Release release, IReadOnlyList<DownloadEntity> existingDownloadEntities)
     {
         var imageFiles = release.AvailableFiles.OfType<AvailableImageFile>();
         foreach (var imageFile in imageFiles)
         {
-            if (!NotDownloadedYet(existingDownloadEntities, imageFile))
+            if (!_downloadPlanner.NotDownloadedYet(existingDownloadEntities, imageFile))
             {
                 continue;
             }
@@ -426,47 +455,6 @@ public class WowNetworkRipper : IYieldingScraper
             var metadata = new ImageFileMetadata(sha256Sum);
             yield return new Download(release, $"{imageFile.ContentType}.jpg", fileInfo.Name, imageFile, metadata);
         }
-    }
-
-    private static bool NotDownloadedYet(List<DownloadEntity> existingDownloadEntities, IAvailableFile bestVideo)
-    {
-        return !existingDownloadEntities.Exists(d => d.FileType == bestVideo.FileType && d.ContentType == bestVideo.ContentType && d.Variant == bestVideo.Variant);
-    }
-
-    private ReleaseDownloadPlan PlanMissingDownloads(ReleaseDownloadPlan releaseDownloadPlan)
-    {
-        var existingDownloads = _context.Downloads.Where(d => d.ReleaseUuid == releaseDownloadPlan.Release.Uuid).ToList();
-        var notYetDownloaded = releaseDownloadPlan.AvailableFiles
-            .Where(f => !existingDownloads.Exists(d =>
-                d.FileType == f.FileType && d.ContentType == f.ContentType && d.Variant == f.Variant))
-            .ToImmutableList();
-
-        return releaseDownloadPlan with { AvailableFiles = notYetDownloaded };
-    }
-
-    private static ReleaseDownloadPlan PlanDownloads(Release release, DownloadConditions downloadConditions)
-    {
-        var sceneFiles = release.AvailableFiles.OfType<AvailableVideoFile>().Where(f => f.ContentType == "scene").ToList();
-        var trailerFiles = release.AvailableFiles.OfType<AvailableVideoFile>().Where(f => f.ContentType == "trailer").ToList();
-
-        var selectedSceneFiles = downloadConditions.PreferredDownloadQuality == PreferredDownloadQuality.Best
-            ? sceneFiles.Take(1)
-            : sceneFiles.TakeLast(1);
-        var selectedTrailerFiles = downloadConditions.PreferredDownloadQuality == PreferredDownloadQuality.Best
-            ? trailerFiles.Take(1)
-            : trailerFiles.TakeLast(1);
-        var otherFiles = release.AvailableFiles
-            .Except(trailerFiles)
-            .Except(sceneFiles)
-            .ToList();
-
-        var availableFiles = new List<IAvailableFile>()
-            .Concat(selectedSceneFiles)
-            .Concat(selectedTrailerFiles)
-            .Concat(otherFiles)
-            .ToImmutableList();
-
-        return new ReleaseDownloadPlan(release, availableFiles);
     }
 
     private static async Task LoginAsync(Site site, IPage page)
@@ -690,31 +678,6 @@ public class WowNetworkRipper : IYieldingScraper
             }
         }
         return string.Join("\r\n\r\n", descriptionParagraphs);
-    }
-
-    public async Task<Download> DownloadReleaseAsync(Release release, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)
-    {
-        await page.GotoAsync(release.Url);
-        await page.WaitForLoadStateAsync();
-
-        await Task.Delay(3000);
-
-        var performerNames = release.Performers.Select(p => p.Name).ToList();
-        var performersStr = performerNames.Count() > 1 ? string.Join(", ", performerNames.Take(performerNames.Count() - 1)) + " & " + performerNames.Last() : performerNames.FirstOrDefault();
-
-        var availableDownloads = await ParseAvailableDownloadsAsyncLegacy(page);
-
-        DownloadDetailsAndElementHandle selectedDownload = downloadConditions.PreferredDownloadQuality switch
-        {
-            PreferredDownloadQuality.Phash => availableDownloads.Last(),
-            PreferredDownloadQuality.Best => availableDownloads.First(),
-            PreferredDownloadQuality.Worst => availableDownloads.Last(),
-            _ => throw new InvalidOperationException("Could not find a download candidate!")
-        };
-
-        return await _legacyDownloader.DownloadSceneAsync(release, page, selectedDownload.AvailableVideoFile, downloadConditions.PreferredDownloadQuality, async () =>
-            await selectedDownload.ElementHandle.ClickAsync()
-);
     }
 
     private static async Task<IReadOnlyList<IAvailableFile>> ParseAvailableDownloadsAsync(IPage page)
