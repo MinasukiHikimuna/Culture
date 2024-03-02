@@ -20,20 +20,17 @@ public class WowNetworkRipper : IYieldingScraper
 {
     private readonly IPlaywrightFactory _playwrightFactory;
     private readonly IRepository _repository;
-    private readonly ICultureExtractorContext _context;
     private readonly IDownloader _downloader;
     private readonly IDownloadPlanner _downloadPlanner;
 
     public WowNetworkRipper(
         IPlaywrightFactory playwrightFactory,
         IRepository repository,
-        ICultureExtractorContext context,
         IDownloader downloader,
         IDownloadPlanner downloadPlanner)
     {
         _playwrightFactory = playwrightFactory;
         _repository = repository;
-        _context = context;
         _downloader = downloader;
         _downloadPlanner = downloadPlanner;
     }
