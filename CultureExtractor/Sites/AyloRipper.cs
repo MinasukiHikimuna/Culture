@@ -72,6 +72,7 @@ public class AyloRipper : IYieldingScraper
     private readonly IPlaywrightFactory _playwrightFactory;
     private readonly IRepository _repository;
     private readonly ICultureExtractorContext _context;
+    private readonly IDownloadPlanner _downloadPlanner;
 
     private static string ScenesUrl(Site site, int pageNumber) =>
         $"{site.Url}/scenes?page={pageNumber}";
@@ -82,12 +83,13 @@ public class AyloRipper : IYieldingScraper
     private static string MovieApiUrl(string shortName) =>
         $"https://site-api.project1service.com/v2/releases/{shortName}?pageType=PLAYER";
 
-    public AyloRipper(IDownloader downloader, IPlaywrightFactory playwrightFactory, IRepository repository, ICultureExtractorContext context)
+    public AyloRipper(IDownloader downloader, IPlaywrightFactory playwrightFactory, IRepository repository, ICultureExtractorContext context, IDownloadPlanner downloadPlanner)
     {
         _downloader = downloader;
         _playwrightFactory = playwrightFactory;
         _repository = repository;
         _context = context;
+        _downloadPlanner = downloadPlanner;
     }
 
     private class TitleLinkPairs
@@ -494,7 +496,7 @@ public class AyloRipper : IYieldingScraper
         foreach (var release in releases)
         {
             var releaseDownloadPlan = PlanDownloads(release, downloadConditions);
-            var releaseMissingDownloadsPlan = PlanMissingDownloads(releaseDownloadPlan);
+            var releaseMissingDownloadsPlan = await _downloadPlanner.PlanMissingDownloadsAsync(releaseDownloadPlan);
 
             if (!releaseMissingDownloadsPlan.AvailableFiles.Any())
             {
@@ -510,8 +512,6 @@ public class AyloRipper : IYieldingScraper
                 convertedHeaders = ConvertHeaders(headers);
             }
             
-            // this is now done on every scene despite we might already have all files
-            // the reason for updated scrape is that the links are timebombed and we need to refresh those
             Release? updatedScrape;
             try
             {
@@ -587,17 +587,6 @@ public class AyloRipper : IYieldingScraper
         return new ReleaseDownloadPlan(release, availableFiles);
     }
 
-    private ReleaseDownloadPlan PlanMissingDownloads(ReleaseDownloadPlan releaseDownloadPlan)
-    {
-        var existingDownloads = _context.Downloads.Where(d => d.ReleaseUuid == releaseDownloadPlan.Release.Uuid).ToList();
-        var notYetDownloaded = releaseDownloadPlan.AvailableFiles
-            .Where(f => !existingDownloads.Exists(d =>
-                d.FileType == f.FileType && d.ContentType == f.ContentType && d.Variant == f.Variant))
-            .ToImmutableList();
-
-        return releaseDownloadPlan with { AvailableFiles = notYetDownloaded };
-    }
-    
     private async Task<IList<Download>> DownloadVideosAsync(DownloadConditions downloadConditions, Release release,
         List<DownloadEntity> existingDownloadEntities, WebHeaderCollection convertedHeaders)
     {
@@ -605,7 +594,7 @@ public class AyloRipper : IYieldingScraper
         var selectedVideo = downloadConditions.PreferredDownloadQuality == PreferredDownloadQuality.Best
             ? availableVideos.FirstOrDefault()
             : availableVideos.LastOrDefault();
-        if (selectedVideo == null || !NotDownloadedYet(existingDownloadEntities, selectedVideo))
+        if (selectedVideo == null || !_downloadPlanner.NotDownloadedYet(existingDownloadEntities, selectedVideo))
         {
             return new List<Download>();
         }
@@ -641,7 +630,7 @@ public class AyloRipper : IYieldingScraper
         var selectedTrailer = downloadConditions.PreferredDownloadQuality == PreferredDownloadQuality.Best
             ? availableTrailers.FirstOrDefault()
             : availableTrailers.LastOrDefault();
-        if (selectedTrailer == null  || !NotDownloadedYet(existingDownloadEntities, selectedTrailer))
+        if (selectedTrailer == null  || !_downloadPlanner.NotDownloadedYet(existingDownloadEntities, selectedTrailer))
         {
             yield break;
         }
@@ -684,7 +673,7 @@ public class AyloRipper : IYieldingScraper
         var imageFiles = release.AvailableFiles.OfType<AvailableImageFile>();
         foreach (var imageFile in imageFiles)
         {
-            if (!NotDownloadedYet(existingDownloadEntities, imageFile))
+            if (!_downloadPlanner.NotDownloadedYet(existingDownloadEntities, imageFile))
             {
                 continue;
             }
@@ -700,11 +689,6 @@ public class AyloRipper : IYieldingScraper
             var metadata = new ImageFileMetadata(sha256Sum);
             yield return new Download(release, $"{imageFile.ContentType}.jpg", fileInfo.Name, imageFile, metadata);
         }
-    }
-    
-    private static bool NotDownloadedYet(List<DownloadEntity> existingDownloadEntities, IAvailableFile bestVideo)
-    {
-        return !existingDownloadEntities.Exists(d => d.FileType == bestVideo.FileType && d.ContentType == bestVideo.ContentType && d.Variant == bestVideo.Variant);
     }
 
     private async Task LoginAsync(Site site, IPage page)
