@@ -142,7 +142,7 @@ public class PrivateRipper : IYieldingScraper
         availableFiles.Add(availableTrailerFile);
 
         var galleryDownloadLink = await releasePage.QuerySelectorAsync("div.download-pictures a");
-        if (galleryDownloadLink == null)
+        if (galleryDownloadLink != null)
         {
             var galleryDownloadUrl = await galleryDownloadLink.GetAttributeAsync("href");
             var availableGalleryFile = new AvailableGalleryZipFile("zip", "gallery", "original", galleryDownloadUrl, null, null, null);
@@ -150,7 +150,7 @@ public class PrivateRipper : IYieldingScraper
         }
 
         var previewVideo = await elementHandle.QuerySelectorAsync("video source");
-        if (previewVideo == null)
+        if (previewVideo != null)
         {
             var previewVideoUrl = await previewVideo.GetAttributeAsync("src");
             var availablePreviewFile = new AvailableVideoFile("video", "preview", string.Empty, previewVideoUrl, null, null, null, null, null);
