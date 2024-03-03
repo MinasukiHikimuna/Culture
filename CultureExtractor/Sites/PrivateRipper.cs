@@ -150,9 +150,12 @@ public class PrivateRipper : IYieldingScraper
         }
 
         var previewVideo = await elementHandle.QuerySelectorAsync("video source");
-        var previewVideoUrl = await previewVideo.GetAttributeAsync("src");
-        var availablePreviewFile = new AvailableVideoFile("video", "preview", string.Empty, previewVideoUrl, null, null, null, null, null);
-        availableFiles.Add(availablePreviewFile);
+        if (previewVideo == null)
+        {
+            var previewVideoUrl = await previewVideo.GetAttributeAsync("src");
+            var availablePreviewFile = new AvailableVideoFile("video", "preview", string.Empty, previewVideoUrl, null, null, null, null, null);
+            availableFiles.Add(availablePreviewFile);
+        }
 
         var scene = new Release(
             releaseGuid,
