@@ -133,7 +133,7 @@ public class PrivateRipper : IYieldingScraper
 
         var ogImageMeta = await releasePage.QuerySelectorAsync("meta[property='og:image']");
         var ogImageUrl = await ogImageMeta.GetAttributeAsync("content");
-        var availableImageFile = new AvailableImageFile("image", "scene", "preview", ogImageUrl, null, null, null);
+        var availableImageFile = new AvailableImageFile("image", "preview", string.Empty, ogImageUrl, null, null, null);
         availableFiles.Add(availableImageFile);
 
         var ogTrailerMeta = await releasePage.QuerySelectorAsync("meta[property='og:video']");
