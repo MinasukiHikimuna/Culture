@@ -125,23 +125,34 @@ public class PrivateRipper : IYieldingScraper
         var title = await ScrapeTitleAsync(releasePage);
         var performers = await ScrapePerformersAsync(releasePage);
         var tags = await ScrapeTagsAsync(releasePage);
+
+        List<IAvailableFile> availableFiles = new List<IAvailableFile>();
+
         var availableVideoFiles = await ParseAvailableDownloadsAsync(releasePage);
+        availableFiles.AddRange(availableVideoFiles);
 
         var ogImageMeta = await releasePage.QuerySelectorAsync("meta[property='og:image']");
         var ogImageUrl = await ogImageMeta.GetAttributeAsync("content");
         var availableImageFile = new AvailableImageFile("image", "scene", "preview", ogImageUrl, null, null, null);
+        availableFiles.Add(availableImageFile);
 
         var ogTrailerMeta = await releasePage.QuerySelectorAsync("meta[property='og:video']");
         var ogTrailerUrl = await ogTrailerMeta.GetAttributeAsync("content");
         var availableTrailerFile = new AvailableVideoFile("video", "trailer", string.Empty, ogTrailerUrl, null, null, null, null, null);
+        availableFiles.Add(availableTrailerFile);
 
         var galleryDownloadLink = await releasePage.QuerySelectorAsync("div.download-pictures a");
-        var galleryDownloadUrl = await galleryDownloadLink.GetAttributeAsync("href");
-        var availableGalleryFile = new AvailableGalleryZipFile("zip", "gallery", "original", galleryDownloadUrl, null, null, null);
+        if (galleryDownloadLink == null)
+        {
+            var galleryDownloadUrl = await galleryDownloadLink.GetAttributeAsync("href");
+            var availableGalleryFile = new AvailableGalleryZipFile("zip", "gallery", "original", galleryDownloadUrl, null, null, null);
+            availableFiles.Add(availableGalleryFile);
+        }
 
         var previewVideo = await elementHandle.QuerySelectorAsync("video source");
         var previewVideoUrl = await previewVideo.GetAttributeAsync("src");
         var availablePreviewFile = new AvailableVideoFile("video", "preview", string.Empty, previewVideoUrl, null, null, null, null, null);
+        availableFiles.Add(availablePreviewFile);
 
         var scene = new Release(
             releaseGuid,
@@ -155,12 +166,7 @@ public class PrivateRipper : IYieldingScraper
             duration.TotalSeconds,
             performers,
             tags,
-            availableVideoFiles
-                .Concat(new List<IAvailableFile> { availableImageFile })
-                .Concat(new List<IAvailableFile> { availablePreviewFile })
-                .Concat(new List<IAvailableFile> { availableGalleryFile })
-                .Concat(new List<IAvailableFile> { availableTrailerFile })
-                .ToList(),
+            availableFiles,
             "{}",
             DateTime.Now);
 
