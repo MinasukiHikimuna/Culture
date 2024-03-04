@@ -1,13 +1,13 @@
 ﻿using CultureExtractor.Interfaces;
 using Microsoft.Playwright;
-using System.Text.RegularExpressions;
 using CultureExtractor.Models;
 using Serilog;
-using Polly;
 using Microsoft.EntityFrameworkCore;
 using System.Net;
 using System.Collections.Immutable;
 using System.Web;
+using System.Globalization;
+using System.Text;
 
 namespace CultureExtractor.Sites;
 
@@ -196,7 +196,7 @@ public class PrivateRipper : IYieldingScraper
             }
 
             
-            string encodedString = HttpUtility.HtmlEncode(release.Name);
+            string encodedString = HttpUtility.HtmlEncode(RemoveDiacritics(release.Name));
             await searchPage.GotoAsync("/en/search.php?query=" + encodedString);
             await searchPage.WaitForLoadStateAsync();
             var searchResults = await searchPage.Locator("div.scene > a[data-track='SCENE_LINK']").ElementHandlesAsync();
@@ -266,6 +266,23 @@ public class PrivateRipper : IYieldingScraper
 
             await releasePage.CloseAsync();
         }
+    }
+
+    private static string RemoveDiacritics(string text)
+    {
+        var normalizedString = text.Normalize(NormalizationForm.FormD);
+        var stringBuilder = new StringBuilder();
+
+        foreach (var c in normalizedString)
+        {
+            var unicodeCategory = CharUnicodeInfo.GetUnicodeCategory(c);
+            if (unicodeCategory != UnicodeCategory.NonSpacingMark)
+            {
+                stringBuilder.Append(c);
+            }
+        }
+
+        return stringBuilder.ToString().Normalize(NormalizationForm.FormC);
     }
 
     private static ReleaseDownloadPlan PlanDownloads(Release release, DownloadConditions downloadConditions)
