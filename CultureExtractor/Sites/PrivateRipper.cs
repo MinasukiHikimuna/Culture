@@ -573,6 +573,11 @@ public class PrivateRipper : IYieldingScraper
     private static async Task<string> ScrapeDescriptionAsync(IPage page)
     {
         var descriptionMeta = await page.QuerySelectorAsync("meta[property='og:description']");
+        if (descriptionMeta == null)
+        {
+            return string.Empty;
+        }
+
         var description = await descriptionMeta.GetAttributeAsync("content");
         return description;
     }
