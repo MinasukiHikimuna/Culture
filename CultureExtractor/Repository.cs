@@ -217,7 +217,10 @@ public class Repository : IRepository
         List<SitePerformerEntity> performerEntities = await GetOrCreatePerformersAsync(release.Performers, siteEntity);
         List<SiteTagEntity> tagEntities = await GetOrCreateTagsAsync(release.Tags, siteEntity);
 
-        var existingReleaseEntity = await _cultureExtractorContext.Releases.FirstOrDefaultAsync(s => s.Uuid == release.Uuid);
+        var existingReleaseEntity = await _cultureExtractorContext.Releases
+            .Include(r => r.Performers)
+            .Include(r => r.Tags)
+            .FirstOrDefaultAsync(s => s.Uuid == release.Uuid);
         
         if (existingReleaseEntity == null)
         {
@@ -297,11 +300,13 @@ public class Repository : IRepository
                 Releases = new List<ReleaseEntity>()
             }).ToList();
 
-        if (newPerformersEntities.Any())
+        if (!newPerformersEntities.Any())
         {
-            await _cultureExtractorContext.Performers.AddRangeAsync(newPerformersEntities);
-            await _cultureExtractorContext.SaveChangesAsync();            
+            return existingPerformers;
         }
+
+        await _cultureExtractorContext.Performers.AddRangeAsync(newPerformersEntities);
+        await _cultureExtractorContext.SaveChangesAsync();            
 
         return existingPerformers.Concat(newPerformersEntities).ToList();
     }
@@ -326,11 +331,13 @@ public class Repository : IRepository
                 Releases = new List<ReleaseEntity>()
             }).ToList();
 
-        if (newTagEntities.Any())
+        if (!newTagEntities.Any())
         {
-            await _cultureExtractorContext.Tags.AddRangeAsync(newTagEntities);
-            await _cultureExtractorContext.SaveChangesAsync();            
+            return existingTags;
         }
+
+        await _cultureExtractorContext.Tags.AddRangeAsync(newTagEntities);
+        await _cultureExtractorContext.SaveChangesAsync();            
 
         return existingTags.Concat(newTagEntities).ToList();
     }
