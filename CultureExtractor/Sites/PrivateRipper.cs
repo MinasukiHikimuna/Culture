@@ -131,15 +131,18 @@ public class PrivateRipper : IYieldingScraper
         var availableVideoFiles = await ParseAvailableDownloadsAsync(releasePage);
         availableFiles.AddRange(availableVideoFiles);
 
-        var ogImageMeta = await releasePage.QuerySelectorAsync("meta[property='og:image']");
+        var ogImageMeta = await releasePage.QuerySelectorAsync("meta[itemprop='thumbnailUrl']");
         var ogImageUrl = await ogImageMeta.GetAttributeAsync("content");
         var availableImageFile = new AvailableImageFile("image", "preview", string.Empty, ogImageUrl, null, null, null);
         availableFiles.Add(availableImageFile);
 
-        var ogTrailerMeta = await releasePage.QuerySelectorAsync("meta[property='og:video']");
+        var ogTrailerMeta = await releasePage.QuerySelectorAsync("meta[itemprop='contentURL']");
         var ogTrailerUrl = await ogTrailerMeta.GetAttributeAsync("content");
-        var availableTrailerFile = new AvailableVideoFile("video", "trailer", string.Empty, ogTrailerUrl, null, null, null, null, null);
-        availableFiles.Add(availableTrailerFile);
+        if (!string.IsNullOrWhiteSpace(ogTrailerUrl))
+        {
+            var availableTrailerFile = new AvailableVideoFile("video", "trailer", string.Empty, ogTrailerUrl, null, null, null, null, null);
+            availableFiles.Add(availableTrailerFile);
+        }
 
         var galleryDownloadLink = await releasePage.QuerySelectorAsync("div.download-pictures a");
         if (galleryDownloadLink != null)
@@ -230,6 +233,7 @@ public class PrivateRipper : IYieldingScraper
             try
             {
                 updatedScrape = await ScrapeSceneAsync(releasePage, site, release.ShortName, release.Url, release.Uuid, searchResult);
+                await _repository.UpsertRelease(updatedScrape);
             }
             catch (Exception ex)
             {
@@ -529,9 +533,9 @@ public class PrivateRipper : IYieldingScraper
 
     private static async Task<string> ScrapeTitleAsync(IPage page)
     {
-        var titleMeta = await page.QuerySelectorAsync("meta[property='og:title']");
+        var titleMeta = await page.QuerySelectorAsync("meta[itemprop='name']");
         var title = await titleMeta.GetAttributeAsync("content");
-        return title.Trim().Replace(" HD Videos & Porn Photos - Private Porn Sex Videos", "");
+        return title.Trim();
     }
 
     private static async Task<IList<SitePerformer>> ScrapePerformersAsync(IPage page)
