@@ -204,7 +204,6 @@ public class PrivateRipper : IYieldingScraper
             for (var searchPageIndex = 1; searchPageIndex < 10; searchPageIndex++)
             {
                 var searchUrl = $"/en/search.php?page={searchPageIndex}&query={encodedString}";
-                Log.Debug($"Search with {encodedString} on {site.Name}.");
                 await searchPage.GotoAsync(searchUrl);
                 await searchPage.WaitForLoadStateAsync();
                 var searchResults = await searchPage.Locator("div.scene > a[data-track='SCENE_LINK']").ElementHandlesAsync();
