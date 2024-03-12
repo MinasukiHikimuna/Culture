@@ -199,24 +199,33 @@ public class PrivateRipper : IYieldingScraper
             }
 
             
-            string encodedString = HttpUtility.HtmlEncode(RemoveDiacritics(release.Name));
-            await searchPage.GotoAsync("/en/search.php?query=" + encodedString);
-            await searchPage.WaitForLoadStateAsync();
-            var searchResults = await searchPage.Locator("div.scene > a[data-track='SCENE_LINK']").ElementHandlesAsync();
-            if (searchResults.Count == 0)
-            {
-                Log.Warning("Could not find {Release} on {Site}", release.Name, site.Name);
-                continue;
-            }
+            string encodedString = HttpUtility.UrlEncode(RemoveDiacritics(release.Name));
             IElementHandle searchResult = null;
-
-            foreach (var result in searchResults)
+            for (var searchPageIndex = 1; searchPageIndex < 10; searchPageIndex++)
             {
-                var url = await result.GetAttributeAsync("href");
-                if (url != null && url.EndsWith(release.ShortName))
+                var searchUrl = $"/en/search.php?page={searchPageIndex}&query={encodedString}";
+                Log.Debug($"Search with {encodedString} on {site.Name}.");
+                await searchPage.GotoAsync(searchUrl);
+                await searchPage.WaitForLoadStateAsync();
+                var searchResults = await searchPage.Locator("div.scene > a[data-track='SCENE_LINK']").ElementHandlesAsync();
+                if (searchResults.Count == 0)
                 {
-                    searchResult = result;
-                    break; // Exit the loop once we find the first match.
+                    break;
+                }
+
+                foreach (var result in searchResults)
+                {
+                    var url = await result.GetAttributeAsync("href");
+                    if (url != null && url.EndsWith(release.ShortName))
+                    {
+                        searchResult = result;
+                        break; // Exit the loop once we find the first match.
+                    }
+                }
+
+                if (searchResult != null)
+                {
+                    break;
                 }
             }
 
