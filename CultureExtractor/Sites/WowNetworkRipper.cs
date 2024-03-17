@@ -287,6 +287,7 @@ public class WowNetworkRipper : IYieldingScraper
                 updatedScrape = release.Url.Contains("/film/")
                     ? await ScrapeSceneAsync(releasePage, site, release.ShortName, release.Url, release.Uuid)
                     : await ScrapeGalleryAsync(releasePage, site, release.ShortName, release.Url, release.Uuid);
+                await _repository.UpsertRelease(updatedScrape);
             }
             catch (Exception ex)
             {
@@ -478,6 +479,11 @@ public class WowNetworkRipper : IYieldingScraper
 
     private static async Task SetSiteFilter(Site site, IPage page)
     {
+        if (site.ShortName == "ultrafilms")
+        {
+            return;
+        }
+
         // Unselect existing site filters
         while ((await page.Locator(".cf_s_site").ElementHandlesAsync()).Count > 0)
         {
