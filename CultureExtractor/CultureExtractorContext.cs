@@ -24,7 +24,7 @@ public class CultureExtractorContext : DbContext, ICultureExtractorContext
     // Add .LogTo(Log.Debug) to function chain to enable query logging.
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         => optionsBuilder
-            .UseNpgsql("Host=localhost;Port=5434;Database=cultureextractor;Username=ce_admin;Password=gTmtNikmpEGf26Fb;")
+            .UseNpgsql("Host=localhost;Port=5434;Database=cultureextractor;Username=ce_admin;Password=gTmtNikmpEGf26Fb;") // Include Error Detail=true;")
             .UseSnakeCaseNamingConvention();
     // .LogTo(Log.Debug);
 }
