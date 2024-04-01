@@ -681,7 +681,7 @@ public class AdultTimeRipper : ISiteScraper
         }
 
         string description = sceneData.description.Replace("</br>", Environment.NewLine);
-        var downloadOptionsAndHandles = await ParseAvailableDownloadsAsync(sceneData);
+        var downloadOptionsAndHandles = ParseAvailableDownloads(sceneData);
 
         var sceneDocument = new AdultTimeSceneDocument(
             Guid.NewGuid(),
@@ -752,7 +752,7 @@ public class AdultTimeRipper : ISiteScraper
 
         var sceneData = data.results[0].hits[0];
 
-        var availableDownloads = await ParseAvailableDownloadsAsync(sceneData);
+        var availableDownloads = ParseAvailableDownloads(sceneData);
 
         DownloadDetailsAndElementHandle selectedDownload = downloadConditions.PreferredDownloadQuality switch
         {
@@ -792,7 +792,7 @@ public class AdultTimeRipper : ISiteScraper
         return download;
     }
 
-    private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloadsAsync(AdultTimeScene sceneData)
+    private static IList<DownloadDetailsAndElementHandle> ParseAvailableDownloads(AdultTimeScene sceneData)
     {
         var availableDownloads = new List<DownloadDetailsAndElementHandle>();
 
