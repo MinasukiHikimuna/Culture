@@ -127,6 +127,12 @@ public class PornFidelityNetworkRipper : IYieldingScraper
         await releasePage.WaitForLoadStateAsync();
 
         var cardElement = await releasePage.QuerySelectorAsync("#site-content > section:nth-child(3) > div > div > div.column.is-full-mobile.is-four-fifths-desktop > div > div.card-content > div.columns");
+        if (cardElement == null)
+        {
+            Log.Warning($"Could not find card element at {releaseUrl}. This release is very likely just a gallery. Skipping!");
+            return null;
+        }
+
         var leftColumn = await cardElement.QuerySelectorAsync("div.column:nth-child(1)");
         var rightColumn = await cardElement.QuerySelectorAsync("div.column:nth-child(2)");
 
