@@ -44,10 +44,6 @@ public class NubileFilmsRipper : IYieldingScraper
         {
             yield return release;
         }
-        /*await foreach (var release in ScrapeGalleriesAsync(site, page, scrapeOptions))
-        {
-            yield return release;
-        }*/
     }
 
     private async IAsyncEnumerable<Release> ScrapeScenesAsync(Site site, IPage page, ScrapeOptions scrapeOptions)
@@ -164,106 +160,6 @@ public class NubileFilmsRipper : IYieldingScraper
 
         return availableImageFiles;
     }
-
-    /*private async IAsyncEnumerable<Release> ScrapeGalleriesAsync(Site site, IPage page, ScrapeOptions scrapeOptions)
-    {
-        await page.GotoAsync(site.Url + "/galleries/");
-        await page.WaitForLoadStateAsync();
-
-        var totalPages = await GetTotalPagesAsync(page);
-
-        for (var pageNumber = 1; pageNumber <= totalPages; pageNumber++)
-        {
-            await GoToPageAsync(page, site, pageNumber);
-
-            var releaseHandles = await page.Locator("section.cf_content > ul > li > div.content_item > a.icon").ElementHandlesAsync();
-
-            var listedReleases = new List<ListedRelease>();
-            foreach (var releaseHandle in releaseHandles)
-            {
-                var releaseIdAndUrl = await GetReleaseIdAsync(site, releaseHandle);
-                listedReleases.Add(new ListedRelease(null, releaseIdAndUrl.Id, releaseIdAndUrl.Url, releaseHandle));
-            }
-
-            var listedReleasesDict = listedReleases
-                .ToDictionary(
-                    listedRelease => listedRelease.ShortName,
-                    listedRelease => listedRelease);
-
-            Log.Information($"Page {pageNumber}/{totalPages} contains {releaseHandles.Count} releases");
-
-            var existingReleases = await _repository
-                .GetReleasesAsync(site.ShortName, listedReleasesDict.Keys.ToList());
-
-
-            var existingReleasesDictionary = existingReleases.ToDictionary(r => r.ShortName, r => r);
-
-            var scenesToBeScraped = listedReleasesDict
-                .Where(g => !existingReleasesDictionary.ContainsKey(g.Key) || existingReleasesDictionary[g.Key].LastUpdated < scrapeOptions.FullScrapeLastUpdated)
-                .Select(g => g.Value)
-                .ToList();
-
-            foreach (var sceneToBeScraped in scenesToBeScraped)
-            {
-                var releaseGuid = existingReleasesDictionary.TryGetValue(sceneToBeScraped.ShortName, out var existingRelease)
-                    ? existingRelease.Uuid
-                    : UuidGenerator.Generate();
-
-                Release? scene = null;
-                IPage? releasePage = null;
-
-                try
-                {
-                    releasePage = await page.Context.NewPageAsync();
-                    await releasePage.GotoAsync(sceneToBeScraped.Url);
-                    scene = await ScrapeGalleryAsync(releasePage, site, sceneToBeScraped.ShortName, sceneToBeScraped.Url, releaseGuid);
-                }
-                catch (Exception ex)
-                {
-                    Log.Error(ex, $"Failed to scrape scene {sceneToBeScraped.Url}");
-                }
-                finally
-                {
-                    releasePage?.CloseAsync();
-                }
-
-                if (scene != null)
-                {
-                    yield return scene;
-                }
-            }
-        }
-    }
-
-    private static async Task<Release> ScrapeGalleryAsync(IPage releasePage, Site site, string releaseShortName, string releaseUrl, Guid releaseGuid)
-    {
-        await releasePage.WaitForLoadStateAsync();
-
-        var releaseDate = await ScrapeReleaseDateAsync(releasePage);
-        var description = await ScrapeDescriptionAsync(releasePage);
-        var title = await ScrapeTitleAsync(releasePage);
-        var performers = await ScrapePerformersAsync(releasePage);
-        var tags = await ScrapeTagsAsync(releasePage);
-        var availableGalleryFiles = await ParseAvailableGalleryDownloadsAsync(releasePage);
-
-        var scene = new Release(
-            releaseGuid,
-            site,
-            null,
-            releaseDate,
-            releaseShortName,
-            title,
-            releaseUrl,
-            description,
-            -1,
-            performers,
-            tags,
-            availableGalleryFiles,
-            "{}",
-            DateTime.Now);
-
-        return scene;
-    }*/
 
     public async IAsyncEnumerable<Download> DownloadReleasesAsync(Site site, BrowserSettings browserSettings, DownloadConditions downloadConditions)
     {
