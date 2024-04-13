@@ -1,0 +1,14 @@
+query Scenes($input: SceneQueryInput!) {
+  queryScenes(input: $input) {
+    count
+    scenes {
+      id
+      title
+      release_date
+      urls {
+        url
+        type
+      }
+    }
+  }
+}

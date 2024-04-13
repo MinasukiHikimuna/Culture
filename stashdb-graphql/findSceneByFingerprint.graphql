@@ -1,0 +1,17 @@
+query FindSceneByFingerprint {
+  findSceneByFingerprint(
+    fingerprint: { hash: "bb77178363488999", algorithm: PHASH }
+  ) {
+    id
+    title
+    details
+    date
+    release_date
+    duration
+    director
+    code
+    deleted
+    created
+    updated
+  }
+}

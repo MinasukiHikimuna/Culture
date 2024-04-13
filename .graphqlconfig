@@ -1,0 +1,16 @@
+{
+  "name": "StashDB",
+  "schemaPath": "schema.graphql",
+  "extensions": {
+    "endpoints": {
+      "Default GraphQL Endpoint": {
+        "url": "https://stashdb.org/graphql",
+        "headers": {
+          "user-agent": "JS GraphQL",
+          "ApiKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOiI3ZDc4MWZkNy1hZGIwLTQ5ZDEtOWU3Ni1lMDJjYmQ0ODViNmUiLCJzdWIiOiJBUElLZXkiLCJpYXQiOjE2OTkwOTU3MDN9.acR6aAUcmbNTctQchM6XJioPjZA40qHtm0NoUb4h0PA"
+        },
+        "introspect": false
+      }
+    }
+  }
+}
