@@ -1,0 +1,34 @@
+query FindScenesBySceneFingerprints($fingerprints: [[FingerprintQueryInput]]!) {
+  findScenesBySceneFingerprints(fingerprints: $fingerprints) {
+    id
+    title
+    details
+    date
+    urls {
+      url
+      site {
+        id
+        name
+      }
+    }
+    performers {
+      performer {
+        id
+        name
+        gender
+      }
+      as
+    }
+    duration
+    director
+    code
+    deleted
+    created
+    updated
+    fingerprints {
+      hash
+      algorithm
+      duration
+    }
+  }
+}
