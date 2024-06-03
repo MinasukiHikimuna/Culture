@@ -9,7 +9,6 @@ using CultureExtractor.Exceptions;
 using CultureExtractor.Models;
 using Microsoft.EntityFrameworkCore;
 using Polly;
-using Polly.Fallback;
 using Serilog;
 using Xabe.FFmpeg;
 
@@ -77,12 +76,12 @@ public class MetArtNetworkRipper : IYieldingScraper
         $"{site.Url}/galleries/{pageNumber}";
     private static string GalleriesApiUrl(Site site, int pageNumber) =>
         $"{site.Url}/api/galleries?first=60&galleryType=GALLERY&page={pageNumber}&order=DATE&direction=DESC";
-    private static string GalleryApiUrl(Site site, string date, string name) =>
-        $"{site.Url}/api/gallery?name={name}&date={date}&page=1&mediaFirst=42";
+    private static string GalleryApiUrl(Site site, ShortName shortName) =>
+        $"{site.Url}/api/gallery?name={shortName.Name}&date={shortName.Date}&page=1&mediaFirst=42";
     private static string MoviesApiUrl(Site site, int pageNumber) =>
         $"{site.Url}/api/movies?galleryType=MOVIE&first=60&page={pageNumber}&showPinnedGallery=false&tabId=0&order=DATE&direction=DESC&type=MOVIE";
-    private static string MovieApiUrl(Site site, string date, string name) =>
-        $"{site.Url}/api/movie?name={name}&date={date}";
+    private static string MovieApiUrl(Site site, ShortName shortName) =>
+        $"{site.Url}/api/movie?name={shortName.Name}&date={shortName.Date}";
     private static string CommentsApiUrl(Site site, string releaseUuid) =>
         $"{site.Url}/api/comments?objectUUID={releaseUuid}&order=TIMESTAMP&direction=DESC";
     private static string GalleryCdnImageUrl(MetArtGalleryRequest.RootObject gallery, MetArtGalleryRequest.RelatedPhotos image) =>
@@ -140,7 +139,13 @@ public class MetArtNetworkRipper : IYieldingScraper
             if (scrapeOptions.FullScrape)
             {
                 // If FullScrape is true, take all galleries
-                galleriesToBeScraped = galleries.Values.ToList();
+                galleriesToBeScraped = galleries
+                    .Where(g =>
+                        !existingReleasesDictionary.ContainsKey(g.Key)
+                        || existingReleasesDictionary[g.Key].LastUpdated < scrapeOptions.FullScrapeLastUpdated
+                    )
+                    .Select(g => g.Value)
+                    .ToList();
             }
             else
             {
@@ -155,47 +160,53 @@ public class MetArtNetworkRipper : IYieldingScraper
             {
                 await Task.Delay(1000);
 
-                var strategy = new ResiliencePipelineBuilder<Release?>()
-                    .AddFallback(new FallbackStrategyOptions<Release?>
-                    {
-                        FallbackAction = _ => Outcome.FromResultAsValueTask<Release?>(null)
-                    })
-                    .AddRetry(new ()
-                    {
-                        MaxRetryAttempts = 3,
-                        Delay = TimeSpan.FromSeconds(10),
-                        OnRetry = args =>
-                        {
-                            var ex = args.Outcome.Exception;
-                            Log.Error($"Caught following exception while scraping {gallery.name}: " + ex, ex);
-                            return default;
-                        }
-                    })
-                    .Build();
-                
-                var scene = await strategy.ExecuteAsync(async token =>
-                    await ScrapeGalleryAsync(site, gallery, existingReleasesDictionary, token)
-                );
+                var shortName = ShortName.FromReleaseUrl(gallery.path);
+                var guid = existingReleasesDictionary.TryGetValue(shortName.Combined, out var existingRelease)
+                    ? existingRelease.Uuid
+                    : UuidGenerator.Generate();
 
-                if (scene != null)
+                Release? release = null;
+                try
                 {
-                    yield return scene;   
+                    release = await ScrapeGalleryAsync(site, shortName, guid, CancellationToken.None);
+                }
+                catch (Exception ex)
+                {
+                    Log.Error(ex, "Error while scraping gallery {Gallery}", gallery.path);
+                    continue;
+                }
+
+                if (release != null)
+                {
+                    yield return release;
                 }
             }
         }
     }
 
-    private static async Task<Release?> ScrapeGalleryAsync(Site site, MetArtGalleriesRequest.Galleries gallery,
-        Dictionary<string, Release> existingReleasesDictionary, CancellationToken cancellationToken)
+    private record ShortName(string Date, string Name)
     {
-        var date = Regex.Match(gallery.path, @"\/(\d{8})\/").Groups[1].Value;
-        var name = Regex.Match(gallery.path, @"\/(\w+)$").Groups[1].Value;
+        public string Combined => $"{Date}/{Name}";
 
-        var shortName = $"{date}/{name}";
+        public static ShortName FromCombined(string combined)
+        {
+            var components = combined.Split('/');
+            return new ShortName(components[0], components[1]);
+        }
 
-        var galleryUrl = GalleryApiUrl(site, date, name);
+        public static ShortName FromReleaseUrl(string url)
+        {
+            var date = Regex.Match(url, @"\/(\d{8})\/").Groups[1].Value;
+            var name = Regex.Match(url, @"\/(\w+)$").Groups[1].Value;
+            return new ShortName(date, name);
+        }
+    }
 
-        using var galleryResponse = await Client.GetAsync(galleryUrl, cancellationToken);
+    private static async Task<Release?> ScrapeGalleryAsync(Site site, ShortName shortName, Guid guid, CancellationToken cancellationToken)
+    {
+        var galleryUrl = GalleryApiUrl(site, shortName);
+        using var galleryResponse = await GetApiResponseAsync(galleryUrl, cancellationToken);
+
         var galleryJson = await galleryResponse.Content.ReadAsStringAsync(cancellationToken);
         
         MetArtGalleryRequest.RootObject? galleryDetails;
@@ -210,14 +221,9 @@ public class MetArtNetworkRipper : IYieldingScraper
         }
         catch (JsonException ex)
         {
-            Log.Error($"Caught following exception while deserializing gallery API response: {ex}{Environment.NewLine}JSON:{Environment.NewLine}{galleryJson}", ex);
+            Log.Error($"Caught following exception while deserializing gallery API response:{Environment.NewLine}Gallery URL: {galleryUrl}{Environment.NewLine}{ex}{Environment.NewLine}JSON:{Environment.NewLine}{galleryJson}", ex);
             return null;
         }
-
-        var commentsUrl = CommentsApiUrl(site, galleryDetails.UUID);
-
-        using var commentResponse = Client.GetAsync(commentsUrl, cancellationToken);
-        var commentsJson = await commentResponse.Result.Content.ReadAsStringAsync(cancellationToken);
 
         var galleryDownloads = galleryDetails.files.sizes.zips
             .Select(g => new AvailableGalleryZipFile(
@@ -254,14 +260,20 @@ public class MetArtNetworkRipper : IYieldingScraper
             .Select(t => new SiteTag(t.Replace(" ", "+"), t, "/tags/" + t.Replace(" ", "+")))
             .ToList();
 
+        var commentsJson = await GetCommentsAsync(site, galleryDetails.UUID, cancellationToken);
+        var jsonDocument = $$"""{"gallery": """ + galleryJson + """, "comments": """ + commentsJson + "}";
+        if (!IsValidJson(jsonDocument))
+        {
+            Log.Error("Invalid JSON document: {JsonDocument}", jsonDocument);
+            jsonDocument = "{}";
+        }
+
         var scene = new Release(
-            existingReleasesDictionary.TryGetValue(shortName, out var existingRelease)
-                ? existingRelease.Uuid
-                : UuidGenerator.Generate(),
+            guid,
             site,
             null,
             DateOnly.FromDateTime(galleryDetails.publishedAt),
-            shortName,
+            shortName.Combined,
             galleryDetails.name,
             $"{site.Url}{galleryDetails.path}",
             galleryDetails.description,
@@ -271,9 +283,29 @@ public class MetArtNetworkRipper : IYieldingScraper
             new List<IAvailableFile>()
                 .Concat(galleryDownloads)
                 .Concat(imageDownloads),
-            $$"""{"gallery": """ + galleryJson + """, "comments": """ + commentsJson + "}",
+            jsonDocument,
             DateTime.Now);
         return scene;
+    }
+
+    private static async Task<string> GetCommentsAsync(Site site, string releaseUuid, CancellationToken cancellationToken)
+    {
+        for (var i = 0; i < 3; i++)
+        {
+            try
+            {
+                var commentsUrl = CommentsApiUrl(site, releaseUuid);
+
+                using var commentResponse = await GetApiResponseAsync(commentsUrl, cancellationToken);
+                return await commentResponse.Content.ReadAsStringAsync(cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Error while getting comments for release {ReleaseUuid}", releaseUuid);
+            }
+        }
+
+        return string.Empty;
     }
 
     private async IAsyncEnumerable<Release> ScrapeScenesAsync(Site site, ScrapeOptions scrapeOptions)
@@ -283,7 +315,7 @@ public class MetArtNetworkRipper : IYieldingScraper
         var pages = (int)Math.Ceiling((double)moviesInitialPage.total / moviesInitialPage.galleries.Length);
         for (var pageNumber = 1; pageNumber <= pages; pageNumber++)
         {
-            await Task.Delay(5000);
+            await Task.Delay(1000);
 
             var moviesPage = await GetMoviesPageAsync(site, pageNumber);
 
@@ -301,69 +333,80 @@ public class MetArtNetworkRipper : IYieldingScraper
             var existingReleases = await _repository
                 .GetReleasesAsync(site.ShortName, movies.Keys.ToList());
 
-            var existingReleasesDictionary = existingReleases.ToDictionary(r => r.ShortName, r => r);
-            
-            var moviesToBeScraped = movies
-                .Where(g => !existingReleasesDictionary.ContainsKey(g.Key) || existingReleasesDictionary[g.Key].LastUpdated < scrapeOptions.FullScrapeLastUpdated)
-                .Select(g => g.Value)
-                .ToList();
+            var existingReleasesLookup = existingReleases.ToLookup(r => r.ShortName, r => r);
+            var existingReleasesDictionary = new Dictionary<string, Release>();
+
+            foreach (var group in existingReleasesLookup)
+            {
+                if (group.Count() > 1)
+                {
+                    // Log a warning
+                    Log.Warning($"Duplicate keys found for {group.Key}");
+                }
+
+                existingReleasesDictionary[group.Key] = group.First();
+            }
+
+            List<MetArtMoviesRequest.Galleries> moviesToBeScraped;
+            if (scrapeOptions.FullScrape)
+            {
+                // If FullScrape is true, take all galleries
+                moviesToBeScraped = movies
+                    .Where(g =>
+                        !existingReleasesDictionary.ContainsKey(g.Key)
+                        || existingReleasesDictionary[g.Key].LastUpdated < scrapeOptions.FullScrapeLastUpdated
+                    )
+                    .Select(g => g.Value)
+                    .ToList();
+            }
+            else
+            {
+                // If FullScrape is false, filter out existing galleries
+                moviesToBeScraped = movies
+                    .Where(g => !existingReleasesDictionary.ContainsKey(g.Key))
+                    .Select(g => g.Value)
+                    .ToList();
+            }
 
             foreach (var movie in moviesToBeScraped)
             {
                 await Task.Delay(1000);
 
-                var strategy = new ResiliencePipelineBuilder<Release?>()
-                    .AddFallback(new FallbackStrategyOptions<Release?>
-                    {
-                        FallbackAction = _ => Outcome.FromResultAsValueTask<Release?>(null)
-                    })
-                    .AddRetry(new ()
-                    {
-                        MaxRetryAttempts = 3,
-                        Delay = TimeSpan.FromSeconds(10),
-                        OnRetry = args =>
-                        {
-                            var ex = args.Outcome.Exception;
-                            Log.Error($"Caught following exception while scraping {movie.name}: " + ex, ex);
-                            return default;
-                        }
-                    })
-                    .Build();
+                var shortName = ShortName.FromReleaseUrl(movie.path);
+                var guid = existingReleasesDictionary.TryGetValue(shortName.Combined, out var existingRelease)
+                    ? existingRelease.Uuid
+                    : UuidGenerator.Generate();
 
-                var scene = await strategy.ExecuteAsync(async token =>
-                    await ScrapeSceneAsync(site, movie, existingReleasesDictionary, token)
-                );
-
-                if (scene != null)
+                Release? release = null;
+                try
                 {
-                    yield return scene;   
+                    release = await ScrapeSceneAsync(site, shortName, guid, CancellationToken.None);
+                }
+                catch (Exception ex)
+                {
+                    Log.Error(ex, "Error while scraping movie {Movie}", movie.path);
+                    continue;
+                }
+
+                if (release != null)
+                {
+                    yield return release;
                 }
             }
         }
     }
 
-    private static async Task<Release?> ScrapeSceneAsync(Site site, MetArtMoviesRequest.Galleries movie,
-        IReadOnlyDictionary<string, Release> existingReleasesDictionary, CancellationToken cancellationToken)
+    private static async Task<Release?> ScrapeSceneAsync(Site site, ShortName shortName, Guid guid, CancellationToken cancellationToken)
     {
-        var date = Regex.Match(movie.path, @"\/(\d{8})\/").Groups[1].Value;
-        var name = Regex.Match(movie.path, @"\/(\w+)$").Groups[1].Value;
+        var movieUrl = MovieApiUrl(site, shortName);
+        using var movieResponse = await GetApiResponseAsync(movieUrl, cancellationToken);
 
-        var shortName = $"{date}/{name}";
-
-        var movieUrl = MovieApiUrl(site, date, name);
-
-        using var movieResponse = Client.GetAsync(movieUrl, cancellationToken);
-        var movieJson = await movieResponse.Result.Content.ReadAsStringAsync(cancellationToken);
+        var movieJson = await movieResponse.Content.ReadAsStringAsync(cancellationToken);
         var movieDetails = JsonSerializer.Deserialize<MetArtMovieRequest.RootObject>(movieJson);
         if (movieDetails == null)
         {
             throw new InvalidOperationException("Could not read movie API response: " + movieJson);
         }
-
-        var commentsUrl = CommentsApiUrl(site, movieDetails.UUID);
-
-        using var commentResponse = Client.GetAsync(commentsUrl, cancellationToken);
-        var commentsJson = await commentResponse.Result.Content.ReadAsStringAsync(cancellationToken);
 
         var sceneDownloads = movieDetails.files.sizes.videos
             .Select(video => new AvailableVideoFile(
@@ -426,15 +469,6 @@ public class MetArtNetworkRipper : IYieldingScraper
             };
         }
 
-        var spriteDownloads = new List<IAvailableFile>
-        {
-            new AvailableImageFile("image", "sprite", string.Empty,
-                $"https://cdn.metartnetwork.com/{movieDetails.siteUUID}/media/{movieDetails.UUID}/sprite_{movieDetails.UUID}-48.jpg",
-                -1, -1, -1),
-            new AvailableVttFile("vtt", "sprite", string.Empty,
-                $"https://cdn.metartnetwork.com/{movieDetails.siteUUID}/media/{movieDetails.UUID}/member_{movieDetails.UUID}.vtt")
-        };
-
         var performers = movieDetails.models.Where(a => a.gender == "female").ToList()
             .Concat(movieDetails.models.Where(a => a.gender != "female").ToList())
             .Select(m =>
@@ -445,14 +479,20 @@ public class MetArtNetworkRipper : IYieldingScraper
             .Select(t => new SiteTag(t.Replace(" ", "+"), t, "/tags/" + t.Replace(" ", "+")))
             .ToList();
 
+        var commentsJson = await GetCommentsAsync(site, movieDetails.UUID, cancellationToken);
+        var jsonDocument = $$"""{"gallery": """ + movieJson + """, "comments": """ + commentsJson + "}";
+        if (!IsValidJson(jsonDocument))
+        {
+            Log.Error("Invalid JSON document: {JsonDocument}", jsonDocument);
+            jsonDocument = "{}";
+        }
+
         var scene = new Release(
-            existingReleasesDictionary.TryGetValue(shortName, out var existingRelease)
-                ? existingRelease.Uuid
-                : UuidGenerator.Generate(),
+            guid,
             site,
             null,
             DateOnly.FromDateTime(movieDetails.publishedAt),
-            shortName,
+            shortName.Combined,
             movieDetails.name,
             $"{site.Url}{movieDetails.path}",
             movieDetails.description,
@@ -463,9 +503,8 @@ public class MetArtNetworkRipper : IYieldingScraper
                 .Concat(sceneDownloads)
                 .Concat(galleryDownloads)
                 .Concat(imageDownloads)
-                .Concat(trailerDownloads)
-                .Concat(spriteDownloads),
-            $$"""{"gallery": """ + movieJson + """, "comments": """ + commentsJson + "}",
+                .Concat(trailerDownloads),
+            jsonDocument,
             DateTime.Now);
         return scene;
     }
@@ -480,17 +519,28 @@ public class MetArtNetworkRipper : IYieldingScraper
         var convertedHeaders = ConvertHeaders(headers);
 
         var releases = await _repository.QueryReleasesAsync(site, downloadConditions);
-        foreach (var release in releases)
+        foreach (var existingRelease in releases)
         {
-            var releaseDownloadPlan = PlanDownloads(release, downloadConditions);
+            var currentRelease = existingRelease;
+
+            // FUCKING KLUDGE
+            if (!currentRelease.ShortName.StartsWith("2") && !currentRelease.ShortName.StartsWith("1999"))
+            {
+                currentRelease = currentRelease with
+                {
+                    ShortName = "2" + currentRelease.ShortName,
+                };
+            }
+            // FUCKING KLUDGE
+
+
+            var releaseDownloadPlan = PlanDownloads(currentRelease, downloadConditions);
             var releaseMissingDownloadsPlan = PlanMissingDownloads(releaseDownloadPlan);
 
             if (!releaseMissingDownloadsPlan.AvailableFiles.Any())
             {
                 continue;
             }
-
-            Log.Information("Downloading: {Site} - {ReleaseDate} - {Release} [{Uuid}]", release.Site.Name, release.ReleaseDate.ToString("yyyy-MM-dd"), release.Name, release.Uuid);
 
             // Define a Polly policy that handles all exceptions.
             var policy = Policy.Handle<Exception>()
@@ -499,6 +549,27 @@ public class MetArtNetworkRipper : IYieldingScraper
                     // This is the onRetry delegate, you can add logging here or other custom behavior.
                     Console.WriteLine($"An error occurred while downloading a release: {exception.Message}. Retry attempt: {retryCount}");
                 });
+
+            var isFilm = currentRelease.AvailableFiles.Any(f => f.ContentType == "scene");
+            Release? updatedScrape;
+            
+            try
+            {
+                updatedScrape = isFilm
+                    ? await ScrapeSceneAsync(site, ShortName.FromCombined(currentRelease.ShortName), currentRelease.Uuid, CancellationToken.None)
+                    : await ScrapeGalleryAsync(site, ShortName.FromCombined(currentRelease.ShortName), currentRelease.Uuid, CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Error while scraping release {Release}", currentRelease.Uuid);
+                continue;
+            }
+            
+            var release = await _repository.UpsertRelease(updatedScrape);
+
+            Log.Information("Downloading: {Site} - {ReleaseDate} - {Release} [{Uuid}]", release.Site.Name, release.ReleaseDate.ToString("yyyy-MM-dd"), release.Name, release.Uuid);
+
+
 
             // Execute the download operation using the Polly policy.
             var downloads = new List<Download>();
@@ -559,7 +630,11 @@ public class MetArtNetworkRipper : IYieldingScraper
         client.DefaultRequestHeaders.Add("cookie", headers["cookie"]);
         client.DefaultRequestHeaders.Add("user-agent", headers["user-agent"]);
 
-        var request = new HttpRequestMessage(HttpMethod.Head, selectedGallery.Url);
+        var url = selectedGallery.Url.StartsWith(release.Site.Url)
+            ? selectedGallery.Url
+            : release.Site.Url + selectedGallery.Url;
+
+        var request = new HttpRequestMessage(HttpMethod.Head, url);
         var response = await client.SendAsync(request);
         if (response.StatusCode == HttpStatusCode.Unauthorized)
         {
@@ -658,7 +733,11 @@ public class MetArtNetworkRipper : IYieldingScraper
         client.DefaultRequestHeaders.Add("cookie", headers["cookie"]);
         client.DefaultRequestHeaders.Add("user-agent", headers["user-agent"]);
 
-        var request = new HttpRequestMessage(HttpMethod.Head, selectedVideo.Url);
+        var url = selectedVideo.Url.StartsWith(release.Site.Url)
+            ? selectedVideo.Url
+            : release.Site.Url + selectedVideo.Url;
+
+        var request = new HttpRequestMessage(HttpMethod.Head, url);
         var response = await client.SendAsync(request);
 
         var actualMediaUrl = response.Headers.Location?.ToString();
@@ -854,42 +933,84 @@ public class MetArtNetworkRipper : IYieldingScraper
     
     private static async Task<MetArtGalleriesRequest.RootObject> GetGalleriesPageAsync(Site site, int pageNumber)
     {
-        var galleriesPageUrl = GalleriesApiUrl(site, pageNumber);
+        Exception? lastException = null;
 
-        using var response = await Client.GetAsync(galleriesPageUrl);
-        if (response.StatusCode != HttpStatusCode.OK)
+        for (var i = 0; i < 3; i++)
         {
-            throw new InvalidOperationException($"Could not read galleries API response:{Environment.NewLine}Url={galleriesPageUrl}{Environment.NewLine}StatusCode={response.StatusCode}{Environment.NewLine}ReasonPhrase={response.ReasonPhrase}");
+            try
+            {
+                var galleriesPageUrl = GalleriesApiUrl(site, pageNumber);
+
+                using var response = await Client.GetAsync(galleriesPageUrl);
+                if (response.StatusCode != HttpStatusCode.OK)
+                {
+                    throw new InvalidOperationException($"Could not read galleries API response:{Environment.NewLine}Url={galleriesPageUrl}{Environment.NewLine}StatusCode={response.StatusCode}{Environment.NewLine}ReasonPhrase={response.ReasonPhrase}");
+                }
+
+                var json = await response.Content.ReadAsStringAsync();
+                var galleries = JsonSerializer.Deserialize<MetArtGalleriesRequest.RootObject>(json);
+                if (galleries == null)
+                {
+                    throw new InvalidOperationException("Could not read galleries API response: " + json);
+                }
+
+                return galleries;
+            }
+            catch (Exception ex)
+            {
+                lastException = ex;
+                Log.Warning(ex, "Failed to get galleries page {PageNumber} from {Site}", pageNumber, site.ShortName);
+                continue;
+            }
         }
-        
-        var json = await response.Content.ReadAsStringAsync();
-        var galleries = JsonSerializer.Deserialize<MetArtGalleriesRequest.RootObject>(json);
-        if (galleries == null)
+
+        if (lastException == null)
         {
-            throw new InvalidOperationException("Could not read galleries API response: " + json);
+            throw new InvalidOperationException("Failed to get galleries page after 3 attempts.");
         }
-        
-        return galleries;
+
+        throw new InvalidOperationException("Failed to get galleries page after 3 attempts.", lastException);
     }
 
     private static async Task<MetArtMoviesRequest.RootObject> GetMoviesPageAsync(Site site, int pageNumber)
     {
-        var moviesApiUrl = MoviesApiUrl(site, pageNumber);
+        Exception? lastException = null;
 
-        using var response = await Client.GetAsync(moviesApiUrl);
-        if (response.StatusCode != HttpStatusCode.OK)
+        for (var i = 0; i < 3; i++)
         {
-            throw new InvalidOperationException($"Could not read movies API response:{Environment.NewLine}Url={moviesApiUrl}{Environment.NewLine}StatusCode={response.StatusCode}{Environment.NewLine}ReasonPhrase={response.ReasonPhrase}");
+            try
+            {
+                var moviesApiUrl = MoviesApiUrl(site, pageNumber);
+
+                using var response = await Client.GetAsync(moviesApiUrl);
+                if (response.StatusCode != HttpStatusCode.OK)
+                {
+                    throw new InvalidOperationException($"Could not read movies API response:{Environment.NewLine}Url={moviesApiUrl}{Environment.NewLine}StatusCode={response.StatusCode}{Environment.NewLine}ReasonPhrase={response.ReasonPhrase}");
+                }
+
+                var json = await response.Content.ReadAsStringAsync();
+                var movies = JsonSerializer.Deserialize<MetArtMoviesRequest.RootObject>(json);
+                if (movies == null)
+                {
+                    throw new InvalidOperationException("Could not read movies API response: " + json);
+                }
+
+                return movies;
+            }
+            catch (Exception ex)
+            {
+                lastException = ex;
+                Log.Warning(ex, "Failed to get movies page {PageNumber} from {Site}", pageNumber, site.ShortName);
+                continue;
+            }
         }
-        
-        var json = await response.Content.ReadAsStringAsync();
-        var movies = JsonSerializer.Deserialize<MetArtMoviesRequest.RootObject>(json);
-        if (movies == null)
+
+        if (lastException == null)
         {
-            throw new InvalidOperationException("Could not read movies API response: " + json);
+            throw new InvalidOperationException("Failed to get movies page after 3 attempts.");
         }
-        
-        return movies;
+
+        throw new InvalidOperationException("Failed to get movies page after 3 attempts.", lastException);
     }
 
     private async Task LoginAsync(Site site, IPage page)
@@ -913,5 +1034,36 @@ public class MetArtNetworkRipper : IYieldingScraper
         }
         
         await _repository.UpdateStorageStateAsync(site, await page.Context.StorageStateAsync());
+    }
+
+    private static async Task<HttpResponseMessage> GetApiResponseAsync(string apiUrl, CancellationToken cancellationToken)
+    {
+        for (var i = 0; i < 3; i++)
+        {
+            var response = await Client.GetAsync(apiUrl, cancellationToken);
+            if (response.IsSuccessStatusCode)
+            {
+                return response;
+            }
+            else
+            {
+                Log.Warning($"Failed to get API response from {apiUrl}{Environment.NewLine}Status code: {response.StatusCode}");
+            }
+        }
+
+        throw new Exception($"Failed to get API response from {apiUrl} after 3 attempts.");
+    }
+
+    private static bool IsValidJson(string jsonString)
+    {
+        try
+        {
+            JsonDocument.Parse(jsonString);
+            return true;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
     }
 }
