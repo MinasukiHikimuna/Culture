@@ -39,7 +39,7 @@ public class VixenFindVideosOnSitesResponse
         public string title { get; init; }
         public string slug { get; init; }
         public string site { get; init; }
-        public double rating { get; init; }
+        public double? rating { get; init; }
         public ExpertReview expertReview { get; init; }
         public string releaseDate { get; init; }
         public object isExclusive { get; init; }
@@ -147,7 +147,7 @@ public class VixenFindOneVideoResponse
         public object showcase { get; init; }
         public Tour tour { get; init; }
         public ModelsSlugged[] modelsSlugged { get; init; }
-        public double rating { get; init; }
+        public double? rating { get; init; }
         public ExpertReview expertReview { get; init; }
         public string runLengthFormatted { get; init; }
         public string videoUrl1080P { get; init; }
@@ -218,14 +218,14 @@ public class VixenFindOneVideoResponse
     {
         public string name { get; init; }
         public string slug { get; init; }
-        public double rating { get; init; }
+        public double? rating { get; init; }
         public string __typename { get; init; }
     }
 
     public class Models
     {
         public string slug { get; init; }
-        public double rating { get; init; }
+        public double? rating { get; init; }
         public string name { get; init; }
         public string __typename { get; init; }
     }
@@ -301,7 +301,7 @@ public class VixenFindOneVideoResponse
         public bool isFreeLimitedTrial { get; init; }
         public Models1[] models { get; init; }
         public string releaseDate { get; init; }
-        public double rating { get; init; }
+        public double? rating { get; init; }
         public ExpertReview1 expertReview { get; init; }
         public object channel { get; init; }
         public Images1 images { get; init; }
@@ -457,5 +457,104 @@ public class VixenGetPictureSetResponse
         public int width { get; init; }
         public int height { get; init; }
         public string __typename { get; init; }
+    }
+}
+
+public class VixenGetSearchResultsResponse
+{
+    public class RootObject
+    {
+        public Data data { get; set; }
+    }
+
+    public class Data
+    {
+        public object[] searchCategories { get; set; }
+        public object[] searchModels { get; set; }
+        public Searchvideos searchVideos { get; set; }
+    }
+
+    public class Searchvideos
+    {
+        public int totalCount { get; set; }
+        public Edge[] edges { get; set; }
+        public string __typename { get; set; }
+    }
+
+    public class Edge
+    {
+        public Node node { get; set; }
+        public string __typename { get; set; }
+    }
+
+    public class Node
+    {
+        public string id { get; set; }
+        public string videoId { get; set; }
+        public string title { get; set; }
+        public string slug { get; set; }
+        public Expertreview expertReview { get; set; }
+        public DateTime releaseDate { get; set; }
+        public object isExclusive { get; set; }
+        public object freeVideo { get; set; }
+        public string site { get; set; }
+        public string description { get; set; }
+        public bool isFreeLimitedTrial { get; set; }
+        public Modelsslugged[] modelsSlugged { get; set; }
+        public Images images { get; set; }
+        public Previews previews { get; set; }
+        public object channel { get; set; }
+        public string __typename { get; set; }
+    }
+
+    public class Expertreview
+    {
+        public float global { get; set; }
+        public string __typename { get; set; }
+    }
+
+    public class Images
+    {
+        public Listing[] listing { get; set; }
+        public string __typename { get; set; }
+    }
+
+    public class Listing
+    {
+        public string src { get; set; }
+        public string placeholder { get; set; }
+        public int width { get; set; }
+        public int height { get; set; }
+        public Highdpi highdpi { get; set; }
+        public string __typename { get; set; }
+    }
+
+    public class Highdpi
+    {
+        public string _double { get; set; }
+        public string triple { get; set; }
+        public string __typename { get; set; }
+    }
+
+    public class Previews
+    {
+        public Listing1[] listing { get; set; }
+        public string __typename { get; set; }
+    }
+
+    public class Listing1
+    {
+        public string src { get; set; }
+        public int width { get; set; }
+        public int height { get; set; }
+        public string type { get; set; }
+        public string __typename { get; set; }
+    }
+
+    public class Modelsslugged
+    {
+        public string name { get; set; }
+        public string slugged { get; set; }
+        public string __typename { get; set; }
     }
 }
