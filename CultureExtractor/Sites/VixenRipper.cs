@@ -1,13 +1,16 @@
 using System.Collections.Immutable;
+using System.Globalization;
 using System.IdentityModel.Tokens.Jwt;
 using System.Net;
 using System.Text;
 using System.Text.Json;
+using System.Web;
 using CultureExtractor.Interfaces;
 using CultureExtractor.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Playwright;
 using Serilog;
+using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
 
 namespace CultureExtractor.Sites;
 
@@ -142,7 +145,7 @@ public class VixenRipper : IYieldingScraper
         } while (findVideosOnSites.pageInfo.hasNextPage);
     }
 
-    private static async Task<Release> ScrapeSceneAsync(Site site, string shortName, Guid releaseGuid)
+    private async Task<Release> ScrapeSceneAsync(Site site, string shortName, Guid releaseGuid)
     {
         await Task.Delay(1211);
 
@@ -181,6 +184,24 @@ public class VixenRipper : IYieldingScraper
         };
         var pictureSetResponse = await GraphQLQuery<VixenGetPictureSetResponse.RootObject>($"{site.Url}/graphql", pictureSetRequestObj);
 
+        // For preview videos
+        var searchResultsRequestObj = new
+        {
+            operationName = "getSearchResults",
+            query = GetSearchResultsQuery,
+            variables = new
+            {
+                site = site.ShortName.ToUpperInvariant(),
+                query = dataFindOneVideo.title,
+                first = 12,
+                skip = 0,
+                shouldDisplayAsThumbnail = false
+            }
+        };
+        var searchResultsResponse = await GraphQLQuery<VixenGetSearchResultsResponse.RootObject>($"{site.Url}/graphql", searchResultsRequestObj);
+        var dataSearchVideos = searchResultsResponse.Deserialized.data.searchVideos;
+        var searchResults = dataSearchVideos.edges
+            .FirstOrDefault(edge => edge.node.id == dataFindOneVideo.id);
 
         var videoTokens = GetAvailableVideos(videoTokenResponseFoo);
 
@@ -275,6 +296,21 @@ public class VixenRipper : IYieldingScraper
                 );
             })
             .OrderByDescending(availableFile => availableFile.ResolutionHeight)
+            .ToList();
+
+        var previewDownloads = searchResults?.node.previews.listing
+            .OrderByDescending(preview => preview.height)
+            .Select(preview => new AvailableVideoFile(
+                "video",
+                "preview",
+                $"{preview.width}x{preview.height}",
+                preview.src,
+                preview.width,
+                preview.height,
+                -1,
+                -1,
+                "H.264"
+            ))
             .ToList();
 
         var performers = dataFindOneVideo.modelsSlugged
@@ -450,8 +486,9 @@ public class VixenRipper : IYieldingScraper
 
         var requests1 = await CaptureRequestsAsync(site, page);
         
-        var graphQlRequest = SetHeadersFromActualRequest(site, requests1);
-        
+        var headers = SetHeadersFromActualRequest(site, requests1);
+        var convertedHeaders = ConvertHeaders(headers);
+
         var releases = await _repository.QueryReleasesAsync(site, downloadConditions);
         var downloadedReleases = 0;
         foreach (var release in releases)
@@ -463,24 +500,21 @@ public class VixenRipper : IYieldingScraper
             {
                 continue;
             }
-            
+
             var cookie = Client.DefaultRequestHeaders.GetValues("cookie").FirstOrDefault();
             var accessToken = ExtractAccessTokenFromCookie(cookie);
             var expiryDate = DecodeTokenAndGetExpiry(accessToken);
-            var convertedHeaders = new WebHeaderCollection();
             if (expiryDate != null && expiryDate.Value.AddMinutes(-5) < DateTime.Now.ToUniversalTime())
             {
                 var requests = await CaptureRequestsAsync(site, page);
         
-                SetHeadersFromActualRequest(site, requests);
-                
+                headers = SetHeadersFromActualRequest(site, requests);
+                convertedHeaders = ConvertHeaders(headers);
+
                 var newCookie = Client.DefaultRequestHeaders.GetValues("cookie").FirstOrDefault();
                 var newAccessToken = ExtractAccessTokenFromCookie(newCookie);
                 
                 Log.Debug($"Refresh access token.{Environment.NewLine}Old: {accessToken}{Environment.NewLine}New: {newAccessToken}");
-                
-                var headers = SetHeadersFromActualRequest(site, requests);
-                convertedHeaders = ConvertHeaders(headers);
             }
             
             // this is now done on every scene despite we might already have all files
@@ -511,6 +545,10 @@ public class VixenRipper : IYieldingScraper
             foreach (var trailerDownload in await DownloadTrailersAsync(downloadConditions, updatedScrape, existingDownloadEntities, convertedHeaders))
             {
                 yield return trailerDownload;
+            }
+            foreach (var previewDownload in await DownloadPreviewsAsync(downloadConditions, updatedScrape, existingDownloadEntities, convertedHeaders))
+            {
+                yield return previewDownload;
             }
             await foreach (var imageDownload in DownloadImagesAsync(updatedScrape, existingDownloadEntities, convertedHeaders))
             {
@@ -626,6 +664,40 @@ public class VixenRipper : IYieldingScraper
         };
     }
 
+    private async Task<IList<Download>> DownloadPreviewsAsync(DownloadConditions downloadConditions, Release release,
+    List<DownloadEntity> existingDownloadEntities, WebHeaderCollection convertedHeaders)
+    {
+        var availableVideos = release.AvailableFiles
+            .OfType<AvailableVideoFile>()
+            .Where(d => d is { FileType: "video", ContentType: "preview" });
+
+        var downloads = new List<Download>();
+        foreach (var selectedVideo in availableVideos)
+        {
+            if (selectedVideo == null || !NotDownloadedYet(existingDownloadEntities, selectedVideo))
+            {
+                return new List<Download>();
+            }
+
+            var uri = new Uri(selectedVideo.Url);
+            var suggestedFileName = Path.GetFileName(uri.LocalPath);
+            var suffix = Path.GetExtension(suggestedFileName);
+
+            var fileName = $"trailer_{selectedVideo.Variant}{suffix}";
+
+            var fileInfo = await _downloader.TryDownloadAsync(release, selectedVideo, selectedVideo.Url, fileName, convertedHeaders);
+            if (fileInfo == null)
+            {
+                return new List<Download>();
+            }
+
+            var videoHashes = Hasher.Phash(@"""" + fileInfo.FullName + @"""");
+            downloads.Add(new(release, suggestedFileName, fileInfo.Name, selectedVideo, videoHashes));
+        }
+
+        return downloads;
+    }
+
     private async IAsyncEnumerable<Download> DownloadImagesAsync(Release release, List<DownloadEntity> existingDownloadEntities, WebHeaderCollection convertedHeaders)
     {
         var imageFiles = release.AvailableFiles.OfType<AvailableImageFile>();
@@ -711,6 +783,9 @@ public class VixenRipper : IYieldingScraper
 
     private async Task LoginAsync(Site site, IPage page)
     {
+        Console.WriteLine("New human check implemented at the site. Please login manually and press Enter.");
+        Console.ReadLine();
+
         var usernameInput = page.GetByRole(AriaRole.Textbox, new() { NameString = "Email" });
         if (await usernameInput.IsVisibleAsync())
         {
@@ -1089,6 +1164,115 @@ public class VixenRipper : IYieldingScraper
             }
             __typename
           }
+        }
+        """;
+
+    private const string GetSearchResultsQuery =
+        """
+        query getSearchResults($query: String!, $site: Site!, $first: Int, $skip: Int, $shouldDisplayAsThumbnail: Boolean) {
+          searchCategories(
+            input: {query: $query, site: $site}
+            shouldDisplayAsThumbnail: $shouldDisplayAsThumbnail
+            includeChannels: false
+          ) {
+            categoryId
+            site
+            slug
+            name
+            description
+            shouldDisplayAsThumbnail
+            images {
+              listing {
+                ...ImageInfo
+                __typename
+              }
+              __typename
+            }
+            scenes
+            __typename
+          }
+          searchModels(input: {query: $query, site: $site}) {
+            modelId
+            name
+            slug
+            biography
+            images {
+              listing {
+                ...ImageInfo
+                __typename
+              }
+              __typename
+            }
+            __typename
+          }
+          searchVideos(input: {query: $query, site: $site, first: $first, skip: $skip}) {
+            totalCount
+            edges {
+              node {
+                id: uuid
+                videoId
+                title
+                slug
+                expertReview {
+                  global
+                  __typename
+                }
+                releaseDate
+                isExclusive
+                freeVideo
+                site
+                description
+                isFreeLimitedTrial
+                modelsSlugged: models {
+                  name
+                  slugged: slug
+                  __typename
+                }
+                images {
+                  listing {
+                    ...ImageInfo
+                    __typename
+                  }
+                  __typename
+                }
+                previews {
+                  listing {
+                    ...PreviewInfo
+                    __typename
+                  }
+                  __typename
+                }
+                channel {
+                  channelId
+                  __typename
+                }
+                __typename
+              }
+              __typename
+            }
+            __typename
+          }
+        }
+
+        fragment ImageInfo on Image {
+          src
+          placeholder
+          width
+          height
+          highdpi {
+            double
+            triple
+            __typename
+          }
+          __typename
+        }
+
+        fragment PreviewInfo on Preview {
+          src
+          width
+          height
+          type
+          __typename
         }
         """;
 
