@@ -1,16 +1,13 @@
 using System.Collections.Immutable;
-using System.Globalization;
 using System.IdentityModel.Tokens.Jwt;
 using System.Net;
 using System.Text;
 using System.Text.Json;
-using System.Web;
 using CultureExtractor.Interfaces;
 using CultureExtractor.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Playwright;
 using Serilog;
-using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
 
 namespace CultureExtractor.Sites;
 
