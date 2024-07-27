@@ -51,7 +51,7 @@ public class NubileFilmsRipper : IYieldingScraper
         await GoToPageAsync(page, site, 1);
         await page.WaitForLoadStateAsync();
 
-        var totalPages = await GetTotalPagesAsync(page);
+        var totalPages = await GetTotalPagesAsync(page, site);
 
         for (var pageNumber = 1; pageNumber <= totalPages; pageNumber++)
         {
@@ -303,7 +303,11 @@ public class NubileFilmsRipper : IYieldingScraper
         var suggestedFileName = Path.GetFileName(uri.LocalPath);
         var suffix = Path.GetExtension(suggestedFileName);
 
-        var fileName = $"{selectedVideo.ContentType} [{selectedVideo.Variant}]{suffix}";
+        var performersStr = release.Performers.Count() > 1
+            ? string.Join(", ", release.Performers.Take(release.Performers.Count() - 1).Select(p => p.Name)) + " & " +
+              release.Performers.Last().Name
+            : release.Performers.FirstOrDefault()?.Name ?? "Unknown";
+        var fileName = ReleaseNamer.Name(release, suffix, performersStr, selectedVideo.Variant, selectedVideo.ContentType);
 
         var headers = new WebHeaderCollection
         {
@@ -410,8 +414,23 @@ public class NubileFilmsRipper : IYieldingScraper
         }
     }
 
-    private static async Task<int> GetTotalPagesAsync(IPage page)
+    private static async Task<int> GetTotalPagesAsync(IPage page, Site site)
     {
+        // TODO: does not support That Sitcom Show which has fewer pages
+        if (site.ShortName == "thatsitcomshow")
+        {
+            var lastPageElement = await page.QuerySelectorAsync("a[aria-label='Last Page']");
+            var lastPageText = await lastPageElement.TextContentAsync();
+
+            if (!int.TryParse(lastPageText.Trim(), out int lastPageNumber))
+            {
+                throw new ArgumentException("Cannot parse number of pages");
+            }
+
+            return lastPageNumber;
+        }
+        
+
         var paginationElement = await page.QuerySelectorAsync("body > div.content-grid-ribbon.mb-2.mt-3.pt-2.py-md-2.position-relative.content-grid-footer > div > div > div.content-grid-ribbon-center.col-12.justify-content-center.mx-auto.mb-2.mb-lg-0 > div > ul > li.page-item.page-item-dropdown > div > button");
         var paginationText = await paginationElement.TextContentAsync();
 
@@ -662,13 +681,13 @@ public class NubileFilmsRipper : IYieldingScraper
 
     private static async Task<IReadOnlyList<IAvailableFile>> ParseAvailableGalleryDownloadsAsync(IPage page)
     {
-        var picsElement = await page.GetByText("Pics").ElementHandleAsync();
-        if (picsElement == null)
+        var picsElementLocator = page.Locator("a > i.icon-camera");
+        if (!(await picsElementLocator.IsVisibleAsync()))
         {
             return new List<IAvailableFile>();
         }
 
-        await picsElement.ClickAsync();
+        await picsElementLocator.ClickAsync();
 
         var downloadItems = await page.Locator("body > div.container.mt-4.mt-lg-2 > div:nth-child(1) > div.col-12.col-md-5.col-lg-7.content-pane-related-links > div:nth-child(5) > div > a").ElementHandlesAsync();
         var availableFiles = new List<AvailableGalleryZipFile>();
