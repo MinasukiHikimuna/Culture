@@ -83,6 +83,12 @@ public class AdultPrimeRipper : IYieldingScraper
                         .Select(g => g.Value)
                         .ToList();
 
+                    if (listedReleases.Any() && !scenesToBeScraped.Any())
+                    {
+                        Log.Information("All releases are up to date for site {Site} {SubSite}", site.ShortName, subSite.ShortName);
+                        break;
+                    }
+
                     foreach (var sceneToBeScraped in scenesToBeScraped)
                     {
                         var releaseGuid = existingReleasesDictionary.TryGetValue(sceneToBeScraped.ShortName, out var existingRelease)

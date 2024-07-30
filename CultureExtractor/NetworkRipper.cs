@@ -114,7 +114,7 @@ public class NetworkRipper : INetworkRipper
                 Release = existingReleases.FirstOrDefault(s => s.ShortName == listedRelease.ShortName)
             }
         ).ToList();
-        var unscrapedListedReleases = scrapeOptions.FullScrape
+        var unscrapedListedReleases = scrapeOptions.FullScrapeLastUpdated != null
             ? checkedListedReleases.Where(s => s.Release == null || s.Release.LastUpdated < scrapeOptions.FullScrapeLastUpdated)
             : checkedListedReleases.Where(s => s.Release == null).ToList();
         if (scrapeOptions.Order == OrderEnum.Descending)

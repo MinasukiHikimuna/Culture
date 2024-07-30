@@ -133,11 +133,11 @@ class Program
 {
     static void Main(string[] args)
     {
-        // var uuid = UuidGenerator.Generate();
+        var uuid = UuidGenerator.Generate();
         
         if (System.Diagnostics.Debugger.IsAttached)
         {
-            var siteShortName = "vixen";
+            var siteShortName = "adultprime";
             // var subSiteShortName = "sex-and-submission";
 
             var scrapeArgs = new string[]
@@ -145,10 +145,10 @@ class Program
                 "scrape",
                 "--site-short-name", siteShortName,
                 // "--sub-site-short-name", subSiteShortName,
-                "--full",
+                // "--full",
                 // "--guest-mode",
-                "--order", "Ascending",
-                // "--order", "Descending",
+                // "--order", "Ascending",
+                "--order", "Descending",
                 "--browser-mode", "Visible",
                 // "--max-scenes", "1000",
                 // "--from", "2020-01-01",
@@ -161,7 +161,7 @@ class Program
                 "--site-short-name", siteShortName,
                 // "--sub-site-short-name", subSiteShortName,
                 // "--scenes", "0231105/PULSATION",
-                // "--performers", "Charlotte Sins",
+                // "--performers", "Barbie Rous", "Antonia Sainz", "Betzz", "Kelly Collins", "Alexis Crystal", "Stacy Cruz", "Nancy A", "Mango A", "Freya Mayer", "Paula Shy", "Jia Lissa", "Michelle H",
                 "--order", "Descending",
                 // "--order", "Descending",
                 "--browser-mode", "Visible",
@@ -216,10 +216,10 @@ public class SiteOptions : BaseOptions
     [Option("sub-site-short-name", Required = false, HelpText = "Sub site short name")]
     public string SubSite { get; set; }
 
-    [Option("include-sub-sites", Required = false, HelpText = "Include sub sites")]
+    [Option("include-sub-sites", Required = false, HelpText = "Include sub sites", Default = new string[0])]
     public IEnumerable<string> IncludeSubSites { get; set; }
 
-    [Option("exclude-sub-sites", Required = false, HelpText = "Exclude sub sites")]
+    [Option("exclude-sub-sites", Required = false, HelpText = "Exclude sub sites", Default = new string[0])]
     public IEnumerable<string> ExcludeSubSites { get; set; }
 
     [Option("browser-mode",
@@ -240,12 +240,6 @@ public class SiteOptions : BaseOptions
 [Verb("scrape", HelpText = "Scrape")]
 public class ScrapeOptions : SiteOptions
 {
-    [Option(
-      "full",
-      Default = false,
-      HelpText = "Full scrape including update existing scenes")]
-    public bool FullScrape { get; set; }
-
     [Option(
       "guest-mode",
       Default = false,

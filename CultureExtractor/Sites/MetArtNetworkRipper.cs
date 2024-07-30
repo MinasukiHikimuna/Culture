@@ -136,7 +136,7 @@ public class MetArtNetworkRipper : IYieldingScraper
             var existingReleasesDictionary = existingReleases.ToDictionary(r => r.ShortName, r => r);
 
             List<MetArtGalleriesRequest.Galleries> galleriesToBeScraped;
-            if (scrapeOptions.FullScrape)
+            if (scrapeOptions.FullScrapeLastUpdated != null)
             {
                 // If FullScrape is true, take all galleries
                 galleriesToBeScraped = galleries
@@ -348,7 +348,7 @@ public class MetArtNetworkRipper : IYieldingScraper
             }
 
             List<MetArtMoviesRequest.Galleries> moviesToBeScraped;
-            if (scrapeOptions.FullScrape)
+            if (scrapeOptions.FullScrapeLastUpdated != null)
             {
                 // If FullScrape is true, take all galleries
                 moviesToBeScraped = movies
