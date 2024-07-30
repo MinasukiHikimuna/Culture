@@ -763,44 +763,4 @@ public class WowNetworkRipper : IYieldingScraper
 
         return availableFiles.AsReadOnly();
     }
-
-    private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloadsAsyncLegacy(IPage page)
-    {
-        var downloadItems = await page.Locator("div.ct_dl_items > ul > li").ElementHandlesAsync();
-        var availableDownloads = new List<DownloadDetailsAndElementHandle>();
-        foreach (var downloadItem in downloadItems)
-        {
-            var downloadLinkElement = await downloadItem.QuerySelectorAsync("a");
-            var downloadUrl = await downloadLinkElement.GetAttributeAsync("href");
-            var resolutionRaw = await downloadLinkElement.TextContentAsync();
-            resolutionRaw = resolutionRaw.Replace("\n", "").Trim();
-            var resolutionWidth = HumanParser.ParseResolutionWidth(resolutionRaw);
-            var resolutionHeight = HumanParser.ParseResolutionHeight(resolutionRaw);
-            var codecElement = await downloadItem.QuerySelectorAsync("span.format");
-            var codecRaw = await codecElement.InnerTextAsync();
-            var codec = HumanParser.ParseCodec(codecRaw);
-            var fpsElement = await downloadItem.QuerySelectorAsync("span.fps");
-            var fpsRaw = await fpsElement.InnerTextAsync();
-            var sizeElement = await downloadItem.QuerySelectorAsync("span.size");
-            var sizeRaw = await sizeElement.InnerTextAsync();
-            var size = HumanParser.ParseFileSize(sizeRaw);
-
-            var description = $"{codec.ToUpperInvariant()} {resolutionWidth}x{resolutionHeight} {fpsRaw}";
-
-            availableDownloads.Add(
-                new DownloadDetailsAndElementHandle(
-                    new AvailableVideoFile(
-                        "video",
-                        "scene",
-                        description,
-                        downloadUrl,
-                        resolutionWidth,
-                        resolutionHeight,
-                        size,
-                        double.Parse(fpsRaw.Replace("fps", "")),
-                        codec),
-                    downloadLinkElement));
-        }
-        return availableDownloads.OrderByDescending(d => d.AvailableVideoFile.ResolutionWidth).ThenByDescending(d => d.AvailableVideoFile.Fps).ToList();
-    }
 }
