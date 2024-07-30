@@ -18,18 +18,72 @@ namespace CultureExtractor
         {
             await Task.Delay(3000);
 
-            var innerIframe = await page.EvaluateAsync<object?>("document.querySelector(\"iframe[title='recaptcha challenge expires in two minutes']\")");
-            if (innerIframe == null)
+            if (!(await page.Locator("div.captcha").IsVisibleAsync()) && !(await page.Locator("div.g-recaptcha").IsVisibleAsync()))
             {
-                Log.Debug("No CAPTCHA found.");
+                Log.Error("CAPTCHA not found! Exiting!");
                 return;
+            }
+
+            var iframes = await page.QuerySelectorAllAsync("iframe");
+
+            IElementHandle iframeA = null;
+            IElementHandle iframeC = null;
+
+            string iframeAName = null;
+            string iframeCName = null;
+
+            foreach (var iframe in iframes)
+            {
+                var iframeName = await iframe.GetAttributeAsync("name");
+                if (!string.IsNullOrWhiteSpace(iframeName))
+                {
+                    if (iframeName.StartsWith("a-"))
+                    {
+                        iframeA = iframe;
+                        iframeAName = iframeName;
+                    }
+                    if (iframeName.StartsWith("c-"))
+                    {
+                        iframeC = iframe;
+                        iframeCName = iframeName;
+                    }
+                }
+            }
+
+            if (iframeA == null)
+            {
+                throw new InvalidOperationException("iframeA is missing!");
+            }
+            if (iframeC == null)
+            {
+                throw new InvalidOperationException("iframeC is missing!");
+            }
+            if (string.IsNullOrWhiteSpace(iframeAName))
+            {
+                throw new InvalidOperationException($"iframeAName is {iframeAName}");
+            }
+            if (string.IsNullOrWhiteSpace(iframeCName))
+            {
+                throw new InvalidOperationException($"iframeCName is {iframeCName}");
             }
 
             Log.Information("CAPTCHA found. Solving...");
 
-            var innerIframeName = await page.EvaluateAsync<string>("document.querySelector(\"iframe[title='recaptcha challenge expires in two minutes']\").name");
-            await page.FrameLocator($"iframe[name=\"{innerIframeName}\"]").Locator("button#recaptcha-audio-button").ClickAsync();
-            var audioUrl = await page.FrameLocator($"iframe[name=\"{innerIframeName}\"]").Locator("a.rc-audiochallenge-tdownload-link").GetAttributeAsync("href");
+            var captchaButton = page.FrameLocator($"iframe[name=\"{iframeAName}\"]").GetByLabel("I'm not a robot");
+            if (await captchaButton.IsVisibleAsync())
+            {
+                await captchaButton.ClickAsync();
+            }
+
+            await Task.Delay(5000);
+
+            var audioButton = page.FrameLocator($"iframe[name=\"{iframeCName}\"]").Locator("button#recaptcha-audio-button");
+            if (await audioButton.IsVisibleAsync())
+            {
+                await audioButton.ClickAsync();
+            }
+
+            var audioUrl = await page.FrameLocator($"iframe[name=\"{iframeCName}\"]").Locator("a.rc-audiochallenge-tdownload-link").GetAttributeAsync("href");
 
             var audioPath = await _legacyDownloader.DownloadCaptchaAudioAsync(audioUrl);
 
@@ -41,14 +95,14 @@ namespace CultureExtractor
             await Task.Delay(5000);
 
             await page
-                .FrameLocator($"iframe[name=\"{innerIframeName}\"]")
+                .FrameLocator($"iframe[name=\"{iframeCName}\"]")
                 .GetByRole(AriaRole.Textbox, new() { NameString = "Enter what you hear" })
                 .FillAsync(result.Text);
 
             await Task.Delay(2000);
 
             await page
-                .FrameLocator($"iframe[name=\"{innerIframeName}\"]")
+                .FrameLocator($"iframe[name=\"{iframeCName}\"]")
                 .GetByRole(AriaRole.Button, new() { NameString = "Verify" })
                 .ClickAsync();
 
