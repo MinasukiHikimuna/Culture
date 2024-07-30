@@ -216,6 +216,12 @@ public class SiteOptions : BaseOptions
     [Option("sub-site-short-name", Required = false, HelpText = "Sub site short name")]
     public string SubSite { get; set; }
 
+    [Option("include-sub-sites", Required = false, HelpText = "Include sub sites")]
+    public IEnumerable<string> IncludeSubSites { get; set; }
+
+    [Option("exclude-sub-sites", Required = false, HelpText = "Exclude sub sites")]
+    public IEnumerable<string> ExcludeSubSites { get; set; }
+
     [Option("browser-mode",
       Default = BrowserMode.Headless,
       HelpText = "Browser mode (Headless, ClassicHeadless, Visible)")]
