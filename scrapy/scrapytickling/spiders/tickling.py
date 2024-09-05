@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 import os
 import json
-import uuid
+import newnewid
 from dotenv import load_dotenv
 import scrapy
 from scrapytickling.spiders.database import get_sites
@@ -136,7 +136,7 @@ class TicklingSpider(scrapy.Spider):
 
         # Create ReleaseItem
         release_item = ReleaseItem(
-            id=uuid.uuid4(),
+            id=newnewid.uuid7(),
             release_date=date.isoformat() if date else None,
             short_name=movie_slug,
             name=movie_name,
