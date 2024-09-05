@@ -4,8 +4,8 @@ import json
 import newnewid
 from dotenv import load_dotenv
 import scrapy
-from scrapytickling.spiders.database import get_site_item, get_existing_release_short_names
-from scrapytickling.items import ReleaseItem, SiteItem
+from cultureextractorscrapy.spiders.database import get_site_item, get_existing_release_short_names
+from cultureextractorscrapy.items import ReleaseItem, SiteItem
 
 load_dotenv()
 

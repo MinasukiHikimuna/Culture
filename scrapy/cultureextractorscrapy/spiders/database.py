@@ -3,7 +3,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 from dotenv import load_dotenv
 import os
-from scrapytickling.items import SiteItem  # Make sure to import SiteItem
+from cultureextractorscrapy.items import SiteItem  # Make sure to import SiteItem
 
 load_dotenv()
 

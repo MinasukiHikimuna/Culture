@@ -20,10 +20,6 @@ from itemadapter import ItemAdapter
 
 import logging
 
-class ScrapyticklingPipeline:
-    def process_item(self, item, spider):
-        return item
-
 
 class PostgresPipeline:
     def __init__(self):

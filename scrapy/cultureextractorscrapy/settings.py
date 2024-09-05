@@ -1,4 +1,4 @@
-# Scrapy settings for scrapytickling project
+# Scrapy settings for cultureextractorscrapy project
 #
 # For simplicity, this file contains only settings considered important or
 # commonly used. You can find more settings consulting the documentation:
@@ -7,10 +7,10 @@
 #     https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
 #     https://docs.scrapy.org/en/latest/topics/spider-middleware.html
 
-BOT_NAME = "scrapytickling"
+BOT_NAME = "cultureextractorscrapy"
 
-SPIDER_MODULES = ["scrapytickling.spiders"]
-NEWSPIDER_MODULE = "scrapytickling.spiders"
+SPIDER_MODULES = ["cultureextractorscrapy.spiders"]
+NEWSPIDER_MODULE = "cultureextractorscrapy.spiders"
 
 
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
@@ -45,13 +45,13 @@ CONCURRENT_REQUESTS = 1
 # Enable or disable spider middlewares
 # See https://docs.scrapy.org/en/latest/topics/spider-middleware.html
 #SPIDER_MIDDLEWARES = {
-#    "scrapytickling.middlewares.ScrapyticklingSpiderMiddleware": 543,
+#    "cultureextractorscrapy.middlewares.CultureExtractorScrapySpiderMiddleware": 543,
 #}
 
 # Enable or disable downloader middlewares
 # See https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
 #DOWNLOADER_MIDDLEWARES = {
-#    "scrapytickling.middlewares.ScrapyticklingDownloaderMiddleware": 543,
+#    "cultureextractorscrapy.middlewares.CultureExtractorScrapyDownloaderMiddleware": 543,
 #}
 
 # Enable or disable extensions
@@ -63,8 +63,8 @@ CONCURRENT_REQUESTS = 1
 # Configure item pipelines
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
 ITEM_PIPELINES = {
-    'scrapytickling.pipelines.PreviewImagesPipeline': 1,
-    'scrapytickling.pipelines.PostgresPipeline': 300,
+    'cultureextractorscrapy.pipelines.PreviewImagesPipeline': 1,
+    'cultureextractorscrapy.pipelines.PostgresPipeline': 300,
 }
 
 # Enable and configure the AutoThrottle extension (disabled by default)
