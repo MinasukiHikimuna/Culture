@@ -4,7 +4,7 @@ import json
 import newnewid
 from dotenv import load_dotenv
 import scrapy
-from scrapytickling.spiders.database import get_sites
+from scrapytickling.spiders.database import get_sites, get_existing_release_short_names
 from scrapytickling.items import ReleaseItem
 
 load_dotenv()
@@ -23,7 +23,10 @@ class TicklingSpider(scrapy.Spider):
         spider = super(TicklingSpider, cls).from_crawler(crawler, *args, **kwargs)
         sites = get_sites()
         site = next((site for site in sites if site.short_name == spider.site_short_name), None)
+        if site is None:
+            raise ValueError(f"Site with short_name '{spider.site_short_name}' not found in the database.")
         spider.site = site
+        spider.existing_short_names = get_existing_release_short_names(site.uuid)
         return spider
 
     def parse(self, response):
@@ -69,7 +72,12 @@ class TicklingSpider(scrapy.Spider):
         movie_slug = response.url.split('/')[-2]
         studio_name = response.css(f'div#main-content ul.menu li a.{studio_slug}::attr(title)').get()
         movie_name = response.css('h1.title::text').get()
-        
+
+        # Check if this release already exists
+        if movie_slug in self.existing_short_names:
+            self.logger.info(f"Release with short_name {movie_slug} already exists for this site. Skipping.")
+            return
+
         date_text = response.xpath('//p[@class="content"][span[@class="label" and contains(text(), "Datum:")]]/text()').get()
         
         if date_text:
@@ -156,5 +164,8 @@ class TicklingSpider(scrapy.Spider):
             }),
             site_uuid=self.site.uuid
         )
+
+        # Add the new short_name to the set of existing short_names
+        self.existing_short_names.add(movie_slug)
 
         yield release_item

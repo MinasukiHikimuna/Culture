@@ -16,6 +16,7 @@ from .spiders.database import get_session, Site, Release
 from .items import ReleaseItem
 from datetime import datetime
 import json
+from sqlalchemy.exc import IntegrityError
 
 class PostgresPipeline:
     def __init__(self):
@@ -23,7 +24,7 @@ class PostgresPipeline:
 
     def process_item(self, item, spider):
         if isinstance(item, ReleaseItem):
-            site = self.session.query(Site).filter_by(uuid=str(item.site_uuid)).first()
+            site = self.session.query(Site).filter_by(uuid=item.site_uuid).first()
             if not site:
                 spider.logger.error(f"Site not found for UUID: {item.site_uuid}")
                 return item
@@ -43,8 +44,12 @@ class PostgresPipeline:
                 site_uuid=str(item.site_uuid)
             )
 
-            self.session.add(release)
-            self.session.commit()
+            try:
+                self.session.add(release)
+                self.session.commit()
+            except IntegrityError:
+                self.session.rollback()
+                spider.logger.warning(f"Release with short_name {item.short_name} already exists. Skipping.")
 
         return item
 

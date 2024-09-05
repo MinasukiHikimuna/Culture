@@ -52,3 +52,13 @@ def save_release(release):
     session.add(release)
     session.commit()
     session.close()
+
+def get_existing_release_short_names(site_uuid):
+    session = get_session()
+    short_names = set(
+        r.short_name for r in session.query(Release.short_name)
+        .filter(Release.site_uuid == site_uuid)
+        .all()
+    )
+    session.close()
+    return short_names
