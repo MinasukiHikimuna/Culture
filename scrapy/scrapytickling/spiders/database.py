@@ -1,0 +1,54 @@
+from sqlalchemy import Date, DateTime, Float, ForeignKey, create_engine, Column, String
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import relationship, sessionmaker
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
+Base = declarative_base()
+
+class Site(Base):
+    __tablename__ = 'sites'
+    uuid = Column(String(36), primary_key=True)
+    short_name = Column(String, nullable=False)
+    name = Column(String, nullable=False)
+    url = Column(String, nullable=False)
+    releases = relationship("Release", back_populates="site")
+
+class Release(Base):
+    __tablename__ = 'releases'
+    uuid = Column(String(36), primary_key=True)
+    release_date = Column(Date, nullable=False)
+    short_name = Column(String, nullable=False)
+    name = Column(String, nullable=False)
+    url = Column(String, nullable=False)
+    description = Column(String, nullable=False)
+    duration = Column(Float, nullable=False)
+    created = Column(DateTime, nullable=False)
+    last_updated = Column(DateTime, nullable=False)
+    available_files = Column(String, nullable=False)
+    json_document = Column(String, nullable=False)
+    site_uuid = Column(String(36), ForeignKey('sites.uuid'), nullable=False)
+    site = relationship("Site", back_populates="releases")
+
+def get_engine():
+    db_url = os.getenv('CONNECTION_STRING')
+    return create_engine(db_url)
+
+def get_session():
+    engine = get_engine()
+    Session = sessionmaker(bind=engine)
+    return Session()
+
+def get_sites():
+    session = get_session()
+    sites = session.query(Site).all()
+    session.close()
+    return sites
+
+def save_release(release):
+    session = get_session()
+    session.add(release)
+    session.commit()
+    session.close()
