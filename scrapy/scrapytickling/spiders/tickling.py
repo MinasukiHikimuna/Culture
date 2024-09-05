@@ -4,8 +4,8 @@ import json
 import newnewid
 from dotenv import load_dotenv
 import scrapy
-from scrapytickling.spiders.database import get_sites, get_existing_release_short_names
-from scrapytickling.items import ReleaseItem
+from scrapytickling.spiders.database import get_site_item, get_existing_release_short_names
+from scrapytickling.items import ReleaseItem, SiteItem
 
 load_dotenv()
 
@@ -21,12 +21,11 @@ class TicklingSpider(scrapy.Spider):
     @classmethod
     def from_crawler(cls, crawler, *args, **kwargs):
         spider = super(TicklingSpider, cls).from_crawler(crawler, *args, **kwargs)
-        sites = get_sites()
-        site = next((site for site in sites if site.short_name == spider.site_short_name), None)
-        if site is None:
+        site_item = get_site_item(spider.site_short_name)
+        if site_item is None:
             raise ValueError(f"Site with short_name '{spider.site_short_name}' not found in the database.")
-        spider.site = site
-        spider.existing_short_names = get_existing_release_short_names(site.uuid)
+        spider.site = site_item
+        spider.existing_short_names = get_existing_release_short_names(site_item.id)
         return spider
 
     def parse(self, response):
@@ -162,7 +161,8 @@ class TicklingSpider(scrapy.Spider):
                 'studio_name': studio_name,
                 'studio_slug': studio_slug,
             }),
-            site_uuid=self.site.uuid
+            site_uuid=self.site.id,
+            site=self.site
         )
 
         # Add the new short_name to the set of existing short_names

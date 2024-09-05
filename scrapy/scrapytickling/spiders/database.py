@@ -3,6 +3,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 from dotenv import load_dotenv
 import os
+from scrapytickling.items import SiteItem  # Make sure to import SiteItem
 
 load_dotenv()
 
@@ -62,3 +63,16 @@ def get_existing_release_short_names(site_uuid):
     )
     session.close()
     return short_names
+
+def get_site_item(site_short_name):
+    session = get_session()
+    site = session.query(Site).filter_by(short_name=site_short_name).first()
+    session.close()
+    if site:
+        return SiteItem(
+            id=site.uuid,
+            short_name=site.short_name,
+            name=site.name,
+            url=site.url
+        )
+    return None

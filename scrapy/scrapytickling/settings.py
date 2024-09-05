@@ -63,6 +63,7 @@ CONCURRENT_REQUESTS = 1
 # Configure item pipelines
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
 ITEM_PIPELINES = {
+    'scrapytickling.pipelines.PreviewImagesPipeline': 1,
     'scrapytickling.pipelines.PostgresPipeline': 300,
 }
 
@@ -91,3 +92,5 @@ AUTOTHROTTLE_TARGET_CONCURRENCY = 1.0
 REQUEST_FINGERPRINTER_IMPLEMENTATION = "2.7"
 TWISTED_REACTOR = "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
 FEED_EXPORT_ENCODING = "utf-8"
+
+FILES_STORE = 'F:/Ripping/'

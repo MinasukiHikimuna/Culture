@@ -47,3 +47,4 @@ class ReleaseItem:
     available_files: str
     json_document: str
     site_uuid: uuid.UUID
+    site: SiteItem

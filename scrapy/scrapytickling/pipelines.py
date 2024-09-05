@@ -4,19 +4,26 @@
 # See: https://docs.scrapy.org/en/latest/topics/item-pipeline.html
 
 
-# useful for handling different item types with a single interface
-from itemadapter import ItemAdapter
-
-
-class ScrapyticklingPipeline:
-    def process_item(self, item, spider):
-        return item
+import os
+from urllib.parse import urlparse
+from scrapy.pipelines.files import FilesPipeline
+from scrapy import Request
 
 from .spiders.database import get_session, Site, Release
 from .items import ReleaseItem
 from datetime import datetime
 import json
 from sqlalchemy.exc import IntegrityError
+
+# useful for handling different item types with a single interface
+from itemadapter import ItemAdapter
+
+import logging
+
+class ScrapyticklingPipeline:
+    def process_item(self, item, spider):
+        return item
+
 
 class PostgresPipeline:
     def __init__(self):
@@ -55,3 +62,36 @@ class PostgresPipeline:
 
     def close_spider(self, spider):
         self.session.close()
+
+
+class PreviewImagesPipeline(FilesPipeline):
+    def get_media_requests(self, item, info):
+        if isinstance(item, ReleaseItem):
+            json_data = json.loads(item.json_document)
+            preview_image_url = json_data.get('preview_image_url')
+            if preview_image_url:
+                logging.info(f"Requesting preview image: {preview_image_url}")
+                yield Request(preview_image_url, meta={'item': item})
+            else:
+                logging.warning(f"No preview image URL found for item: {item.short_name}")
+
+    def file_path(self, request, response=None, info=None, *, item=None):
+        logging.info("file_path method called") 
+        item = request.meta['item']
+        filename = os.path.basename(urlparse(request.url).path)
+        path = f'{item.site.name}/Metadata/{item.id}/{filename}'
+        logging.info(f"File will be saved to: {path}")
+        return path
+
+    def item_completed(self, results, item, info):
+        logging.info("item_completed method called")
+        if isinstance(item, ReleaseItem):
+            file_paths = [x['path'] for ok, x in results if ok]
+            if file_paths:
+                json_data = json.loads(item.json_document)
+                json_data['preview_image_local_path'] = file_paths[0]
+                item.json_document = json.dumps(json_data)
+                logging.info(f"Updated item with local path: {file_paths[0]}")
+            else:
+                logging.warning(f"No files were successfully downloaded for item: {item.short_name}")
+        return item
