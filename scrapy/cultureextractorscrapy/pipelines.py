@@ -10,7 +10,7 @@ from scrapy.pipelines.files import FilesPipeline
 from scrapy import Request
 
 from .spiders.database import get_session, Site, Release
-from .items import ReleaseItem
+from .items import ReleaseItem, AvailableVideoFile, AvailableImageFile, AvailableGalleryZipFile
 from datetime import datetime
 import json
 from sqlalchemy.exc import IntegrityError
@@ -60,34 +60,41 @@ class PostgresPipeline:
         self.session.close()
 
 
-class PreviewImagesPipeline(FilesPipeline):
+class AvailableFilesPipeline(FilesPipeline):
     def get_media_requests(self, item, info):
         if isinstance(item, ReleaseItem):
-            json_data = json.loads(item.json_document)
-            preview_image_url = json_data.get('preview_image_url')
-            if preview_image_url:
-                logging.info(f"Requesting preview image: {preview_image_url}")
-                yield Request(preview_image_url, meta={'item': item})
-            else:
-                logging.warning(f"No preview image URL found for item: {item.short_name}")
+            available_files = json.loads(item.available_files)
+            for file in available_files:
+                if file['file_type'] in ['video', 'image', 'gallery']:
+                    yield Request(file['url'], meta={'item': item, 'file_info': file})
 
     def file_path(self, request, response=None, info=None, *, item=None):
-        logging.info("file_path method called") 
         item = request.meta['item']
+        file_info = request.meta['file_info']
         filename = os.path.basename(urlparse(request.url).path)
-        path = f'{item.site.name}/Metadata/{item.id}/{filename}'
+        
+        # Create a folder structure based on file type and content type
+        folder = f"{item.site.name}/{file_info['file_type']}/{file_info['content_type']}"
+        
+        # Add resolution to video file names
+        if file_info['file_type'] == 'video' and 'resolution_width' in file_info:
+            filename = f"{file_info['resolution_width']}p_{filename}"
+        
+        path = f'{folder}/{item.id}/{filename}'
         logging.info(f"File will be saved to: {path}")
         return path
 
     def item_completed(self, results, item, info):
-        logging.info("item_completed method called")
         if isinstance(item, ReleaseItem):
-            file_paths = [x['path'] for ok, x in results if ok]
-            if file_paths:
-                json_data = json.loads(item.json_document)
-                json_data['preview_image_local_path'] = file_paths[0]
-                item.json_document = json.dumps(json_data)
-                logging.info(f"Updated item with local path: {file_paths[0]}")
+            downloaded_files = [x for ok, x in results if ok]
+            if downloaded_files:
+                available_files = json.loads(item.available_files)
+                for file in available_files:
+                    matching_downloads = [x for x in downloaded_files if x['url'] == file['url']]
+                    if matching_downloads:
+                        file['local_path'] = matching_downloads[0]['path']
+                item.available_files = json.dumps(available_files)
+                logging.info(f"Updated item with local paths for {len(downloaded_files)} files")
             else:
                 logging.warning(f"No files were successfully downloaded for item: {item.short_name}")
         return item

@@ -3,7 +3,9 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 from dotenv import load_dotenv
 import os
-from cultureextractorscrapy.items import SiteItem  # Make sure to import SiteItem
+from cultureextractorscrapy.items import SiteItem, SitePerformerItem  # Make sure to import SiteItem
+import newnewid
+from sqlalchemy.orm.exc import NoResultFound
 
 load_dotenv()
 
@@ -32,6 +34,14 @@ class Release(Base):
     json_document = Column(String, nullable=False)
     site_uuid = Column(String(36), ForeignKey('sites.uuid'), nullable=False)
     site = relationship("Site", back_populates="releases")
+
+class Performer(Base):
+    __tablename__ = 'performers'
+    uuid = Column(String(36), primary_key=True)
+    short_name = Column(String, nullable=False)
+    name = Column(String, nullable=False)
+    url = Column(String, nullable=False)
+    site_uuid = Column(String(36), ForeignKey('sites.uuid'), nullable=False)
 
 def get_engine():
     db_url = os.getenv('CONNECTION_STRING')
@@ -76,3 +86,28 @@ def get_site_item(site_short_name):
             url=site.url
         )
     return None
+
+def get_or_create_performer(site_uuid, short_name, name, url):
+    session = get_session()
+    try:
+        performer = session.query(Performer).filter_by(site_uuid=site_uuid, short_name=short_name).one()
+    except NoResultFound:
+        performer = Performer(
+            uuid=newnewid.uuid7(),
+            site_uuid=site_uuid,
+            short_name=short_name,
+            name=name,
+            url=url
+        )
+        session.add(performer)
+        session.commit()
+    finally:
+        site_performer_item = SitePerformerItem(
+            id=performer.uuid,
+            short_name=performer.short_name,
+            name=performer.name,
+            url=performer.url,
+            site_uuid=performer.site_uuid
+        )
+        session.close()
+        return site_performer_item

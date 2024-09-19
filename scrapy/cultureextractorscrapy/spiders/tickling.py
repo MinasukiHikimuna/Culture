@@ -4,8 +4,12 @@ import json
 import newnewid
 from dotenv import load_dotenv
 import scrapy
-from cultureextractorscrapy.spiders.database import get_site_item, get_existing_release_short_names
-from cultureextractorscrapy.items import ReleaseItem, SiteItem
+from cultureextractorscrapy.spiders.database import get_site_item, get_existing_release_short_names, get_or_create_performer
+from cultureextractorscrapy.items import (
+    AvailableGalleryZipFile, AvailableImageFile, AvailableVideoFile, AvailableVttFile,
+    AvailableFileEncoder, available_file_decoder, ReleaseItem, SiteItem
+)
+from cultureextractorscrapy.utils import parse_resolution_height, parse_resolution_width
 
 load_dotenv()
 
@@ -100,13 +104,17 @@ class TicklingSpider(scrapy.Spider):
         performer_elements = response.css('div.field-field-tag-performers div.field-items div.field-item')
         for element in performer_elements:
             if 'Performers:' in element.get():
+                short_name = element.css('a::attr(href)').get().split('/')[-1]
                 name = element.css('a::text').get()
                 url = element.css('a::attr(href)').get()
                 if name and url:
-                    performers.append({
-                        'name': name.strip(),
-                        'url': f"{base_url}{url.strip()}"
-                    })
+                    performer = get_or_create_performer(
+                        site_uuid=self.site.id,
+                        short_name=short_name,
+                        name=name.strip(),
+                        url=f"{base_url}{url.strip()}"
+                    )
+                    performers.append(performer)
 
         keywords = []
         keyword_elements = response.css('div.field-field-tag-keywords div.field-items div.field-item')
@@ -123,23 +131,55 @@ class TicklingSpider(scrapy.Spider):
         description = response.css("div.product-body p::text").get()
 
         # Extract downloadable files
-        download_links = []
+        available_files = []
         file_elements = response.css('div.download-files-block span.views-field-field-mp4fullhd-url, div.download-files-block span.views-field-field-mp4hd-url')
         for element in file_elements:
             link = element.css('a::attr(href)').get()
             title = element.css('a::attr(title)').get()
             text = element.css('a::text').get()
             file_type = element.css('span.field-content::text').re_first(r'\((.*?)\)')
-            if link and title and text:
-                download_links.append({
-                    'url': link,
-                    'title': title,
-                    'text': text,
-                    'type': file_type
-                })
 
+            if 'mp4' in file_type.lower():
+                width = parse_resolution_width(file_type)
+                height = parse_resolution_height(file_type)
+                available_files.append(AvailableVideoFile(
+                    file_type='video',
+                    content_type='scene',
+                    variant=title,
+                    url=link,
+                    resolution_width=width,
+                    resolution_height=height,
+                ))
+            elif 'zip' in file_type.lower():
+                available_files.append(AvailableGalleryZipFile(
+                    file_type='gallery',
+                    content_type='application/zip',
+                    variant=file_type,
+                    url=link,
+                    # Add other fields if available
+                ))
+            # Add more conditions for other file types
+
+        available_files = sorted(available_files, key=lambda x: x.resolution_width, reverse=True)
+        
+        
         preview_video_url = response.css("div#mediaspace span.field-content a::attr(href)").get()
+        if preview_video_url:
+            available_files.append(AvailableVideoFile(
+                file_type='video',
+                content_type='preview',
+                variant='',
+                url=preview_video_url,
+            ))
+
         preview_image_url = response.css("div#mediaspace span.field-content a img::attr(src)").get()
+        if preview_image_url:
+            available_files.append(AvailableImageFile(
+                file_type='image',
+                content_type='preview',
+                variant='',
+                url=preview_image_url,
+            ))
 
         # Create ReleaseItem
         release_item = ReleaseItem(
@@ -154,12 +194,9 @@ class TicklingSpider(scrapy.Spider):
             last_updated=datetime.now(timezone.utc),
             performers=[],
             tags=[],
-            available_files=json.dumps(download_links),
+            available_files=json.dumps(available_files, cls=AvailableFileEncoder),
             json_document=json.dumps({
-                'preview_video_url': preview_video_url,
-                'preview_image_url': preview_image_url,
-                'studio_name': studio_name,
-                'studio_slug': studio_slug,
+                "html": response.text
             }),
             site_uuid=self.site.id,
             site=self.site

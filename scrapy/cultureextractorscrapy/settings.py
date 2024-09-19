@@ -63,7 +63,7 @@ CONCURRENT_REQUESTS = 1
 # Configure item pipelines
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
 ITEM_PIPELINES = {
-    'cultureextractorscrapy.pipelines.PreviewImagesPipeline': 1,
+    'cultureextractorscrapy.pipelines.AvailableFilesPipeline': 1,
     'cultureextractorscrapy.pipelines.PostgresPipeline': 300,
 }
 
