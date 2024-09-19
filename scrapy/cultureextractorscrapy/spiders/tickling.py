@@ -4,7 +4,7 @@ import json
 import newnewid
 from dotenv import load_dotenv
 import scrapy
-from cultureextractorscrapy.spiders.database import get_site_item, get_existing_release_short_names, get_or_create_performer
+from cultureextractorscrapy.spiders.database import get_site_item, get_existing_release_short_names, get_or_create_performer, get_or_create_tag
 from cultureextractorscrapy.items import (
     AvailableGalleryZipFile, AvailableImageFile, AvailableVideoFile, AvailableVttFile,
     AvailableFileEncoder, available_file_decoder, ReleaseItem, SiteItem
@@ -116,17 +116,21 @@ class TicklingSpider(scrapy.Spider):
                     )
                     performers.append(performer)
 
-        keywords = []
+        tags = []
         keyword_elements = response.css('div.field-field-tag-keywords div.field-items div.field-item')
         for element in keyword_elements:
             if 'Keywords:' in element.get():
                 name = element.css('a::text').get()
                 url = element.css('a::attr(href)').get()
                 if name and url:
-                    keywords.append({
-                        'name': name.strip(),
-                        'url': f"{base_url}{url.strip()}"
-                    })
+                    short_name = url.split('/')[-1]
+                    tag = get_or_create_tag(
+                        site_uuid=self.site.id,
+                        short_name=short_name,
+                        name=name.strip(),
+                        url=f"{base_url}{url.strip()}"
+                    )
+                    tags.append(tag)
 
         description = response.css("div.product-body p::text").get()
 
@@ -192,8 +196,8 @@ class TicklingSpider(scrapy.Spider):
             duration=0,
             created=datetime.now(timezone.utc),
             last_updated=datetime.now(timezone.utc),
-            performers=[],
-            tags=[],
+            performers=performers,
+            tags=tags,  # Update this line
             available_files=json.dumps(available_files, cls=AvailableFileEncoder),
             json_document=json.dumps({
                 "html": response.text

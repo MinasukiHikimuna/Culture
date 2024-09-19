@@ -3,7 +3,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 from dotenv import load_dotenv
 import os
-from cultureextractorscrapy.items import SiteItem, SitePerformerItem  # Make sure to import SiteItem
+from cultureextractorscrapy.items import SiteItem, SitePerformerItem, SiteTagItem  # Make sure to import SiteItem
 import newnewid
 from sqlalchemy.orm.exc import NoResultFound
 
@@ -37,6 +37,14 @@ class Release(Base):
 
 class Performer(Base):
     __tablename__ = 'performers'
+    uuid = Column(String(36), primary_key=True)
+    short_name = Column(String, nullable=False)
+    name = Column(String, nullable=False)
+    url = Column(String, nullable=False)
+    site_uuid = Column(String(36), ForeignKey('sites.uuid'), nullable=False)
+
+class Tag(Base):
+    __tablename__ = 'tags'
     uuid = Column(String(36), primary_key=True)
     short_name = Column(String, nullable=False)
     name = Column(String, nullable=False)
@@ -111,3 +119,28 @@ def get_or_create_performer(site_uuid, short_name, name, url):
         )
         session.close()
         return site_performer_item
+
+def get_or_create_tag(site_uuid, short_name, name, url):
+    session = get_session()
+    try:
+        tag = session.query(Tag).filter_by(site_uuid=site_uuid, short_name=short_name).one()
+    except NoResultFound:
+        tag = Tag(
+            uuid=newnewid.uuid7(),
+            site_uuid=site_uuid,
+            short_name=short_name,
+            name=name,
+            url=url
+        )
+        session.add(tag)
+        session.commit()
+    finally:
+        site_tag_item = SiteTagItem(
+            id=tag.uuid,
+            short_name=tag.short_name,
+            name=tag.name,
+            url=tag.url,
+            site_uuid=tag.site_uuid
+        )
+        session.close()
+        return site_tag_item
