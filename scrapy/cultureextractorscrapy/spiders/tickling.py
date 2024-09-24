@@ -38,7 +38,7 @@ class TicklingSpider(scrapy.Spider):
     def parse_studios(self, response):
         menu_items = response.css("div.studio-side-menu ul.menu li")
 
-        for item in menu_items[0:1]:
+        for item in menu_items:
             href = item.css('a::attr(href)').get()
             yield scrapy.Request(
                 url=f"{base_url}{href}",
@@ -53,7 +53,7 @@ class TicklingSpider(scrapy.Spider):
             last_page = int(last_page)
             # The page nuumbering is weird. First page is 0 but last page is the total number of pages.
             # If last page is 116, then there are 117 pages.
-            for page_number in range(0, last_page)[0:1]:
+            for page_number in range(0, last_page):
                 yield scrapy.Request(
                     url=f"{response.url}?page={page_number}",
                     callback=self.parse_updates,
@@ -62,7 +62,7 @@ class TicklingSpider(scrapy.Spider):
 
     def parse_updates(self, response):
         updates = response.css('div.views-row div.node')
-        for update in updates[0:1]:
+        for update in updates:
             url = update.css('h2 a::attr(href)').get()
             yield scrapy.Request(
                 url=f"{base_url}{url}",
@@ -137,7 +137,8 @@ class TicklingSpider(scrapy.Spider):
 
         # Extract downloadable files
         available_files = []
-        file_elements = response.css('div.download-files-block span.views-field-field-mp4fullhd-url, div.download-files-block span.views-field-field-mp4hd-url')
+        file_elements = response.css(
+            'div.download-files-block span.views-field-field-mp4fullhd-url, div.download-files-block span.views-field-field-mp4hd-url, div.download-files-block span.views-field-field-mp4sd-url, div.download-files-block span.views-field-field-wmvhd-url, div.download-files-block span.views-field-field-wmv-url')
         highest_resolution_video = None
         highest_resolution = 0
 
@@ -146,11 +147,11 @@ class TicklingSpider(scrapy.Spider):
             title = element.css('a::attr(title)').get()
             file_type = element.css('span.field-content::text').re_first(r'\((.*?)\)')
 
-            if 'mp4' in file_type.lower():
+            if 'mp4' in file_type.lower() or 'wmv' in file_type.lower():
                 width = parse_resolution_width(title)
                 height = parse_resolution_height(title)
                 
-                if height > highest_resolution or (height == highest_resolution and "MP4" in title):
+                if height > highest_resolution or (height == highest_resolution and 'mp4' in file_type.lower()):
                     highest_resolution = height
                     highest_resolution_video = AvailableVideoFile(
                         file_type='video',
@@ -180,7 +181,7 @@ class TicklingSpider(scrapy.Spider):
                 url=preview_video_url,
             ))
 
-        preview_image_url = response.css("div#mediaspace span.field-content a img::attr(src)").get()
+        preview_image_url = response.css("div#mediaspace span.field-content img::attr(src)").get()
         if preview_image_url:
             available_files.append(AvailableImageFile(
                 file_type='image',
