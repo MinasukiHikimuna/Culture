@@ -138,35 +138,38 @@ class TicklingSpider(scrapy.Spider):
         # Extract downloadable files
         available_files = []
         file_elements = response.css('div.download-files-block span.views-field-field-mp4fullhd-url, div.download-files-block span.views-field-field-mp4hd-url')
+        highest_resolution_video = None
+        highest_resolution = 0
+
         for element in file_elements:
             link = element.css('a::attr(href)').get()
             title = element.css('a::attr(title)').get()
-            text = element.css('a::text').get()
             file_type = element.css('span.field-content::text').re_first(r'\((.*?)\)')
 
             if 'mp4' in file_type.lower():
                 width = parse_resolution_width(title)
                 height = parse_resolution_height(title)
-                available_files.append(AvailableVideoFile(
-                    file_type='video',
-                    content_type='scene',
-                    variant=title,
-                    url=link,
-                    resolution_width=width,
-                    resolution_height=height,
-                ))
+                
+                if height > highest_resolution or (height == highest_resolution and "MP4" in title):
+                    highest_resolution = height
+                    highest_resolution_video = AvailableVideoFile(
+                        file_type='video',
+                        content_type='scene',
+                        variant=title,
+                        url=link,
+                        resolution_width=width,
+                        resolution_height=height,
+                    )
             elif 'zip' in file_type.lower():
                 available_files.append(AvailableGalleryZipFile(
                     file_type='gallery',
                     content_type='application/zip',
                     variant=file_type,
                     url=link,
-                    # Add other fields if available
                 ))
-            # Add more conditions for other file types
 
-        available_files = sorted(available_files, key=lambda x: x.resolution_width, reverse=True)
-        
+        if highest_resolution_video:
+            available_files.append(highest_resolution_video)
         
         preview_video_url = response.css("div#mediaspace span.field-content a::attr(href)").get()
         if preview_video_url:
