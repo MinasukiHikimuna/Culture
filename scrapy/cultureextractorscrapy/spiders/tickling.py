@@ -116,6 +116,7 @@ class TicklingSpider(scrapy.Spider):
                     )
                     performers.append(performer)
 
+        # Extract tags (keywords)
         tags = []
         keyword_elements = response.css('div.field-field-tag-keywords div.field-items div.field-item')
         for element in keyword_elements:
@@ -144,8 +145,8 @@ class TicklingSpider(scrapy.Spider):
             file_type = element.css('span.field-content::text').re_first(r'\((.*?)\)')
 
             if 'mp4' in file_type.lower():
-                width = parse_resolution_width(file_type)
-                height = parse_resolution_height(file_type)
+                width = parse_resolution_width(title)
+                height = parse_resolution_height(title)
                 available_files.append(AvailableVideoFile(
                     file_type='video',
                     content_type='scene',

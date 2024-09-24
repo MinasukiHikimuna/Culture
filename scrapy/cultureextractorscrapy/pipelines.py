@@ -71,16 +71,30 @@ class AvailableFilesPipeline(FilesPipeline):
     def file_path(self, request, response=None, info=None, *, item=None):
         item = request.meta['item']
         file_info = request.meta['file_info']
-        filename = os.path.basename(urlparse(request.url).path)
         
-        # Create a folder structure based on file type and content type
-        folder = f"{item.site.name}/{file_info['file_type']}/{file_info['content_type']}"
+        # Extract file extension from the URL
+        url_path = urlparse(request.url).path
+        file_extension = os.path.splitext(url_path)[1]
         
-        # Add resolution to video file names
-        if file_info['file_type'] == 'video' and 'resolution_width' in file_info:
-            filename = f"{file_info['resolution_width']}p_{filename}"
+        # If the extension is .php, extract the real extension from the 'file' parameter
+        if file_extension.lower() == '.php':
+            query = urlparse(request.url).query
+            query_params = dict(param.split('=') for param in query.split('&') if '=' in param)
+            if 'file' in query_params:
+                file_param = query_params['file']
+                _, file_extension = os.path.splitext(file_param)
         
-        path = f'{folder}/{item.id}/{filename}'
+        # Create filename in the specified format
+        date_str = item.release_date
+        if file_info['file_type'] == 'video' and 'resolution_height' in file_info and file_info['resolution_height']:
+            filename = f"{item.site.name} - {date_str} - {item.name} - {item.id} - {file_info['resolution_width']}x{file_info['resolution_height']}{file_extension}"
+        else:
+            filename = f"{item.site.name} - {date_str} - {item.name} - {item.id}{file_extension}"
+        
+        # Create a folder structure based on release ID
+        folder = f"{item.site.name}/Metadata/{item.id}"
+        
+        path = f'{folder}/{filename}'
         logging.info(f"File will be saved to: {path}")
         return path
 

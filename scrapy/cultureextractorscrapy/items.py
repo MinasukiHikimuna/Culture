@@ -54,26 +54,11 @@ from dataclasses import dataclass
 from typing import Optional
 
 class IAvailableFile(ABC):
-    @property
-    @abstractmethod
-    def file_type(self) -> str:
-        pass
+    file_type: str
+    content_type: str
+    variant: str
+    url: str
 
-    @property
-    @abstractmethod
-    def content_type(self) -> str:
-        pass
-
-    @property
-    @abstractmethod
-    def variant(self) -> str:
-        pass
-
-    @property
-    @abstractmethod
-    def url(self) -> str:
-        pass
-    
 @dataclass
 class AvailableGalleryZipFile(IAvailableFile):
     file_type: str
