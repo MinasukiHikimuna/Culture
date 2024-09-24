@@ -94,3 +94,6 @@ TWISTED_REACTOR = "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
 FEED_EXPORT_ENCODING = "utf-8"
 
 FILES_STORE = 'F:/Ripping/'
+
+MEDIA_ALLOW_REDIRECTS = True
+DOWNLOAD_MAXSIZE = 0
