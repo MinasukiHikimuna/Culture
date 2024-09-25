@@ -32,27 +32,47 @@ class PostgresPipeline:
                 spider.logger.error(f"Site not found for UUID: {item.site_uuid}")
                 return item
 
-            release = Release(
-                uuid=str(item.id),
-                release_date=datetime.fromisoformat(item.release_date) if item.release_date else None,
-                short_name=item.short_name,
-                name=item.name,
-                url=item.url,
-                description=item.description,
-                duration=item.duration,
-                created=item.created,
-                last_updated=item.last_updated,
-                available_files=item.available_files,
-                json_document=item.json_document,
-                site_uuid=str(item.site_uuid)
-            )
+            existing_release = self.session.query(Release).filter_by(uuid=str(item.id)).first()
+
+            if existing_release:
+                # Update existing release
+                existing_release.release_date = datetime.fromisoformat(item.release_date) if item.release_date else None
+                existing_release.short_name = item.short_name
+                existing_release.name = item.name
+                existing_release.url = item.url
+                existing_release.description = item.description
+                existing_release.duration = item.duration
+                existing_release.last_updated = item.last_updated
+                existing_release.available_files = item.available_files
+                existing_release.json_document = item.json_document
+                spider.logger.info(f"Updating existing release with ID: {item.id}")
+            else:
+                # Create new release
+                new_release = Release(
+                    uuid=str(item.id),
+                    release_date=datetime.fromisoformat(item.release_date) if item.release_date else None,
+                    short_name=item.short_name,
+                    name=item.name,
+                    url=item.url,
+                    description=item.description,
+                    duration=item.duration,
+                    created=item.created,
+                    last_updated=item.last_updated,
+                    available_files=item.available_files,
+                    json_document=item.json_document,
+                    site_uuid=str(item.site_uuid)
+                )
+                self.session.add(new_release)
+                spider.logger.info(f"Creating new release with ID: {item.id}")
 
             try:
-                self.session.add(release)
                 self.session.commit()
-            except IntegrityError:
+            except IntegrityError as e:
                 self.session.rollback()
-                spider.logger.warning(f"Release with short_name {item.short_name} already exists. Skipping.")
+                import traceback
+                spider.logger.error(f"IntegrityError while processing release with ID: {item.id}")
+                spider.logger.error(traceback.format_exc())
+                spider.logger.error(f"IntegrityError details: {str(e)}")
 
         return item
 
@@ -66,19 +86,26 @@ class AvailableFilesPipeline(FilesPipeline):
             available_files = json.loads(item.available_files)
             for file in available_files:
                 if file['file_type'] in ['video', 'image', 'gallery']:
-                    yield Request(file['url'], meta={'item': item, 'file_info': file})
+                    file_path = self.file_path(None, None, info, item=item, file_info=file)
+                    full_path = os.path.join(self.store.basedir, file_path)
+                    if not os.path.exists(full_path):
+                        yield Request(file['url'], meta={'item': item, 'file_info': file})
+                    else:
+                        logging.info(f"File already exists, skipping download: {full_path}")
+                        file['local_path'] = file_path
 
-    def file_path(self, request, response=None, info=None, *, item=None):
-        item = request.meta['item']
-        file_info = request.meta['file_info']
+    def file_path(self, request, response=None, info=None, *, item=None, file_info=None):
+        if request:
+            item = request.meta['item']
+            file_info = request.meta['file_info']
         
         # Extract file extension from the URL
-        url_path = urlparse(request.url).path
+        url_path = urlparse(file_info['url']).path
         file_extension = os.path.splitext(url_path)[1]
         
         # If the extension is .php, extract the real extension from the 'file' parameter
         if file_extension.lower() == '.php':
-            query = urlparse(request.url).query
+            query = urlparse(file_info['url']).query
             query_params = dict(param.split('=') for param in query.split('&') if '=' in param)
             if 'file' in query_params:
                 file_param = query_params['file']
@@ -104,14 +131,12 @@ class AvailableFilesPipeline(FilesPipeline):
     def item_completed(self, results, item, info):
         if isinstance(item, ReleaseItem):
             downloaded_files = [x for ok, x in results if ok]
-            if downloaded_files:
-                available_files = json.loads(item.available_files)
-                for file in available_files:
+            available_files = json.loads(item.available_files)
+            for file in available_files:
+                if 'local_path' not in file:
                     matching_downloads = [x for x in downloaded_files if x['url'] == file['url']]
                     if matching_downloads:
                         file['local_path'] = matching_downloads[0]['path']
-                item.available_files = json.dumps(available_files)
-                logging.info(f"Updated item with local paths for {len(downloaded_files)} files")
-            else:
-                logging.warning(f"No files were successfully downloaded for item: {item.short_name}")
+            item.available_files = json.dumps(available_files)
+            logging.info(f"Updated item with local paths for {len([f for f in available_files if 'local_path' in f])} files")
         return item

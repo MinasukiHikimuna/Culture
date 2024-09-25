@@ -29,7 +29,7 @@ class TicklingSpider(scrapy.Spider):
         if site_item is None:
             raise ValueError(f"Site with short_name '{spider.site_short_name}' not found in the database.")
         spider.site = site_item
-        spider.existing_short_names = get_existing_release_short_names(site_item.id)
+        spider.existing_releases = get_existing_release_short_names(site_item.id)
         return spider
 
     def parse(self, response):
@@ -77,9 +77,12 @@ class TicklingSpider(scrapy.Spider):
         movie_name = response.css('h1.title::text').get()
 
         # Check if this release already exists
-        if movie_slug in self.existing_short_names:
-            self.logger.info(f"Release with short_name {movie_slug} already exists for this site. Skipping.")
-            return
+        existing_release_id = self.existing_releases.get(movie_slug)
+        release_id = existing_release_id if existing_release_id else newnewid.uuid7()
+        if existing_release_id:
+            self.logger.info(f"Release ID={existing_release_id} short_name={movie_slug} already exists. Updating existing release.")
+        else:
+            self.logger.info(f"Creating new release ID={release_id} short_name={movie_slug}.")
 
         date_text = response.xpath('//p[@class="content"][span[@class="label" and contains(text(), "Datum:")]]/text()').get()
         
@@ -190,28 +193,26 @@ class TicklingSpider(scrapy.Spider):
                 url=preview_image_url,
             ))
 
-        # Create ReleaseItem
+        # Create or update ReleaseItem
         release_item = ReleaseItem(
-            id=newnewid.uuid7(),
+            id=release_id,
             release_date=date.isoformat() if date else None,
             short_name=movie_slug,
             name=movie_name,
             url=response.url,
             description=description,
             duration=0,
-            created=datetime.now(timezone.utc),
-            last_updated=datetime.now(timezone.utc),
+            created=datetime.now(tz=timezone.utc).astimezone() if not existing_release_id else None,
+            last_updated=datetime.now(tz=timezone.utc).astimezone(),
             performers=performers,
-            tags=tags,  # Update this line
+            tags=tags,
             available_files=json.dumps(available_files, cls=AvailableFileEncoder),
             json_document=json.dumps({
+                "duration": duration_text,
                 "html": response.text
             }),
             site_uuid=self.site.id,
             site=self.site
         )
-
-        # Add the new short_name to the set of existing short_names
-        self.existing_short_names.add(movie_slug)
 
         yield release_item

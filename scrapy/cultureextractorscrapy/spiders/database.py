@@ -74,13 +74,12 @@ def save_release(release):
 
 def get_existing_release_short_names(site_uuid):
     session = get_session()
-    short_names = set(
-        r.short_name for r in session.query(Release.short_name)
-        .filter(Release.site_uuid == site_uuid)
+    releases = session.query(Release.short_name, Release.uuid)\
+        .filter(Release.site_uuid == site_uuid)\
         .all()
-    )
+    result = {r.short_name: r.uuid for r in releases}
     session.close()
-    return short_names
+    return result
 
 def get_site_item(site_short_name):
     session = get_session()
