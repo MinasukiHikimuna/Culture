@@ -91,6 +91,9 @@ class AvailableFilesPipeline(FilesPipeline):
         else:
             filename = f"{item.site.name} - {date_str} - {item.name} - {item.id}{file_extension}"
         
+        # Remove path separators from filename
+        filename = filename.replace('/', '').replace('\\', '')
+        
         # Create a folder structure based on release ID
         folder = f"{item.site.name}/Metadata/{item.id}"
         
