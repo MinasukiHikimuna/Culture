@@ -133,7 +133,7 @@ class TicklingSpider(scrapy.Spider):
                     )
                     tags.append(tag)
 
-        description = response.css("div.product-body p::text").get()
+        description = response.css("div.product-body p::text").get() or ""
 
         # Extract downloadable files
         available_files = []
