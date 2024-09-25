@@ -1,0 +1,18 @@
+{
+    "version": "0.1.0",
+    "configurations": [
+        {
+            "name": "Python: Launch Scrapy Spider",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "scrapy",
+            "args": [
+                "crawl",
+                "tickling",
+                "--loglevel",
+                "DEBUG",
+            ],
+            "console": "integratedTerminal"
+        }
+    ]
+}
