@@ -11,6 +11,7 @@ from scrapy.pipelines.files import FilesPipeline
 from scrapy import Request
 from scrapy.exceptions import DropItem
 import logging
+from scrapy.utils.project import get_project_settings
 
 from .spiders.database import get_session, Site, Release, DownloadedFile
 from .items import ReleaseAndDownloadsItem, ReleaseItem, AvailableVideoFile, AvailableImageFile, AvailableGalleryZipFile, DownloadedFileItem
@@ -201,9 +202,17 @@ class AvailableFilesPipeline(FilesPipeline):
         # Create a folder structure based on release ID
         folder = f"{item.site.name}/Metadata/{item.id}"
         
-        path = f'{folder}/{filename}'
-        logging.info(f"File will be saved to: {path}")
-        return path
+        relative_path = f'{folder}/{filename}'
+        
+        # Get the FILES_STORE setting
+        settings = get_project_settings()
+        files_store = settings.get('FILES_STORE')
+        
+        # Create the absolute path
+        absolute_path = os.path.join(files_store, relative_path)
+        
+        logging.info(f"File will be saved to: {absolute_path}")
+        return absolute_path
 
     # def item_completed(self, results, item, info):
     #     file_paths = [x["path"] for ok, x in results if ok]
@@ -248,7 +257,7 @@ class AvailableFilesPipeline(FilesPipeline):
                         variant=file.get('variant'),
                         available_file=file,
                         original_filename=file['url'],
-                        saved_filename=file_info['path'],
+                        saved_filename=file_info['path'],  # This is now an absolute path
                         release_uuid=str(item.id),
                         file_metadata=file_metadata
                     )
