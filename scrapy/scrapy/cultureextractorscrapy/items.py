@@ -117,3 +117,15 @@ def available_file_decoder(dct):
         cls = globals()[class_name]
         return cls(**dct)
     return dct
+
+class DownloadedFileItem(scrapy.Item):
+    uuid = scrapy.Field()
+    downloaded_at = scrapy.Field()
+    file_type = scrapy.Field()
+    content_type = scrapy.Field()
+    variant = scrapy.Field()
+    available_file = scrapy.Field()
+    original_filename = scrapy.Field()
+    saved_filename = scrapy.Field()
+    release_uuid = scrapy.Field()
+    file_metadata = scrapy.Field()

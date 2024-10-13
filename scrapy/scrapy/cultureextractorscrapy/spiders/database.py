@@ -1,4 +1,4 @@
-from sqlalchemy import Date, DateTime, Float, ForeignKey, create_engine, Column, String
+from sqlalchemy import Date, DateTime, Float, ForeignKey, create_engine, Column, String, Integer, UUID, JSON
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 from dotenv import load_dotenv
@@ -34,6 +34,7 @@ class Release(Base):
     json_document = Column(String, nullable=False)
     site_uuid = Column(String(36), ForeignKey('sites.uuid'), nullable=False)
     site = relationship("Site", back_populates="releases")
+    downloads = relationship("DownloadedFile", back_populates="release")
 
 class Performer(Base):
     __tablename__ = 'performers'
@@ -50,6 +51,22 @@ class Tag(Base):
     name = Column(String, nullable=False)
     url = Column(String, nullable=False)
     site_uuid = Column(String(36), ForeignKey('sites.uuid'), nullable=False)
+
+class DownloadedFile(Base):
+    __tablename__ = 'downloads'
+
+    uuid = Column(UUID, primary_key=True)
+    downloaded_at = Column(DateTime, nullable=False)
+    file_type = Column(String, nullable=False)
+    content_type = Column(String, nullable=False)
+    variant = Column(String, nullable=False)
+    available_file = Column(JSON, nullable=False)
+    original_filename = Column(String)
+    saved_filename = Column(String)
+    release_uuid = Column(UUID, ForeignKey('releases.uuid'), nullable=False)
+    file_metadata = Column(JSON, nullable=False, default='{}')
+
+    release = relationship("Release", back_populates="downloads")
 
 def get_engine():
     db_url = os.getenv('CONNECTION_STRING')

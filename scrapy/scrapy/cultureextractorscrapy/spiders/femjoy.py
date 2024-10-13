@@ -54,7 +54,7 @@ class FemjoySpider(scrapy.Spider):
         # Get the last page number
         last_page = int(pagination.css('div.right a.pageBtn[title="last"]::attr(data-page)').get())
         
-        for page in range(1, 2): # TODO: last_page + 1):
+        for page in range(1, 3): # TODO: last_page + 1):
             yield scrapy.Request(
                 url=f"{base_url}/photos?page={page}",
                 callback=self.parse_photos_page,
@@ -192,7 +192,7 @@ class FemjoySpider(scrapy.Spider):
         # Get the last page number
         last_page = int(pagination.css('div.right a.pageBtn[title="last"]::attr(data-page)').get())
         
-        for page in range(1, 2): # TODO: last_page + 1):
+        for page in range(1, 3): # TODO: last_page + 1):
             yield scrapy.Request(
                 url=f"{base_url}/videos?page={page}",
                 callback=self.parse_videos_page,
