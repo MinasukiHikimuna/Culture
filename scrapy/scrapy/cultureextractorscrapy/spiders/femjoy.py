@@ -22,6 +22,9 @@ class FemjoySpider(scrapy.Spider):
     allowed_domains = os.getenv("FEMJOY_ALLOWED_DOMAINS").split(",")
     start_urls = [base_url]
     site_short_name = "femjoy"
+    
+    # Add this new class attribute to store desired performer short names
+    desired_performers = ["heidi-romanova", "carisha", "belinda", "ashley", "ryana", "linda-a", "sofie", "susi-r", "darina-a", "cara-mell-1", "susann", "cara-mell", "stella-cardo", "candy-d", "vanea-h", "miela", "davina-e", "niemira", "corinna", "josephine", "jane-f", "ariel", "vika-p", "caprice", "marga-e", "pandora-red", "aelita", "lana-lane", "vika-a", "karla-s", "melina-d", "stacy-cruz", "mila-k", "missa", "sugar-ann", "erin-k", "paula-s", "anneth", "jasmine-a", "annabell", "alice-kelly", "rinna", "myla", "simona", "penelope-g", "april-e", "olivia-linz", "lillie", "ella-c", "danica", "kinga", "anna-delos", "casey", "mara-blake", "aveira", "melisa", "alisha", "alicia-fox", "hayden-w", "vanessa-a", "jenni", "mariposa", "ruth", "linda-a", "susi-r"]  # Add short names of desired performers here, e.g., ["performer1", "performer2"]
 
     @classmethod
     def from_crawler(cls, crawler, *args, **kwargs):
@@ -34,10 +37,10 @@ class FemjoySpider(scrapy.Spider):
         return spider
 
     def parse(self, response):
-        # yield scrapy.Request(
-        #     url=f"{base_url}/photos",
-        #     callback=self.parse_photos,
-        #     cookies=cookies)
+        yield scrapy.Request(
+            url=f"{base_url}/photos",
+            callback=self.parse_photos,
+            cookies=cookies)
         
         yield scrapy.Request(
             url=f"{base_url}/videos",
@@ -48,13 +51,10 @@ class FemjoySpider(scrapy.Spider):
         # Extract pagination data
         pagination = response.css('div._pagination div.paginationArea')
         
-        # Get the current page number
-        current_page = int(pagination.css('div.center a.highlight::text').get())
-        
         # Get the last page number
         last_page = int(pagination.css('div.right a.pageBtn[title="last"]::attr(data-page)').get())
         
-        for page in range(1, 2): # TODO: last_page + 1):
+        for page in range(1, last_page + 1):
             yield scrapy.Request(
                 url=f"{base_url}/photos?page={page}",
                 callback=self.parse_photos_page,
@@ -64,7 +64,7 @@ class FemjoySpider(scrapy.Spider):
        
     def parse_photos_page(self, response):
         posts = response.css('div.post_item')
-        for post in posts[0:1]:
+        for post in posts:
             external_id = post.css('::attr(data-post-id)').get()
             title = post.css('h1 a::text').get()
             cover_url = post.css('div.post_image a img.item_cover::attr(src)').get()
@@ -81,9 +81,10 @@ class FemjoySpider(scrapy.Spider):
             for model_element in model_elements:
                 model_name = model_element.css('::text').get()
                 model_url = model_element.css('::attr(href)').get()
+                model_short_name = model_url.split('/')[-1] if model_url else None
                 models.append({
                     "name": model_name,
-                    "short_name": model_url.split('/')[-1] if model_url else None,
+                    "short_name": model_short_name,
                     "url": model_url
                 })
             
@@ -109,6 +110,10 @@ class FemjoySpider(scrapy.Spider):
                 "director": director
             }
             
+            # Check if any of the desired performers are in this release
+            if self.desired_performers and not any(model['short_name'] in self.desired_performers for model in models):
+                continue  # Skip this release if it doesn't contain any desired performers
+
             yield scrapy.Request(
                 url=f"{base_url}{post_url}",
                 callback=self.parse_photoset,
@@ -186,13 +191,10 @@ class FemjoySpider(scrapy.Spider):
         # Extract pagination data
         pagination = response.css('div._pagination div.paginationArea')
         
-        # Get the current page number
-        current_page = int(pagination.css('div.center a.highlight::text').get())
-        
         # Get the last page number
         last_page = int(pagination.css('div.right a.pageBtn[title="last"]::attr(data-page)').get())
         
-        for page in range(1, 2): # TODO: last_page + 1):
+        for page in range(1, last_page + 1):
             yield scrapy.Request(
                 url=f"{base_url}/videos?page={page}",
                 callback=self.parse_videos_page,
@@ -202,7 +204,7 @@ class FemjoySpider(scrapy.Spider):
     
     def parse_videos_page(self, response):
         posts = response.css('div.post_item')
-        for post in posts[0:1]:
+        for post in posts:
             external_id = post.css('::attr(data-post-id)').get()
             title = post.css('h1 a::text').get()
             cover_url = post.css('div.post_video a img.item_cover::attr(src)').get()
@@ -211,9 +213,9 @@ class FemjoySpider(scrapy.Spider):
             parsed_release_date = datetime.strptime(raw_release_date, '%b %d, %Y').date() if raw_release_date else None
             release_date = parsed_release_date.isoformat() if parsed_release_date else None
             
-            duration_text = post.css('h3 span.counter_photos::text').get().strip()
-            if duration_text:
-                duration_parts = duration_text.split(':')
+            raw_duration_text = post.css('h3 span.counter_photos::text').get()
+            if raw_duration_text:
+                duration_parts = raw_duration_text.strip().split(':')
                 if len(duration_parts) == 2:
                     minutes, seconds = map(int, duration_parts)
                     duration = minutes * 60 + seconds
@@ -228,12 +230,17 @@ class FemjoySpider(scrapy.Spider):
             for model_element in model_elements:
                 model_name = model_element.css('::text').get()
                 model_url = model_element.css('::attr(href)').get()
+                model_short_name = model_url.split('/')[-1] if model_url else None
                 models.append({
                     "name": model_name,
-                    "short_name": model_url.split('/')[-1] if model_url else None,
+                    "short_name": model_short_name,
                     "url": model_url
                 })
             
+            # Check if any of the desired performers are in this release
+            if self.desired_performers and not any(model['short_name'] in self.desired_performers for model in models):
+                continue  # Skip this release if it doesn't contain any desired performers
+
             director = {}
             director_element = post.css('h2 a[href^="/director/"]')
             if director_element:
