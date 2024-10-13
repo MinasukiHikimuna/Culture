@@ -13,7 +13,7 @@ from scrapy.exceptions import DropItem
 import logging
 
 from .spiders.database import get_session, Site, Release, DownloadedFile
-from .items import ReleaseItem, AvailableVideoFile, AvailableImageFile, AvailableGalleryZipFile, DownloadedFileItem
+from .items import ReleaseAndDownloadsItem, ReleaseItem, AvailableVideoFile, AvailableImageFile, AvailableGalleryZipFile, DownloadedFileItem
 from datetime import datetime
 import json
 from sqlalchemy.exc import IntegrityError
@@ -221,6 +221,7 @@ class AvailableFilesPipeline(FilesPipeline):
         if not file_paths:
             raise DropItem("Item contains no files")
         
+        downloaded_files = []
         if isinstance(item, ReleaseItem):
             logging.info(f"Processing release item {item.id}")
             
@@ -251,12 +252,9 @@ class AvailableFilesPipeline(FilesPipeline):
                         release_uuid=str(item.id),
                         file_metadata=file_metadata
                     )
-            # item.available_files = json.dumps(available_files)
-            # logging.info(f"Updated item with local paths for {len([f for f in available_files if 'local_path' in f])} files")
+                    downloaded_files.append(downloaded_file_item)
         
-        # TODO: is this needed?
-        # item['file_paths'] = file_paths
-        return item
+        return ReleaseAndDownloadsItem(release=item, downloaded_files=downloaded_files)
 
     def process_file_metadata(self, file_path, file_type):
         if file_type == 'video':

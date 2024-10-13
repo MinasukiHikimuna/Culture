@@ -129,3 +129,8 @@ class DownloadedFileItem(scrapy.Item):
     saved_filename = scrapy.Field()
     release_uuid = scrapy.Field()
     file_metadata = scrapy.Field()
+
+@dataclass
+class ReleaseAndDownloadsItem:
+    release: ReleaseItem
+    downloaded_files: list[DownloadedFileItem]
