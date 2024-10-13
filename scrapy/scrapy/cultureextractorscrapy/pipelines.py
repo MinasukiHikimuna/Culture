@@ -221,83 +221,80 @@ class AvailableFilesPipeline(FilesPipeline):
         if not file_paths:
             raise DropItem("Item contains no files")
         
+        if isinstance(item, ReleaseItem):
+            logging.info(f"Processing release item {item.id}")
+            
+            downloaded_files = [x for ok, x in results if ok]
+            logging.info(f"Downloaded files: {downloaded_files}")
+            available_files = json.loads(item.available_files)
+            for file in available_files:
+                logging.info(f"Processing file: {file}")
+                
+                matching_downloads = [x for x in downloaded_files if x['url'] == file['url']]
+                if matching_downloads:
+                    file['local_path'] = matching_downloads[0]['path']
+                    
+                    # Process file metadata
+                    file_info = matching_downloads[0]
+                    file_metadata = self.process_file_metadata(file_info['path'], file['file_type'])
+                    
+                    # Create DownloadedFileItem
+                    downloaded_file_item = DownloadedFileItem(
+                        uuid=newnewid.uuid7(),
+                        downloaded_at=datetime.now(),
+                        file_type=file['file_type'],
+                        content_type=file.get('content_type'),
+                        variant=file.get('variant'),
+                        available_file=file,
+                        original_filename=file['url'],
+                        saved_filename=file_info['path'],
+                        release_uuid=str(item.id),
+                        file_metadata=file_metadata
+                    )
+            # item.available_files = json.dumps(available_files)
+            # logging.info(f"Updated item with local paths for {len([f for f in available_files if 'local_path' in f])} files")
+        
+        # TODO: is this needed?
+        # item['file_paths'] = file_paths
         return item
-#         
-#         if isinstance(item, ReleaseItem):
-#             downloaded_files = [x for ok, x in results if ok]
-#             logging.info(f"Downloaded files: {downloaded_files}")
-#             available_files = json.loads(item.available_files)
-#             for file in available_files:
-#                 if 'local_path' not in file:
-#                     matching_downloads = [x for x in downloaded_files if x['url'] == file['url']]
-#                     if matching_downloads:
-#                         file['local_path'] = matching_downloads[0]['path']
-#                         
-#                         # Process file metadata
-#                         file_info = matching_downloads[0]
-#                         file_metadata = self.process_file_metadata(file_info['path'], file['file_type'])
-#                         
-#                         # Create DownloadedFileItem
-#                         downloaded_file_item = DownloadedFileItem(
-#                             uuid=newnewid.uuid7(),
-#                             downloaded_at=datetime.now(),
-#                             file_type=file['file_type'],
-#                             content_type=file.get('content_type'),
-#                             variant=file.get('variant'),
-#                             available_file=file,
-#                             original_filename=file['url'],
-#                             saved_filename=file_info['path'],
-#                             release_uuid=str(item.id),
-#                             file_metadata=file_metadata
-#                         )
-#                         
-#                         # Yield the DownloadedFileItem
-#                         yield downloaded_file_item
-# 
-#             item.available_files = json.dumps(available_files)
-#             logging.info(f"Updated item with local paths for {len([f for f in available_files if 'local_path' in f])} files")
-#         
-#         item['file_paths'] = file_paths
-#         return item
-# 
-#     def process_file_metadata(self, file_path, file_type):
-#         if file_type == 'video':
-#             return self.process_video_metadata(file_path)
-#         else:
-#             return self.process_file_metadata(file_path, file_type)
-# 
-#     def process_video_metadata(self, file_path):
-#         result = subprocess.run(['C:\\Tools\\videohashes-windows-amd64.exe', '-json', '-md5', file_path], capture_output=True, text=True)
-#         
-#         if result.returncode == 0:
-#             video_hashes = json.loads(result.stdout)
-#             return {
-#                 "$type": "VideoHashes",
-#                 "duration": video_hashes.get("duration"),
-#                 "phash": video_hashes.get("phash"),
-#                 "oshash": video_hashes.get("oshash"),
-#                 "md5": video_hashes.get("md5")
-#             }
-#         else:
-#             self.logger.error(f"Failed to get video hashes: {result.stderr}")
-#             return {}
-# 
-#     def process_file_metadata(self, file_path, file_type):
-#         if file_type == 'zip':
-#             type = "GalleryZipFileMetadata"
-#         elif file_type == 'image':
-#             type = "ImageFileMetadata"
-#         elif file_type == 'vtt':
-#             type = "VttFileMetadata"
-#         
-#         sha256_hash = hashlib.sha256()
-#         with open(file_path, "rb") as f:
-#             for byte_block in iter(lambda: f.read(4096), b""):
-#                 sha256_hash.update(byte_block)
-#         sha256_sum = sha256_hash.hexdigest()
-# 
-#         return {
-#             "$type": "GalleryZipFileMetadata",
-#             "sha256Sum": sha256_sum
-#         }
-# 
+
+    def process_file_metadata(self, file_path, file_type):
+        if file_type == 'video':
+            return self.process_video_metadata(file_path)
+        else:
+            return self.process_file_metadata(file_path, file_type)
+
+    def process_video_metadata(self, file_path):
+        result = subprocess.run(['C:\\Tools\\videohashes-windows-amd64.exe', '-json', '-md5', file_path], capture_output=True, text=True)
+        
+        if result.returncode == 0:
+            video_hashes = json.loads(result.stdout)
+            return {
+                "$type": "VideoHashes",
+                "duration": video_hashes.get("duration"),
+                "phash": video_hashes.get("phash"),
+                "oshash": video_hashes.get("oshash"),
+                "md5": video_hashes.get("md5")
+            }
+        else:
+            self.logger.error(f"Failed to get video hashes: {result.stderr}")
+            return {}
+
+    def process_file_metadata(self, file_path, file_type):
+        if file_type == 'zip':
+            type = "GalleryZipFileMetadata"
+        elif file_type == 'image':
+            type = "ImageFileMetadata"
+        elif file_type == 'vtt':
+            type = "VttFileMetadata"
+        
+        sha256_hash = hashlib.sha256()
+        with open(file_path, "rb") as f:
+            for byte_block in iter(lambda: f.read(4096), b""):
+                sha256_hash.update(byte_block)
+        sha256_sum = sha256_hash.hexdigest()
+
+        return {
+            "$type": type,
+            "sha256Sum": sha256_sum
+        }
