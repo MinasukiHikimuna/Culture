@@ -65,7 +65,7 @@ DOWNLOAD_TIMEOUT = 600
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
 ITEM_PIPELINES = {
     'cultureextractorscrapy.pipelines.AvailableFilesPipeline': 1,
-    'cultureextractorscrapy.pipelines.PostgresPipeline': 300,
+    # 'cultureextractorscrapy.pipelines.PostgresPipeline': 300,
 }
 
 # Enable and configure the AutoThrottle extension (disabled by default)
@@ -93,8 +93,6 @@ AUTOTHROTTLE_TARGET_CONCURRENCY = 1.0
 REQUEST_FINGERPRINTER_IMPLEMENTATION = "2.7"
 TWISTED_REACTOR = "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
 FEED_EXPORT_ENCODING = "utf-8"
-
-FILES_STORE = 'F:/Ripping/'
 
 MEDIA_ALLOW_REDIRECTS = True
 DOWNLOAD_MAXSIZE = 0

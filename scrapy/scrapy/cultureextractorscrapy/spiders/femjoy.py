@@ -34,10 +34,10 @@ class FemjoySpider(scrapy.Spider):
         return spider
 
     def parse(self, response):
-        yield scrapy.Request(
-            url=f"{base_url}/photos",
-            callback=self.parse_photos,
-            cookies=cookies)
+        # yield scrapy.Request(
+        #     url=f"{base_url}/photos",
+        #     callback=self.parse_photos,
+        #     cookies=cookies)
         
         yield scrapy.Request(
             url=f"{base_url}/videos",
@@ -54,7 +54,7 @@ class FemjoySpider(scrapy.Spider):
         # Get the last page number
         last_page = int(pagination.css('div.right a.pageBtn[title="last"]::attr(data-page)').get())
         
-        for page in range(1, 3): # TODO: last_page + 1):
+        for page in range(1, 2): # TODO: last_page + 1):
             yield scrapy.Request(
                 url=f"{base_url}/photos?page={page}",
                 callback=self.parse_photos_page,
@@ -64,7 +64,7 @@ class FemjoySpider(scrapy.Spider):
        
     def parse_photos_page(self, response):
         posts = response.css('div.post_item')
-        for post in posts:
+        for post in posts[0:1]:
             external_id = post.css('::attr(data-post-id)').get()
             title = post.css('h1 a::text').get()
             cover_url = post.css('div.post_image a img.item_cover::attr(src)').get()
@@ -192,7 +192,7 @@ class FemjoySpider(scrapy.Spider):
         # Get the last page number
         last_page = int(pagination.css('div.right a.pageBtn[title="last"]::attr(data-page)').get())
         
-        for page in range(1, 3): # TODO: last_page + 1):
+        for page in range(1, 2): # TODO: last_page + 1):
             yield scrapy.Request(
                 url=f"{base_url}/videos?page={page}",
                 callback=self.parse_videos_page,
@@ -202,7 +202,7 @@ class FemjoySpider(scrapy.Spider):
     
     def parse_videos_page(self, response):
         posts = response.css('div.post_item')
-        for post in posts:
+        for post in posts[0:1]:
             external_id = post.css('::attr(data-post-id)').get()
             title = post.css('h1 a::text').get()
             cover_url = post.css('div.post_video a img.item_cover::attr(src)').get()
