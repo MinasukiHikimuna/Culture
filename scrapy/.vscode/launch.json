@@ -8,10 +8,11 @@
             "module": "scrapy",
             "args": [
                 "crawl",
-                "tickling",
+                "femjoy",
                 "--loglevel",
                 "DEBUG",
             ],
+            "cwd": "${workspaceFolder}/scrapy",
             "console": "integratedTerminal"
         }
     ]

@@ -84,8 +84,15 @@ class AvailableFilesPipeline(FilesPipeline):
     def get_media_requests(self, item, info):
         if isinstance(item, ReleaseItem):
             available_files = json.loads(item.available_files)
+            largest_zip_gallery = None
+            largest_size = 0
             for file in available_files:
-                if file['file_type'] in ['video', 'image', 'gallery']:
+                if file['file_type'] == 'zip' and file.get('content_type') == 'gallery':
+                    file_size = file.get('resolution_width', 0)
+                    if file_size > largest_size:
+                        largest_size = file_size
+                        largest_zip_gallery = file
+                elif file['file_type'] in ['video', 'image']:
                     file_path = self.file_path(None, None, info, item=item, file_info=file)
                     full_path = os.path.join(self.store.basedir, file_path)
                     if not os.path.exists(full_path):
@@ -93,6 +100,15 @@ class AvailableFilesPipeline(FilesPipeline):
                     else:
                         logging.info(f"File already exists, skipping download: {full_path}")
                         file['local_path'] = file_path
+            
+            if largest_zip_gallery:
+                file_path = self.file_path(None, None, info, item=item, file_info=largest_zip_gallery)
+                full_path = os.path.join(self.store.basedir, file_path)
+                if not os.path.exists(full_path):
+                    yield Request(largest_zip_gallery['url'], meta={'item': item, 'file_info': largest_zip_gallery})
+                else:
+                    logging.info(f"File already exists, skipping download: {full_path}")
+                    largest_zip_gallery['local_path'] = file_path
 
     def file_path(self, request, response=None, info=None, *, item=None, file_info=None):
         if request:
@@ -115,6 +131,8 @@ class AvailableFilesPipeline(FilesPipeline):
         date_str = item.release_date
         if file_info['file_type'] == 'video' and 'resolution_height' in file_info and file_info['resolution_height']:
             filename = f"{item.site.name} - {date_str} - {item.name} - {item.id} - {file_info['resolution_width']}x{file_info['resolution_height']}{file_extension}"
+        elif file_info['file_type'] == 'zip':
+            filename = f"{item.site.name} - {date_str} - {item.name} - {file_info['variant']} - {item.id}{file_extension}"
         else:
             filename = f"{item.site.name} - {date_str} - {item.name} - {item.id}{file_extension}"
         
