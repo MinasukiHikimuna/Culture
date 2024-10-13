@@ -9,13 +9,15 @@ def parse_resolution_width(resolution_string):
     # Handle common labels for width-height formats
     common_resolutions = {
         '1080p': 1920,
+        '1080i': 1920,
         '720p': 1280,
+        '720i': 1280,
         '2160p': 3840,
         '4K': 3840,  # 4K typically means 3840x2160
         'FULL HD': 1920,
     }
     
-    # Check for keywords like 1080p, 720p, etc.
+    # Check for keywords like 1080p, 720p, 1080i, 720i, etc.
     for key, value in common_resolutions.items():
         if key.upper() in resolution_string.upper():
             return value
@@ -28,18 +30,25 @@ def parse_resolution_height(resolution_string):
     if match:
         return int(match.group(1))
 
-    # Handle common labels for height-only formats (like 1080p, 720p, 2160p)
+    # Handle common labels for height-only formats (including interlaced formats)
     common_heights = {
         '1080p': 1080,
+        '1080i': 1080,
         '720p': 720,
+        '720i': 720,
         '2160p': 2160,
         '4K': 2160,  # 4K typically means 3840x2160
         'FULL HD': 1080,
     }
     
-    # Check for keywords like 1080p, 720p, etc.
+    # Check for keywords like 1080p, 720p, 1080i, 720i, etc.
     for key, value in common_heights.items():
         if key.upper() in resolution_string.upper():
             return value
+
+    # Check for other interlaced formats
+    match = re.search(r'(\d{3,4})I', resolution_string, re.IGNORECASE)
+    if match:
+        return int(match.group(1))
 
     return -1

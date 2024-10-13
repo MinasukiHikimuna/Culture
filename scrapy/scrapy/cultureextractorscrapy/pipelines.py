@@ -85,14 +85,22 @@ class AvailableFilesPipeline(FilesPipeline):
         if isinstance(item, ReleaseItem):
             available_files = json.loads(item.available_files)
             largest_zip_gallery = None
-            largest_size = 0
+            largest_video = None
+            largest_zip_size = 0
+            largest_video_size = 0
+            
             for file in available_files:
                 if file['file_type'] == 'zip' and file.get('content_type') == 'gallery':
                     file_size = file.get('resolution_width', 0)
-                    if file_size > largest_size:
-                        largest_size = file_size
+                    if file_size > largest_zip_size:
+                        largest_zip_size = file_size
                         largest_zip_gallery = file
-                elif file['file_type'] in ['video', 'image']:
+                elif file['file_type'] == 'video' and file.get('content_type') == 'scene':
+                    file_size = file.get('resolution_width', 0) * file.get('resolution_height', 0)
+                    if file_size > largest_video_size:
+                        largest_video_size = file_size
+                        largest_video = file
+                elif file['file_type'] == 'image':
                     file_path = self.file_path(None, None, info, item=item, file_info=file)
                     full_path = os.path.join(self.store.basedir, file_path)
                     if not os.path.exists(full_path):
@@ -101,14 +109,15 @@ class AvailableFilesPipeline(FilesPipeline):
                         logging.info(f"File already exists, skipping download: {full_path}")
                         file['local_path'] = file_path
             
-            if largest_zip_gallery:
-                file_path = self.file_path(None, None, info, item=item, file_info=largest_zip_gallery)
-                full_path = os.path.join(self.store.basedir, file_path)
-                if not os.path.exists(full_path):
-                    yield Request(largest_zip_gallery['url'], meta={'item': item, 'file_info': largest_zip_gallery})
-                else:
-                    logging.info(f"File already exists, skipping download: {full_path}")
-                    largest_zip_gallery['local_path'] = file_path
+            for file in [largest_zip_gallery, largest_video]:
+                if file:
+                    file_path = self.file_path(None, None, info, item=item, file_info=file)
+                    full_path = os.path.join(self.store.basedir, file_path)
+                    if not os.path.exists(full_path):
+                        yield Request(file['url'], meta={'item': item, 'file_info': file})
+                    else:
+                        logging.info(f"File already exists, skipping download: {full_path}")
+                        file['local_path'] = file_path
 
     def file_path(self, request, response=None, info=None, *, item=None, file_info=None):
         if request:
@@ -130,7 +139,7 @@ class AvailableFilesPipeline(FilesPipeline):
         # Create filename in the specified format
         date_str = item.release_date
         if file_info['file_type'] == 'video' and 'resolution_height' in file_info and file_info['resolution_height']:
-            filename = f"{item.site.name} - {date_str} - {item.name} - {item.id} - {file_info['resolution_width']}x{file_info['resolution_height']}{file_extension}"
+            filename = f"{item.site.name} - {date_str} - {item.name} - {file_info['resolution_width']}x{file_info['resolution_height']} - {item.id}{file_extension}"
         elif file_info['file_type'] == 'zip':
             filename = f"{item.site.name} - {date_str} - {item.name} - {file_info['variant']} - {item.id}{file_extension}"
         else:
