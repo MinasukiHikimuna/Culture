@@ -65,7 +65,7 @@ DOWNLOAD_TIMEOUT = 600
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
 ITEM_PIPELINES = {
     'cultureextractorscrapy.pipelines.AvailableFilesPipeline': 1,
-    # 'cultureextractorscrapy.pipelines.PostgresPipeline': 300,
+    'cultureextractorscrapy.pipelines.PostgresPipeline': 300,
 }
 
 # Enable and configure the AutoThrottle extension (disabled by default)

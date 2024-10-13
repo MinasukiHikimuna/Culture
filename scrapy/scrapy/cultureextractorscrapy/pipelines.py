@@ -25,102 +25,104 @@ from itemadapter import ItemAdapter
 import subprocess
 import hashlib
 
+from .spiders.database import Site, Release, DownloadedFile
+
 
 class PostgresPipeline:
     def __init__(self):
         self.session = get_session()
 
     def process_item(self, item, spider):
-        if isinstance(item, ReleaseItem):
-            return self.process_release(item, spider)
-        elif isinstance(item, DownloadedFileItem):
-            return self.process_downloaded_file(item, spider)
+        if isinstance(item, ReleaseAndDownloadsItem):
+            return self.process_release_and_downloads(item, spider)
         return item
 
-    def process_release(self, item, spider):
-        site = self.session.query(Site).filter_by(uuid=item.site_uuid).first()
-        if not site:
-            spider.logger.error(f"Site not found for UUID: {item.site_uuid}")
-            return item
-
-        existing_release = self.session.query(Release).filter_by(uuid=str(item.id)).first()
-
-        if existing_release:
-            # Update existing release
-            existing_release.release_date = datetime.fromisoformat(item.release_date) if item.release_date else None
-            existing_release.short_name = item.short_name
-            existing_release.name = item.name
-            existing_release.url = item.url
-            existing_release.description = item.description
-            existing_release.duration = item.duration
-            existing_release.last_updated = item.last_updated
-            existing_release.available_files = item.available_files
-            existing_release.json_document = item.json_document
-            spider.logger.info(f"Updating existing release with ID: {item.id}")
-        else:
-            # Create new release
-            new_release = Release(
-                uuid=str(item.id),
-                release_date=datetime.fromisoformat(item.release_date) if item.release_date else None,
-                short_name=item.short_name,
-                name=item.name,
-                url=item.url,
-                description=item.description,
-                duration=item.duration,
-                created=item.created,
-                last_updated=item.last_updated,
-                available_files=item.available_files,
-                json_document=item.json_document,
-                site_uuid=str(item.site_uuid)
-            )
-            self.session.add(new_release)
-            spider.logger.info(f"Creating new release with ID: {item.id}")
+    def process_release_and_downloads(self, item, spider):
+        release_item = item.release
+        downloaded_files = item.downloaded_files
 
         try:
+            site = self.session.query(Site).filter_by(uuid=release_item.site_uuid).first()
+            if not site:
+                spider.logger.error(f"Site not found for UUID: {release_item.site_uuid}")
+                return item
+
+            existing_release = self.session.query(Release).filter_by(uuid=str(release_item.id)).first()
+
+            if existing_release:
+                # Update existing release
+                existing_release.release_date = datetime.fromisoformat(release_item.release_date) if release_item.release_date else None
+                existing_release.short_name = release_item.short_name
+                existing_release.name = release_item.name
+                existing_release.url = release_item.url
+                existing_release.description = release_item.description
+                existing_release.duration = release_item.duration
+                existing_release.last_updated = release_item.last_updated
+                existing_release.available_files = release_item.available_files
+                existing_release.json_document = release_item.json_document
+                spider.logger.info(f"Updating existing release with ID: {release_item.id}")
+            else:
+                # Create new release
+                new_release = Release(
+                    uuid=str(release_item.id),
+                    release_date=datetime.fromisoformat(release_item.release_date) if release_item.release_date else None,
+                    short_name=release_item.short_name,
+                    name=release_item.name,
+                    url=release_item.url,
+                    description=release_item.description,
+                    duration=release_item.duration,
+                    created=release_item.created,
+                    last_updated=release_item.last_updated,
+                    available_files=release_item.available_files,
+                    json_document=release_item.json_document,
+                    site_uuid=str(release_item.site_uuid)
+                )
+                self.session.add(new_release)
+                spider.logger.info(f"Creating new release with ID: {release_item.id}")
+
+            # Process downloaded files
+            for file_item in downloaded_files:
+                existing_file = self.session.query(DownloadedFile).filter_by(
+                    release_uuid=str(release_item.id),
+                    file_type=file_item['file_type'],
+                    content_type=file_item['content_type'],
+                    variant=file_item['variant']
+                ).first()
+
+                if existing_file:
+                    # Existing file, do nothing
+                    pass
+                else:
+                    # Create new file
+                    new_file = DownloadedFile(
+                        uuid=newnewid.uuid7(),
+                        downloaded_at=datetime.now(),
+                        file_type=file_item['file_type'],
+                        content_type=file_item['content_type'],
+                        variant=file_item['variant'],
+                        available_file=file_item['available_file'],
+                        original_filename=file_item['original_filename'],
+                        saved_filename=file_item['saved_filename'],
+                        release_uuid=str(file_item['release_uuid']),
+                        file_metadata=file_item['file_metadata']
+                    )
+                    self.session.add(new_file)
+                    spider.logger.info(f"Creating new downloaded file: {file_item['saved_filename']}")
+
+            # Commit the transaction
             self.session.commit()
+            spider.logger.info(f"Successfully processed release and downloads for ID: {release_item.id}")
+
         except IntegrityError as e:
             self.session.rollback()
-            import traceback
-            spider.logger.error(f"IntegrityError while processing release with ID: {item.id}")
-            spider.logger.error(traceback.format_exc())
-            spider.logger.error(f"IntegrityError details: {str(e)}")
-
-    def process_downloaded_file(self, item, spider):
-        existing_file = self.session.query(DownloadedFile).filter_by(
-            release_uuid=str(item.release_id),
-            file_url=item.file_url
-        ).first()
-
-        if existing_file:
-            # Update existing file
-            existing_file.file_path = item.file_path
-            existing_file.file_type = item.file_type
-            existing_file.content_type = item.content_type
-            existing_file.variant = item.variant
-            existing_file.resolution_width = item.resolution_width
-            existing_file.resolution_height = item.resolution_height
-            spider.logger.info(f"Updating existing downloaded file: {item.file_path}")
-        else:
-            # Create new file
-            new_file = DownloadedFile(
-                release_uuid=str(item.release_id),
-                file_path=item.file_path,
-                file_url=item.file_url,
-                file_type=item.file_type,
-                content_type=item.content_type,
-                variant=item.variant,
-                resolution_width=item.resolution_width,
-                resolution_height=item.resolution_height
-            )
-            self.session.add(new_file)
-            spider.logger.info(f"Creating new downloaded file: {item.file_path}")
-
-        try:
-            self.session.commit()
-        except IntegrityError as e:
-            self.session.rollback()
-            spider.logger.error(f"IntegrityError while processing downloaded file: {item.file_path}")
+            spider.logger.error(f"IntegrityError while processing release and downloads with ID: {release_item.id}")
             spider.logger.error(str(e))
+        except Exception as e:
+            self.session.rollback()
+            spider.logger.error(f"Error processing release and downloads with ID: {release_item.id}")
+            spider.logger.error(str(e))
+        finally:
+            self.session.close()
 
         return item
 
@@ -163,8 +165,7 @@ class AvailableFilesPipeline(FilesPipeline):
                     file_path = self.file_path(None, None, info, item=item, file_info=file)
                     full_path = os.path.join(self.store.basedir, file_path)
                     if not os.path.exists(full_path):
-                        # yield Request(file['url'], meta={'item': item, 'file_info': file})
-                        pass
+                        yield Request(file['url'], meta={'item': item, 'file_info': file})
                     else:
                         logging.info(f"File already exists, skipping download: {full_path}")
                         file['local_path'] = file_path
@@ -234,19 +235,25 @@ class AvailableFilesPipeline(FilesPipeline):
         if isinstance(item, ReleaseItem):
             logging.info(f"Processing release item {item.id}")
             
-            downloaded_files = [x for ok, x in results if ok]
-            logging.info(f"Downloaded files: {downloaded_files}")
+            result_files = [x for ok, x in results if ok]
+            logging.info(f"Downloaded files: {result_files}")
             available_files = json.loads(item.available_files)
             for file in available_files:
                 logging.info(f"Processing file: {file}")
                 
-                matching_downloads = [x for x in downloaded_files if x['url'] == file['url']]
+                matching_downloads = [x for x in result_files if x['url'] == file['url']]
                 if matching_downloads:
-                    file['local_path'] = matching_downloads[0]['path']
-                    
                     # Process file metadata
                     file_info = matching_downloads[0]
                     file_metadata = self.process_file_metadata(file_info['path'], file['file_type'])
+                    
+                    # Extract the original filename from the URL
+                    parsed_url = urlparse(file['url'])
+                    original_filename = os.path.basename(parsed_url.path)
+                    # Remove query parameters if present
+                    original_filename = original_filename.split('?')[0]
+                  
+                    saved_filename = os.path.basename(file_info['path'])
                     
                     # Create DownloadedFileItem
                     downloaded_file_item = DownloadedFileItem(
@@ -256,8 +263,8 @@ class AvailableFilesPipeline(FilesPipeline):
                         content_type=file.get('content_type'),
                         variant=file.get('variant'),
                         available_file=file,
-                        original_filename=file['url'],
-                        saved_filename=file_info['path'],  # This is now an absolute path
+                        original_filename=original_filename,
+                        saved_filename=saved_filename,  # This is now an absolute path
                         release_uuid=str(item.id),
                         file_metadata=file_metadata
                     )
@@ -269,7 +276,7 @@ class AvailableFilesPipeline(FilesPipeline):
         if file_type == 'video':
             return self.process_video_metadata(file_path)
         else:
-            return self.process_file_metadata(file_path, file_type)
+            return self.process_generic_metadata(file_path, file_type)
 
     def process_video_metadata(self, file_path):
         result = subprocess.run(['C:\\Tools\\videohashes-windows-amd64.exe', '-json', '-md5', file_path], capture_output=True, text=True)
@@ -287,7 +294,7 @@ class AvailableFilesPipeline(FilesPipeline):
             self.logger.error(f"Failed to get video hashes: {result.stderr}")
             return {}
 
-    def process_file_metadata(self, file_path, file_type):
+    def process_generic_metadata(self, file_path, file_type):
         if file_type == 'zip':
             type = "GalleryZipFileMetadata"
         elif file_type == 'image':
