@@ -293,21 +293,47 @@ class FemjoySpider(scrapy.Spider):
         
         # Extract video download links
         video_links = response.css('div.column a.post_download')
+        video_files = {}
         for link in video_links:
             url = link.attrib['href']
             variant = link.xpath('text()').get()
             width = parse_resolution_width(variant)
             height = parse_resolution_height(variant)
             
+            # Create a key based on resolution
+            resolution_key = f"{width}x{height}"
+            
+            # Check if this resolution already exists and if the new file is MOV
+            if resolution_key in video_files:
+                existing_file = video_files[resolution_key]
+                if 'mov' in variant.lower() and 'wmv' in existing_file['variant'].lower():
+                    # Replace WMV with MOV
+                    video_files[resolution_key] = {
+                        'url': url,
+                        'variant': variant,
+                        'width': width,
+                        'height': height
+                    }
+            else:
+                # Add new resolution
+                video_files[resolution_key] = {
+                    'url': url,
+                    'variant': variant,
+                    'width': width,
+                    'height': height
+                }
+        
+        # Add the selected video files to available_files
+        for video_file in video_files.values():
             available_files.append(AvailableVideoFile(
                 file_type='video',
                 content_type='scene',
-                variant=variant,
-                url=url,
-                resolution_width=width,
-                resolution_height=height,
+                variant=video_file['variant'],
+                url=video_file['url'],
+                resolution_width=video_file['width'],
+                resolution_height=video_file['height'],
             ))
-                               
+                           
         cover_url = post_data.get('cover_url')
         if cover_url:
             available_files.append(AvailableImageFile(
