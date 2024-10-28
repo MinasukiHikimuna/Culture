@@ -303,12 +303,16 @@ class AvailableFilesPipeline(FilesPipeline):
             type = "VttFileMetadata"
         
         sha256_hash = hashlib.sha256()
+        md5_hash = hashlib.md5()
         with open(file_path, "rb") as f:
             for byte_block in iter(lambda: f.read(4096), b""):
                 sha256_hash.update(byte_block)
+                md5_hash.update(byte_block)
         sha256_sum = sha256_hash.hexdigest()
+        md5_sum = md5_hash.hexdigest()
 
         return {
             "$type": type,
-            "sha256Sum": sha256_sum
+            "sha256Sum": sha256_sum,
+            "md5Sum": md5_sum
         }
