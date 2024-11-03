@@ -16,7 +16,7 @@ public class DigiGammaModels
         public int page { get; set; }
         public int nbPages { get; set; }
         public int hitsPerPage { get; set; }
-        public Facets facets { get; set; }
+        public object facets { get; set; }
         public bool exhaustiveFacetsCount { get; set; }
         public bool exhaustiveNbHits { get; set; }
         public bool exhaustiveTypo { get; set; }

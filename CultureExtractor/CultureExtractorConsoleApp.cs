@@ -41,7 +41,7 @@ public class CultureExtractorConsoleApp
         {
             InitializeLogger(opts);
 
-            if (opts.FullScrape && opts.FullScrapeLastUpdated == null)
+            if (opts.FullScrapeLastUpdated == null)
             {
                 // temporary, restore before commit
                 // this needs a better option

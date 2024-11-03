@@ -307,7 +307,7 @@ public class NubileFilmsRipper : IYieldingScraper
             ? string.Join(", ", release.Performers.Take(release.Performers.Count() - 1).Select(p => p.Name)) + " & " +
               release.Performers.Last().Name
             : release.Performers.FirstOrDefault()?.Name ?? "Unknown";
-        var fileName = ReleaseNamer.Name(release, suffix, performersStr, selectedVideo.Variant, selectedVideo.ContentType);
+        var fileName = string.Empty; // TODO: ReleaseNamer.Name(release, suffix, performersStr, selectedVideo.Variant, selectedVideo.ContentType);
 
         var headers = new WebHeaderCollection
         {
