@@ -24,14 +24,16 @@ def test_header_parsing(sample_header):
     header = decryptor.header
     
     # Test basic header fields
-    assert header.header_length > 0
-    assert header.file_length > 0
-    assert header.extra_length >= 0
+    assert header.header_length == 15268
+    assert header.file_length == 27430737
+    assert header.extra_length == 4871
     
     # Test metadata
     assert 'segmentCount' in header.meta
+    assert header.meta['segmentCount'] == 1880
     assert 'durationMs' in header.meta
-    assert header.base_key is not None
+    assert header.meta['durationMs'] == 1919754
+    assert header.base_key == b'\x8d\x0c\xab\xa7\x18\xff5\xa17\x0e[\x8cH\xd2O\x00'
 
 # def test_key_derivation(sample_header, sample_keys):
 #     decryptor = HotAudioDecryptor(sample_header, sample_keys)
