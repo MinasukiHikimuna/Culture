@@ -1,0 +1,62 @@
+import pytest
+from decrypt_hotaudio import HotAudioDecryptor
+import json
+
+@pytest.fixture
+def sample_keys():
+    with open('hm6aq9rrzwtt2drebe64hmjf00.json') as f:
+        return json.load(f)['keys']
+
+@pytest.fixture
+def sample_header():
+    with open('hm6aq9rrzwtt2drebe64hmjf00.hax', 'rb') as f:
+        return f.read()  # Read enough for header
+
+def test_header_parsing(sample_header):
+    # Print the header magic and lengths
+    print(f"Header magic: {sample_header[:4]}")
+    print(f"File length: {int.from_bytes(sample_header[4:8], 'little')}")
+    print(f"Header length: {int.from_bytes(sample_header[8:12], 'little')}")
+    print(f"Extra length: {int.from_bytes(sample_header[12:16], 'little')}")
+    print(f"Bencoded data (hex): {sample_header[16:50].hex()}")
+    
+    decryptor = HotAudioDecryptor(sample_header, {})
+    header = decryptor.header
+    
+    # Test basic header fields
+    assert header.header_length > 0
+    assert header.file_length > 0
+    assert header.extra_length >= 0
+    
+    # Test metadata
+    assert 'segmentCount' in header.meta
+    assert 'durationMs' in header.meta
+    assert header.base_key is not None
+
+# def test_key_derivation(sample_header, sample_keys):
+#     decryptor = HotAudioDecryptor(sample_header, sample_keys)
+#     
+#     # Test deriving key for segment 0
+#     key = decryptor._derive_key(0)
+#     assert len(key) == 32  # SHA-256 output length
+#     
+#     # Test deriving key for higher segment
+#     key = decryptor._derive_key(10)
+#     assert len(key) == 32
+# 
+# def test_segment_decryption(sample_header, sample_keys):
+#     decryptor = HotAudioDecryptor(sample_header, sample_keys)
+#     
+#     # Read first segment data
+#     with open('hm6aq9rrzwtt2drebe64hmjf00.hax', 'rb') as f:
+#         f.seek(decryptor.header.header_length + decryptor.header.extra_length)
+#         segment_data = f.read(decryptor.header.segments[1][0] - decryptor.header.segments[0][0])
+#     
+#     # Decrypt first segment
+#     decrypted = decryptor.decrypt_segment(0, segment_data)
+#     
+#     # Basic validation of decrypted data
+#     assert len(decrypted) > 0
+#     # Check for AAC ADTS header magic bytes
+#     assert decrypted.startswith(b'\xff\xf1') or decrypted.startswith(b'\xff\xf9')
+# 
