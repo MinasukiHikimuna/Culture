@@ -35,17 +35,14 @@ def test_header_parsing(sample_header):
     assert header.meta['durationMs'] == 1919754
     assert header.base_key == b'\x8d\x0c\xab\xa7\x18\xff5\xa17\x0e[\x8cH\xd2O\x00'
 
-# def test_key_derivation(sample_header, sample_keys):
-#     decryptor = HotAudioDecryptor(sample_header, sample_keys)
-#     
-#     # Test deriving key for segment 0
-#     key = decryptor._derive_key(0)
-#     assert len(key) == 32  # SHA-256 output length
-#     
-#     # Test deriving key for higher segment
-#     key = decryptor._derive_key(10)
-#     assert len(key) == 32
-# 
+def test_key_derivation(sample_header, sample_keys):
+    decryptor = HotAudioDecryptor(sample_header, sample_keys)
+    
+    # Test deriving key for segment 0
+    key = decryptor._derive_key(4096)
+    assert len(key) == 32  # SHA-256 output length
+    assert key == b'\xe7A\xd9\xb2u\x8a\xb8\x90z\xc4\xb8\x8dk\xd2\xd6\xf1\x1dn\xef\xe5\xfe\xd3\xcf\xe0\x1e\x1d\x97\x99~\x1fB\xc1'
+
 # def test_segment_decryption(sample_header, sample_keys):
 #     decryptor = HotAudioDecryptor(sample_header, sample_keys)
 #     
