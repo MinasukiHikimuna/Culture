@@ -2,6 +2,7 @@ import requests
 import stashapi.log as logger
 
 from abc import ABC, abstractmethod
+from .scene_matcher import SceneMatcher
 
 
 class StashboxClient(ABC):
@@ -21,6 +22,7 @@ class StashDbClient(StashboxClient):
     def __init__(self, endpoint, api_key):
         self.endpoint = endpoint
         self.api_key = api_key
+        self.scene_matcher = SceneMatcher()
 
     def query_performer_image(self, performer_stash_id):
         query = """
@@ -167,6 +169,137 @@ class StashDbClient(StashboxClient):
                 break
 
         return scenes
+
+    def query_scenes_by_phash(self, scenes: list[dict]) -> dict[str, dict]:
+        """
+        Query StashDB for multiple scenes using their phash fingerprints in a single request.
+        
+        Args:
+            scenes (list[dict]): List of scene objects with filename, phash and duration
+
+        Returns:
+            dict: Dictionary mapping phash to scene data (None if not found)
+        """
+        query = """
+        query FindScenesByFullFingerprints($fingerprints: [FingerprintQueryInput!]!) {
+            findScenesByFullFingerprints(fingerprints: $fingerprints) {
+                id
+                title
+                code
+                details
+                director
+                duration
+                date
+                urls {
+                    url
+                    type
+                }
+                images {
+                    id
+                    url
+                    width
+                    height
+                }
+                studio {
+                    name
+                    id
+                    urls {
+                        url
+                        type
+                    }
+                    parent {
+                        name
+                        id
+                    }
+                    images {
+                        id
+                        url
+                        width
+                        height
+                    }
+                }
+                tags {
+                    name
+                    id
+                }
+                performers {
+                    as
+                    performer {
+                        id
+                        name
+                        disambiguation
+                        aliases
+                        gender
+                        merged_ids
+                        urls {
+                            url
+                            type
+                        }
+                        images {
+                            id
+                            url
+                            width
+                            height
+                        }
+                        birth_date
+                        ethnicity
+                        country
+                        eye_color
+                        hair_color
+                        height
+                        measurements {
+                            band_size
+                            cup_size
+                            waist
+                            hip
+                        }
+                        breast_type
+                        career_start_year
+                        career_end_year
+                        tattoos {
+                            location
+                            description
+                        }
+                        piercings {
+                            location
+                            description
+                        }
+                    }
+                }
+                fingerprints {
+                    algorithm
+                    hash
+                    duration
+                }
+            }
+        }
+        """
+        
+        variables = {
+            "fingerprints": [
+                {
+                    "algorithm": "PHASH",
+                    "hash": scene["phash"]
+                }
+                for scene in scenes
+            ]
+        }
+        
+        result = self._gql_query(query, variables)
+        
+        if not result or "data" not in result or "findScenesByFullFingerprints" not in result["data"]:
+            raise Exception("Failed to query scenes by phash")
+        
+        stashdb_scenes = result["data"]["findScenesByFullFingerprints"]
+        
+        # Save to file for debugging/testing
+        import datetime
+        import json
+        time_in_ticks = datetime.datetime.now().timestamp()
+        with open(f"phash_to_scene_{time_in_ticks}.json", "w") as f:
+            f.write(json.dumps({ "input_scenes": scenes, "results": result }, indent=4))
+        
+        return self.scene_matcher.match_scenes(scenes, stashdb_scenes)
 
     def _gql_query(self, query, variables=None):
         headers = {"Content-Type": "application/json"}
