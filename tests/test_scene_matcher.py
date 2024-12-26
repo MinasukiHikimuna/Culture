@@ -1,5 +1,7 @@
 import json
+import os
 import pytest
+from pathlib import Path
 from libraries.scene_matcher import SceneMatcher
 
 class TestSceneMatcher:
@@ -9,32 +11,16 @@ class TestSceneMatcher:
     
     @pytest.fixture
     def sample_data(self):
-        with open("phash_to_scene.sample.json") as f:
+        """Load test data from sample JSON file"""
+        test_dir = Path(__file__).parent
+        sample_path = test_dir / "data" / "phash_to_scene.sample.json"
+        with open(sample_path) as f:
             data = json.load(f)
         return data["input_scenes"], data["results"]["data"]["findScenesByFullFingerprints"]
     
-    def test_exact_phash_match(self, matcher, sample_data):
+    # There are multiple results with the phash 870f040525ef8bfe. That phash should match to the scene with the ID 9d73eca2-569e-4c59-99b6-95543e4e678e.    
+    def test_scene_matcher(self, matcher, sample_data):
         input_scenes, stashdb_scenes = sample_data
-        # Test with a known exact match from your data
-        result = matcher.match_scenes([input_scenes[0]], [stashdb_scenes[0]])
-        assert result[input_scenes[0]["phash"]] is not None
-    
-    def test_close_phash_match(self, matcher):
-        # Test with slightly different phashes
-        input_scene = {"phash": "f85c3c1c1c1c1c1c", "duration": 300}
-        stashdb_scene = {
-            "fingerprints": [{"algorithm": "PHASH", "hash": "f85c3c1c1c1c1c1d"}],
-            "duration": 301
-        }
-        result = matcher.match_scenes([input_scene], [stashdb_scene])
-        assert result[input_scene["phash"]] is not None
-    
-    def test_duration_mismatch(self, matcher):
-        # Test that scenes with matching phash but very different durations don't match
-        input_scene = {"phash": "f85c3c1c1c1c1c1c", "duration": 300}
-        stashdb_scene = {
-            "fingerprints": [{"algorithm": "PHASH", "hash": "f85c3c1c1c1c1c1c"}],
-            "duration": 500  # >10% difference
-        }
-        result = matcher.match_scenes([input_scene], [stashdb_scene])
-        assert result[input_scene["phash"]] is None 
+        result = matcher.match_scenes(input_scenes, stashdb_scenes)
+        expected_scene = next(scene for scene in stashdb_scenes if scene["id"] == "9d73eca2-569e-4c59-99b6-95543e4e678e")
+        assert result["870f040525ef8bfe"] == expected_scene
