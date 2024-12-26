@@ -1,0 +1,270 @@
+{
+    "culture_extractor_performers": [
+        {
+            "url": "/model/profile/2176/paula",
+            "name": "Paula",
+            "uuid": "018ea258-5e09-74b4-a548-73be748cb6d2",
+            "short_name": "2176"
+        },
+        {
+            "url": "/model/profile/2177/dan",
+            "name": "Dan",
+            "uuid": "018ea23e-da2f-715b-9c76-1470eb2dd0ed",
+            "short_name": "2177"
+        }
+    ],
+    "stashdb_performers": [
+        {
+            "as": "Dan",
+            "performer": {
+                "id": "0e932d97-219f-474f-b549-d3d227ba6b51",
+                "name": "Daniel G",
+                "disambiguation": null,
+                "aliases": [
+                    "Dan",
+                    "Daniel",
+                    "Daniel Gortaz",
+                    "Declan",
+                    "Gabin",
+                    "Jeff",
+                    "Zen"
+                ],
+                "gender": "MALE",
+                "merged_ids": [
+                    "42152edb-8323-4892-b6f1-3c5f70cad7db"
+                ],
+                "urls": [
+                    {
+                        "url": "https://www.iafd.com/person.rme/perfid=daniel_2015/gender=m/daniel-g..htm",
+                        "type": "IAFD"
+                    }
+                ],
+                "images": [
+                    {
+                        "id": "0b448817-c82a-49a8-9755-af27c15af4bc",
+                        "url": "https://cdn.stashdb.org/images/0b/44/0b448817-c82a-49a8-9755-af27c15af4bc",
+                        "width": 480,
+                        "height": 720
+                    },
+                    {
+                        "id": "49c0d50b-713a-45e4-a5aa-9c8b6d8fea54",
+                        "url": "https://cdn.stashdb.org/images/49/c0/49c0d50b-713a-45e4-a5aa-9c8b6d8fea54",
+                        "width": 229,
+                        "height": 345
+                    },
+                    {
+                        "id": "77fa5a5f-1648-4d81-8139-6d62e3975d04",
+                        "url": "https://cdn.stashdb.org/images/77/fa/77fa5a5f-1648-4d81-8139-6d62e3975d04",
+                        "width": 200,
+                        "height": 300
+                    },
+                    {
+                        "id": "acbd3127-1cc1-41c7-a2a6-cf36a7d8d470",
+                        "url": "https://cdn.stashdb.org/images/ac/bd/acbd3127-1cc1-41c7-a2a6-cf36a7d8d470",
+                        "width": 210,
+                        "height": 284
+                    }
+                ],
+                "birth_date": "1992-08-28",
+                "ethnicity": "CAUCASIAN",
+                "country": "CZ",
+                "eye_color": null,
+                "hair_color": null,
+                "height": 173,
+                "measurements": {
+                    "band_size": null,
+                    "cup_size": null,
+                    "waist": null,
+                    "hip": null
+                },
+                "breast_type": "NA",
+                "career_start_year": 2013,
+                "career_end_year": 2020,
+                "tattoos": null,
+                "piercings": null
+            }
+        },
+        {
+            "as": "Paula",
+            "performer": {
+                "id": "e7167957-a37f-476e-83f8-86427676b4ff",
+                "name": "Paula Shy",
+                "disambiguation": null,
+                "aliases": [
+                    "Christy Charming",
+                    "Misty",
+                    "Paola de Sousa",
+                    "Paula Lee",
+                    "Paula O",
+                    "Paula Pearl",
+                    "kristyna"
+                ],
+                "gender": "FEMALE",
+                "merged_ids": [
+                    "f6157a94-11cd-4079-9542-9c21534a15c1",
+                    "ca64ad1b-55cb-4ba8-9804-7291ce678231"
+                ],
+                "urls": [
+                    {
+                        "url": "https://twitter.com/xxxPaulaShyxxx",
+                        "type": "TWITTER"
+                    },
+                    {
+                        "url": "https://www.babepedia.com/babe/Paula_Shy",
+                        "type": "BABEPEDIA"
+                    },
+                    {
+                        "url": "https://www.boobpedia.com/boobs/Paula_Shy",
+                        "type": "BOOBPEDIA"
+                    },
+                    {
+                        "url": "https://www.data18.com/name/paula-shy",
+                        "type": "DATA18"
+                    },
+                    {
+                        "url": "https://www.egafd.com/actresses/details.php/id/p00502",
+                        "type": "EGAFD"
+                    },
+                    {
+                        "url": "https://www.eurobabeindex.com/sbandoindex/paulashy.html",
+                        "type": "EUROBABEINDEX"
+                    },
+                    {
+                        "url": "https://www.freeones.com/christy-charming",
+                        "type": "FREEONES"
+                    },
+                    {
+                        "url": "https://www.iafd.com/person.rme/perfid=paula_12_cz/gender=f/paula-shy.htm",
+                        "type": "IAFD"
+                    },
+                    {
+                        "url": "https://www.imdb.com/name/nm6064768/",
+                        "type": "IMDB"
+                    },
+                    {
+                        "url": "https://www.indexxx.com/m/paula-shy",
+                        "type": "INDEXXX"
+                    },
+                    {
+                        "url": "https://www.thenude.com/_25179.htm",
+                        "type": "THENUDE"
+                    },
+                    {
+                        "url": "https://www.wikidata.org/wiki/Q52160394",
+                        "type": "WIKIDATA"
+                    },
+                    {
+                        "url": "http://www.pornteengirl.com/model/kristyna-2.html",
+                        "type": "PORNTEENGIRL"
+                    },
+                    {
+                        "url": "https://theporndb.net/performers/paula-shy",
+                        "type": "THEPORNDB"
+                    }
+                ],
+                "images": [
+                    {
+                        "id": "6163a494-c028-4933-994b-852772270ae5",
+                        "url": "https://cdn.stashdb.org/images/65/95/6595a11111e0f5c3e3d74806ec0c282a",
+                        "width": 3744,
+                        "height": 5616
+                    },
+                    {
+                        "id": "63198fc5-7a1d-4514-9a2f-ffc4ba53de97",
+                        "url": "https://cdn.stashdb.org/images/79/52/7952c92bde6ad5de6aabb918e4dd88f9",
+                        "width": 1356,
+                        "height": 2034
+                    },
+                    {
+                        "id": "191f626a-800d-497e-af4c-380a43e7185e",
+                        "url": "https://cdn.stashdb.org/images/19/1f/191f626a-800d-497e-af4c-380a43e7185e",
+                        "width": 751,
+                        "height": 1127
+                    },
+                    {
+                        "id": "e864ac91-8f35-4e59-ad70-a8170c565281",
+                        "url": "https://cdn.stashdb.org/images/e8/64/e864ac91-8f35-4e59-ad70-a8170c565281",
+                        "width": 591,
+                        "height": 1000
+                    },
+                    {
+                        "id": "65d17ceb-85c0-45e4-8101-4e9424f07b0e",
+                        "url": "https://cdn.stashdb.org/images/65/d1/65d17ceb-85c0-45e4-8101-4e9424f07b0e",
+                        "width": 636,
+                        "height": 1000
+                    },
+                    {
+                        "id": "d6289331-3249-471d-a4be-ef251e1e829e",
+                        "url": "https://cdn.stashdb.org/images/d6/28/d6289331-3249-471d-a4be-ef251e1e829e",
+                        "width": 592,
+                        "height": 1000
+                    },
+                    {
+                        "id": "20e0230e-66ca-40f4-8d72-1252cd792a5b",
+                        "url": "https://cdn.stashdb.org/images/20/e0/20e0230e-66ca-40f4-8d72-1252cd792a5b",
+                        "width": 647,
+                        "height": 970
+                    },
+                    {
+                        "id": "620550c3-485c-45e6-a31c-44d65d1a83d6",
+                        "url": "https://cdn.stashdb.org/images/62/05/620550c3-485c-45e6-a31c-44d65d1a83d6",
+                        "width": 532,
+                        "height": 760
+                    },
+                    {
+                        "id": "e8461b03-e09a-4d53-80d3-67b163bdfe91",
+                        "url": "https://cdn.stashdb.org/images/e8/46/e8461b03-e09a-4d53-80d3-67b163bdfe91",
+                        "width": 500,
+                        "height": 749
+                    },
+                    {
+                        "id": "bfb41c98-a575-4bb5-835e-6232a32bcb89",
+                        "url": "https://cdn.stashdb.org/images/bf/b4/bfb41c98-a575-4bb5-835e-6232a32bcb89",
+                        "width": 475,
+                        "height": 704
+                    },
+                    {
+                        "id": "026cc7eb-3e22-4a29-8ca8-96fe4cc07a0b",
+                        "url": "https://cdn.stashdb.org/images/02/6c/026cc7eb-3e22-4a29-8ca8-96fe4cc07a0b",
+                        "width": 375,
+                        "height": 500
+                    },
+                    {
+                        "id": "0e66479c-3b8c-418e-bfda-0fef45f5aad9",
+                        "url": "https://cdn.stashdb.org/images/0e/66/0e66479c-3b8c-418e-bfda-0fef45f5aad9",
+                        "width": 247,
+                        "height": 409
+                    },
+                    {
+                        "id": "83091b73-3ed4-458e-b6ea-88784d8a7693",
+                        "url": "https://cdn.stashdb.org/images/83/09/83091b73-3ed4-458e-b6ea-88784d8a7693",
+                        "width": 229,
+                        "height": 345
+                    }
+                ],
+                "birth_date": "1993-11-13",
+                "ethnicity": "ASIAN",
+                "country": "CZ",
+                "eye_color": "BROWN",
+                "hair_color": "BRUNETTE",
+                "height": 162,
+                "measurements": {
+                    "band_size": 30,
+                    "cup_size": "C",
+                    "waist": 24,
+                    "hip": 32
+                },
+                "breast_type": "NATURAL",
+                "career_start_year": 2013,
+                "career_end_year": null,
+                "tattoos": [
+                    {
+                        "location": "back of neck",
+                        "description": "chinese characters"
+                    }
+                ],
+                "piercings": null
+            }
+        }
+    ]
+}

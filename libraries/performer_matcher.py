@@ -1,5 +1,11 @@
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, NamedTuple
 import difflib
+
+class PerformerMatch(NamedTuple):
+    """Represents a match between Culture Extractor and StashDB performers"""
+    culture_extractor: Dict
+    stashdb: Optional[Dict]
+    confidence: float
 
 class PerformerMatcher:
     @staticmethod
@@ -10,6 +16,10 @@ class PerformerMatcher:
     @staticmethod
     def _calculate_name_similarity(name1: str, name2: str) -> float:
         """Calculate similarity score between two names"""
+        # For very short names, we want to be more strict about matching
+        if len(name1) <= 4 or len(name2) <= 4:
+            return 1.0 if PerformerMatcher._normalize_name(name1) == PerformerMatcher._normalize_name(name2) else 0.0
+            
         return difflib.SequenceMatcher(None, 
                                      PerformerMatcher._normalize_name(name1),
                                      PerformerMatcher._normalize_name(name2)).ratio()
@@ -20,14 +30,16 @@ class PerformerMatcher:
         if 'aliases' not in stashdb_performer['performer']:
             return False, 0.0
             
+        best_score = 0.0
         for alias in stashdb_performer['performer']['aliases']:
             similarity = PerformerMatcher._calculate_name_similarity(ce_name, alias)
-            if similarity > 0.9:  # High confidence threshold for aliases
-                return True, similarity
-        return False, 0.0
+            if similarity > best_score:
+                best_score = similarity
+                
+        return best_score > 0.9, best_score
 
     @staticmethod
-    def _match_performer(ce_performer: Dict, stashdb_performers: List[Dict]) -> Optional[Dict]:
+    def _match_performer(ce_performer: Dict, stashdb_performers: List[Dict]) -> PerformerMatch:
         """
         Match a single Culture Extractor performer to StashDB performer
         
@@ -36,7 +48,7 @@ class PerformerMatcher:
             stashdb_performers: List of StashDB performers
             
         Returns:
-            Matched StashDB performer or None if no match
+            PerformerMatch with matched StashDB performer and confidence score
         """
         best_match = None
         best_score = 0.0
@@ -59,12 +71,14 @@ class PerformerMatcher:
                 best_score = score
                 best_match = stashdb_entry
         
-        if best_score > 0.8:  # Confidence threshold
-            return best_match
-        return None
+        return PerformerMatch(
+            culture_extractor=ce_performer,
+            stashdb=best_match if best_score > 0.5 else None,  # Lower threshold but return None for very low confidence
+            confidence=best_score
+        )
 
     @staticmethod
-    def match_all_performers(culture_extractor_performers: List[Dict], stashdb_performers: List[Dict]) -> List[Tuple[Dict, Optional[Dict]]]:
+    def match_all_performers(culture_extractor_performers: List[Dict], stashdb_performers: List[Dict]) -> List[PerformerMatch]:
         """
         Match all performers between Culture Extractor and StashDB
         
@@ -73,7 +87,7 @@ class PerformerMatcher:
             stashdb_performers: List of performers from StashDB
             
         Returns:
-            List of tuples containing (CE performer, matched StashDB performer or None)
+            List of PerformerMatch objects containing match results and confidence scores
         """
-        return [(ce_performer, PerformerMatcher._match_performer(ce_performer, stashdb_performers))
+        return [PerformerMatcher._match_performer(ce_performer, stashdb_performers)
                 for ce_performer in culture_extractor_performers]
