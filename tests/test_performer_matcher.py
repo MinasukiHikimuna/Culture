@@ -55,3 +55,27 @@ def test_match_all_performers_sample02():
     assert dan.stashdb['performer']['name'] == 'Daniel G'
     assert 'Dan' in dan.stashdb['performer']['aliases']
     assert dan.confidence > 0.9  # High confidence for exact alias match
+
+def test_match_all_performers_sample03():
+    """Test that performers are not incorrectly matched to the same StashDB performer"""
+    ce_performers, stashdb_performers = load_test_data('culture_extractor_stashdb_performers.sample03.json')
+    
+    matches = PerformerMatcher.match_all_performers(ce_performers, stashdb_performers)
+    
+    # Should have matches for both performers
+    assert len(matches) == 2
+    
+    # Get both matches
+    zazie = next(match for match in matches if match.culture_extractor['name'] == 'Zazie Skymm')
+    nikki = next(match for match in matches if match.culture_extractor['name'] == 'Nikki Nutz')
+    
+    # Both should have a match
+    assert zazie.stashdb is not None
+    assert nikki.stashdb is not None
+    
+    # They should not be matched to the same StashDB performer
+    assert zazie.stashdb['performer']['id'] != nikki.stashdb['performer']['id']
+    
+    # Zazie should match correctly
+    assert zazie.stashdb['performer']['name'] == 'Zazie Skymm'
+    assert zazie.confidence > 0.95  # Exact name match
