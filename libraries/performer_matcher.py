@@ -1,10 +1,19 @@
 from typing import List, Dict, Optional, Tuple, NamedTuple
 import difflib
+from dataclasses import dataclass
+from operator import attrgetter
 
 class PerformerMatch(NamedTuple):
     """Represents a match between Culture Extractor and StashDB performers"""
     culture_extractor: Dict
     stashdb: Optional[Dict]
+    confidence: float
+
+@dataclass
+class PotentialMatch:
+    """Internal class for tracking potential matches during matching process"""
+    ce_performer: Dict
+    stashdb_performer: Dict
     confidence: float
 
 class PerformerMatcher:
@@ -39,20 +48,9 @@ class PerformerMatcher:
         return best_score > 0.9, best_score
 
     @staticmethod
-    def _match_performer(ce_performer: Dict, stashdb_performers: List[Dict]) -> PerformerMatch:
-        """
-        Match a single Culture Extractor performer to StashDB performer
-        
-        Args:
-            ce_performer: Culture Extractor performer dict
-            stashdb_performers: List of StashDB performers
-            
-        Returns:
-            PerformerMatch with matched StashDB performer and confidence score
-        """
-        best_match = None
-        best_score = 0.0
-        
+    def _find_potential_matches(ce_performer: Dict, stashdb_performers: List[Dict]) -> List[PotentialMatch]:
+        """Find all potential matches for a Culture Extractor performer with confidence scores"""
+        potential_matches = []
         ce_name = ce_performer['name']
         
         for stashdb_entry in stashdb_performers:
@@ -67,15 +65,10 @@ class PerformerMatcher:
             # Use the higher score between name and alias matches
             score = max(name_similarity, alias_score)
             
-            if score > best_score:
-                best_score = score
-                best_match = stashdb_entry
-        
-        return PerformerMatch(
-            culture_extractor=ce_performer,
-            stashdb=best_match if best_score > 0.5 else None,  # Lower threshold but return None for very low confidence
-            confidence=best_score
-        )
+            if score > 0.5:  # Only consider matches above threshold
+                potential_matches.append(PotentialMatch(ce_performer, stashdb_entry, score))
+                
+        return potential_matches
 
     @staticmethod
     def match_all_performers(culture_extractor_performers: List[Dict], stashdb_performers: List[Dict]) -> List[PerformerMatch]:
@@ -89,5 +82,44 @@ class PerformerMatcher:
         Returns:
             List of PerformerMatch objects containing match results and confidence scores
         """
-        return [PerformerMatcher._match_performer(ce_performer, stashdb_performers)
-                for ce_performer in culture_extractor_performers]
+        # Find all potential matches for each performer
+        all_potential_matches = []
+        for ce_performer in culture_extractor_performers:
+            potential_matches = PerformerMatcher._find_potential_matches(ce_performer, stashdb_performers)
+            all_potential_matches.extend(potential_matches)
+            
+        # Sort by confidence score in descending order
+        all_potential_matches.sort(key=attrgetter('confidence'), reverse=True)
+        
+        # Track which performers have been matched
+        matched_ce_performers = set()
+        matched_stashdb_performers = set()
+        final_matches = {}
+        
+        # Assign matches starting with highest confidence
+        for potential_match in all_potential_matches:
+            ce_id = potential_match.ce_performer['uuid']
+            stashdb_id = potential_match.stashdb_performer['performer']['id']
+            
+            if ce_id not in matched_ce_performers and stashdb_id not in matched_stashdb_performers:
+                matched_ce_performers.add(ce_id)
+                matched_stashdb_performers.add(stashdb_id)
+                final_matches[ce_id] = PerformerMatch(
+                    culture_extractor=potential_match.ce_performer,
+                    stashdb=potential_match.stashdb_performer,
+                    confidence=potential_match.confidence
+                )
+        
+        # Create final list of matches, including unmatched performers
+        result = []
+        for ce_performer in culture_extractor_performers:
+            if ce_performer['uuid'] in final_matches:
+                result.append(final_matches[ce_performer['uuid']])
+            else:
+                result.append(PerformerMatch(
+                    culture_extractor=ce_performer,
+                    stashdb=None,
+                    confidence=0.0
+                ))
+                
+        return result

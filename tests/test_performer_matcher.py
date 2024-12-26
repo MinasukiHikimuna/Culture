@@ -69,13 +69,11 @@ def test_match_all_performers_sample03():
     zazie = next(match for match in matches if match.culture_extractor['name'] == 'Zazie Skymm')
     nikki = next(match for match in matches if match.culture_extractor['name'] == 'Nikki Nutz')
     
-    # Both should have a match
-    assert zazie.stashdb is not None
-    assert nikki.stashdb is not None
-    
-    # They should not be matched to the same StashDB performer
-    assert zazie.stashdb['performer']['id'] != nikki.stashdb['performer']['id']
-    
     # Zazie should match correctly
+    assert zazie.stashdb is not None
     assert zazie.stashdb['performer']['name'] == 'Zazie Skymm'
     assert zazie.confidence > 0.95  # Exact name match
+    
+    # Nikki should not match to Zazie's profile despite the ManyVids URL
+    assert nikki.stashdb is None
+    assert nikki.confidence == 0.0
