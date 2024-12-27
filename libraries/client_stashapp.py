@@ -109,13 +109,13 @@ class StashAppClientPolars:
             size
             duration
         }
-        """
-        
-        todo_fragment = """
         tags {
             id
             name
         }
+        """
+        
+        todo_fragment = """
         performers {
             id
             name
@@ -146,6 +146,7 @@ class StashAppClientPolars:
                         "size": int(f.get("size", 0)),
                         "duration": int(f.get("duration", 0) * 1000)  # Convert seconds to milliseconds
                     } for f in stash_scene.get("files", [])],
+                    "tags": stash_scene.get("tags", []),
                     "organized": stash_scene.get("organized", False),
                     "interactive": stash_scene.get("interactive", False),
                     "play_duration": stash_scene.get("play_duration", 0),
@@ -164,8 +165,8 @@ class StashAppClientPolars:
             "updated_at": pl.Datetime,
             "files": pl.List(pl.Struct({"id": pl.Int64, "path": pl.Utf8, "size": pl.Int64, "duration": pl.Duration(time_unit="ms")})),
             "studio": pl.Struct({"id": pl.Int64, "name": pl.Utf8, "url": pl.Utf8, "parent_studio": pl.Struct({"id": pl.Int64, "name": pl.Utf8, "url": pl.Utf8})}),
-            #"tags": pl.List(pl.Struct),
-            #"performers": pl.List(pl.Struct),
+            "tags": pl.List(pl.Struct({"id": pl.Int64, "name": pl.Utf8})),
+            # "performers": pl.List(pl.Struct({"id": pl.Int64, "name": pl.Utf8, "disambiguation": pl.Utf8, "alias_list": pl.List(pl.Utf8), "gender": pl.Utf8})),
             "organized": pl.Boolean,
             "interactive": pl.Boolean,
             "play_duration": pl.Int64,
