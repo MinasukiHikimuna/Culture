@@ -93,6 +93,16 @@ class StashAppClientPolars:
         play_duration
         play_count
         o_counter
+        studio {
+            id
+            name
+            url
+            parent_studio {
+                id
+                name
+                url
+            }
+        }
         files {
             id
             path
@@ -102,14 +112,6 @@ class StashAppClientPolars:
         """
         
         todo_fragment = """
-        studio {
-            id
-            name
-            parent_studio {
-                id
-                name
-            }
-        }
         tags {
             id
             name
@@ -137,6 +139,7 @@ class StashAppClientPolars:
                     "urls": stash_scene.get("urls", []),
                     "created_at": datetime.fromisoformat(stash_scene.get("created_at").replace('Z', '+00:00')) if stash_scene.get("created_at") else None,
                     "updated_at": datetime.fromisoformat(stash_scene.get("updated_at").replace('Z', '+00:00')) if stash_scene.get("updated_at") else None,
+                    "studio": stash_scene.get("studio", {}),
                     "files": [{
                         "id": int(f.get("id")),
                         "path": f.get("path", ""),
@@ -160,7 +163,7 @@ class StashAppClientPolars:
             "created_at": pl.Datetime,
             "updated_at": pl.Datetime,
             "files": pl.List(pl.Struct({"id": pl.Int64, "path": pl.Utf8, "size": pl.Int64, "duration": pl.Duration(time_unit="ms")})),
-            #"studio": pl.Struct,
+            "studio": pl.Struct({"id": pl.Int64, "name": pl.Utf8, "url": pl.Utf8, "parent_studio": pl.Struct({"id": pl.Int64, "name": pl.Utf8, "url": pl.Utf8})}),
             #"tags": pl.List(pl.Struct),
             #"performers": pl.List(pl.Struct),
             "organized": pl.Boolean,
