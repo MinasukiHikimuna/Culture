@@ -31,7 +31,7 @@ def get_stashapp_client(prefix=""):
     return stash
 
 
-class StashAppClientPolars:
+class StashAppClient:
     def __init__(self, prefix=""):
         self.stash = get_stashapp_client(prefix)
 
