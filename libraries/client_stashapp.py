@@ -58,9 +58,15 @@ class StashAppClientPolars:
             }
             parent_studio = studio.get("parent_studio")
             if parent_studio:
-                studio_data["stash_studios_parent_studio_id"] = int(parent_studio.get("id"))
-                studio_data["stash_studios_parent_studio_name"] = parent_studio.get("name")
-                studio_data["stash_studios_parent_studio_url"] = parent_studio.get("url")
+                studio_data["stash_studios_parent_studio_id"] = int(
+                    parent_studio.get("id")
+                )
+                studio_data["stash_studios_parent_studio_name"] = parent_studio.get(
+                    "name"
+                )
+                studio_data["stash_studios_parent_studio_url"] = parent_studio.get(
+                    "url"
+                )
             else:
                 studio_data["stash_studios_parent_studio_id"] = None
                 studio_data["stash_studios_parent_studio_name"] = None
@@ -93,6 +99,13 @@ class StashAppClientPolars:
         play_duration
         play_count
         o_counter
+        performers {
+            id
+            name
+            disambiguation
+            alias_list
+            gender
+        }
         studio {
             id
             name
@@ -114,17 +127,6 @@ class StashAppClientPolars:
             name
         }
         """
-        
-        todo_fragment = """
-        performers {
-            id
-            name
-            disambiguation
-            alias_list
-            gender
-        }
-
-        """
 
         scenes = []
         for oshash in oshashes:
@@ -135,17 +137,41 @@ class StashAppClientPolars:
                     "id": int(stash_scene.get("id")),
                     "title": stash_scene.get("title", ""),
                     "details": stash_scene.get("details", ""),
-                    "date": datetime.strptime(stash_scene.get("date", ""), "%Y-%m-%d").date() if stash_scene.get("date") else None,
+                    "date": (
+                        datetime.strptime(
+                            stash_scene.get("date", ""), "%Y-%m-%d"
+                        ).date()
+                        if stash_scene.get("date")
+                        else None
+                    ),
                     "urls": stash_scene.get("urls", []),
-                    "created_at": datetime.fromisoformat(stash_scene.get("created_at").replace('Z', '+00:00')) if stash_scene.get("created_at") else None,
-                    "updated_at": datetime.fromisoformat(stash_scene.get("updated_at").replace('Z', '+00:00')) if stash_scene.get("updated_at") else None,
+                    "created_at": (
+                        datetime.fromisoformat(
+                            stash_scene.get("created_at").replace("Z", "+00:00")
+                        )
+                        if stash_scene.get("created_at")
+                        else None
+                    ),
+                    "updated_at": (
+                        datetime.fromisoformat(
+                            stash_scene.get("updated_at").replace("Z", "+00:00")
+                        )
+                        if stash_scene.get("updated_at")
+                        else None
+                    ),
+                    "performers": stash_scene.get("performers", []),
                     "studio": stash_scene.get("studio", {}),
-                    "files": [{
-                        "id": int(f.get("id")),
-                        "path": f.get("path", ""),
-                        "size": int(f.get("size", 0)),
-                        "duration": int(f.get("duration", 0) * 1000)  # Convert seconds to milliseconds
-                    } for f in stash_scene.get("files", [])],
+                    "files": [
+                        {
+                            "id": int(f.get("id")),
+                            "path": f.get("path", ""),
+                            "size": int(f.get("size", 0)),
+                            "duration": int(
+                                f.get("duration", 0) * 1000
+                            ),  # Convert seconds to milliseconds
+                        }
+                        for f in stash_scene.get("files", [])
+                    ],
                     "tags": stash_scene.get("tags", []),
                     "organized": stash_scene.get("organized", False),
                     "interactive": stash_scene.get("interactive", False),
@@ -163,10 +189,38 @@ class StashAppClientPolars:
             "urls": pl.List(pl.Utf8),
             "created_at": pl.Datetime,
             "updated_at": pl.Datetime,
-            "files": pl.List(pl.Struct({"id": pl.Int64, "path": pl.Utf8, "size": pl.Int64, "duration": pl.Duration(time_unit="ms")})),
-            "studio": pl.Struct({"id": pl.Int64, "name": pl.Utf8, "url": pl.Utf8, "parent_studio": pl.Struct({"id": pl.Int64, "name": pl.Utf8, "url": pl.Utf8})}),
+            "performers": pl.List(
+                pl.Struct(
+                    {
+                        "id": pl.Int64,
+                        "name": pl.Utf8,
+                        "disambiguation": pl.Utf8,
+                        "alias_list": pl.List(pl.Utf8),
+                        "gender": pl.Utf8,
+                    }
+                )
+            ),
+            "studio": pl.Struct(
+                {
+                    "id": pl.Int64,
+                    "name": pl.Utf8,
+                    "url": pl.Utf8,
+                    "parent_studio": pl.Struct(
+                        {"id": pl.Int64, "name": pl.Utf8, "url": pl.Utf8}
+                    ),
+                }
+            ),
+            "files": pl.List(
+                pl.Struct(
+                    {
+                        "id": pl.Int64,
+                        "path": pl.Utf8,
+                        "size": pl.Int64,
+                        "duration": pl.Duration(time_unit="ms"),
+                    }
+                )
+            ),
             "tags": pl.List(pl.Struct({"id": pl.Int64, "name": pl.Utf8})),
-            # "performers": pl.List(pl.Struct({"id": pl.Int64, "name": pl.Utf8, "disambiguation": pl.Utf8, "alias_list": pl.List(pl.Utf8), "gender": pl.Utf8})),
             "organized": pl.Boolean,
             "interactive": pl.Boolean,
             "play_duration": pl.Int64,
@@ -176,7 +230,6 @@ class StashAppClientPolars:
 
         df_scenes = pl.DataFrame(scenes, schema=schema)
         return df_scenes
-
 
 
 class StashAppClient:
@@ -258,16 +311,39 @@ class StashAppClient:
                     "id": int(stash_scene.get("id")),
                     "title": stash_scene.get("title", ""),
                     "details": stash_scene.get("details", ""),
-                    "date": datetime.strptime(stash_scene.get("date", ""), "%Y-%m-%d").date() if stash_scene.get("date") else None,
+                    "date": (
+                        datetime.strptime(
+                            stash_scene.get("date", ""), "%Y-%m-%d"
+                        ).date()
+                        if stash_scene.get("date")
+                        else None
+                    ),
                     "urls": stash_scene.get("urls", []),
-                    "created_at": datetime.fromisoformat(stash_scene.get("created_at").replace('Z', '+00:00')) if stash_scene.get("created_at") else None,
-                    "updated_at": datetime.fromisoformat(stash_scene.get("updated_at").replace('Z', '+00:00')) if stash_scene.get("updated_at") else None,
-                    "files": [{
-                        "id": int(f.get("id")),
-                        "path": f.get("path", ""),
-                        "size": int(f.get("size", 0)),
-                        "duration": int(f.get("duration", 0) * 1000)  # Convert seconds to milliseconds
-                    } for f in stash_scene.get("files", [])],
+                    "created_at": (
+                        datetime.fromisoformat(
+                            stash_scene.get("created_at").replace("Z", "+00:00")
+                        )
+                        if stash_scene.get("created_at")
+                        else None
+                    ),
+                    "updated_at": (
+                        datetime.fromisoformat(
+                            stash_scene.get("updated_at").replace("Z", "+00:00")
+                        )
+                        if stash_scene.get("updated_at")
+                        else None
+                    ),
+                    "files": [
+                        {
+                            "id": int(f.get("id")),
+                            "path": f.get("path", ""),
+                            "size": int(f.get("size", 0)),
+                            "duration": int(
+                                f.get("duration", 0) * 1000
+                            ),  # Convert seconds to milliseconds
+                        }
+                        for f in stash_scene.get("files", [])
+                    ],
                     "studio": stash_scene.get("studio", {}),
                     "tags": stash_scene.get("tags", []),
                     "performers": stash_scene.get("performers", []),
