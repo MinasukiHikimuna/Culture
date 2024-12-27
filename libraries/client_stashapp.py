@@ -196,7 +196,7 @@ class StashAppClientPolars:
                         "name": pl.Utf8,
                         "disambiguation": pl.Utf8,
                         "alias_list": pl.List(pl.Utf8),
-                        "gender": pl.Utf8,
+                        "gender": pl.Enum(["MALE", "FEMALE", "TRANSGENDER_MALE", "TRANSGENDER_FEMALE", "NON_BINARY"]),
                     }
                 )
             ),
