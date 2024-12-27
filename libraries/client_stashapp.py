@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import stashapi.log as log
 from stashapi.stashapp import StashInterface
+from datetime import datetime
 from dotenv import load_dotenv
 import os
 import polars as pl
@@ -132,10 +133,10 @@ class StashAppClientPolars:
                     "id": int(stash_scene.get("id")),
                     "title": stash_scene.get("title", ""),
                     "details": stash_scene.get("details", ""),
-                    "date": stash_scene.get("date", ""),
+                    "date": datetime.strptime(stash_scene.get("date", ""), "%Y-%m-%d").date() if stash_scene.get("date") else None,
                     "urls": stash_scene.get("urls", []),
-                    "created_at": stash_scene.get("created_at", ""),
-                    "updated_at": stash_scene.get("updated_at", ""),
+                    "created_at": datetime.fromisoformat(stash_scene.get("created_at").replace('Z', '+00:00')) if stash_scene.get("created_at") else None,
+                    "updated_at": datetime.fromisoformat(stash_scene.get("updated_at").replace('Z', '+00:00')) if stash_scene.get("updated_at") else None,
                     "files": [{
                         "id": int(f.get("id")),
                         "path": f.get("path", ""),
@@ -154,10 +155,10 @@ class StashAppClientPolars:
             "id": pl.Int64,
             "title": pl.Utf8,
             "details": pl.Utf8,
-            "date": pl.Utf8,
+            "date": pl.Date,
             "urls": pl.List(pl.Utf8),
-            "created_at": pl.Utf8,
-            "updated_at": pl.Utf8,
+            "created_at": pl.Datetime,
+            "updated_at": pl.Datetime,
             "files": pl.List(pl.Struct({"id": pl.Int64, "path": pl.Utf8, "size": pl.Int64, "duration": pl.Duration(time_unit="ms")})),
             #"studio": pl.Struct,
             #"tags": pl.List(pl.Struct),
@@ -253,10 +254,10 @@ class StashAppClient:
                     "id": int(stash_scene.get("id")),
                     "title": stash_scene.get("title", ""),
                     "details": stash_scene.get("details", ""),
-                    "date": stash_scene.get("date", ""),
+                    "date": datetime.strptime(stash_scene.get("date", ""), "%Y-%m-%d").date() if stash_scene.get("date") else None,
                     "urls": stash_scene.get("urls", []),
-                    "created_at": stash_scene.get("created_at", ""),
-                    "updated_at": stash_scene.get("updated_at", ""),
+                    "created_at": datetime.fromisoformat(stash_scene.get("created_at").replace('Z', '+00:00')) if stash_scene.get("created_at") else None,
+                    "updated_at": datetime.fromisoformat(stash_scene.get("updated_at").replace('Z', '+00:00')) if stash_scene.get("updated_at") else None,
                     "files": [{
                         "id": int(f.get("id")),
                         "path": f.get("path", ""),
