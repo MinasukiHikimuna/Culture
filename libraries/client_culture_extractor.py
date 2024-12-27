@@ -1,50 +1,43 @@
-import numpy as np
 import pandas as pd
 import psycopg
+import polars as pl
 import json
-from typing import List, Dict, Any
-from typedframe import TypedDataFrame, DATE_TIME_DTYPE
-from datetime import datetime, date
 
-class Sites(TypedDataFrame):
-    schema = {
-        'uuid': str,
-        'short_name': str,
-        'name': str,
-        'url': str,
-        'username': str,
-        'password': str
-    }
 
-class Downloads(TypedDataFrame):
-    schema = {
-        'site_name': str,
-        'sub_site_name': str,
-        'release_uuid': str,
-        'release_date': DATE_TIME_DTYPE,
-        'release_short_name': str,
-        'release_name': str,
-        'release_url': str,
-        'release_description': str,
-        'release_created': DATE_TIME_DTYPE,
-        'release_last_updated': DATE_TIME_DTYPE,
-        'release_available_files': object,
-        'release_json_document': object,
-        'downloads_uuid': str,
-        'downloads_downloaded_at': DATE_TIME_DTYPE,
-        'file_type': str,
-        'content_type': str,
-        'downloads_variant': str,
-        'downloads_available_file': object,
-        'downloads_original_filename': str,
-        'downloads_saved_filename': str,
-        'downloads_file_metadata': object,
-        'performers': object,
-        'tags': object,
-        'hash_sha256': str,
-        'hash_phash': str,
-        'hash_oshash': str
-    }
+class ClientCultureExtractorPolars:
+    def __init__(self, connection_string):
+        self.connection_string = connection_string
+        self.connection = psycopg.connect(connection_string)
+
+    def __del__(self):
+        if hasattr(self, "connection") and not self.connection.closed:
+            self.connection.close()
+
+    def get_sites(self) -> pl.DataFrame:
+        with self.connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT uuid AS ce_sites_uuid, short_name AS ce_sites_short_name, name AS ce_sites_name, url AS ce_sites_url FROM sites"
+            )
+
+            sites_rows = cursor.fetchall()
+
+            # Convert UUID objects to strings
+            sites_rows = [(str(row[0]), row[1], row[2], row[3]) for row in sites_rows]
+
+            schema = {
+                "ce_sites_uuid": pl.Utf8,
+                "ce_sites_short_name": pl.Utf8,
+                "ce_sites_name": pl.Utf8,
+                "ce_sites_url": pl.Utf8,
+            }
+
+            df_sites = pl.DataFrame(
+                sites_rows,
+                schema=schema,
+            )
+
+            return df_sites
+
 
 class ClientCultureExtractor:
     def __init__(self, connection_string):
@@ -52,21 +45,21 @@ class ClientCultureExtractor:
         self.connection = psycopg.connect(connection_string)
 
     def __del__(self):
-        if hasattr(self, 'connection') and not self.connection.closed:
+        if hasattr(self, "connection") and not self.connection.closed:
             self.connection.close()
 
-    def get_sites(self) -> Sites:
+    def get_sites(self) -> pd.DataFrame:
         with self.connection.cursor() as cursor:
-            cursor.execute("SELECT * FROM sites")
-            
+            cursor.execute("SELECT uuid, short_name, name, url FROM sites")
+
             sites_rows = cursor.fetchall()
             column_names = [desc[0] for desc in cursor.description]
             df_sites = pd.DataFrame(sites_rows, columns=column_names)
+            df_sites = df_sites.add_prefix("ce_sites_")
 
-            sites = Sites.convert(df_sites)
-            return sites
+            return df_sites
 
-    def get_downloads(self, site_name: str) -> Downloads:
+    def get_downloads(self, site_name: str) -> pd.DataFrame:
         with self.connection.cursor() as cursor:
             query = """
                 SELECT 
@@ -146,21 +139,44 @@ class ClientCultureExtractor:
             downloads = cursor.fetchall()
             column_names = [desc[0] for desc in cursor.description]
             df_downloads = pd.DataFrame(downloads, columns=column_names)
-            
+
             # Convert date and datetime columns
-            df_downloads['release_date'] = pd.to_datetime(df_downloads['release_date'])
-            df_downloads['release_created'] = pd.to_datetime(df_downloads['release_created'])
-            df_downloads['release_last_updated'] = pd.to_datetime(df_downloads['release_last_updated'])
-            df_downloads['downloads_downloaded_at'] = pd.to_datetime(df_downloads['downloads_downloaded_at'])
-            
+            df_downloads["release_date"] = pd.to_datetime(df_downloads["release_date"])
+            df_downloads["release_created"] = pd.to_datetime(
+                df_downloads["release_created"]
+            )
+            df_downloads["release_last_updated"] = pd.to_datetime(
+                df_downloads["release_last_updated"]
+            )
+            df_downloads["downloads_downloaded_at"] = pd.to_datetime(
+                df_downloads["downloads_downloaded_at"]
+            )
+
             # Convert JSON string fields to Python objects
-            json_fields = ['release_available_files', 'release_json_document', 'downloads_available_file', 'downloads_file_metadata', 'performers', 'tags']
+            json_fields = [
+                "release_available_files",
+                "release_json_document",
+                "downloads_available_file",
+                "downloads_file_metadata",
+                "performers",
+                "tags",
+            ]
             for field in json_fields:
-                df_downloads[field] = df_downloads[field].apply(lambda x: json.loads(x) if isinstance(x, str) else x)
-            
+                df_downloads[field] = df_downloads[field].apply(
+                    lambda x: json.loads(x) if isinstance(x, str) else x
+                )
+
             # Extract hash fields from file_metadata
-            df_downloads['hash_sha256'] = df_downloads['downloads_file_metadata'].apply(lambda x: x.get('sha256Sum') if isinstance(x, dict) else None)
-            df_downloads['hash_phash'] = df_downloads['downloads_file_metadata'].apply(lambda x: x.get('phash') if isinstance(x, dict) else None)
-            df_downloads['hash_oshash'] = df_downloads['downloads_file_metadata'].apply(lambda x: x.get('oshash') if isinstance(x, dict) else None)
-            
-            return Downloads.convert(df_downloads)
+            df_downloads["hash_sha256"] = df_downloads["downloads_file_metadata"].apply(
+                lambda x: x.get("sha256Sum") if isinstance(x, dict) else None
+            )
+            df_downloads["hash_phash"] = df_downloads["downloads_file_metadata"].apply(
+                lambda x: x.get("phash") if isinstance(x, dict) else None
+            )
+            df_downloads["hash_oshash"] = df_downloads["downloads_file_metadata"].apply(
+                lambda x: x.get("oshash") if isinstance(x, dict) else None
+            )
+
+            df_downloads = df_downloads.add_prefix("ce_downloads_")
+
+            return df_downloads
