@@ -21,8 +21,15 @@ class ClientCultureExtractorPolars:
 
             sites_rows = cursor.fetchall()
 
-            # Convert UUID objects to strings
-            sites_rows = [(str(row[0]), row[1], row[2], row[3]) for row in sites_rows]
+            sites = [
+                {
+                    "ce_sites_uuid": str(row[0]),
+                    "ce_sites_short_name": row[1],
+                    "ce_sites_name": row[2],
+                    "ce_sites_url": row[3]
+                }
+                for row in sites_rows
+            ]
 
             schema = {
                 "ce_sites_uuid": pl.Utf8,
@@ -31,11 +38,7 @@ class ClientCultureExtractorPolars:
                 "ce_sites_url": pl.Utf8,
             }
 
-            df_sites = pl.DataFrame(
-                sites_rows,
-                schema=schema,
-            )
-
+            df_sites = pl.DataFrame(sites, schema=schema)
             return df_sites
 
 
