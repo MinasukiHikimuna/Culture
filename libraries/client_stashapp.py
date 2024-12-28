@@ -65,7 +65,7 @@ class StashAppClient:
                 "stash_studios_id": int(studio.get("id")),
                 "stash_studios_name": studio.get("name"),
                 "stash_studios_url": studio.get("url"),
-                **self._get_stash_ids(studio.get("stash_ids", []))
+                **self._get_stash_ids(studio.get("stash_ids", [])),
             }
             parent_studio = studio.get("parent_studio")
             if parent_studio:
@@ -78,9 +78,15 @@ class StashAppClient:
                 studio_data["stash_studios_parent_studio_url"] = parent_studio.get(
                     "url"
                 )
-                parent_stash_ids = self._get_stash_ids(parent_studio.get("stash_ids", []))
-                studio_data["stash_studios_parent_studio_stashdb_id"] = parent_stash_ids["stash_studios_stashdb_id"]
-                studio_data["stash_studios_parent_studio_tpdb_id"] = parent_stash_ids["stash_studios_tpdb_id"]
+                parent_stash_ids = self._get_stash_ids(
+                    parent_studio.get("stash_ids", [])
+                )
+                studio_data["stash_studios_parent_studio_stashdb_id"] = (
+                    parent_stash_ids["stash_studios_stashdb_id"]
+                )
+                studio_data["stash_studios_parent_studio_tpdb_id"] = parent_stash_ids[
+                    "stash_studios_tpdb_id"
+                ]
             else:
                 studio_data["stash_studios_parent_studio_id"] = None
                 studio_data["stash_studios_parent_studio_name"] = None
@@ -99,7 +105,7 @@ class StashAppClient:
             "stash_studios_parent_studio_name": pl.Utf8,
             "stash_studios_parent_studio_url": pl.Utf8,
             "stash_studios_parent_studio_stashdb_id": pl.Utf8,
-            "stash_studios_parent_studio_tpdb_id": pl.Utf8
+            "stash_studios_parent_studio_tpdb_id": pl.Utf8,
         }
 
         df_studios = pl.DataFrame(studios, schema=schema)
@@ -107,10 +113,7 @@ class StashAppClient:
 
     def _get_stash_ids(self, stash_ids):
         """Extract StashDB and TPDB IDs from stash_ids list."""
-        result = {
-            "stash_studios_stashdb_id": None,
-            "stash_studios_tpdb_id": None
-        }
+        result = {"stash_studios_stashdb_id": None, "stash_studios_tpdb_id": None}
         if stash_ids:
             for stash_id in stash_ids:
                 if stash_id["endpoint"] == "https://stashdb.org/graphql":
@@ -230,7 +233,15 @@ class StashAppClient:
                         "name": pl.Utf8,
                         "disambiguation": pl.Utf8,
                         "alias_list": pl.List(pl.Utf8),
-                        "gender": pl.Enum(["MALE", "FEMALE", "TRANSGENDER_MALE", "TRANSGENDER_FEMALE", "NON_BINARY"]),
+                        "gender": pl.Enum(
+                            [
+                                "MALE",
+                                "FEMALE",
+                                "TRANSGENDER_MALE",
+                                "TRANSGENDER_FEMALE",
+                                "NON_BINARY",
+                            ]
+                        ),
                     }
                 )
             ),
@@ -264,3 +275,48 @@ class StashAppClient:
 
         df_scenes = pl.DataFrame(scenes, schema=schema)
         return df_scenes
+
+    def set_studio_stash_id_for_endpoint(
+        self, studio_id: int, endpoint: str, stash_id: str
+    ):
+        refreshed_studio = self.stash.find_studio(
+            studio_id,
+            fragment="""
+            id
+            name
+            url
+            stash_ids {
+                endpoint
+                stash_id
+                updated_at
+            }
+            """,
+        )
+
+        existing_stash_ids = refreshed_studio.get("stash_ids", [])
+        existing_entry = next((x for x in existing_stash_ids if x["endpoint"] == endpoint), None)
+        
+        if existing_entry and existing_entry["stash_id"] == stash_id:
+            return
+
+        if existing_entry:
+            new_stash_ids = [
+                {
+                    "endpoint": x["endpoint"],
+                    "stash_id": stash_id if x["endpoint"] == endpoint else x["stash_id"]
+                }
+                for x in existing_stash_ids
+            ]
+        else:
+            new_stash_ids = [
+                *[
+                    {
+                        "endpoint": x["endpoint"],
+                        "stash_id": x["stash_id"],
+                    }
+                    for x in existing_stash_ids
+                ],
+                {"endpoint": endpoint, "stash_id": stash_id},
+            ]
+
+        self.stash.update_studio({"id": studio_id, "stash_ids": new_stash_ids})
