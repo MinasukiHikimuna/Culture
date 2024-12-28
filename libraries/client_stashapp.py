@@ -40,10 +40,20 @@ class StashAppClient:
         id
         name
         url
+        stash_ids {
+            endpoint
+            stash_id
+            updated_at
+        }
         parent_studio {
             id
             name
             url
+            stash_ids {
+                endpoint
+                stash_id
+                updated_at
+            }
         }
         """
 
@@ -55,6 +65,7 @@ class StashAppClient:
                 "stash_studios_id": int(studio.get("id")),
                 "stash_studios_name": studio.get("name"),
                 "stash_studios_url": studio.get("url"),
+                **self._get_stash_ids(studio.get("stash_ids", []))
             }
             parent_studio = studio.get("parent_studio")
             if parent_studio:
@@ -67,23 +78,46 @@ class StashAppClient:
                 studio_data["stash_studios_parent_studio_url"] = parent_studio.get(
                     "url"
                 )
+                parent_stash_ids = self._get_stash_ids(parent_studio.get("stash_ids", []))
+                studio_data["stash_studios_parent_studio_stashdb_id"] = parent_stash_ids["stash_studios_stashdb_id"]
+                studio_data["stash_studios_parent_studio_tpdb_id"] = parent_stash_ids["stash_studios_tpdb_id"]
             else:
                 studio_data["stash_studios_parent_studio_id"] = None
                 studio_data["stash_studios_parent_studio_name"] = None
                 studio_data["stash_studios_parent_studio_url"] = None
+                studio_data["stash_studios_parent_studio_stashdb_id"] = None
+                studio_data["stash_studios_parent_studio_tpdb_id"] = None
             studios.append(studio_data)
 
         schema = {
             "stash_studios_id": pl.Int64,
             "stash_studios_name": pl.Utf8,
             "stash_studios_url": pl.Utf8,
+            "stash_studios_stashdb_id": pl.Utf8,
+            "stash_studios_tpdb_id": pl.Utf8,
             "stash_studios_parent_studio_id": pl.Int64,
             "stash_studios_parent_studio_name": pl.Utf8,
             "stash_studios_parent_studio_url": pl.Utf8,
+            "stash_studios_parent_studio_stashdb_id": pl.Utf8,
+            "stash_studios_parent_studio_tpdb_id": pl.Utf8
         }
 
         df_studios = pl.DataFrame(studios, schema=schema)
         return df_studios
+
+    def _get_stash_ids(self, stash_ids):
+        """Extract StashDB and TPDB IDs from stash_ids list."""
+        result = {
+            "stash_studios_stashdb_id": None,
+            "stash_studios_tpdb_id": None
+        }
+        if stash_ids:
+            for stash_id in stash_ids:
+                if stash_id["endpoint"] == "https://stashdb.org/graphql":
+                    result["stash_studios_stashdb_id"] = stash_id["stash_id"]
+                elif stash_id["endpoint"] == "https://theporndb.net/graphql":
+                    result["stash_studios_tpdb_id"] = stash_id["stash_id"]
+        return result
 
     def find_scenes_by_oshash(self, oshashes: List[str]) -> pl.DataFrame:
         fragment = """
