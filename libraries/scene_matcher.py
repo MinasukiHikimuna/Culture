@@ -4,7 +4,7 @@ from typing import Optional, Dict, List
 @dataclass
 class SceneMatcher:
     MAX_DISTANCE: int = 16
-    MAX_DURATION_DIFF_PCT: float = 10.0
+    MAX_DURATION_DIFF_SECS: int = 60
 
     def _hamming_distance(self, hash1: str, hash2: str) -> int:
         """Calculate the Hamming distance between two hex strings."""
@@ -32,27 +32,36 @@ class SceneMatcher:
             input_duration = input_scene.get('duration')
             
             for stashdb_scene in stashdb_scenes:
+                scene_duration = stashdb_scene.get('duration')
+                
                 for fingerprint in stashdb_scene["fingerprints"]:
                     if fingerprint["algorithm"] == "PHASH":
                         distance = self._hamming_distance(input_scene["phash"], fingerprint["hash"])
                         
-                        # Calculate duration difference percentage if both durations exist
-                        stashdb_duration = stashdb_scene.get('duration')
-                        duration_diff_pct = float('inf')
+                        if distance > self.MAX_DISTANCE:
+                            continue
+                            
+                        fingerprint_duration = fingerprint.get('duration')
+                        duration_diff = float('inf')
+                        scene_duration_diff = float('inf')
                         
-                        if input_duration and stashdb_duration:
-                            duration_diff_pct = abs(input_duration - stashdb_duration) / input_duration * 100
+                        if input_duration and fingerprint_duration:
+                            duration_diff = abs(input_duration - fingerprint_duration)
+                            
+                        if input_duration and scene_duration:
+                            scene_duration_diff = abs(input_duration - scene_duration)
                         
-                        # Only consider matches within both phash and duration thresholds
-                        if distance <= self.MAX_DISTANCE and duration_diff_pct <= self.MAX_DURATION_DIFF_PCT:
-                            # Update match if:
-                            # 1. This is the closest phash match yet, or
-                            # 2. Equal phash distance but better duration match
-                            if (distance < min_distance or 
-                                (distance == min_distance and duration_diff_pct < min_duration_diff)):
-                                min_distance = distance
-                                min_duration_diff = duration_diff_pct
-                                matching_scene = stashdb_scene
+                        if duration_diff > self.MAX_DURATION_DIFF_SECS:
+                            continue
+                            
+                        # Update match if:
+                        # 1. This is the closest phash match yet, or
+                        # 2. Equal phash distance but scene duration matches better
+                        if (distance < min_distance or
+                            (distance == min_distance and scene_duration_diff < min_duration_diff)):
+                            min_distance = distance
+                            min_duration_diff = scene_duration_diff
+                            matching_scene = stashdb_scene
             
             phash_to_scene[input_scene["phash"]] = matching_scene
             
