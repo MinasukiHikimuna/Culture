@@ -1,3 +1,4 @@
+from typing import Dict, List, Optional
 import requests
 import stashapi.log as logger
 
@@ -170,7 +171,7 @@ class StashDbClient(StashboxClient):
 
         return scenes
 
-    def query_scenes_by_phash(self, scenes: list[dict]) -> dict[str, dict]:
+    def query_scenes_by_phash(self, scenes: List[Dict]) -> Dict[str, Optional[Dict]]:
         """
         Query StashDB for multiple scenes using their phash fingerprints in a single request.
         
@@ -290,15 +291,14 @@ class StashDbClient(StashboxClient):
         if not result or "data" not in result or "findScenesByFullFingerprints" not in result["data"]:
             raise Exception("Failed to query scenes by phash")
         
-        stashdb_scenes = result["data"]["findScenesByFullFingerprints"]
-        
         # Save to file for debugging/testing
-        import datetime
-        import json
-        time_in_ticks = datetime.datetime.now().timestamp()
-        with open(f"phash_to_scene_{time_in_ticks}.json", "w") as f:
-            f.write(json.dumps({ "input_scenes": scenes, "results": result }, indent=4))
+        # import datetime
+        # import json
+        # time_in_ticks = datetime.datetime.now().timestamp()
+        # with open(f"phash_to_scene_{time_in_ticks}.json", "w") as f:
+        #     f.write(json.dumps({ "input_scenes": scenes, "results": result }, indent=4))
         
+        stashdb_scenes = result["data"]["findScenesByFullFingerprints"]
         return self.scene_matcher.match_scenes(scenes, stashdb_scenes)
 
     def _gql_query(self, query, variables=None):
