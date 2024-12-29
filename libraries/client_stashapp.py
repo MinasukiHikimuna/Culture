@@ -175,34 +175,34 @@ class StashAppClient:
             if stash_scene:
                 # Extract fields according to our schema
                 scene_data = {
-                    "id": int(stash_scene.get("id")),
-                    "title": stash_scene.get("title", ""),
-                    "details": stash_scene.get("details", ""),
-                    "date": (
+                    "stashapp_id": int(stash_scene.get("id")),
+                    "stashapp_title": stash_scene.get("title", ""),
+                    "stashapp_details": stash_scene.get("details", ""),
+                    "stashapp_date": (
                         datetime.strptime(
                             stash_scene.get("date", ""), "%Y-%m-%d"
                         ).date()
                         if stash_scene.get("date")
                         else None
                     ),
-                    "urls": stash_scene.get("urls", []),
-                    "created_at": (
+                    "stashapp_urls": stash_scene.get("urls", []),
+                    "stashapp_created_at": (
                         datetime.fromisoformat(
                             stash_scene.get("created_at").replace("Z", "+00:00")
                         )
                         if stash_scene.get("created_at")
                         else None
                     ),
-                    "updated_at": (
+                    "stashapp_updated_at": (
                         datetime.fromisoformat(
                             stash_scene.get("updated_at").replace("Z", "+00:00")
                         )
                         if stash_scene.get("updated_at")
                         else None
                     ),
-                    "performers": stash_scene.get("performers", []),
-                    "studio": stash_scene.get("studio", {}),
-                    "files": [
+                    "stashapp_performers": stash_scene.get("performers", []),
+                    "stashapp_studio": stash_scene.get("studio", {}),
+                    "stashapp_files": [
                         {
                             "id": int(f.get("id")),
                             "path": f.get("path", ""),
@@ -220,27 +220,29 @@ class StashAppClient:
                         }
                         for f in stash_scene.get("files", [])
                     ],
-                    "primary_file_oshash": next((fp['value'] for fp in stash_scene.get("files", [])[0].get("fingerprints", []) if fp['type'] == 'oshash'), None),
-                    "primary_file_phash": next((fp['value'] for fp in stash_scene.get("files", [])[0].get("fingerprints", []) if fp['type'] == 'phash'), None),
-                    "primary_file_xxhash": next((fp['value'] for fp in stash_scene.get("files", [])[0].get("fingerprints", []) if fp['type'] == 'xxhash'), None),
-                    "tags": stash_scene.get("tags", []),
-                    "organized": stash_scene.get("organized", False),
-                    "interactive": stash_scene.get("interactive", False),
-                    "play_duration": stash_scene.get("play_duration", 0),
-                    "play_count": stash_scene.get("play_count", 0),
-                    "o_counter": stash_scene.get("o_counter", 0),
+                    "stashapp_primary_file_path": stash_scene.get("files", [])[0].get("path", ""),
+                    "stashapp_primary_file_oshash": next((fp['value'] for fp in stash_scene.get("files", [])[0].get("fingerprints", []) if fp['type'] == 'oshash'), None),
+                    "stashapp_primary_file_phash": next((fp['value'] for fp in stash_scene.get("files", [])[0].get("fingerprints", []) if fp['type'] == 'phash'), None),
+                    "stashapp_primary_file_xxhash": next((fp['value'] for fp in stash_scene.get("files", [])[0].get("fingerprints", []) if fp['type'] == 'xxhash'), None),
+                    "stashapp_primary_file_duration": stash_scene.get("files", [])[0].get("duration", 0) * 1000,
+                    "stashapp_tags": stash_scene.get("tags", []),
+                    "stashapp_organized": stash_scene.get("organized", False),
+                    "stashapp_interactive": stash_scene.get("interactive", False),
+                    "stashapp_play_duration": stash_scene.get("play_duration", 0),
+                    "stashapp_play_count": stash_scene.get("play_count", 0),
+                    "stashapp_o_counter": stash_scene.get("o_counter", 0),
                 }
                 scenes.append(scene_data)
 
         schema = {
-            "id": pl.Int64,
-            "title": pl.Utf8,
-            "details": pl.Utf8,
-            "date": pl.Date,
-            "urls": pl.List(pl.Utf8),
-            "created_at": pl.Datetime,
-            "updated_at": pl.Datetime,
-            "performers": pl.List(
+            "stashapp_id": pl.Int64,
+            "stashapp_title": pl.Utf8,
+            "stashapp_details": pl.Utf8,
+            "stashapp_date": pl.Date,
+            "stashapp_urls": pl.List(pl.Utf8),
+            "stashapp_created_at": pl.Datetime,
+            "stashapp_updated_at": pl.Datetime,
+            "stashapp_performers": pl.List(
                 pl.Struct(
                     {
                         "id": pl.Int64,
@@ -259,7 +261,7 @@ class StashAppClient:
                     }
                 )
             ),
-            "studio": pl.Struct(
+            "stashapp_studio": pl.Struct(
                 {
                     "id": pl.Int64,
                     "name": pl.Utf8,
@@ -269,7 +271,7 @@ class StashAppClient:
                     ),
                 }
             ),
-            "files": pl.List(
+            "stashapp_files": pl.List(
                 pl.Struct(
                     {
                         "id": pl.Int64,
@@ -287,15 +289,17 @@ class StashAppClient:
                     }
                 )
             ),
-            "primary_file_oshash": pl.Utf8,
-            "primary_file_phash": pl.Utf8,
-            "primary_file_xxhash": pl.Utf8,
-            "tags": pl.List(pl.Struct({"id": pl.Int64, "name": pl.Utf8})),
-            "organized": pl.Boolean,
-            "interactive": pl.Boolean,
-            "play_duration": pl.Int64,
-            "play_count": pl.Int64,
-            "o_counter": pl.Int64,
+            "stashapp_primary_file_path": pl.Utf8,
+            "stashapp_primary_file_oshash": pl.Utf8,
+            "stashapp_primary_file_phash": pl.Utf8,
+            "stashapp_primary_file_xxhash": pl.Utf8,
+            "stashapp_primary_file_duration": pl.Duration(time_unit="ms"),
+            "stashapp_tags": pl.List(pl.Struct({"id": pl.Int64, "name": pl.Utf8})),
+            "stashapp_organized": pl.Boolean,
+            "stashapp_interactive": pl.Boolean,
+            "stashapp_play_duration": pl.Int64,
+            "stashapp_play_count": pl.Int64,
+            "stashapp_o_counter": pl.Int64,
         }
 
         df_scenes = pl.DataFrame(scenes, schema=schema)
