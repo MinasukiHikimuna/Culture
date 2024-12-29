@@ -158,6 +158,10 @@ class StashAppClient:
             path
             size
             duration
+            fingerprints {
+                type
+                value
+            }
         }
         tags {
             id
@@ -206,9 +210,19 @@ class StashAppClient:
                             "duration": int(
                                 f.get("duration", 0) * 1000
                             ),  # Convert seconds to milliseconds
+                            "fingerprints": [
+                                {
+                                    "type": fp.get("type", ""),
+                                    "value": fp.get("value", ""),
+                                }
+                                for fp in f.get("fingerprints", [])
+                            ],
                         }
                         for f in stash_scene.get("files", [])
                     ],
+                    "primary_file_oshash": next((fp['value'] for fp in stash_scene.get("files", [])[0].get("fingerprints", []) if fp['type'] == 'oshash'), None),
+                    "primary_file_phash": next((fp['value'] for fp in stash_scene.get("files", [])[0].get("fingerprints", []) if fp['type'] == 'phash'), None),
+                    "primary_file_xxhash": next((fp['value'] for fp in stash_scene.get("files", [])[0].get("fingerprints", []) if fp['type'] == 'xxhash'), None),
                     "tags": stash_scene.get("tags", []),
                     "organized": stash_scene.get("organized", False),
                     "interactive": stash_scene.get("interactive", False),
@@ -262,9 +276,20 @@ class StashAppClient:
                         "path": pl.Utf8,
                         "size": pl.Int64,
                         "duration": pl.Duration(time_unit="ms"),
+                        "fingerprints": pl.List(
+                            pl.Struct(
+                                {
+                                    "type": pl.Utf8,
+                                    "value": pl.Utf8,
+                                }
+                            )
+                        ),
                     }
                 )
             ),
+            "primary_file_oshash": pl.Utf8,
+            "primary_file_phash": pl.Utf8,
+            "primary_file_xxhash": pl.Utf8,
             "tags": pl.List(pl.Struct({"id": pl.Int64, "name": pl.Utf8})),
             "organized": pl.Boolean,
             "interactive": pl.Boolean,
@@ -274,6 +299,7 @@ class StashAppClient:
         }
 
         df_scenes = pl.DataFrame(scenes, schema=schema)
+
         return df_scenes
 
     def set_studio_stash_id_for_endpoint(
@@ -294,8 +320,10 @@ class StashAppClient:
         )
 
         existing_stash_ids = refreshed_studio.get("stash_ids", [])
-        existing_entry = next((x for x in existing_stash_ids if x["endpoint"] == endpoint), None)
-        
+        existing_entry = next(
+            (x for x in existing_stash_ids if x["endpoint"] == endpoint), None
+        )
+
         if existing_entry and existing_entry["stash_id"] == stash_id:
             return
 
@@ -303,7 +331,9 @@ class StashAppClient:
             new_stash_ids = [
                 {
                     "endpoint": x["endpoint"],
-                    "stash_id": stash_id if x["endpoint"] == endpoint else x["stash_id"]
+                    "stash_id": (
+                        stash_id if x["endpoint"] == endpoint else x["stash_id"]
+                    ),
                 }
                 for x in existing_stash_ids
             ]
