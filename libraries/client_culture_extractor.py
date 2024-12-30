@@ -133,25 +133,17 @@ class ClientCultureExtractor:
                     "ce_downloads_release_description": row[7],
                     "ce_downloads_release_created": row[8],
                     "ce_downloads_release_last_updated": row[9],
-                    "ce_downloads_release_available_files": (
-                        json.loads(row[10]) if isinstance(row[10], str) else None
-                    ),
-                    "ce_downloads_release_json_document": (
-                        json.loads(row[11]) if isinstance(row[11], str) else None
-                    ),
+                    "ce_downloads_release_available_files": row[10],
+                    "ce_downloads_release_json_document": row[11],
                     "ce_downloads_uuid": str(row[12]),
                     "ce_downloads_downloaded_at": row[13],
                     "ce_downloads_file_type": row[14],
                     "ce_downloads_content_type": row[15],
                     "ce_downloads_variant": row[16],
-                    "ce_downloads_available_file": (
-                        json.loads(row[17]) if isinstance(row[17], str) else None
-                    ),
+                    "ce_downloads_available_file": row[17],
                     "ce_downloads_original_filename": row[18],
                     "ce_downloads_saved_filename": row[19],
-                    "ce_downloads_file_metadata": (
-                        json.loads(row[20]) if isinstance(row[20], str) else None
-                    ),
+                    "ce_downloads_file_metadata": row[20],
                     "ce_downloads_performers": row[21],
                     "ce_downloads_tags": row[22],
                     "ce_downloads_hash_oshash": (
@@ -185,17 +177,17 @@ class ClientCultureExtractor:
                 "ce_downloads_release_created": pl.Datetime,
                 "ce_downloads_release_last_updated": pl.Datetime,
                 "ce_downloads_release_downloaded_at": pl.Datetime,
-                "ce_downloads_release_available_files": pl.List,
-                "ce_downloads_release_json_document": pl.Object,
+                "ce_downloads_release_available_files": pl.Utf8,
+                "ce_downloads_release_json_document": pl.Utf8,
                 "ce_downloads_uuid": pl.Utf8,
                 "ce_downloads_downloaded_at": pl.Datetime,
                 "ce_downloads_file_type": pl.Utf8,
                 "ce_downloads_content_type": pl.Utf8,
                 "ce_downloads_variant": pl.Utf8,
-                "ce_downloads_available_file": pl.Object,
+                "ce_downloads_available_file": pl.Utf8,
                 "ce_downloads_original_filename": pl.Utf8,
                 "ce_downloads_saved_filename": pl.Utf8,
-                "ce_downloads_file_metadata": pl.Object,
+                "ce_downloads_file_metadata": pl.Utf8,
                 "ce_downloads_performers": pl.List(
                     pl.Struct(
                         {
