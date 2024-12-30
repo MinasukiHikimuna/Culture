@@ -1,5 +1,7 @@
 from typing import Dict, List, Optional
+import polars as pl
 import requests
+from datetime import datetime
 import stashapi.log as logger
 
 from abc import ABC, abstractmethod
@@ -18,6 +20,7 @@ class StashboxClient(ABC):
     @abstractmethod
     def query_scenes(self, performer_stash_id):
         pass
+
 
 class StashDbClient(StashboxClient):
     def __init__(self, endpoint, api_key):
@@ -171,15 +174,15 @@ class StashDbClient(StashboxClient):
 
         return scenes
 
-    def query_scenes_by_phash(self, scenes: List[Dict]) -> Dict[str, Optional[Dict]]:
+    def query_scenes_by_phash(self, scenes: List[Dict]) -> pl.DataFrame:
         """
         Query StashDB for multiple scenes using their phash fingerprints in a single request.
-        
+
         Args:
             scenes (list[dict]): List of scene objects with filename, phash and duration
 
         Returns:
-            dict: Dictionary mapping phash to scene data (None if not found)
+            pl.DataFrame: DataFrame with phash, id, title, code, duration, date, urls, images, studio, tags, performers
         """
         query = """
         query FindScenesByFullFingerprints($fingerprints: [FingerprintQueryInput!]!) {
@@ -202,21 +205,31 @@ class StashDbClient(StashboxClient):
                     height
                 }
                 studio {
-                    name
                     id
+                    name
                     urls {
                         url
                         type
-                    }
-                    parent {
-                        name
-                        id
                     }
                     images {
                         id
                         url
                         width
                         height
+                    }
+                    parent {
+                        id
+                        name
+                        urls {
+                            url
+                            type
+                        }
+                        images {
+                            id
+                            url
+                            width
+                            height
+                        }
                     }
                 }
                 tags {
@@ -275,31 +288,295 @@ class StashDbClient(StashboxClient):
             }
         }
         """
-        
+
         variables = {
             "fingerprints": [
-                {
-                    "algorithm": "PHASH",
-                    "hash": scene["phash"]
-                }
-                for scene in scenes
+                {"algorithm": "PHASH", "hash": scene["phash"]} for scene in scenes
             ]
         }
-        
+
         result = self._gql_query(query, variables)
-        
-        if not result or "data" not in result or "findScenesByFullFingerprints" not in result["data"]:
+
+        if (
+            not result
+            or "data" not in result
+            or "findScenesByFullFingerprints" not in result["data"]
+        ):
             raise Exception("Failed to query scenes by phash")
-        
+
         # Save to file for debugging/testing
         # import datetime
         # import json
         # time_in_ticks = datetime.datetime.now().timestamp()
         # with open(f"phash_to_scene_{time_in_ticks}.json", "w") as f:
         #     f.write(json.dumps({ "input_scenes": scenes, "results": result }, indent=4))
-        
+
         stashdb_scenes = result["data"]["findScenesByFullFingerprints"]
-        return self.scene_matcher.match_scenes(scenes, stashdb_scenes)
+        matched_scenes = self.scene_matcher.match_scenes(scenes, stashdb_scenes)
+
+        matched_scenes_list = [
+            (
+                {
+                    "queried_phash": phash,
+                    "id": scene_data["id"],
+                    "title": scene_data["title"],
+                    "code": scene_data["code"],
+                    "duration": scene_data["duration"],
+                    "date": (
+                        datetime.strptime(scene_data.get("date", ""), "%Y-%m-%d").date()
+                        if scene_data.get("date")
+                        else None
+                    ),
+                    "urls": [
+                        {"url": url["url"], "type": url["type"]}
+                        for url in scene_data.get("urls", [])
+                    ],
+                    "images": [
+                        {
+                            "id": image["id"],
+                            "url": image["url"],
+                            "width": image["width"],
+                            "height": image["height"],
+                        }
+                        for image in scene_data.get("images", [])
+                    ],
+                    "studio": {
+                        "id": scene_data["studio"]["id"],
+                        "name": scene_data["studio"]["name"],
+                        "urls": [
+                            {"url": url["url"], "type": url["type"]}
+                            for url in scene_data["studio"].get("urls", [])
+                        ],
+                        "images": [
+                            {
+                                "id": image["id"],
+                                "url": image["url"],
+                                "width": image["width"],
+                                "height": image["height"],
+                            }
+                            for image in scene_data["studio"].get("images", [])
+                        ],
+                        "parent": (
+                            {
+                                "id": scene_data["studio"]["parent"]["id"],
+                                "name": scene_data["studio"]["parent"]["name"],
+                                "urls": [
+                                    {"url": url["url"], "type": url["type"]}
+                                    for url in scene_data["studio"]["parent"].get(
+                                        "urls", []
+                                    )
+                                ],
+                                "images": [
+                                    {
+                                        "id": image["id"],
+                                        "url": image["url"],
+                                        "width": image["width"],
+                                        "height": image["height"],
+                                    }
+                                    for image in scene_data["studio"]["parent"].get(
+                                        "images", []
+                                    )
+                                ],
+                            }
+                            if scene_data["studio"].get("parent")
+                            else None
+                        ),
+                    },
+                    "tags": [
+                        {"name": tag["name"], "id": tag["id"]}
+                        for tag in scene_data.get("tags", [])
+                    ],
+                    "performers": [
+                        {
+                            "as": performer["as"],
+                            "performer": {
+                                "id": performer["performer"]["id"],
+                                "name": performer["performer"]["name"],
+                                "disambiguation": performer["performer"]["disambiguation"],
+                                "aliases": performer["performer"]["aliases"],
+                                "gender": performer["performer"]["gender"],
+                                "merged_ids": performer["performer"]["merged_ids"],
+                                "urls": [
+                                    {"url": url["url"], "type": url["type"]}
+                                    for url in performer["performer"].get("urls", [])
+                                ],
+                                "images": [
+                                    {
+                                        "id": image["id"],
+                                        "url": image["url"],
+                                        "width": image["width"],
+                                        "height": image["height"],
+                                    }
+                                    for image in performer["performer"].get("images", [])
+                                ],
+                                "birth_date": performer["performer"]["birth_date"],
+                                "ethnicity": performer["performer"]["ethnicity"],
+                                "country": performer["performer"]["country"],
+                                "eye_color": performer["performer"]["eye_color"],
+                                "hair_color": performer["performer"]["hair_color"],
+                                "height": performer["performer"]["height"],
+                                "measurements": {
+                                    "band_size": performer["performer"]["measurements"]["band_size"],
+                                    "cup_size": performer["performer"]["measurements"]["cup_size"],
+                                    "waist": performer["performer"]["measurements"]["waist"],
+                                    "hip": performer["performer"]["measurements"]["hip"],
+                                },
+                                "breast_type": performer["performer"]["breast_type"],
+                                "career_start_year": performer["performer"]["career_start_year"],
+                                "career_end_year": performer["performer"]["career_end_year"],
+                                "tattoos": [
+                                    {
+                                        "location": tattoo.get("location"),
+                                        "description": tattoo.get("description"),
+                                    }
+                                    for tattoo in performer["performer"].get("tattoos") or []
+                                ],
+                                "piercings": [
+                                    {
+                                        "location": piercing["location"],
+                                        "description": piercing["description"],
+                                    }
+                                    for piercing in performer["performer"].get("piercings") or []
+                                ],
+                                "fingerprints": [
+                                    {
+                                        "algorithm": fingerprint["algorithm"],
+                                        "hash": fingerprint["hash"],
+                                        "duration": fingerprint["duration"],
+                                    }
+                                    for fingerprint in performer["performer"].get("fingerprints") or []
+                                ],
+                            },
+                        }
+                        for performer in scene_data.get("performers", [])
+                    ],
+                    "fingerprints": [
+                        {
+                            "algorithm": fingerprint["algorithm"],
+                            "hash": fingerprint["hash"],
+                            "duration": fingerprint["duration"],
+                        }
+                        for fingerprint in scene_data.get("fingerprints") or []
+                    ],
+                }
+                if scene_data
+                else {"queried_phash": phash}
+            )
+            for phash, scene_data in matched_scenes.items()
+        ]
+
+        schema = {
+            "queried_phash": pl.Utf8,
+            "id": pl.Utf8,
+            "title": pl.Utf8,
+            "code": pl.Utf8,
+            "duration": pl.Int64,
+            "date": pl.Date,
+            "urls": pl.List(pl.Struct({"url": pl.Utf8, "type": pl.Utf8})),
+            "images": pl.List(
+                pl.Struct(
+                    {
+                        "id": pl.Utf8,
+                        "url": pl.Utf8,
+                        "width": pl.Int64,
+                        "height": pl.Int64,
+                    }
+                )
+            ),
+            "studio": pl.Struct(
+                {
+                    "id": pl.Utf8,
+                    "name": pl.Utf8,
+                    "urls": pl.List(pl.Struct({"url": pl.Utf8, "type": pl.Utf8})),
+                    "images": pl.List(
+                        pl.Struct(
+                            {
+                                "id": pl.Utf8,
+                                "url": pl.Utf8,
+                                "width": pl.Int64,
+                                "height": pl.Int64,
+                            }
+                        )
+                    ),
+                    "parent": pl.Struct(
+                        {
+                            "id": pl.Utf8,
+                            "name": pl.Utf8,
+                            "urls": pl.List(
+                                pl.Struct({"url": pl.Utf8, "type": pl.Utf8})
+                            ),
+                        }
+                    ),
+                }
+            ),
+            "tags": pl.List(pl.Struct({"name": pl.Utf8, "id": pl.Utf8})),
+            "performers": pl.List(
+                pl.Struct(
+                    {
+                        "as": pl.Utf8,
+                        "performer": pl.Struct(
+                            {
+                                "id": pl.Utf8,
+                                "name": pl.Utf8,
+                                "disambiguation": pl.Utf8,
+                                "aliases": pl.List(pl.Utf8),
+                                "gender": pl.Utf8,
+                                "merged_ids": pl.List(pl.Utf8),
+                                "urls": pl.List(
+                                    pl.Struct({"url": pl.Utf8, "type": pl.Utf8})
+                                ),
+                                "images": pl.List(
+                                    pl.Struct(
+                                        {
+                                            "id": pl.Utf8,
+                                            "url": pl.Utf8,
+                                            "width": pl.Int64,
+                                            "height": pl.Int64,
+                                        }
+                                    )
+                                ),
+                                "birth_date": pl.Date,
+                                "ethnicity": pl.Utf8,
+                                "country": pl.Utf8,
+                                "eye_color": pl.Utf8,
+                                "hair_color": pl.Utf8,
+                                "height": pl.Int64,
+                                "measurements": pl.Struct(
+                                    {
+                                        "band_size": pl.Utf8,
+                                        "cup_size": pl.Utf8,
+                                        "waist": pl.Utf8,
+                                        "hip": pl.Utf8,
+                                    }
+                                ),
+                                "breast_type": pl.Utf8,
+                                "career_start_year": pl.Int64,
+                                "career_end_year": pl.Int64,
+                                "tattoos": pl.List(
+                                    pl.Struct(
+                                        {"location": pl.Utf8, "description": pl.Utf8}
+                                    )
+                                ),
+                                "piercings": pl.List(
+                                    pl.Struct(
+                                        {"location": pl.Utf8, "description": pl.Utf8}
+                                    )
+                                ),
+                            }
+                        ),
+                    }
+                )
+            ),
+            "fingerprints": pl.List(
+                pl.Struct(
+                    {"algorithm": pl.Utf8, "hash": pl.Utf8, "duration": pl.Int64}
+                )
+            ),
+        }
+
+        df_matched_scenes = pl.DataFrame(matched_scenes_list, schema=schema)
+
+        return df_matched_scenes
 
     def _gql_query(self, query, variables=None):
         headers = {"Content-Type": "application/json"}
