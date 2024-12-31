@@ -12,20 +12,24 @@ class PerformerMatch:
     stashdb_name: str  # StashDB name
     confidence: float  # Match confidence score
     reason: str  # Reason for the match/confidence
+    source: str  # Where the match came from: "stashapp_scene", "stashdb_scene", or "stashapp_all"
 
 class PerformerMatcher:
-    def __init__(self):
+    def __init__(self, all_stashapp_performers: Optional[pl.DataFrame] = None):
         self.matches: List[PerformerMatch] = []
+        self.all_stashapp_performers = all_stashapp_performers
         
     def match_performers(self, 
                         ce_performers: pl.Series, 
-                        stashapp_performers: pl.Series) -> List[PerformerMatch]:
+                        stashapp_performers: pl.Series,
+                        stashdb_performers: Optional[pl.Series] = None) -> List[PerformerMatch]:
         """
         Match performers between Culture Extractor and Stashapp/StashDB
         
         Args:
             ce_performers: Series of Culture Extractor performers (List[struct])
             stashapp_performers: Series of Stashapp performers (List[struct])
+            stashdb_performers: Optional Series of StashDB performers (List[struct])
             
         Returns:
             List of PerformerMatch objects
@@ -33,49 +37,130 @@ class PerformerMatcher:
         matches = []
         
         # Iterate through each row (scene)
-        for ce_list, stashapp_list in zip(ce_performers, stashapp_performers):
-            if ce_list is None or stashapp_list is None or len(ce_list) == 0 or len(stashapp_list) == 0:
+        for ce_list, stashapp_list, stashdb_list in zip(
+            ce_performers, 
+            stashapp_performers, 
+            stashdb_performers if stashdb_performers is not None else [None] * len(ce_performers)
+        ):
+            if ce_list is None or len(ce_list) == 0:
                 continue
                 
-            # First pass: Find high confidence matches
-            high_conf_matches = []
-            remaining_ce = []
-            remaining_stash = list(stashapp_list)
+            scene_matches = []
+            remaining_ce = list(ce_list)
             
-            for ce_perf in ce_list:
-                match = self._find_best_match(ce_perf, remaining_stash)
-                if match and match.confidence >= 0.9:  # High confidence threshold for first pass
-                    high_conf_matches.append(match)
-                    # Remove matched performer from remaining list
-                    remaining_stash = [p for p in remaining_stash 
-                                     if p["stashapp_performers_id"] != match.stashapp_id]
-                else:
-                    remaining_ce.append(ce_perf)
+            # First try: Match with scene's Stashapp performers
+            if stashapp_list is not None and len(stashapp_list) > 0:
+                scene_matches.extend(
+                    self._match_scene_performers(remaining_ce, stashapp_list, "stashapp_scene")
+                )
+                # Remove matched performers
+                matched_uuids = {m.ce_uuid for m in scene_matches}
+                remaining_ce = [p for p in remaining_ce if p["uuid"] not in matched_uuids]
             
-            # Second pass: Use scene context to match remaining performers
-            if high_conf_matches and remaining_ce:
-                for ce_perf in remaining_ce:
-                    match = self._find_best_match(
-                        ce_perf, 
-                        remaining_stash,
-                        context_confidence_boost=0.15  # Boost confidence if we have other matches
-                    )
-                    if match and match.confidence >= 0.65:  # Lower threshold for context-boosted matches
-                        match.reason += f" (boosted by scene context with {', '.join(m.ce_name for m in high_conf_matches)})"
-                        high_conf_matches.append(match)
-                        remaining_stash = [p for p in remaining_stash 
-                                         if p["stashapp_performers_id"] != match.stashapp_id]
+            # Second try: Match remaining with StashDB performers if available
+            if remaining_ce and stashdb_list is not None and len(stashdb_list) > 0:
+                # Convert StashDB performers to Stashapp format for matching
+                stashdb_performers_converted = [
+                    {
+                        "stashapp_performers_id": -1,  # Placeholder
+                        "stashapp_performers_name": p["performer"]["name"],
+                        "stashapp_performers_alias_list": p["performer"]["aliases"],
+                        "stashapp_performers_gender": p["performer"]["gender"],
+                        "stashapp_performers_stash_ids": [
+                            {
+                                "endpoint": "https://stashdb.org/graphql",
+                                "stash_id": p["performer"]["id"],
+                                "updated_at": None
+                            }
+                        ]
+                    }
+                    for p in stashdb_list
+                ]
+                
+                stashdb_matches = self._match_scene_performers(
+                    remaining_ce, 
+                    stashdb_performers_converted,
+                    "stashdb_scene"
+                )
+                scene_matches.extend(stashdb_matches)
+                # Remove matched performers
+                matched_uuids = {m.ce_uuid for m in scene_matches}
+                remaining_ce = [p for p in remaining_ce if p["uuid"] not in matched_uuids]
             
-            matches.extend(high_conf_matches)
+            # Third try: Match remaining with all known Stashapp performers
+            if remaining_ce and self.all_stashapp_performers is not None:
+                all_performers_list = [
+                    {
+                        "stashapp_performers_id": row["stashapp_id"],
+                        "stashapp_performers_name": row["stashapp_name"],
+                        "stashapp_performers_alias_list": [],  # TODO: Get aliases if available
+                        "stashapp_performers_gender": row["stashapp_gender"],
+                        "stashapp_performers_stash_ids": row["stashapp_stash_ids"]
+                    }
+                    for row in self.all_stashapp_performers.iter_rows(named=True)
+                ]
+                
+                global_matches = self._match_scene_performers(
+                    remaining_ce, 
+                    all_performers_list,
+                    "stashapp_all",
+                    min_confidence=0.9  # Higher threshold for global matches
+                )
+                scene_matches.extend(global_matches)
+            
+            matches.extend(scene_matches)
             
         # Deduplicate matches
         unique_matches = self._deduplicate_matches(matches)
         self.matches = unique_matches
         return unique_matches
     
+    def _match_scene_performers(self, 
+                              ce_performers: List[Dict], 
+                              stashapp_performers: List[Dict],
+                              source: str,
+                              min_confidence: float = 0.65) -> List[PerformerMatch]:
+        """Match performers within a single scene"""
+        matches = []
+        remaining_ce = list(ce_performers)
+        remaining_stash = list(stashapp_performers)
+        
+        # First pass: Find high confidence matches
+        high_conf_matches = []
+        
+        for ce_perf in ce_performers:
+            match = self._find_best_match(ce_perf, remaining_stash, source)
+            if match and match.confidence >= 0.9:  # High confidence threshold for first pass
+                high_conf_matches.append(match)
+                # Remove matched performer from remaining list
+                remaining_stash = [p for p in remaining_stash 
+                                 if (source == "stashdb_scene" and p["stashapp_performers_stash_ids"][0]["stash_id"] != match.stashdb_uuid) or
+                                    (source != "stashdb_scene" and p["stashapp_performers_id"] != match.stashapp_id)]
+                remaining_ce = [p for p in remaining_ce 
+                              if p["uuid"] != match.ce_uuid]
+        
+        # Second pass: Use scene context to match remaining performers
+        if high_conf_matches and remaining_ce:
+            for ce_perf in remaining_ce:
+                match = self._find_best_match(
+                    ce_perf, 
+                    remaining_stash,
+                    source,
+                    context_confidence_boost=0.15  # Boost confidence if we have other matches
+                )
+                if match and match.confidence >= min_confidence:
+                    match.reason += f" (boosted by scene context with {', '.join(m.ce_name for m in high_conf_matches)})"
+                    high_conf_matches.append(match)
+                    remaining_stash = [p for p in remaining_stash 
+                                     if (source == "stashdb_scene" and p["stashapp_performers_stash_ids"][0]["stash_id"] != match.stashdb_uuid) or
+                                        (source != "stashdb_scene" and p["stashapp_performers_id"] != match.stashapp_id)]
+        
+        return high_conf_matches
+
     def _find_best_match(self, 
                         ce_perf: Dict, 
                         stashapp_performers: List[Dict],
+                        source: str,
                         context_confidence_boost: float = 0.0) -> Optional[PerformerMatch]:
         """Find the best matching Stashapp performer for a CE performer"""
         best_match = None
@@ -84,14 +169,10 @@ class PerformerMatcher:
         for stash_perf in stashapp_performers:
             # Get StashDB UUID from stash_ids
             stashdb_uuid = None
-            stashdb_name = None
             for stash_id in stash_perf["stashapp_performers_stash_ids"]:
                 if stash_id["endpoint"] == "https://stashdb.org/graphql":
                     stashdb_uuid = stash_id["stash_id"]
                     break
-            
-            if not stashdb_uuid:
-                continue
             
             # Calculate match confidence
             confidence, reason = self._calculate_match_confidence(
@@ -110,10 +191,11 @@ class PerformerMatcher:
                     ce_name=ce_perf["name"],
                     stashapp_id=stash_perf["stashapp_performers_id"],
                     stashapp_name=stash_perf["stashapp_performers_name"],
-                    stashdb_uuid=stashdb_uuid,
-                    stashdb_name=stashdb_name,
+                    stashdb_uuid=stashdb_uuid or "",
+                    stashdb_name=stash_perf["stashapp_performers_name"],  # Use Stashapp name as fallback
                     confidence=confidence,
-                    reason=reason
+                    reason=reason,
+                    source=source
                 )
                 best_confidence = confidence
         
@@ -191,5 +273,6 @@ class PerformerMatcher:
             f"Stashapp: {match.stashapp_name} (ID: {match.stashapp_id})\n"
             f"StashDB: {match.stashdb_uuid}\n"
             f"Confidence: {match.confidence:.2f}\n"
+            f"Source: {match.source}\n"
             f"Reason: {match.reason}\n"
         )

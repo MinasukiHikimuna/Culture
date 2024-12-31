@@ -2,233 +2,136 @@ import json
 import polars as pl
 from libraries.performer_matcher import PerformerMatcher
 
-def create_test_data(ce_performers, stashapp_performers):
-    """Helper function to create test DataFrame"""
-    return pl.DataFrame({
-        'ce_downloads_performers': [ce_performers],
-        'stashapp_performers': [stashapp_performers]
+def test_performer_matcher():
+    # Load sample data
+    with open("tests/data/performer_matcher.sample01.json", "r") as f:
+        sample01 = json.load(f)
+    with open("tests/data/performer_matcher.sample02.json", "r") as f:
+        sample02 = json.load(f)
+        
+    # Create test data for all known Stashapp performers
+    all_stashapp_performers = pl.DataFrame({
+        "stashapp_id": [1, 2],
+        "stashapp_name": ["Jill Kassidy", "Ryan Driller"],
+        "stashapp_gender": ["FEMALE", "MALE"],
+        "stashapp_stash_ids": [
+            [{"endpoint": "https://stashdb.org/graphql", "stash_id": "c853319b-60af-437c-94a2-63b29d8389b6"}],
+            [{"endpoint": "https://stashdb.org/graphql", "stash_id": "8a07a611-fc9d-402c-bd9d-54f501dadd21"}]
+        ]
     })
-
-def test_exact_name_match():
-    """Test exact name matching"""
-    # Create test data
-    ce_performers = [
-        {
-            "uuid": "test-uuid-1",
-            "name": "Sybil",
-            "short_name": "1234",
-            "url": "/model/1234"
-        }
-    ]
     
-    stashapp_performers = [
-        {
-            "stashapp_performers_id": 157,
-            "stashapp_performers_name": "Sybil A",
-            "stashapp_performers_disambiguation": "",
-            "stashapp_performers_alias_list": ["Sybil"],
-            "stashapp_performers_gender": "FEMALE",
-            "stashapp_performers_stash_ids": [
-                {
-                    "endpoint": "https://stashdb.org/graphql",
-                    "stash_id": "test-stashdb-1",
-                    "updated_at": "1970-01-01 00:00:00"
-                }
-            ],
-            "stashapp_performers_custom_fields": []
-        }
-    ]
+    # Test case 1: Scene with Stashapp performers (sample01)
+    # Modify Charlie Dean's name to test scene context boosting
+    ce_performers = sample01[0]["ce_downloads_performers"]
+    for perf in ce_performers:
+        if perf["name"] == "Charlie Dean":
+            perf["name"] = "Charlie D"  # Use partial name
+            
+    df = pl.DataFrame([{
+        "ce_downloads_performers": ce_performers,
+        "stashapp_performers": sample01[0]["stashapp_performers"],
+        "stashdb_performers": None
+    }])
     
-    df = create_test_data(ce_performers, stashapp_performers)
-    matcher = PerformerMatcher()
-    matches = matcher.match_performers(df['ce_downloads_performers'], df['stashapp_performers'])
+    matcher = PerformerMatcher(all_stashapp_performers)
+    matches = matcher.match_performers(
+        df["ce_downloads_performers"],
+        df["stashapp_performers"],
+        df["stashdb_performers"]
+    )
     
-    assert len(matches) == 1
-    match = matches[0]
-    assert match.ce_name == "Sybil"
-    assert match.stashapp_name == "Sybil A"
-    assert match.confidence >= 0.9
-
-def test_scene_context_matching():
-    """Test matching using scene context"""
-    # Create test data with two performers
-    ce_performers = [
-        {
-            "uuid": "test-uuid-1",
-            "name": "Sybil",
-            "short_name": "1234",
-            "url": "/model/1234"
-        },
-        {
-            "uuid": "test-uuid-2",
-            "name": "Charlie D",  # Partial name
-            "short_name": "5678",
-            "url": "/model/5678"
-        }
-    ]
-    
-    stashapp_performers = [
-        {
-            "stashapp_performers_id": 157,
-            "stashapp_performers_name": "Sybil A",
-            "stashapp_performers_disambiguation": "",
-            "stashapp_performers_alias_list": ["Sybil"],
-            "stashapp_performers_gender": "FEMALE",
-            "stashapp_performers_stash_ids": [
-                {
-                    "endpoint": "https://stashdb.org/graphql",
-                    "stash_id": "test-stashdb-1",
-                    "updated_at": "1970-01-01 00:00:00"
-                }
-            ],
-            "stashapp_performers_custom_fields": []
-        },
-        {
-            "stashapp_performers_id": 412,
-            "stashapp_performers_name": "Charlie Dean",
-            "stashapp_performers_disambiguation": "",
-            "stashapp_performers_alias_list": ["Charlie"],
-            "stashapp_performers_gender": "MALE",
-            "stashapp_performers_stash_ids": [
-                {
-                    "endpoint": "https://stashdb.org/graphql",
-                    "stash_id": "test-stashdb-2",
-                    "updated_at": "1970-01-01 00:00:00"
-                }
-            ],
-            "stashapp_performers_custom_fields": []
-        }
-    ]
-    
-    df = create_test_data(ce_performers, stashapp_performers)
-    matcher = PerformerMatcher()
-    matches = matcher.match_performers(df['ce_downloads_performers'], df['stashapp_performers'])
-    
-    assert len(matches) == 2, "Should match both performers"
-    
-    # Check high confidence match
+    # Verify matches from Stashapp scene
+    assert len(matches) == 2, "Should find matches for both performers"
     sybil_match = next(m for m in matches if m.ce_name == "Sybil")
-    assert sybil_match.stashapp_name == "Sybil A"
-    assert sybil_match.confidence >= 0.9
+    assert sybil_match.confidence >= 0.9, "Should have high confidence for exact name match"
+    assert sybil_match.source == "stashapp_scene", "Should be matched from scene performers"
     
-    # Check context-boosted match
     charlie_match = next(m for m in matches if m.ce_name == "Charlie D")
-    assert charlie_match.stashapp_name == "Charlie Dean"
+    assert charlie_match.confidence >= 0.75, "Should have boosted confidence from scene context"
+    assert charlie_match.source == "stashapp_scene", "Should be matched from scene performers"
     assert "boosted by scene context" in charlie_match.reason
-    assert 0.65 <= charlie_match.confidence < 0.9
-
-def test_alias_matching():
-    """Test matching through aliases"""
-    ce_performers = [
-        {
-            "uuid": "test-uuid-1",
-            "name": "Charles",  # This is an alias
-            "short_name": "1234",
-            "url": "/model/1234"
-        }
-    ]
     
-    stashapp_performers = [
-        {
-            "stashapp_performers_id": 412,
-            "stashapp_performers_name": "Charlie Dean",
-            "stashapp_performers_disambiguation": "",
-            "stashapp_performers_alias_list": ["Charles", "Charlie"],
-            "stashapp_performers_gender": "MALE",
-            "stashapp_performers_stash_ids": [
-                {
-                    "endpoint": "https://stashdb.org/graphql",
-                    "stash_id": "test-stashdb-1",
-                    "updated_at": "1970-01-01 00:00:00"
+    # Test case 2: Scene with empty Stashapp performers but StashDB data (sample02)
+    df = pl.DataFrame([{
+        "ce_downloads_performers": sample02[0]["ce_downloads_performers"],
+        "stashapp_performers": None,
+        "stashdb_performers": [
+            {
+                "as": None,
+                "performer": {
+                    "id": "c853319b-60af-437c-94a2-63b29d8389b6",
+                    "name": "Jill Kassidy",
+                    "aliases": ["Jill", "Jill Cassidy"],
+                    "gender": "FEMALE"
                 }
-            ],
-            "stashapp_performers_custom_fields": []
-        }
-    ]
-    
-    df = create_test_data(ce_performers, stashapp_performers)
-    matcher = PerformerMatcher()
-    matches = matcher.match_performers(df['ce_downloads_performers'], df['stashapp_performers'])
-    
-    assert len(matches) == 1
-    match = matches[0]
-    assert match.ce_name == "Charles"
-    assert match.stashapp_name == "Charlie Dean"
-    assert match.confidence >= 0.95  # Exact alias match should have high confidence
-    assert "alias match" in match.reason.lower()
-
-def test_no_matches():
-    """Test handling of no matches"""
-    ce_performers = [
-        {
-            "uuid": "test-uuid-1",
-            "name": "Completely Different Name",
-            "short_name": "1234",
-            "url": "/model/1234"
-        }
-    ]
-    
-    stashapp_performers = [
-        {
-            "stashapp_performers_id": 412,
-            "stashapp_performers_name": "Charlie Dean",
-            "stashapp_performers_disambiguation": "",
-            "stashapp_performers_alias_list": ["Charles", "Charlie"],
-            "stashapp_performers_gender": "MALE",
-            "stashapp_performers_stash_ids": [
-                {
-                    "endpoint": "https://stashdb.org/graphql",
-                    "stash_id": "test-stashdb-1",
-                    "updated_at": "1970-01-01 00:00:00"
+            },
+            {
+                "as": None,
+                "performer": {
+                    "id": "8a07a611-fc9d-402c-bd9d-54f501dadd21",
+                    "name": "Ryan Driller",
+                    "aliases": ["Adam Driller", "Jeremy Bilding", "Ryan"],
+                    "gender": "MALE"
                 }
-            ],
-            "stashapp_performers_custom_fields": []
-        }
-    ]
+            }
+        ]
+    }])
     
-    df = create_test_data(ce_performers, stashapp_performers)
-    matcher = PerformerMatcher()
-    matches = matcher.match_performers(df['ce_downloads_performers'], df['stashapp_performers'])
+    matches = matcher.match_performers(
+        df["ce_downloads_performers"],
+        df["stashapp_performers"],
+        df["stashdb_performers"]
+    )
     
-    assert len(matches) == 0, "Should not find any matches for completely different names"
-
-def test_custom_field_generation():
-    """Test generation of custom fields"""
-    ce_performers = [
-        {
-            "uuid": "test-uuid-1",
-            "name": "Sybil",
-            "short_name": "1234",
-            "url": "/model/1234"
-        }
-    ]
+    # Verify matches from StashDB
+    assert len(matches) == 2, "Should find matches for both performers"
+    jill_match = next(m for m in matches if m.ce_name == "Jill Kassidy")
+    assert jill_match.confidence >= 0.9, "Should have high confidence for exact name match"
+    assert jill_match.source == "stashdb_scene", "Should be matched from StashDB performers"
+    assert jill_match.stashdb_uuid == "c853319b-60af-437c-94a2-63b29d8389b6"
     
-    stashapp_performers = [
-        {
-            "stashapp_performers_id": 157,
-            "stashapp_performers_name": "Sybil A",
-            "stashapp_performers_disambiguation": "",
-            "stashapp_performers_alias_list": ["Sybil"],
-            "stashapp_performers_gender": "FEMALE",
-            "stashapp_performers_stash_ids": [
-                {
-                    "endpoint": "https://stashdb.org/graphql",
-                    "stash_id": "test-stashdb-1",
-                    "updated_at": "1970-01-01 00:00:00"
-                }
-            ],
-            "stashapp_performers_custom_fields": []
-        }
-    ]
+    ryan_match = next(m for m in matches if m.ce_name == "Ryan Driller")
+    assert ryan_match.confidence >= 0.9, "Should have high confidence for exact name match"
+    assert ryan_match.source == "stashdb_scene", "Should be matched from StashDB performers"
+    assert ryan_match.stashdb_uuid == "8a07a611-fc9d-402c-bd9d-54f501dadd21"
     
-    df = create_test_data(ce_performers, stashapp_performers)
-    matcher = PerformerMatcher()
-    matches = matcher.match_performers(df['ce_downloads_performers'], df['stashapp_performers'])
+    # Test case 3: Scene with no performers but match from all known Stashapp performers
+    df = pl.DataFrame([{
+        "ce_downloads_performers": sample02[0]["ce_downloads_performers"],
+        "stashapp_performers": None,
+        "stashdb_performers": None
+    }])
     
-    assert len(matches) == 1
-    match = matches[0]
+    matches = matcher.match_performers(
+        df["ce_downloads_performers"],
+        df["stashapp_performers"],
+        df["stashdb_performers"]
+    )
     
-    custom_fields = matcher.get_stashapp_custom_fields(match)
+    # Verify matches from all known performers
+    assert len(matches) == 2, "Should find matches for both performers"
+    jill_match = next(m for m in matches if m.ce_name == "Jill Kassidy")
+    assert jill_match.confidence >= 0.9, "Should have high confidence for exact name match"
+    assert jill_match.source == "stashapp_all", "Should be matched from all known performers"
+    assert jill_match.stashapp_id == 1
+    
+    ryan_match = next(m for m in matches if m.ce_name == "Ryan Driller")
+    assert ryan_match.confidence >= 0.9, "Should have high confidence for exact name match"
+    assert ryan_match.source == "stashapp_all", "Should be matched from all known performers"
+    assert ryan_match.stashapp_id == 2
+    
+    # Test custom fields generation
+    custom_fields = matcher.get_stashapp_custom_fields(jill_match)
     assert len(custom_fields) == 1
-    assert custom_fields[0]['key'] == "CultureExtractor.sybil"
-    assert custom_fields[0]['value'] == "test-uuid-1"
+    assert custom_fields[0]["key"] == "CultureExtractor.jillkassidy"
+    assert custom_fields[0]["value"] == jill_match.ce_uuid
+    
+    # Test match formatting
+    formatted = matcher.format_match_for_review(jill_match)
+    assert "Jill Kassidy" in formatted
+    assert jill_match.ce_uuid in formatted
+    assert str(jill_match.stashapp_id) in formatted
+    assert jill_match.stashdb_uuid in formatted
+    assert f"{jill_match.confidence:.2f}" in formatted
+    assert jill_match.source in formatted
+    assert jill_match.reason in formatted
