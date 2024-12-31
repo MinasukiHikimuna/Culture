@@ -80,7 +80,6 @@ class PerformerMatcher:
         """Find the best matching Stashapp performer for a CE performer"""
         best_match = None
         best_confidence = 0.0
-        match_reason = ""
         
         for stash_perf in stashapp_performers:
             # Get StashDB UUID from stash_ids
@@ -117,7 +116,6 @@ class PerformerMatcher:
                     reason=reason
                 )
                 best_confidence = confidence
-                match_reason = reason
         
         return best_match if best_match and best_confidence >= 0.65 else None
     
