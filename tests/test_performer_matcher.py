@@ -1,79 +1,53 @@
 import json
-import os
+import polars as pl
 from libraries.performer_matcher import PerformerMatcher
 
-def load_test_data(sample_file):
-    """Load test data from sample files"""
-    current_dir = os.path.dirname(os.path.abspath(__file__))
+def test_performer_matcher():
+    # Load sample data
+    with open('tests/data/performer_matcher.sample01.json', 'r') as f:
+        sample_data = json.load(f)
     
-    with open(os.path.join(current_dir, f'data/{sample_file}')) as f:
-        data = json.load(f)
-        return data['culture_extractor_performers'], data['stashdb_performers']
-
-def test_match_all_performers_sample01():
-    """Test matching all performers from sample01"""
-    ce_performers, stashdb_performers = load_test_data('culture_extractor_stashdb_performers.sample01.json')
+    # Modify one performer name to test context matching
+    sample_data[0]['ce_downloads_performers'][1]['name'] = 'Charlie D'  # Changed from "Charlie Dean"
+        
+    # Convert sample data to polars DataFrame
+    df = pl.DataFrame({
+        'ce_downloads_performers': [sample_data[0]['ce_downloads_performers']],
+        'stashapp_performers': [sample_data[0]['stashapp_performers']]
+    })
     
-    matches = PerformerMatcher.match_all_performers(ce_performers, stashdb_performers)
+    # Create matcher
+    matcher = PerformerMatcher()
     
-    # Should match all 3 performers in sample data
-    assert len(matches) == 3
-    assert all(match.stashdb is not None for match in matches)
+    # Run matching
+    matches = matcher.match_performers(
+        df['ce_downloads_performers'],
+        df['stashapp_performers']
+    )
     
-    # Test Kyler Quinn exact match
-    kyler = next(match for match in matches if match.culture_extractor['name'] == 'Kyler Quinn')
-    assert kyler.stashdb['performer']['name'] == 'Kyler Quinn'
-    assert kyler.confidence > 0.95  # Should be very high confidence for exact match
+    # Verify matches
+    assert len(matches) == 2, "Should find matches for both performers"
     
-    # Test Robby Echo alias match
-    robby = next(match for match in matches if match.culture_extractor['name'] == 'Robby Echo')
-    assert 'Robby Echo' in robby.stashdb['performer']['aliases']
-    assert robby.confidence > 0.9  # High confidence for alias match
+    # Check Sybil match (should be high confidence)
+    sybil_match = next(m for m in matches if m.ce_name == "Sybil")
+    assert sybil_match.stashapp_name == "Sybil A"
+    assert sybil_match.confidence >= 0.9, "Should be high confidence match"
     
-    # Test Anna Claire Clouds match
-    anna = next(match for match in matches if match.culture_extractor['name'] == 'Anna Claire Clouds')
-    assert anna.stashdb['performer']['name'] == 'Anna Claire Clouds'
-    assert anna.confidence > 0.95  # Should be very high confidence for exact match
-
-def test_match_all_performers_sample02():
-    """Test matching performers with short names from sample02"""
-    ce_performers, stashdb_performers = load_test_data('culture_extractor_stashdb_performers.sample02.json')
+    # Check Charlie Dean match (should be context-boosted)
+    charlie_match = next(m for m in matches if m.ce_name == "Charlie D")
+    assert charlie_match.stashapp_name == "Charlie Dean"
+    assert "boosted by scene context" in charlie_match.reason, "Should indicate context boost from Sybil match"
+    assert 0.65 <= charlie_match.confidence < 0.9, "Should have boosted but not high confidence"
     
-    matches = PerformerMatcher.match_all_performers(ce_performers, stashdb_performers)
+    # Test custom field generation
+    custom_fields = matcher.get_stashapp_custom_fields(sybil_match)
+    assert len(custom_fields) == 1
+    assert custom_fields[0]['key'].startswith('CultureExtractor.')
+    assert custom_fields[0]['value'] == sybil_match.ce_uuid
     
-    # Should match both performers in sample data
-    assert len(matches) == 2
-    assert all(match.stashdb is not None for match in matches)
-    
-    # Test Paula match (matches to Paula Shy)
-    paula = next(match for match in matches if match.culture_extractor['name'] == 'Paula')
-    assert paula.stashdb['performer']['name'] == 'Paula Shy'
-    assert paula.confidence > 0.5  # Should match with lower confidence due to short name
-    
-    # Test Dan match (matches through alias)
-    dan = next(match for match in matches if match.culture_extractor['name'] == 'Dan')
-    assert dan.stashdb['performer']['name'] == 'Daniel G'
-    assert 'Dan' in dan.stashdb['performer']['aliases']
-    assert dan.confidence > 0.9  # High confidence for exact alias match
-
-def test_match_all_performers_sample03():
-    """Test that performers are not incorrectly matched to the same StashDB performer"""
-    ce_performers, stashdb_performers = load_test_data('culture_extractor_stashdb_performers.sample03.json')
-    
-    matches = PerformerMatcher.match_all_performers(ce_performers, stashdb_performers)
-    
-    # Should have matches for both performers
-    assert len(matches) == 2
-    
-    # Get both matches
-    zazie = next(match for match in matches if match.culture_extractor['name'] == 'Zazie Skymm')
-    nikki = next(match for match in matches if match.culture_extractor['name'] == 'Nikki Nutz')
-    
-    # Zazie should match correctly
-    assert zazie.stashdb is not None
-    assert zazie.stashdb['performer']['name'] == 'Zazie Skymm'
-    assert zazie.confidence > 0.95  # Exact name match
-    
-    # Nikki should not match to Zazie's profile despite the ManyVids URL
-    assert nikki.stashdb is None
-    assert nikki.confidence == 0.0
+    # Test match formatting
+    formatted = matcher.format_match_for_review(sybil_match)
+    assert "CE: Sybil" in formatted
+    assert "Stashapp: Sybil A" in formatted
+    assert str(sybil_match.stashapp_id) in formatted
+    assert sybil_match.stashdb_uuid in formatted
