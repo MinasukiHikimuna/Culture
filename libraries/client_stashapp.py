@@ -142,6 +142,12 @@ class StashAppClient:
             disambiguation
             alias_list
             gender
+            stash_ids {
+                endpoint
+                stash_id
+                updated_at
+            }
+            custom_fields
         }
         studio {
             id
@@ -200,7 +206,30 @@ class StashAppClient:
                         if stash_scene.get("updated_at")
                         else None
                     ),
-                    "stashapp_performers": stash_scene.get("performers", []),
+                    "stashapp_performers": [
+                        {
+                            "stashapp_performers_id": int(p.get("id")),
+                            "stashapp_performers_name": p.get("name"),
+                            "stashapp_performers_disambiguation": p.get(
+                                "disambiguation"
+                            ),
+                            "stashapp_performers_alias_list": p.get("alias_list", []),
+                            "stashapp_performers_gender": p.get("gender"),
+                            "stashapp_performers_stash_ids": [
+                                {
+                                    "endpoint": x["endpoint"],
+                                    "stash_id": x["stash_id"],
+                                    "updated_at": x["updated_at"],
+                                }
+                                for x in p.get("stash_ids", [])
+                            ],
+                            "stashapp_performers_custom_fields": [
+                                {"key": k, "value": v}
+                                for k, v in p.get("custom_fields", {}).items()
+                            ],
+                        }
+                        for p in stash_scene.get("performers", [])
+                    ],
                     "stashapp_studio": stash_scene.get("studio", {}),
                     "stashapp_files": [
                         {
@@ -245,11 +274,11 @@ class StashAppClient:
             "stashapp_performers": pl.List(
                 pl.Struct(
                     {
-                        "id": pl.Int64,
-                        "name": pl.Utf8,
-                        "disambiguation": pl.Utf8,
-                        "alias_list": pl.List(pl.Utf8),
-                        "gender": pl.Enum(
+                        "stashapp_performers_id": pl.Int64,
+                        "stashapp_performers_name": pl.Utf8,
+                        "stashapp_performers_disambiguation": pl.Utf8,
+                        "stashapp_performers_alias_list": pl.List(pl.Utf8),
+                        "stashapp_performers_gender": pl.Enum(
                             [
                                 "MALE",
                                 "FEMALE",
@@ -257,6 +286,18 @@ class StashAppClient:
                                 "TRANSGENDER_FEMALE",
                                 "NON_BINARY",
                             ]
+                        ),
+                        "stashapp_performers_stash_ids": pl.List(
+                            pl.Struct(
+                                {
+                                    "endpoint": pl.Utf8,
+                                    "stash_id": pl.Utf8,
+                                    "updated_at": pl.Datetime,
+                                }
+                            )
+                        ),
+                        "stashapp_performers_custom_fields": pl.List(
+                            pl.Struct({"key": pl.Utf8, "value": pl.Utf8})
                         ),
                     }
                 )
