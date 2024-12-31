@@ -306,6 +306,73 @@ class StashAppClient:
 
         return df_scenes
 
+    def get_performers(self) -> pl.DataFrame:
+        fragment = """
+        id
+        name
+        url
+        gender
+        stash_ids {
+            endpoint
+            stash_id
+            updated_at
+        }
+        custom_fields
+        """
+        performers = self.stash.find_performers(fragment=fragment)
+
+        performers_data = []
+        for performer in performers:
+            performers_data.append(
+                {
+                    "stashapp_id": int(performer.get("id")),
+                    "stashapp_name": performer.get("name"),
+                    "stashapp_url": performer.get("url"),
+                    "stashapp_gender": performer.get("gender"),
+                    "stashapp_stash_ids": [
+                        {
+                            "endpoint": x["endpoint"],
+                            "stash_id": x["stash_id"],
+                            "updated_at": x["updated_at"],
+                        }
+                        for x in performer.get("stash_ids", [])
+                    ],
+                    "stashapp_custom_fields": [
+                        {"key": k, "value": v}
+                        for k, v in performer.get("custom_fields", {}).items()
+                    ],
+                }
+            )
+
+        schema = {
+            "stashapp_id": pl.Int64,
+            "stashapp_name": pl.Utf8,
+            "stashapp_url": pl.Utf8,
+            "stashapp_gender": pl.Enum(
+                [
+                    "MALE",
+                    "FEMALE",
+                    "TRANSGENDER_MALE",
+                    "TRANSGENDER_FEMALE",
+                    "NON_BINARY",
+                ]
+            ),
+            "stashapp_stash_ids": pl.List(
+                pl.Struct(
+                    {
+                        "endpoint": pl.Utf8,
+                        "stash_id": pl.Utf8,
+                        "updated_at": pl.Datetime,
+                    }
+                )
+            ),
+            "stashapp_custom_fields": pl.List(
+                pl.Struct({"key": pl.Utf8, "value": pl.Utf8})
+            ),
+        }
+
+        return pl.DataFrame(performers_data, schema=schema)
+
     def set_studio_stash_id_for_endpoint(
         self, studio_id: int, endpoint: str, stash_id: str
     ):
