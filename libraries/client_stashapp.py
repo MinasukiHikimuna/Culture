@@ -111,6 +111,8 @@ class StashAppClient:
         }
 
         df_studios = pl.DataFrame(studios, schema=schema)
+        df_studios = df_studios.sort(by=["stash_studios_name"])
+        
         return df_studios
 
     def _get_stash_ids(self, stash_ids):
