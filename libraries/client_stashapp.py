@@ -1,4 +1,4 @@
-from typing import List
+from typing import Dict, List
 import numpy as np
 import pandas as pd
 import stashapi.log as log
@@ -101,11 +101,13 @@ class StashAppClient:
             "stash_studios_url": pl.Utf8,
             "stash_studios_stashdb_id": pl.Utf8,
             "stash_studios_tpdb_id": pl.Utf8,
+            "stash_studios_ce_id": pl.Utf8,
             "stash_studios_parent_studio_id": pl.Int64,
             "stash_studios_parent_studio_name": pl.Utf8,
             "stash_studios_parent_studio_url": pl.Utf8,
             "stash_studios_parent_studio_stashdb_id": pl.Utf8,
             "stash_studios_parent_studio_tpdb_id": pl.Utf8,
+            "stash_studios_parent_studio_ce_id": pl.Utf8,
         }
 
         df_studios = pl.DataFrame(studios, schema=schema)
@@ -120,6 +122,8 @@ class StashAppClient:
                     result["stash_studios_stashdb_id"] = stash_id["stash_id"]
                 elif stash_id["endpoint"] == "https://theporndb.net/graphql":
                     result["stash_studios_tpdb_id"] = stash_id["stash_id"]
+                elif stash_id["endpoint"] == "https://culture.extractor/graphql":
+                    result["stash_studios_ce_id"] = stash_id["stash_id"]
         return result
 
     def find_scenes_by_oshash(self, oshashes: List[str]) -> pl.DataFrame:
@@ -172,6 +176,11 @@ class StashAppClient:
         tags {
             id
             name
+        }
+        stash_ids {
+            endpoint
+            stash_id
+            updated_at
         }
         """
 
@@ -249,17 +258,74 @@ class StashAppClient:
                         }
                         for f in stash_scene.get("files", [])
                     ],
-                    "stashapp_primary_file_path": stash_scene.get("files", [])[0].get("path", ""),
-                    "stashapp_primary_file_oshash": next((fp['value'] for fp in stash_scene.get("files", [])[0].get("fingerprints", []) if fp['type'] == 'oshash'), None),
-                    "stashapp_primary_file_phash": next((fp['value'] for fp in stash_scene.get("files", [])[0].get("fingerprints", []) if fp['type'] == 'phash'), None),
-                    "stashapp_primary_file_xxhash": next((fp['value'] for fp in stash_scene.get("files", [])[0].get("fingerprints", []) if fp['type'] == 'xxhash'), None),
-                    "stashapp_primary_file_duration": stash_scene.get("files", [])[0].get("duration", 0) * 1000,
+                    "stashapp_primary_file_path": stash_scene.get("files", [])[0].get(
+                        "path", ""
+                    ),
+                    "stashapp_primary_file_oshash": next(
+                        (
+                            fp["value"]
+                            for fp in stash_scene.get("files", [])[0].get(
+                                "fingerprints", []
+                            )
+                            if fp["type"] == "oshash"
+                        ),
+                        None,
+                    ),
+                    "stashapp_primary_file_phash": next(
+                        (
+                            fp["value"]
+                            for fp in stash_scene.get("files", [])[0].get(
+                                "fingerprints", []
+                            )
+                            if fp["type"] == "phash"
+                        ),
+                        None,
+                    ),
+                    "stashapp_primary_file_xxhash": next(
+                        (
+                            fp["value"]
+                            for fp in stash_scene.get("files", [])[0].get(
+                                "fingerprints", []
+                            )
+                            if fp["type"] == "xxhash"
+                        ),
+                        None,
+                    ),
+                    "stashapp_primary_file_duration": stash_scene.get("files", [])[
+                        0
+                    ].get("duration", 0)
+                    * 1000,
                     "stashapp_tags": stash_scene.get("tags", []),
                     "stashapp_organized": stash_scene.get("organized", False),
                     "stashapp_interactive": stash_scene.get("interactive", False),
                     "stashapp_play_duration": stash_scene.get("play_duration", 0),
                     "stashapp_play_count": stash_scene.get("play_count", 0),
                     "stashapp_o_counter": stash_scene.get("o_counter", 0),
+                    "stashapp_stash_ids": stash_scene.get("stash_ids", []),
+                    "stashapp_stashdb_id": next(
+                        (
+                            x["stash_id"]
+                            for x in stash_scene.get("stash_ids", [])
+                            if x["endpoint"] == "https://stashdb.org/graphql"
+                        ),
+                        None,
+                    ),
+                    "stashapp_tpdb_id": next(
+                        (
+                            x["stash_id"]
+                            for x in stash_scene.get("stash_ids", [])
+                            if x["endpoint"] == "https://theporndb.net/graphql"
+                        ),
+                        None,
+                    ),
+                    "stashapp_ce_id": next(
+                        (
+                            x["stash_id"]
+                            for x in stash_scene.get("stash_ids", [])
+                            if x["endpoint"] == "https://culture.extractor/graphql"
+                        ),
+                        None,
+                    ),
                 }
                 scenes.append(scene_data)
 
@@ -341,6 +407,18 @@ class StashAppClient:
             "stashapp_play_duration": pl.Int64,
             "stashapp_play_count": pl.Int64,
             "stashapp_o_counter": pl.Int64,
+            "stashapp_stash_ids": pl.List(
+                pl.Struct(
+                    {
+                        "endpoint": pl.Utf8,
+                        "stash_id": pl.Utf8,
+                        "updated_at": pl.Datetime,
+                    }
+                )
+            ),
+            "stashapp_stashdb_id": pl.Utf8,
+            "stashapp_tpdb_id": pl.Utf8,
+            "stashapp_ce_id": pl.Utf8,
         }
 
         df_scenes = pl.DataFrame(scenes, schema=schema)
@@ -462,3 +540,10 @@ class StashAppClient:
             ]
 
         self.stash.update_studio({"id": studio_id, "stash_ids": new_stash_ids})
+
+    def update_performer_custom_fields(
+        self, performer_id: int, custom_fields: Dict[str, str]
+    ):
+        self.stash.update_performer(
+            {"id": performer_id, "custom_fields": {"partial": custom_fields}}
+        )
