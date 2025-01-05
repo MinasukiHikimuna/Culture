@@ -321,7 +321,7 @@ class StashDbClient(StashboxClient):
                     "id": scene_data["id"],
                     "title": scene_data["title"],
                     "code": scene_data["code"],
-                    "duration": scene_data["duration"],
+                    "duration": scene_data["duration"] * 1000,
                     "date": (
                         datetime.strptime(scene_data.get("date", ""), "%Y-%m-%d").date()
                         if scene_data.get("date")
@@ -470,7 +470,7 @@ class StashDbClient(StashboxClient):
             "id": pl.Utf8,
             "title": pl.Utf8,
             "code": pl.Utf8,
-            "duration": pl.Int64,
+            "duration": pl.Duration(time_unit="ms"),
             "date": pl.Date,
             "urls": pl.List(pl.Struct({"url": pl.Utf8, "type": pl.Utf8})),
             "images": pl.List(
