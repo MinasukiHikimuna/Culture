@@ -15,9 +15,16 @@ class ClientCultureExtractor:
     def get_sites(self) -> pl.DataFrame:
         with self.connection.cursor() as cursor:
             cursor.execute(
-                "SELECT uuid AS ce_sites_uuid, short_name AS ce_sites_short_name, name AS ce_sites_name, url AS ce_sites_url FROM sites"
+                """
+                SELECT
+                    uuid AS ce_sites_uuid,
+                    short_name AS ce_sites_short_name,
+                    name AS ce_sites_name,
+                    url AS ce_sites_url
+                FROM sites
+                ORDER BY name
+                """
             )
-
             sites_rows = cursor.fetchall()
 
             sites = [
@@ -39,6 +46,48 @@ class ClientCultureExtractor:
 
             df_sites = pl.DataFrame(sites, schema=schema)
             return df_sites
+        
+    def get_sub_sites(self) -> pl.DataFrame:
+        with self.connection.cursor() as cursor:
+            cursor.execute("""
+                           SELECT
+                                sites.uuid AS ce_sites_uuid,
+                                sites.short_name AS ce_sites_short_name,
+                                sites.name AS ce_sites_name,
+                                sites.url AS ce_sites_url,
+                                sub_sites.uuid AS ce_sub_sites_uuid,
+                                sub_sites.short_name AS ce_sub_sites_short_name,
+                                sub_sites.name AS ce_sub_sites_name
+                                FROM sub_sites
+                                JOIN sites ON sub_sites.site_uuid = sites.uuid
+                                ORDER BY sites.name, sub_sites.name
+                           """)
+            sub_sites_rows = cursor.fetchall()
+            
+            sub_sites = [
+                {
+                    "ce_sites_uuid": str(row[0]),
+                    "ce_sites_short_name": row[1],
+                    "ce_sites_name": row[2],
+                    "ce_sites_url": row[3],
+                    "ce_sub_sites_uuid": str(row[4]),
+                    "ce_sub_sites_short_name": row[5],
+                    "ce_sub_sites_name": row[6],
+                }
+                for row in sub_sites_rows
+            ]
+            
+            schema = {
+                "ce_sites_uuid": pl.Utf8,
+                "ce_sites_short_name": pl.Utf8,
+                "ce_sites_name": pl.Utf8,
+                "ce_sites_url": pl.Utf8,
+                "ce_sub_sites_uuid": pl.Utf8,
+                "ce_sub_sites_short_name": pl.Utf8,
+                "ce_sub_sites_name": pl.Utf8,
+            }
+            
+            return pl.DataFrame(sub_sites, schema=schema)
 
     def get_downloads(self, site_name: str) -> pl.DataFrame:
         with self.connection.cursor() as cursor:
@@ -144,7 +193,15 @@ class ClientCultureExtractor:
                     "ce_downloads_original_filename": row[18],
                     "ce_downloads_saved_filename": row[19],
                     "ce_downloads_file_metadata": row[20],
-                    "ce_downloads_performers": row[21],
+                    "ce_downloads_performers": [
+                        {
+                            "uuid": p["uuid"],
+                            "short_name": p["short_name"],
+                            "name": p["name"],
+                            "url": p["url"]
+                        }
+                        for p in row[21]
+                    ],
                     "ce_downloads_tags": row[22],
                     "ce_downloads_hash_oshash": (
                         json.loads(row[20]).get("oshash")
