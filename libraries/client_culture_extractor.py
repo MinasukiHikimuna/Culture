@@ -89,7 +89,7 @@ class ClientCultureExtractor:
             
             return pl.DataFrame(sub_sites, schema=schema)
 
-    def get_downloads(self, site_name: str) -> pl.DataFrame:
+    def get_downloads(self, site_uuid: str) -> pl.DataFrame:
         with self.connection.cursor() as cursor:
             query = """
                 SELECT 
@@ -140,7 +140,7 @@ class ClientCultureExtractor:
                 -- Left join tags through junction table
                 LEFT JOIN release_entity_site_tag_entity ret ON releases.uuid = ret.releases_uuid
                 LEFT JOIN tags ON ret.tags_uuid = tags.uuid
-                WHERE sites.name = %s
+                WHERE sites.uuid = %s
                 GROUP BY
                     sites.name,
                     sub_sites.name,
@@ -164,7 +164,7 @@ class ClientCultureExtractor:
                     downloads.saved_filename,
                     downloads.file_metadata::text
             """
-            cursor.execute(query, (site_name,))
+            cursor.execute(query, (site_uuid,))
             downloads_rows = cursor.fetchall()
 
             if not downloads_rows:
