@@ -263,7 +263,6 @@ class ClientCultureExtractor:
                 "ce_downloads_release_description": pl.Utf8,
                 "ce_downloads_release_created": pl.Datetime,
                 "ce_downloads_release_last_updated": pl.Datetime,
-                "ce_downloads_release_downloaded_at": pl.Datetime,
                 "ce_downloads_release_available_files": pl.Utf8,
                 "ce_downloads_release_json_document": pl.Utf8,
                 "ce_downloads_uuid": pl.Utf8,
