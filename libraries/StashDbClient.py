@@ -179,21 +179,32 @@ class StashDbClient(StashboxClient):
         Query StashDB for multiple scenes using their phash fingerprints in a single request.
 
         Args:
-            scenes (list[dict]): List of scene objects with filename, title, phash and duration
+            scenes (list[dict]): List of scene objects
 
         Returns:
             pl.DataFrame: DataFrame with phash, id, title, code, duration, date, urls, images, studio, tags, performers
         """
-        query = """
-        query FindScenesByFullFingerprints($fingerprints: [FingerprintQueryInput!]!) {
-            findScenesByFullFingerprints(fingerprints: $fingerprints) {
+        fragment = """
+            id
+            title
+            code
+            details
+            director
+            duration
+            date
+            urls {
+                url
+                type
+            }
+            images {
                 id
-                title
-                code
-                details
-                director
-                duration
-                date
+                url
+                width
+                height
+            }
+            studio {
+                id
+                name
                 urls {
                     url
                     type
@@ -204,7 +215,7 @@ class StashDbClient(StashboxClient):
                     width
                     height
                 }
-                studio {
+                parent {
                     id
                     name
                     urls {
@@ -217,90 +228,100 @@ class StashDbClient(StashboxClient):
                         width
                         height
                     }
-                    parent {
-                        id
-                        name
-                        urls {
-                            url
-                            type
-                        }
-                        images {
-                            id
-                            url
-                            width
-                            height
-                        }
-                    }
-                }
-                tags {
-                    name
-                    id
-                }
-                performers {
-                    as
-                    performer {
-                        id
-                        name
-                        disambiguation
-                        aliases
-                        gender
-                        merged_ids
-                        urls {
-                            url
-                            type
-                        }
-                        images {
-                            id
-                            url
-                            width
-                            height
-                        }
-                        birth_date
-                        ethnicity
-                        country
-                        eye_color
-                        hair_color
-                        height
-                        measurements {
-                            band_size
-                            cup_size
-                            waist
-                            hip
-                        }
-                        breast_type
-                        career_start_year
-                        career_end_year
-                        tattoos {
-                            location
-                            description
-                        }
-                        piercings {
-                            location
-                            description
-                        }
-                    }
-                }
-                fingerprints {
-                    algorithm
-                    hash
-                    duration
                 }
             }
-        }
+            tags {
+                name
+                id
+            }
+            performers {
+                as
+                performer {
+                    id
+                    name
+                    disambiguation
+                    aliases
+                    gender
+                    merged_ids
+                    urls {
+                        url
+                        type
+                    }
+                    images {
+                        id
+                        url
+                        width
+                        height
+                    }
+                    birth_date
+                    ethnicity
+                    country
+                    eye_color
+                    hair_color
+                    height
+                    measurements {
+                        band_size
+                        cup_size
+                        waist
+                        hip
+                    }
+                    breast_type
+                    career_start_year
+                    career_end_year
+                    tattoos {
+                        location
+                        description
+                    }
+                    piercings {
+                        location
+                        description
+                    }
+                }
+            }
+            fingerprints {
+                algorithm
+                hash
+                duration
+            }
         """
+        
+        find_scene = f"""
+            query FindScene($id: ID!) {{
+                findScene(id: $id) {{
+                    {fragment}
+                }}
+            }}
+        """
+        
+        find_scenes_by_full_fingerprints = f"""
+            query FindScenesByFullFingerprints($fingerprints: [FingerprintQueryInput!]!) {{
+                findScenesByFullFingerprints(fingerprints: $fingerprints) {{
+                    {fragment}
+                }}
+            }}
+        """
+    
+        scenes_with_stashdb_id = [scene for scene in scenes if scene["stashdb_id"]]
+        scenes_without_stashdb_id = [scene for scene in scenes if not scene["stashdb_id"]]
 
-        variables = {
+        results_with_stashdb_id = {}
+        for scene in scenes_with_stashdb_id:
+            find_scene_result = self._gql_query(find_scene, {"id": scene["stashdb_id"]})
+            if find_scene_result:
+                results_with_stashdb_id[scene["phash"]] = find_scene_result["data"]["findScene"]
+
+        find_scenes_by_full_fingerprints_variables = {
             "fingerprints": [
-                {"algorithm": "PHASH", "hash": scene["phash"]} for scene in scenes
+                {"algorithm": "PHASH", "hash": scene["phash"]} for scene in scenes_without_stashdb_id
             ]
         }
 
-        result = self._gql_query(query, variables)
+        results_without_stashdb_id = self._gql_query(find_scenes_by_full_fingerprints, find_scenes_by_full_fingerprints_variables)
 
         if (
-            not result
-            or "data" not in result
-            or "findScenesByFullFingerprints" not in result["data"]
+            not results_without_stashdb_id
+            or "data" not in results_without_stashdb_id
+            or "findScenesByFullFingerprints" not in results_without_stashdb_id["data"]
         ):
             raise Exception("Failed to query scenes by phash")
 
@@ -308,10 +329,14 @@ class StashDbClient(StashboxClient):
         # import json
         # time_in_ticks = datetime.now().timestamp()
         # with open(f"phash_to_scene_{time_in_ticks}.json", "w") as f:
-        #     f.write(json.dumps({ "input_scenes": scenes, "results": result }, indent=4))
+        #     f.write(json.dumps({ "input_scenes": scenes, "results": results_without_stashdb_id }, indent=4))
 
-        stashdb_scenes = result["data"]["findScenesByFullFingerprints"]
+        stashdb_scenes = results_without_stashdb_id["data"]["findScenesByFullFingerprints"]
         matched_scenes = self.scene_matcher.match_scenes(scenes, stashdb_scenes)
+
+        # Combined results
+        for phash, scene_data in results_with_stashdb_id.items():
+            matched_scenes[phash] = scene_data
 
         matched_scenes_list = [
             (
