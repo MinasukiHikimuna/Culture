@@ -179,7 +179,7 @@ class StashDbClient(StashboxClient):
         Query StashDB for multiple scenes using their phash fingerprints in a single request.
 
         Args:
-            scenes (list[dict]): List of scene objects with filename, phash and duration
+            scenes (list[dict]): List of scene objects with filename, title, phash and duration
 
         Returns:
             pl.DataFrame: DataFrame with phash, id, title, code, duration, date, urls, images, studio, tags, performers
@@ -305,9 +305,8 @@ class StashDbClient(StashboxClient):
             raise Exception("Failed to query scenes by phash")
 
         # Save to file for debugging/testing
-        # import datetime
         # import json
-        # time_in_ticks = datetime.datetime.now().timestamp()
+        # time_in_ticks = datetime.now().timestamp()
         # with open(f"phash_to_scene_{time_in_ticks}.json", "w") as f:
         #     f.write(json.dumps({ "input_scenes": scenes, "results": result }, indent=4))
 
