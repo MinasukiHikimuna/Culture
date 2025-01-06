@@ -187,16 +187,6 @@ class ClientCultureExtractor:
             """, (site_uuid,))
             tags = dict(cursor.fetchall())
 
-            def convert_uuids_to_str(obj):
-                """Helper function to convert UUIDs to strings in nested structures"""
-                if isinstance(obj, dict):
-                    return {k: convert_uuids_to_str(v) for k, v in obj.items()}
-                elif isinstance(obj, list):
-                    return [convert_uuids_to_str(item) for item in obj]
-                elif hasattr(obj, 'hex'):  # UUID objects have a hex attribute
-                    return str(obj)
-                return obj
-
             # Combine all data
             downloads = []
             for row in downloads_rows:
@@ -210,7 +200,6 @@ class ClientCultureExtractor:
                         available_file = json.loads(available_file)
                     except json.JSONDecodeError:
                         available_file = None
-                available_file = convert_uuids_to_str(available_file)
 
                 # Parse file_metadata JSON if it's a string
                 file_metadata = row[9]
@@ -219,7 +208,6 @@ class ClientCultureExtractor:
                         file_metadata = json.loads(file_metadata)
                     except json.JSONDecodeError:
                         file_metadata = {}
-                file_metadata = convert_uuids_to_str(file_metadata)
 
                 download_data = {
                     "ce_downloads_site_name": site_name,
@@ -245,9 +233,9 @@ class ClientCultureExtractor:
                     "ce_downloads_file_metadata": json.dumps(file_metadata) if file_metadata else None,
                     "ce_downloads_performers": performers.get(release_uuid, []),
                     "ce_downloads_tags": tags.get(release_uuid, []),
-                    "ce_downloads_hash_oshash": file_metadata.get("oshash"),
-                    "ce_downloads_hash_phash": file_metadata.get("phash"),
-                    "ce_downloads_hash_sha256": file_metadata.get("sha256Sum"),
+                    "ce_downloads_hash_oshash": file_metadata.get("oshash") if file_metadata else None,
+                    "ce_downloads_hash_phash": file_metadata.get("phash") if file_metadata else None,
+                    "ce_downloads_hash_sha256": file_metadata.get("sha256Sum") if file_metadata else None,
                 }
                 downloads.append(download_data)
 
