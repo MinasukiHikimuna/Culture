@@ -27,3 +27,11 @@ def test_scene_matcher_sample02():
     result = matcher.match_scenes(input_scenes, stashdb_scenes)
     expected_scene = next(scene for scene in stashdb_scenes if scene["id"] == "005c612f-ea44-4c8b-8e7b-bf5f840de147")
     assert result["e796ec4d1b40a28f"] == expected_scene
+
+def test_scene_matcher_sample03():
+    # There are multiple results with the phash b414ba062f6bdc72. The incorrect match has more fingerprints with the correct phash but the incorrect fingerprint is also included.
+    matcher = SceneMatcher()
+    input_scenes, stashdb_scenes = load_sample_data("phash_to_scene.sample03.json")
+    result = matcher.match_scenes(input_scenes, stashdb_scenes)
+    expected_scene = next(scene for scene in stashdb_scenes if scene["id"] == "69698da1-46de-42e1-84ce-fc560e76fb62")
+    assert result["b414ba062f6bdc72"] == expected_scene
