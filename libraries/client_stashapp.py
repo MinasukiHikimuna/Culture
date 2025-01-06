@@ -438,7 +438,7 @@ class StashAppClient:
         fragment = """
         id
         name
-        url
+        urls
         gender
         stash_ids {
             endpoint
@@ -455,7 +455,7 @@ class StashAppClient:
                 {
                     "stashapp_id": int(performer.get("id")),
                     "stashapp_name": performer.get("name"),
-                    "stashapp_url": performer.get("url"),
+                    "stashapp_urls": performer.get("urls", []),
                     "stashapp_gender": performer.get("gender"),
                     "stashapp_stash_ids": [
                         {
@@ -475,7 +475,7 @@ class StashAppClient:
         schema = {
             "stashapp_id": pl.Int64,
             "stashapp_name": pl.Utf8,
-            "stashapp_url": pl.Utf8,
+            "stashapp_urls": pl.List(pl.Utf8),
             "stashapp_gender": pl.Enum(
                 [
                     "MALE",
