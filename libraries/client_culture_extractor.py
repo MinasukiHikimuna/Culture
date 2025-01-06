@@ -91,137 +91,167 @@ class ClientCultureExtractor:
 
     def get_downloads(self, site_uuid: str) -> pl.DataFrame:
         with self.connection.cursor() as cursor:
-            query = """
-                SELECT 
-                    sites.name AS site_name,
-                    sub_sites.name AS sub_site_name,
-                    releases.uuid AS release_uuid,
-                    NULLIF(releases.release_date, '-infinity') as release_date,
-                    releases.short_name AS release_short_name, 
-                    releases.name AS release_name, 
-                    releases.url AS release_url,
-                    releases.description AS release_description,
-                    NULLIF(releases.created, '-infinity') as created,
-                    NULLIF(releases.last_updated, '-infinity') as last_updated,
-                    releases.available_files::text AS release_available_files,
-                    releases.json_document::text AS release_json_document,
-                    downloads.uuid AS downloads_uuid,
-                    NULLIF(downloads.downloaded_at, '-infinity') as downloaded_at,
-                    downloads.file_type,
-                    downloads.content_type,
-                    downloads.variant AS downloads_variant,
-                    downloads.available_file::text AS downloads_available_file,
-                    downloads.original_filename AS downloads_original_filename,
-                    downloads.saved_filename AS downloads_saved_filename,
-                    downloads.file_metadata::text AS downloads_file_metadata,
-                    -- Aggregate performers into a JSON array of objects
-                    COALESCE(json_agg(
-                        DISTINCT jsonb_build_object(
-                            'uuid', performers.uuid,
-                            'short_name', performers.short_name,
-                            'name', performers.name,
-                            'url', performers.url
-                        ) 
-                    ) FILTER (WHERE performers.uuid IS NOT NULL), '[]') as performers,
-                    -- Aggregate tags into an array  
-                    COALESCE(json_agg(DISTINCT jsonb_build_object(
-                        'uuid', tags.uuid,
-                        'short_name', tags.short_name,
-                        'name', tags.name,
-                        'url', tags.url
-                    )) FILTER (WHERE tags.name IS NOT NULL), '[]') as tags
-                FROM releases
-                JOIN sites ON releases.site_uuid = sites.uuid
-                JOIN downloads ON releases.uuid = downloads.release_uuid
-                LEFT JOIN sub_sites ON releases.sub_site_uuid = sub_sites.uuid
-                -- Left join performers through junction table
-                LEFT JOIN release_entity_site_performer_entity rep ON releases.uuid = rep.releases_uuid
-                LEFT JOIN performers ON rep.performers_uuid = performers.uuid
-                -- Left join tags through junction table
-                LEFT JOIN release_entity_site_tag_entity ret ON releases.uuid = ret.releases_uuid
-                LEFT JOIN tags ON ret.tags_uuid = tags.uuid
+            # Get site info
+            cursor.execute("""
+                SELECT name, uuid 
+                FROM sites 
                 WHERE sites.uuid = %s
-                GROUP BY
-                    sites.name,
-                    sub_sites.name,
-                    releases.uuid,
-                    releases.release_date,
-                    releases.short_name,
-                    releases.name,
-                    releases.url,
-                    releases.description,
-                    releases.created,
-                    releases.last_updated,
-                    releases.available_files::text,
-                    releases.json_document::text,
-                    downloads.uuid,
-                    downloads.downloaded_at,
-                    downloads.file_type,
-                    downloads.content_type,
-                    downloads.variant,
-                    downloads.available_file::text,
-                    downloads.original_filename,
-                    downloads.saved_filename,
-                    downloads.file_metadata::text
-            """
-            cursor.execute(query, (site_uuid,))
+            """, (site_uuid,))
+            site_row = cursor.fetchone()
+            if not site_row:
+                return pl.DataFrame()
+            site_name = site_row[0]
+
+            # Get all releases for the site
+            cursor.execute("""
+                SELECT 
+                    uuid,
+                    NULLIF(release_date, '-infinity') as release_date,
+                    short_name,
+                    name,
+                    url,
+                    description,
+                    NULLIF(created, '-infinity') as created,
+                    NULLIF(last_updated, '-infinity') as last_updated,
+                    available_files::text,
+                    json_document::text,
+                    sub_site_uuid
+                FROM releases 
+                WHERE site_uuid = %s
+            """, (site_uuid,))
+            releases = {row[0]: row for row in cursor.fetchall()}
+
+            # Get sub_sites info
+            sub_site_uuids = {row[10] for row in releases.values() if row[10] is not None}
+            sub_sites = {}
+            if sub_site_uuids:
+                cursor.execute("""
+                    SELECT uuid, name 
+                    FROM sub_sites 
+                    WHERE uuid = ANY(%s)
+                """, (list(sub_site_uuids),))
+                sub_sites = dict(cursor.fetchall())
+
+            # Get downloads
+            cursor.execute("""
+                SELECT r.uuid AS release_uuid,
+                    d.uuid AS download_uuid,
+                    d.downloaded_at,
+                    d.file_type,
+                    d.content_type,
+                    d.variant,
+                    d.available_file,
+                    d.original_filename,
+                    d.saved_filename,
+                    d.file_metadata
+                FROM downloads d
+                JOIN releases r ON r.uuid = d.release_uuid
+                WHERE r.site_uuid = %s
+                ORDER BY r.uuid
+            """, (site_uuid,))
             downloads_rows = cursor.fetchall()
 
-            if not downloads_rows:
-                return pl.DataFrame(schema=schema)
+            # Get performers
+            cursor.execute("""
+                SELECT r.uuid, json_agg(
+                    json_build_object(
+                        'uuid', p.uuid,
+                        'short_name', p.short_name,
+                        'name', p.name,
+                        'url', p.url
+                    )
+                )
+                FROM performers p
+                JOIN release_entity_site_performer_entity resp ON p.uuid = resp.performers_uuid
+                JOIN releases r ON resp.releases_uuid = r.uuid
+                WHERE r.site_uuid = %s
+                GROUP BY r.uuid
+            """, (site_uuid,))
+            performers = dict(cursor.fetchall())
 
-            downloads = [
-                {
-                    "ce_downloads_site_name": row[0],
-                    "ce_downloads_sub_site_name": row[1],
-                    "ce_downloads_release_uuid": str(row[2]),
-                    "ce_downloads_release_date": row[3],
-                    "ce_downloads_release_short_name": row[4],
-                    "ce_downloads_release_name": row[5],
-                    "ce_downloads_release_url": row[6],
-                    "ce_downloads_release_description": row[7],
-                    "ce_downloads_release_created": row[8],
-                    "ce_downloads_release_last_updated": row[9],
-                    "ce_downloads_release_available_files": row[10],
-                    "ce_downloads_release_json_document": row[11],
-                    "ce_downloads_uuid": str(row[12]),
-                    "ce_downloads_downloaded_at": row[13],
-                    "ce_downloads_file_type": row[14],
-                    "ce_downloads_content_type": row[15],
-                    "ce_downloads_variant": row[16],
-                    "ce_downloads_available_file": row[17],
-                    "ce_downloads_original_filename": row[18],
-                    "ce_downloads_saved_filename": row[19],
-                    "ce_downloads_file_metadata": row[20],
-                    "ce_downloads_performers": [
-                        {
-                            "uuid": p["uuid"],
-                            "short_name": p["short_name"],
-                            "name": p["name"],
-                            "url": p["url"]
-                        }
-                        for p in row[21]
-                    ],
-                    "ce_downloads_tags": row[22],
-                    "ce_downloads_hash_oshash": (
-                        json.loads(row[20]).get("oshash")
-                        if isinstance(row[20], str)
-                        else None
-                    ),
-                    "ce_downloads_hash_phash": (
-                        json.loads(row[20]).get("phash")
-                        if isinstance(row[20], str)
-                        else None
-                    ),
-                    "ce_downloads_hash_sha256": (
-                        json.loads(row[20]).get("sha256Sum")
-                        if isinstance(row[20], str)
-                        else None
-                    ),
+            # Get tags
+            cursor.execute("""
+                SELECT r.uuid, json_agg(
+                    json_build_object(
+                        'uuid', t.uuid,
+                        'short_name', t.short_name,
+                        'name', t.name,
+                        'url', t.url
+                    )
+                )
+                FROM tags t
+                JOIN release_entity_site_tag_entity rest ON t.uuid = rest.tags_uuid
+                JOIN releases r ON rest.releases_uuid = r.uuid
+                WHERE r.site_uuid = %s
+                GROUP BY r.uuid
+            """, (site_uuid,))
+            tags = dict(cursor.fetchall())
+
+            def convert_uuids_to_str(obj):
+                """Helper function to convert UUIDs to strings in nested structures"""
+                if isinstance(obj, dict):
+                    return {k: convert_uuids_to_str(v) for k, v in obj.items()}
+                elif isinstance(obj, list):
+                    return [convert_uuids_to_str(item) for item in obj]
+                elif hasattr(obj, 'hex'):  # UUID objects have a hex attribute
+                    return str(obj)
+                return obj
+
+            # Combine all data
+            downloads = []
+            for row in downloads_rows:
+                release_uuid = row[0]
+                release = releases[release_uuid]
+                
+                # Parse available_file JSON if it's a string
+                available_file = row[6]
+                if isinstance(available_file, str):
+                    try:
+                        available_file = json.loads(available_file)
+                    except json.JSONDecodeError:
+                        available_file = None
+                available_file = convert_uuids_to_str(available_file)
+
+                # Parse file_metadata JSON if it's a string
+                file_metadata = row[9]
+                if isinstance(file_metadata, str):
+                    try:
+                        file_metadata = json.loads(file_metadata)
+                    except json.JSONDecodeError:
+                        file_metadata = {}
+                file_metadata = convert_uuids_to_str(file_metadata)
+
+                download_data = {
+                    "ce_downloads_site_name": site_name,
+                    "ce_downloads_sub_site_name": sub_sites.get(release[10]) if release[10] else None,
+                    "ce_downloads_release_uuid": str(release_uuid),
+                    "ce_downloads_release_date": release[1],
+                    "ce_downloads_release_short_name": release[2],
+                    "ce_downloads_release_name": release[3],
+                    "ce_downloads_release_url": release[4],
+                    "ce_downloads_release_description": release[5],
+                    "ce_downloads_release_created": release[6],
+                    "ce_downloads_release_last_updated": release[7],
+                    "ce_downloads_release_available_files": release[8],
+                    "ce_downloads_release_json_document": release[9],
+                    "ce_downloads_uuid": str(row[1]),
+                    "ce_downloads_downloaded_at": row[2],
+                    "ce_downloads_file_type": row[3],
+                    "ce_downloads_content_type": row[4],
+                    "ce_downloads_variant": row[5],
+                    "ce_downloads_available_file": json.dumps(available_file) if available_file else None,
+                    "ce_downloads_original_filename": row[7],
+                    "ce_downloads_saved_filename": row[8],
+                    "ce_downloads_file_metadata": json.dumps(file_metadata) if file_metadata else None,
+                    "ce_downloads_performers": performers.get(release_uuid, []),
+                    "ce_downloads_tags": tags.get(release_uuid, []),
+                    "ce_downloads_hash_oshash": file_metadata.get("oshash"),
+                    "ce_downloads_hash_phash": file_metadata.get("phash"),
+                    "ce_downloads_hash_sha256": file_metadata.get("sha256Sum"),
                 }
-                for row in downloads_rows
-            ]
+                downloads.append(download_data)
 
+            # Schema remains the same as before
             schema = {
                 "ce_downloads_site_name": pl.Utf8,
                 "ce_downloads_sub_site_name": pl.Utf8,
@@ -270,5 +300,4 @@ class ClientCultureExtractor:
                 "ce_downloads_hash_sha256": pl.Utf8,
             }
 
-            df_downloads = pl.DataFrame(downloads, schema=schema)
-            return df_downloads
+            return pl.DataFrame(downloads, schema=schema)
