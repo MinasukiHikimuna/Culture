@@ -168,6 +168,7 @@ class StashAppClient:
         files {
             id
             path
+            basename
             size
             duration
             fingerprints {
@@ -246,6 +247,7 @@ class StashAppClient:
                         {
                             "id": int(f.get("id")),
                             "path": f.get("path", ""),
+                            "basename": f.get("basename", ""),
                             "size": int(f.get("size", 0)),
                             "duration": int(
                                 f.get("duration", 0) * 1000
@@ -262,6 +264,9 @@ class StashAppClient:
                     ],
                     "stashapp_primary_file_path": stash_scene.get("files", [])[0].get(
                         "path", ""
+                    ),
+                    "stashapp_primary_file_basename": stash_scene.get("files", [])[0].get(
+                        "basename", ""
                     ),
                     "stashapp_primary_file_oshash": next(
                         (
@@ -385,6 +390,7 @@ class StashAppClient:
                     {
                         "id": pl.Int64,
                         "path": pl.Utf8,
+                        "basename": pl.Utf8,
                         "size": pl.Int64,
                         "duration": pl.Duration(time_unit="ms"),
                         "fingerprints": pl.List(
@@ -399,6 +405,7 @@ class StashAppClient:
                 )
             ),
             "stashapp_primary_file_path": pl.Utf8,
+            "stashapp_primary_file_basename": pl.Utf8,
             "stashapp_primary_file_oshash": pl.Utf8,
             "stashapp_primary_file_phash": pl.Utf8,
             "stashapp_primary_file_xxhash": pl.Utf8,
