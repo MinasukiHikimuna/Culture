@@ -24,7 +24,7 @@ class FemjoySpider(scrapy.Spider):
     site_short_name = "femjoy"
     
     # Add this new class attribute to store desired performer short names
-    desired_performers = ["heidi-romanova", "carisha", "belinda", "ashley", "ryana", "linda-a", "sofie", "susi-r", "darina-a", "cara-mell-1", "susann", "cara-mell", "stella-cardo", "candy-d", "vanea-h", "miela", "davina-e", "niemira", "corinna", "josephine", "jane-f", "ariel", "vika-p", "caprice", "marga-e", "pandora-red", "aelita", "lana-lane", "vika-a", "karla-s", "melina-d", "stacy-cruz", "mila-k", "missa", "sugar-ann", "erin-k", "paula-s", "anneth", "jasmine-a", "annabell", "alice-kelly", "rinna", "myla", "simona", "penelope-g", "april-e", "olivia-linz", "lillie", "ella-c", "danica", "kinga", "anna-delos", "casey", "mara-blake", "aveira", "melisa", "alisha", "alicia-fox", "hayden-w", "vanessa-a", "jenni", "mariposa", "ruth", "linda-a", "susi-r"]  # Add short names of desired performers here, e.g., ["performer1", "performer2"]
+    desired_performers = ["heidi-romanova", "carisha", "belinda", "ashley", "ryana", "linda-a", "sofie", "susi-r", "darina-a", "cara-mell-1", "susann", "cara-mell", "stella-cardo", "candy-d", "vanea-h", "miela", "davina-e", "niemira", "corinna", "josephine", "jane-f", "ariel", "vika-p", "caprice", "marga-e", "pandora-red", "aelita", "lana-lane", "vika-a", "karla-s", "melina-d", "stacy-cruz", "mila-k", "missa", "sugar-ann", "erin-k", "paula-s", "anneth", "jasmine-a", "annabell", "alice-kelly", "rinna", "myla", "simona", "penelope-g", "april-e", "olivia-linz", "lillie", "ella-c", "danica", "kinga", "anna-delos", "casey", "mara-blake", "aveira", "melisa", "alisha", "alicia-fox", "hayden-w", "vanessa-a", "jenni", "mariposa", "ruth", "linda-a", "susi-r", "marria-leeah", "ramona", "lizzie", "laura", "paula-s", "anna-t", "bella-o", "lee-d", "magdalene", "abigail", "dori-k", "karol", "lucy-l", "katy", "foxy-t", "paloma", "aida", "kissin", "katie-g", "amaris", "acacia", "anastasia", "charlotta", "kamilla-j", "zelda", "dido", "beata-p", "yanina", "amelie-belain", "holly-m", "lena-s", "chesney", "lena-r", "varya-k", "vicky-z", "pamela", "anika"]
 
     @classmethod
     def from_crawler(cls, crawler, *args, **kwargs):
@@ -306,14 +306,23 @@ class FemjoySpider(scrapy.Spider):
             # Check if this resolution already exists and if the new file is MOV
             if resolution_key in video_files:
                 existing_file = video_files[resolution_key]
-                if 'mov' in variant.lower() and 'wmv' in existing_file['variant'].lower():
-                    # Replace WMV with MOV
+                if 'mp4' in variant.lower():
+                    # Always prefer MP4
                     video_files[resolution_key] = {
                         'url': url,
                         'variant': variant,
                         'width': width,
                         'height': height
                     }
+                elif 'mov' in variant.lower() and 'mp4' not in existing_file['variant'].lower():
+                    # Prefer MOV over WMV
+                    video_files[resolution_key] = {
+                        'url': url,
+                        'variant': variant,
+                        'width': width,
+                        'height': height
+                    }
+                # If it's WMV and we don't have MP4 or MOV, keep the existing WMV
             else:
                 # Add new resolution
                 video_files[resolution_key] = {
