@@ -64,7 +64,7 @@ class PerformerMatcher:
                     {
                         "stashapp_performers_id": -1,  # Placeholder
                         "stashapp_performers_name": p["performer"]["name"],
-                        "stashapp_performers_alias_list": p["performer"]["aliases"],
+                        "stashapp_performers_alias_list": p["performer"].get("aliases", []) + ([p["as"]] if p["as"] else []),  # Include both aliases and "as" name
                         "stashapp_performers_gender": p["performer"]["gender"],
                         "stashapp_performers_stash_ids": [
                             {

@@ -171,3 +171,26 @@ def test_match_utilities(all_stashapp_performers, samples):
     assert f"{jill_match.confidence:.2f}" in formatted
     assert jill_match.source in formatted
     assert jill_match.reason in formatted
+
+def test_alias_matching(all_stashapp_performers, samples):
+    df = pl.DataFrame([{
+        "ce_downloads_performers": samples["sample03"][0]["ce_downloads_performers"],
+        "stashapp_performers": None,
+        "stashdb_performers": samples["sample03"][0]["performers"]
+    }])
+    
+    matcher = PerformerMatcher(all_stashapp_performers)
+    matches = matcher.match_performers(
+        df["ce_downloads_performers"],
+        df["stashapp_performers"],
+        df["stashdb_performers"]
+    )
+    
+    assert len(matches) == 1, "Should find match for the performer"
+    
+    simona_match = matches[0]
+    assert simona_match.ce_name == "Simona", "Should match the CE name"
+    assert simona_match.confidence >= 0.75, "Should have good confidence for alias match"
+    assert simona_match.source == "stashdb_scene", "Should be matched from StashDB performers"
+    assert simona_match.stashdb_uuid == "97695d2a-4ec4-4349-8402-c171ebb9e220", "Should match to Silvie Deluxe's UUID"
+    assert "alias" in simona_match.reason.lower(), "Reason should mention alias matching"
