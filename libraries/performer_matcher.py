@@ -186,11 +186,22 @@ class PerformerMatcher:
             confidence = min(confidence, 1.0)  # Cap at 1.0
             
             if confidence > best_confidence:
+                stashapp_id = stash_perf["stashapp_performers_id"]
+                stashapp_name = stash_perf["stashapp_performers_name"]
+                if source == "stashdb_scene" and stashapp_id == -1 and self.all_stashapp_performers is not None and stashdb_uuid:
+                    for row in self.all_stashapp_performers.iter_rows(named=True):
+                        for stash_id in row["stashapp_stash_ids"]:
+                            if (stash_id["endpoint"] == "https://stashdb.org/graphql" and 
+                                stash_id["stash_id"] == stashdb_uuid):
+                                stashapp_id = row["stashapp_id"]
+                                stashapp_name = row["stashapp_name"]
+                                break
+
                 best_match = PerformerMatch(
                     ce_uuid=ce_perf["uuid"],
                     ce_name=ce_perf["name"],
-                    stashapp_id=stash_perf["stashapp_performers_id"],
-                    stashapp_name=stash_perf["stashapp_performers_name"],
+                    stashapp_id=stashapp_id,
+                    stashapp_name=stashapp_name,
                     stashdb_uuid=stashdb_uuid or "",
                     stashdb_name=stash_perf["stashapp_performers_name"],  # Use Stashapp name as fallback
                     confidence=confidence,

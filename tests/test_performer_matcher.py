@@ -108,11 +108,15 @@ def test_stashdb_scene_matching(all_stashapp_performers, samples):
     assert jill_match.confidence >= 0.9, "Should have high confidence for exact name match"
     assert jill_match.source == "stashdb_scene", "Should be matched from StashDB performers"
     assert jill_match.stashdb_uuid == "c853319b-60af-437c-94a2-63b29d8389b6"
+    assert jill_match.stashapp_id != -1, "Should not have placeholder Stashapp ID"
+    assert jill_match.stashapp_id == 1, "Should have valid Stashapp ID from all_stashapp_performers"
     
     ryan_match = next(m for m in matches if m.ce_name == "Ryan Driller")
     assert ryan_match.confidence >= 0.9, "Should have high confidence for exact name match"
     assert ryan_match.source == "stashdb_scene", "Should be matched from StashDB performers"
     assert ryan_match.stashdb_uuid == "8a07a611-fc9d-402c-bd9d-54f501dadd21"
+    assert ryan_match.stashapp_id != -1, "Should not have placeholder Stashapp ID"
+    assert ryan_match.stashapp_id == 2, "Should have valid Stashapp ID from all_stashapp_performers"
 
 def test_all_known_performers_matching(all_stashapp_performers, samples):
     df = pl.DataFrame([{
