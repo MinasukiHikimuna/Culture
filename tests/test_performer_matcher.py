@@ -16,25 +16,38 @@ def all_stashapp_performers():
     })
 
 @pytest.fixture
-def sample_data():
+def sample01():
     with open("tests/data/performer_matcher.sample01.json", "r") as f:
-        sample01 = json.load(f)
-    with open("tests/data/performer_matcher.sample02.json", "r") as f:
-        sample02 = json.load(f)
-    return sample01, sample02
+        return json.load(f)
 
-def test_stashapp_scene_matching(all_stashapp_performers, sample_data):
-    sample01, _ = sample_data
-    
+@pytest.fixture
+def sample02():
+    with open("tests/data/performer_matcher.sample02.json", "r") as f:
+        return json.load(f)
+
+@pytest.fixture
+def sample03():
+    with open("tests/data/performer_matcher.sample03.json", "r") as f:
+        return json.load(f)
+
+@pytest.fixture
+def samples(sample01, sample02, sample03):
+    return {
+        "sample01": sample01,
+        "sample02": sample02,
+        "sample03": sample03
+    }
+
+def test_stashapp_scene_matching(all_stashapp_performers, samples):
     # Modify Charlie Dean's name to test scene context boosting
-    ce_performers = sample01[0]["ce_downloads_performers"]
+    ce_performers = samples["sample01"][0]["ce_downloads_performers"]
     for perf in ce_performers:
         if perf["name"] == "Charlie Dean":
             perf["name"] = "Charlie D"  # Use partial name
             
     df = pl.DataFrame([{
         "ce_downloads_performers": ce_performers,
-        "stashapp_performers": sample01[0]["stashapp_performers"],
+        "stashapp_performers": samples["sample01"][0]["stashapp_performers"],
         "stashdb_performers": None
     }])
     
@@ -56,11 +69,9 @@ def test_stashapp_scene_matching(all_stashapp_performers, sample_data):
     assert charlie_match.source == "stashapp_scene", "Should be matched from scene performers"
     assert "boosted by scene context" in charlie_match.reason
 
-def test_stashdb_scene_matching(all_stashapp_performers, sample_data):
-    _, sample02 = sample_data
-    
+def test_stashdb_scene_matching(all_stashapp_performers, samples):
     df = pl.DataFrame([{
-        "ce_downloads_performers": sample02[0]["ce_downloads_performers"],
+        "ce_downloads_performers": samples["sample02"][0]["ce_downloads_performers"],
         "stashapp_performers": None,
         "stashdb_performers": [
             {
@@ -103,11 +114,9 @@ def test_stashdb_scene_matching(all_stashapp_performers, sample_data):
     assert ryan_match.source == "stashdb_scene", "Should be matched from StashDB performers"
     assert ryan_match.stashdb_uuid == "8a07a611-fc9d-402c-bd9d-54f501dadd21"
 
-def test_all_known_performers_matching(all_stashapp_performers, sample_data):
-    _, sample02 = sample_data
-    
+def test_all_known_performers_matching(all_stashapp_performers, samples):
     df = pl.DataFrame([{
-        "ce_downloads_performers": sample02[0]["ce_downloads_performers"],
+        "ce_downloads_performers": samples["sample02"][0]["ce_downloads_performers"],
         "stashapp_performers": None,
         "stashdb_performers": None
     }])
@@ -131,11 +140,9 @@ def test_all_known_performers_matching(all_stashapp_performers, sample_data):
     assert ryan_match.source == "stashapp_all", "Should be matched from all known performers"
     assert ryan_match.stashapp_id == 2
 
-def test_match_utilities(all_stashapp_performers, sample_data):
-    _, sample02 = sample_data
-    
+def test_match_utilities(all_stashapp_performers, samples):
     df = pl.DataFrame([{
-        "ce_downloads_performers": sample02[0]["ce_downloads_performers"],
+        "ce_downloads_performers": samples["sample02"][0]["ce_downloads_performers"],
         "stashapp_performers": None,
         "stashdb_performers": None
     }])
