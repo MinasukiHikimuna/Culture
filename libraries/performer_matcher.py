@@ -93,7 +93,7 @@ class PerformerMatcher:
                     {
                         "stashapp_performers_id": row["stashapp_id"],
                         "stashapp_performers_name": row["stashapp_name"],
-                        "stashapp_performers_alias_list": [],  # TODO: Get aliases if available
+                        "stashapp_performers_alias_list": row["stashapp_alias_list"],
                         "stashapp_performers_gender": row["stashapp_gender"],
                         "stashapp_performers_stash_ids": row["stashapp_stash_ids"]
                     }

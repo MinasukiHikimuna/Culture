@@ -12,8 +12,9 @@ def all_stashapp_performers():
         "stashapp_stash_ids": [
             [{"endpoint": "https://stashdb.org/graphql", "stash_id": "c853319b-60af-437c-94a2-63b29d8389b6"}],
             [{"endpoint": "https://stashdb.org/graphql", "stash_id": "8a07a611-fc9d-402c-bd9d-54f501dadd21"}]
-        ]
-    })
+        ],
+        "stashapp_alias_list": [[], []]  # Empty alias lists for both performers
+    }).with_columns(pl.col("stashapp_alias_list").cast(pl.List(pl.Utf8)))
 
 @pytest.fixture
 def sample01():
@@ -198,3 +199,39 @@ def test_alias_matching(all_stashapp_performers, samples):
     assert simona_match.source == "stashdb_scene", "Should be matched from StashDB performers"
     assert simona_match.stashdb_uuid == "97695d2a-4ec4-4349-8402-c171ebb9e220", "Should match to Silvie Deluxe's UUID"
     assert "alias" in simona_match.reason.lower(), "Reason should mention alias matching"
+
+def test_all_known_performers_should_use_aliases(all_stashapp_performers):
+    # Create test data with a performer that should match via alias
+    df = pl.DataFrame([{
+        "ce_downloads_performers": [{
+            "uuid": "test-uuid",
+            "name": "Jill"  # This should match "Jill Kassidy" via alias
+        }],
+        "stashapp_performers": None,
+        "stashdb_performers": None
+    }])
+
+    # Add a performer with aliases to all_stashapp_performers
+    test_performers = pl.DataFrame({
+        "stashapp_id": [123],
+        "stashapp_name": ["Jill Kassidy"],
+        "stashapp_gender": ["FEMALE"],
+        "stashapp_stash_ids": [[]],
+        "stashapp_alias_list": [["Jill", "Jill K"]]  # Add alias list with correct type
+    }).with_columns(pl.col("stashapp_alias_list").cast(pl.List(pl.Utf8)))
+
+    # Combine the test performers with existing ones
+    all_performers = pl.concat([all_stashapp_performers, test_performers])
+
+    # Create the matcher with our test data
+    matcher = PerformerMatcher(all_performers)
+    matches = matcher.match_performers(
+        df["ce_downloads_performers"],
+        df["stashapp_performers"],
+        df["stashdb_performers"]
+    )
+
+    # We should find one match with high confidence
+    assert len(matches) == 1
+    assert matches[0].confidence > 0.9  # High confidence match via alias
+    assert matches[0].stashapp_id == 123  # Should match our test performer
