@@ -238,3 +238,43 @@ def test_all_known_performers_should_use_aliases(all_stashapp_performers):
     assert len(matches) == 1
     assert matches[0].confidence > 0.9  # High confidence match via alias
     assert matches[0].stashapp_id == 123  # Should match our test performer
+
+def test_stashdb_scene_matching_without_stashapp(all_stashapp_performers):
+    """Test matching a performer from StashDB that doesn't exist in Stashapp yet"""
+    df = pl.DataFrame([{
+        "ce_downloads_performers": [{
+            "uuid": "test-uuid",
+            "name": "New Performer",
+            "short_name": "1234",
+            "url": "/model/profile/1234/new-performer"
+        }],
+        "stashapp_performers": None,
+        "stashdb_performers": [
+            {
+                "as": None,
+                "performer": {
+                    "id": "new-performer-uuid",
+                    "name": "New Performer",
+                    "aliases": ["Alternative Name"],
+                    "gender": "FEMALE"
+                }
+            }
+        ]
+    }])
+    
+    matcher = PerformerMatcher(all_stashapp_performers)  # Using existing Stashapp performers without the new one
+    matches = matcher.match_performers(
+        df["ce_downloads_performers"],
+        df["stashapp_performers"],
+        df["stashdb_performers"]
+    )
+    
+    assert len(matches) == 1, "Should find the match from StashDB"
+    
+    match = matches[0]
+    assert match.source == "stashdb_scene", "Should be matched from StashDB performers"
+    assert match.stashdb_uuid == "new-performer-uuid", "Should have StashDB UUID"
+    assert match.stashdb_name == "New Performer", "Should have StashDB name"
+    assert match.stashapp_id == -1, "Should have placeholder Stashapp ID since performer doesn't exist in Stashapp"
+    assert match.stashapp_name == "", "Should have empty Stashapp name since performer doesn't exist in Stashapp"
+    assert match.confidence >= 0.9, "Should have high confidence for exact name match"
