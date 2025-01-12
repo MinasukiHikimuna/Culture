@@ -434,6 +434,302 @@ class StashAppClient:
 
         return df_scenes
 
+    def find_galleries_by_sha256(self, sha256s: List[str]) -> pl.DataFrame:
+        fragment = """
+        id
+        title
+        details
+        date
+        code
+        urls
+        photographer
+        created_at
+        updated_at
+        organized
+        performers {
+            id
+            name
+            disambiguation
+            alias_list
+            gender
+            stash_ids {
+                endpoint
+                stash_id
+                updated_at
+            }
+            custom_fields
+        }
+        studio {
+            id
+            name
+            url
+            parent_studio {
+                id
+                name
+                url
+            }
+        }
+        files {
+            id
+            path
+            basename
+            size
+            fingerprints {
+                type
+                value
+            }
+        }
+        tags {
+            id
+            name
+        }
+        scenes {
+            id
+            title
+        }
+        image_count
+        """
+
+        # Get all galleries in one request
+        stash_galleries = self.stash.find_galleries(f={}, fragment=fragment)
+        
+        # Create a lookup of sha256 -> gallery
+        gallery_by_sha256 = {}
+        for gallery in stash_galleries:
+            if not gallery.get("files"):
+                continue
+            file_fingerprints = gallery["files"][0].get("fingerprints", [])
+            gallery_sha256 = next(
+                (fp["value"] for fp in file_fingerprints if fp["type"] == "sha256"),
+                None
+            )
+            if gallery_sha256:
+                gallery_by_sha256[gallery_sha256] = gallery
+
+        # Process only the galleries that match our sha256s
+        galleries = []
+        for sha256 in sha256s:
+            stash_gallery = gallery_by_sha256.get(sha256)
+            if not stash_gallery:
+                continue
+            
+            # Extract fields according to our schema
+            gallery_data = {
+                "stashapp_id": int(stash_gallery.get("id")),
+                "stashapp_title": stash_gallery.get("title", ""),
+                "stashapp_details": stash_gallery.get("details", ""),
+                "stashapp_date": (
+                    datetime.strptime(
+                        stash_gallery.get("date", ""), "%Y-%m-%d"
+                    ).date()
+                    if stash_gallery.get("date")
+                    else None
+                ),
+                "stashapp_code": stash_gallery.get("code", ""),
+                "stashapp_urls": stash_gallery.get("urls", []),
+                "stashapp_photographer": stash_gallery.get("photographer", {}),
+                "stashapp_created_at": (
+                    datetime.fromisoformat(
+                        stash_gallery.get("created_at").replace("Z", "+00:00")
+                    )
+                    if stash_gallery.get("created_at")
+                    else None
+                ),
+                "stashapp_updated_at": (
+                    datetime.fromisoformat(
+                        stash_gallery.get("updated_at").replace("Z", "+00:00")
+                    )
+                    if stash_gallery.get("updated_at")
+                    else None
+                ),
+                "stashapp_performers": [
+                    {
+                        "stashapp_performers_id": int(p.get("id")),
+                        "stashapp_performers_name": p.get("name"),
+                        "stashapp_performers_disambiguation": p.get(
+                            "disambiguation"
+                        ),
+                        "stashapp_performers_alias_list": p.get("alias_list", []),
+                        "stashapp_performers_gender": p.get("gender"),
+                        "stashapp_performers_stash_ids": [
+                            {
+                                "endpoint": x["endpoint"],
+                                "stash_id": x["stash_id"],
+                                "updated_at": x["updated_at"],
+                            }
+                            for x in p.get("stash_ids", [])
+                        ],
+                        "stashapp_performers_custom_fields": [
+                            {"key": k, "value": v}
+                            for k, v in p.get("custom_fields", {}).items()
+                        ],
+                    }
+                    for p in stash_gallery.get("performers", [])
+                ],
+                "stashapp_studio": stash_gallery.get("studio", {}),
+                "stashapp_files": [
+                    {
+                        "id": int(f.get("id")),
+                        "path": f.get("path", ""),
+                        "basename": f.get("basename", ""),
+                        "size": int(f.get("size", 0)),
+                        "fingerprints": [
+                            {
+                                "type": fp.get("type", ""),
+                                "value": fp.get("value", ""),
+                            }
+                            for fp in f.get("fingerprints", [])
+                        ],
+                    }
+                    for f in stash_gallery.get("files", [])
+                ],
+                "stashapp_primary_file_path": stash_gallery.get("files", [])[0].get(
+                    "path", ""
+                ),
+                "stashapp_primary_file_basename": stash_gallery.get("files", [])[0].get(
+                    "basename", ""
+                ),
+                "stashapp_primary_file_md5": next(
+                    (
+                        fp["value"]
+                        for fp in stash_gallery.get("files", [])[0].get(
+                            "fingerprints", []
+                        )
+                        if fp["type"] == "md5"
+                    ),
+                    None,
+                ),
+                "stashapp_primary_file_sha256": next(
+                    (
+                        fp["value"]
+                        for fp in stash_gallery.get("files", [])[0].get(
+                            "fingerprints", []
+                        )
+                        if fp["type"] == "sha256"
+                    ),
+                    None,
+                ),
+                "stashapp_primary_file_xxhash": next(
+                    (
+                        fp["value"]
+                        for fp in stash_gallery.get("files", [])[0].get(
+                            "fingerprints", []
+                        )
+                        if fp["type"] == "xxhash"
+                    ),
+                    None,
+                ),
+                "stashapp_tags": stash_gallery.get("tags", []),
+                "stashapp_organized": stash_gallery.get("organized", False),
+                "stashapp_ce_id": next(
+                    (
+                        url.split("/")[-1]
+                        for url in stash_gallery.get("urls", [])
+                        if url.startswith("https://culture.extractor/galleries/")
+                    ),
+                    None,
+                ),
+            }
+            galleries.append(gallery_data)
+
+        schema = {
+            "stashapp_id": pl.Int64,
+            "stashapp_title": pl.Utf8,
+            "stashapp_details": pl.Utf8,
+            "stashapp_date": pl.Date,
+            "stashapp_code": pl.Utf8,
+            "stashapp_urls": pl.List(pl.Utf8),
+            "stashapp_photographer": pl.Struct(
+                {
+                    "id": pl.Int64,
+                    "name": pl.Utf8,
+                    "urls": pl.List(pl.Utf8),
+                }
+            ),
+            "stashapp_created_at": pl.Datetime,
+            "stashapp_updated_at": pl.Datetime,
+            "stashapp_performers": pl.List(
+                pl.Struct(
+                    {
+                        "stashapp_performers_id": pl.Int64,
+                        "stashapp_performers_name": pl.Utf8,
+                        "stashapp_performers_disambiguation": pl.Utf8,
+                        "stashapp_performers_alias_list": pl.List(pl.Utf8),
+                        "stashapp_performers_gender": pl.Enum(
+                            [
+                                "MALE",
+                                "FEMALE",
+                                "TRANSGENDER_MALE",
+                                "TRANSGENDER_FEMALE",
+                                "NON_BINARY",
+                            ]
+                        ),
+                        "stashapp_performers_stash_ids": pl.List(
+                            pl.Struct(
+                                {
+                                    "endpoint": pl.Utf8,
+                                    "stash_id": pl.Utf8,
+                                    "updated_at": pl.Datetime,
+                                }
+                            )
+                        ),
+                        "stashapp_performers_custom_fields": pl.List(
+                            pl.Struct({"key": pl.Utf8, "value": pl.Utf8})
+                        ),
+                    }
+                )
+            ),
+            "stashapp_studio": pl.Struct(
+                {
+                    "id": pl.Int64,
+                    "name": pl.Utf8,
+                    "url": pl.Utf8,
+                    "parent_studio": pl.Struct(
+                        {"id": pl.Int64, "name": pl.Utf8, "url": pl.Utf8}
+                    ),
+                }
+            ),
+            "stashapp_files": pl.List(
+                pl.Struct(
+                    {
+                        "id": pl.Int64,
+                        "path": pl.Utf8,
+                        "basename": pl.Utf8,
+                        "size": pl.Int64,
+                        "fingerprints": pl.List(
+                            pl.Struct(
+                                {
+                                    "type": pl.Utf8,
+                                    "value": pl.Utf8,
+                                }
+                            )
+                        ),
+                    }
+                )
+            ),
+            "stashapp_primary_file_path": pl.Utf8,
+            "stashapp_primary_file_basename": pl.Utf8,
+            "stashapp_primary_file_md5": pl.Utf8,
+            "stashapp_primary_file_sha256": pl.Utf8,
+            "stashapp_primary_file_xxhash": pl.Utf8,
+            "stashapp_tags": pl.List(pl.Struct({"id": pl.Int64, "name": pl.Utf8})),
+            "stashapp_organized": pl.Boolean,
+            "stashapp_stash_ids": pl.List(
+                pl.Struct(
+                    {
+                        "endpoint": pl.Utf8,
+                        "stash_id": pl.Utf8,
+                        "updated_at": pl.Datetime,
+                    }
+                )
+            ),
+            "stashapp_ce_id": pl.Utf8,
+        }
+
+        df_galleries = pl.DataFrame(galleries, schema=schema)
+
+        return df_galleries
+
     def get_performers(self) -> pl.DataFrame:
         fragment = """
         id
