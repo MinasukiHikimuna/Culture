@@ -194,6 +194,8 @@ class AvailableFilesPipeline(FilesPipeline):
             filename = f"{item.site.name} - {date_str} - {item.name} - {file_info['resolution_width']}x{file_info['resolution_height']} - {item.id}{file_extension}"
         elif file_info['file_type'] == 'zip':
             filename = f"{item.site.name} - {date_str} - {item.name} - {file_info['variant']} - {item.id}{file_extension}"
+        elif file_info['file_type'] == 'image':
+            filename = f"{item.site.name} - {date_str} - {item.name} - {file_info['variant']} - {item.id}{file_extension}"
         else:
             filename = f"{item.site.name} - {date_str} - {item.name} - {item.id}{file_extension}"
         
