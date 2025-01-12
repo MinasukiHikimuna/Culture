@@ -12,6 +12,27 @@ class ClientCultureExtractor:
         if hasattr(self, "connection") and not self.connection.closed:
             self.connection.close()
 
+    def get_database_schema(self) -> pl.DataFrame:
+        with self.connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT
+                    table_name,
+                    column_name,
+                    data_type
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                ORDER BY table_name, column_name
+            """)
+            schema_rows = cursor.fetchall()
+            
+            schema = {
+                "table_name": pl.Utf8,
+                "column_name": pl.Utf8,
+                "data_type": pl.Utf8,
+            }
+            
+            return pl.DataFrame(schema_rows, schema=schema, orient="row")
+
     def get_sites(self) -> pl.DataFrame:
         with self.connection.cursor() as cursor:
             cursor.execute(
