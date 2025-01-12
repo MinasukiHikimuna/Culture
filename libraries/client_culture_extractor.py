@@ -210,6 +210,7 @@ class ClientCultureExtractor:
                         file_metadata = {}
 
                 download_data = {
+                    "ce_downloads_site_uuid": site_uuid,
                     "ce_downloads_site_name": site_name,
                     "ce_downloads_sub_site_name": sub_sites.get(release[10]) if release[10] else None,
                     "ce_downloads_release_uuid": str(release_uuid),
@@ -241,6 +242,7 @@ class ClientCultureExtractor:
 
             # Schema remains the same as before
             schema = {
+                "ce_downloads_site_uuid": pl.Utf8,
                 "ce_downloads_site_name": pl.Utf8,
                 "ce_downloads_sub_site_name": pl.Utf8,
                 "ce_downloads_release_uuid": pl.Utf8,
