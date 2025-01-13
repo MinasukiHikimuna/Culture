@@ -198,21 +198,51 @@ class HegreSpider(scrapy.Spider):
         
         # Extract gallery download links from the new structure
         gallery_links = response.css('div.gallery-zips a')
+        largest_gallery = None
+        largest_size_mb = 0
+        
         for link in gallery_links:
             url = link.attrib['href']
             # Extract resolution from the URL (e.g., "14000px" from filename)
             resolution = url.split('-')[-1].split('.')[0]
-            width = int(resolution.replace('px', ''))
             
-            # Get the edition name (e.g., "Mega Size Edition")
+            # Get the edition name and file size info
             variant = link.css('strong::text').get().strip()
+            file_size_text = link.css('em::text').get()
             
+            # Extract file size in MB
+            if file_size_text and 'MB' in file_size_text:
+                # Get the last number before "MB" (e.g., from "6000px, 69 MB" get "69")
+                size_mb = float(file_size_text.split('MB')[0].split(',')[-1].strip())
+                
+                # Keep track of the largest gallery
+                if size_mb > largest_size_mb:
+                    largest_size_mb = size_mb
+                    
+                    # Handle 'originals' case
+                    if resolution == 'originals':
+                        # Try to get resolution from the file size text
+                        if 'px' in file_size_text:
+                            width = int(file_size_text.split('px')[0].strip())
+                        else:
+                            width = 0
+                    else:
+                        width = int(resolution.replace('px', ''))
+                    
+                    largest_gallery = {
+                        'url': url,
+                        'variant': variant,
+                        'width': width
+                    }
+        
+        # Add only the largest gallery to available_files
+        if largest_gallery:
             available_files.append(AvailableGalleryZipFile(
                 file_type='zip',
                 content_type='gallery',
-                variant=variant,
-                url=url,
-                resolution_width=width,
+                variant=largest_gallery['variant'],
+                url=largest_gallery['url'],
+                resolution_width=largest_gallery['width'],
             ))
                                
         cover_url = post_data.get('cover_url')
