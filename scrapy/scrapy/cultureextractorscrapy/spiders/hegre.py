@@ -499,8 +499,8 @@ class HegreSpider(scrapy.Spider):
             # Yield DirectDownloadItem for video
             yield DirectDownloadItem(
                 release_id=release_id,
-                file_info=video_file,
-                url=video_file['url']
+                file_info=dict(video_file),
+                url=video_file.url
             )
         
         # Add and download cover and board images
@@ -516,8 +516,8 @@ class HegreSpider(scrapy.Spider):
             
             yield DirectDownloadItem(
                 release_id=release_id,
-                file_info=cover_file,
-                url=cover_file['url']
+                file_info=dict(cover_file),
+                url=cover_file.url
             )
             
         board_url = post_data.get('board_url')
@@ -532,8 +532,8 @@ class HegreSpider(scrapy.Spider):
             
             yield DirectDownloadItem(
                 release_id=release_id,
-                file_info=board_file,
-                url=board_file['url']
+                file_info=dict(board_file),
+                url=board_file.url
             )
             
         # Update post_data with additional information
