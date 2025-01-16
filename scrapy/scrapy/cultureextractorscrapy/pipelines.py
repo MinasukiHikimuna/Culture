@@ -98,113 +98,64 @@ class PostgresPipeline:
 
 
 class AvailableFilesPipeline(FilesPipeline):
-    @defer.inlineCallbacks
     def get_media_requests(self, item, info):
         if isinstance(item, DirectDownloadItem):
-            # Wait a bit to ensure the release is in the database
-            yield defer.succeed(None)
-            
             file_path = self.file_path(None, None, info, 
                 release_id=item['release_id'], 
                 file_info=item['file_info'])
             
             full_path = os.path.join(self.store.basedir, file_path)
             if not os.path.exists(full_path):
-                yield Request(
+                return [Request(
                     item['url'], 
                     meta={
                         'release_id': item['release_id'],
                         'file_info': item['file_info']
                     }
-                )
+                )]
             else:
                 logging.info(f"File already exists, skipping download: {full_path}")
+        return []
 
     def file_path(self, request, response=None, info=None, *, item=None, release_id=None, file_info=None):
         if request:
-            if isinstance(item, ReleaseItem):
-                # Existing ReleaseItem handling
-                item = request.meta['item']
-                file_info = request.meta['file_info']
-                release_id = item.id
-                release_date = item.release_date
-                release_name = item.name
-                site_name = item.site.name
-            else:
-                # DirectDownloadItem handling
-                release_id = request.meta['release_id']
-                file_info = request.meta['file_info']
-                
-                # Get release info from database
-                session = get_session()
-                release = session.query(Release).filter_by(uuid=release_id).first()
-                if not release:
-                    raise ValueError(f"Release with ID {release_id} not found")
-                
-                site = session.query(Site).filter_by(uuid=release.site_uuid).first()
-                if not site:
-                    raise ValueError(f"Site with ID {release.site_uuid} not found")
-                
-                release_date = release.release_date.isoformat()
-                release_name = release.name
-                site_name = site.name
-                session.close()
-        else:
-            # When called without a request (for checking if file exists)
-            if release_id:
-                session = get_session()
-                release = session.query(Release).filter_by(uuid=release_id).first()
-                if not release:
-                    raise ValueError(f"Release with ID {release_id} not found")
-                
-                site = session.query(Site).filter_by(uuid=release.site_uuid).first()
-                if not site:
-                    raise ValueError(f"Site with ID {release.site_uuid} not found")
-                
-                release_date = release.release_date.isoformat()
-                release_name = release.name
-                site_name = site.name
-                session.close()
+            release_id = request.meta['release_id']
+            file_info = request.meta['file_info']
+
+        # Get release info from database
+        session = get_session()
+        try:
+            release = session.query(Release).filter_by(uuid=release_id).first()
+            if not release:
+                raise ValueError(f"Release with ID {release_id} not found")
             
-        # Extract file extension from the URL
-        url_path = urlparse(file_info['url']).path
-        file_extension = os.path.splitext(url_path)[1]
-        
-        # If the extension is .php, extract the real extension from the 'file' parameter
-        if file_extension.lower() == '.php':
-            query = urlparse(file_info['url']).query
-            query_params = dict(param.split('=') for param in query.split('&') if '=' in param)
-            if 'file' in query_params:
-                file_param = query_params['file']
-                _, file_extension = os.path.splitext(file_param)
-        
-        # Create filename in the specified format
-        if file_info['file_type'] == 'video' and 'resolution_height' in file_info and file_info['resolution_height']:
-            filename = f"{site_name} - {release_date} - {release_name} - {file_info['resolution_width']}x{file_info['resolution_height']} - {release_id}{file_extension}"
-        elif file_info['file_type'] == 'zip':
-            filename = f"{site_name} - {release_date} - {release_name} - {file_info['variant']} - {release_id}{file_extension}"
-        elif file_info['file_type'] == 'image':
-            filename = f"{site_name} - {release_date} - {release_name} - {file_info['variant']} - {release_id}{file_extension}"
-        else:
-            filename = f"{site_name} - {release_date} - {release_name} - {release_id}{file_extension}"
-        
-        # Remove path separators from filename
-        filename = filename.replace('/', '').replace('\\', '')
-        
-        # Create a folder structure based on release ID
-        folder = f"{site_name}/Metadata/{release_id}"
-        
-        relative_path = f'{folder}/{filename}'
-        
-        # Get the FILES_STORE setting
-        settings = get_project_settings()
-        files_store = settings.get('FILES_STORE')
-        
-        # Create the absolute path
-        absolute_path = os.path.join(files_store, relative_path)
-        
-        logging.info(f"File will be saved to: {absolute_path}")
-        return absolute_path
+            site = session.query(Site).filter_by(uuid=release.site_uuid).first()
+            if not site:
+                raise ValueError(f"Site with ID {release.site_uuid} not found")
+            
+            release_date = release.release_date.isoformat()
+            release_name = release.name
+            site_name = site.name
+            
+            # Extract file extension from the URL
+            url_path = urlparse(file_info['url']).path
+            file_extension = os.path.splitext(url_path)[1]
+            
+            # Create filename in the specified format
+            if file_info['file_type'] == 'video':
+                filename = f"{site_name} - {release_date} - {release_name} - {file_info['resolution_width']}x{file_info['resolution_height']} - {release_id}{file_extension}"
+            else:
+                filename = f"{site_name} - {release_date} - {release_name} - {file_info['variant']} - {release_id}{file_extension}"
+            
+            # Remove path separators from filename
+            filename = filename.replace('/', '').replace('\\', '')
+            
+            # Create a folder structure based on site and release ID
+            folder = f"{site_name}/Metadata/{release_id}"
+            
+            return f'{folder}/{filename}'
+        finally:
+            session.close()
 
     # def item_completed(self, results, item, info):
     #     file_paths = [x["path"] for ok, x in results if ok]
