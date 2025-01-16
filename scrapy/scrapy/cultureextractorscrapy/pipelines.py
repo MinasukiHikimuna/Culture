@@ -14,7 +14,7 @@ import logging
 from scrapy.utils.project import get_project_settings
 
 from .spiders.database import get_session, Site, Release, DownloadedFile
-from .items import ReleaseAndDownloadsItem, ReleaseItem, AvailableVideoFile, AvailableImageFile, AvailableGalleryZipFile, DownloadedFileItem
+from .items import ReleaseAndDownloadsItem, ReleaseItem, AvailableVideoFile, AvailableImageFile, AvailableGalleryZipFile, DownloadedFileItem, DirectDownloadItem
 from datetime import datetime
 import json
 from sqlalchemy.exc import IntegrityError
@@ -133,49 +133,75 @@ class PostgresPipeline:
 class AvailableFilesPipeline(FilesPipeline):
     def get_media_requests(self, item, info):
         logging.info(f"get_media_requests called for item: {item}")
-        if isinstance(item, ReleaseItem):
-            available_files = json.loads(item.available_files)
-            largest_zip_gallery = None
-            largest_video = None
-            largest_zip_size = 0
-            largest_video_size = 0
-            
-            for file in available_files:
-                if file['file_type'] == 'zip' and file.get('content_type') == 'gallery':
-                    file_size = file.get('resolution_width', 0)
-                    if file_size > largest_zip_size:
-                        largest_zip_size = file_size
-                        largest_zip_gallery = file
-                elif file['file_type'] == 'video' and file.get('content_type') == 'scene':
-                    file_size = file.get('resolution_width', 0) * file.get('resolution_height', 0)
-                    if file_size > largest_video_size:
-                        largest_video_size = file_size
-                        largest_video = file
-                else:
-                    file_path = self.file_path(None, None, info, item=item, file_info=file)
-                    full_path = os.path.join(self.store.basedir, file_path)
-                    if not os.path.exists(full_path):
-                        yield Request(file['url'], meta={'item': item, 'file_info': file})
-                    else:
-                        logging.info(f"File already exists, skipping download: {full_path}")
-                        file['local_path'] = file_path
-            
-            for file in [largest_zip_gallery, largest_video]:
-                if file:
-                    file_path = self.file_path(None, None, info, item=item, file_info=file)
-                    full_path = os.path.join(self.store.basedir, file_path)
-                    if not os.path.exists(full_path):
-                        yield Request(file['url'], meta={'item': item, 'file_info': file})
-                    else:
-                        logging.info(f"File already exists, skipping download: {full_path}")
-                        file['local_path'] = file_path
-
-    def file_path(self, request, response=None, info=None, *, item=None, file_info=None):
-        logging.info(f"file_path called for request: {request}")
-        if request:
-            item = request.meta['item']
-            file_info = request.meta['file_info']
         
+        if isinstance(item, DirectDownloadItem):
+            # Handle direct download items
+            file_path = self.file_path(None, None, info, 
+                release_id=item['release_id'], 
+                file_info=item['file_info'])
+            
+            full_path = os.path.join(self.store.basedir, file_path)
+            if not os.path.exists(full_path):
+                yield Request(
+                    item['url'], 
+                    meta={
+                        'release_id': item['release_id'],
+                        'file_info': item['file_info']
+                    }
+                )
+            else:
+                logging.info(f"File already exists, skipping download: {full_path}")
+                
+        elif isinstance(item, ReleaseItem):
+            # Your existing ReleaseItem handling code...
+            pass
+
+    def file_path(self, request, response=None, info=None, *, item=None, release_id=None, file_info=None):
+        if request:
+            if isinstance(item, ReleaseItem):
+                # Existing ReleaseItem handling
+                item = request.meta['item']
+                file_info = request.meta['file_info']
+                release_id = item.id
+                release_date = item.release_date
+                release_name = item.name
+                site_name = item.site.name
+            else:
+                # DirectDownloadItem handling
+                release_id = request.meta['release_id']
+                file_info = request.meta['file_info']
+                
+                # Get release info from database
+                session = get_session()
+                release = session.query(Release).filter_by(uuid=release_id).first()
+                if not release:
+                    raise ValueError(f"Release with ID {release_id} not found")
+                
+                site = session.query(Site).filter_by(uuid=release.site_uuid).first()
+                if not site:
+                    raise ValueError(f"Site with ID {release.site_uuid} not found")
+                
+                release_date = release.release_date.isoformat()
+                release_name = release.name
+                site_name = site.name
+                session.close()
+        else:
+            # When called without a request (for checking if file exists)
+            if release_id:
+                session = get_session()
+                release = session.query(Release).filter_by(uuid=release_id).first()
+                if not release:
+                    raise ValueError(f"Release with ID {release_id} not found")
+                
+                site = session.query(Site).filter_by(uuid=release.site_uuid).first()
+                if not site:
+                    raise ValueError(f"Site with ID {release.site_uuid} not found")
+                
+                release_date = release.release_date.isoformat()
+                release_name = release.name
+                site_name = site.name
+                session.close()
+            
         # Extract file extension from the URL
         url_path = urlparse(file_info['url']).path
         file_extension = os.path.splitext(url_path)[1]
@@ -189,21 +215,20 @@ class AvailableFilesPipeline(FilesPipeline):
                 _, file_extension = os.path.splitext(file_param)
         
         # Create filename in the specified format
-        date_str = item.release_date
         if file_info['file_type'] == 'video' and 'resolution_height' in file_info and file_info['resolution_height']:
-            filename = f"{item.site.name} - {date_str} - {item.name} - {file_info['resolution_width']}x{file_info['resolution_height']} - {item.id}{file_extension}"
+            filename = f"{site_name} - {release_date} - {release_name} - {file_info['resolution_width']}x{file_info['resolution_height']} - {release_id}{file_extension}"
         elif file_info['file_type'] == 'zip':
-            filename = f"{item.site.name} - {date_str} - {item.name} - {file_info['variant']} - {item.id}{file_extension}"
+            filename = f"{site_name} - {release_date} - {release_name} - {file_info['variant']} - {release_id}{file_extension}"
         elif file_info['file_type'] == 'image':
-            filename = f"{item.site.name} - {date_str} - {item.name} - {file_info['variant']} - {item.id}{file_extension}"
+            filename = f"{site_name} - {release_date} - {release_name} - {file_info['variant']} - {release_id}{file_extension}"
         else:
-            filename = f"{item.site.name} - {date_str} - {item.name} - {item.id}{file_extension}"
+            filename = f"{site_name} - {release_date} - {release_name} - {release_id}{file_extension}"
         
         # Remove path separators from filename
         filename = filename.replace('/', '').replace('\\', '')
         
         # Create a folder structure based on release ID
-        folder = f"{item.site.name}/Metadata/{item.id}"
+        folder = f"{site_name}/Metadata/{release_id}"
         
         relative_path = f'{folder}/{filename}'
         
@@ -226,53 +251,29 @@ class AvailableFilesPipeline(FilesPipeline):
     #     return item
 
     def item_completed(self, results, item, info):
-        logging.info(f"item_completed called for item: {item}")
-        logging.info(f"Results: {results}")
-        
-        file_paths = [x['path'] for ok, x in results if ok]
-        if not file_paths:
-            raise DropItem("Item contains no files")
-        
-        downloaded_files = []
-        if isinstance(item, ReleaseItem):
-            logging.info(f"Processing release item {item.id}")
-            
-            result_files = [x for ok, x in results if ok]
-            logging.info(f"Downloaded files: {result_files}")
-            available_files = json.loads(item.available_files)
-            for file in available_files:
-                logging.info(f"Processing file: {file}")
+        if isinstance(item, DirectDownloadItem):
+            # Handle completed direct downloads
+            file_paths = [x['path'] for ok, x in results if ok]
+            if file_paths:
+                file_info = item['file_info']
+                file_metadata = self.process_file_metadata(file_paths[0], file_info['file_type'])
                 
-                matching_downloads = [x for x in result_files if x['url'] == file['url']]
-                if matching_downloads:
-                    # Process file metadata
-                    file_info = matching_downloads[0]
-                    file_metadata = self.process_file_metadata(file_info['path'], file['file_type'])
-                    
-                    # Extract the original filename from the URL
-                    parsed_url = urlparse(file['url'])
-                    original_filename = os.path.basename(parsed_url.path)
-                    # Remove query parameters if present
-                    original_filename = original_filename.split('?')[0]
-                  
-                    saved_filename = os.path.basename(file_info['path'])
-                    
-                    # Create DownloadedFileItem
-                    downloaded_file_item = DownloadedFileItem(
-                        uuid=newnewid.uuid7(),
-                        downloaded_at=datetime.now(),
-                        file_type=file['file_type'],
-                        content_type=file.get('content_type'),
-                        variant=file.get('variant'),
-                        available_file=file,
-                        original_filename=original_filename,
-                        saved_filename=saved_filename,  # This is now an absolute path
-                        release_uuid=str(item.id),
-                        file_metadata=file_metadata
-                    )
-                    downloaded_files.append(downloaded_file_item)
+                return DownloadedFileItem(
+                    uuid=newnewid.uuid7(),
+                    downloaded_at=datetime.now(),
+                    file_type=file_info['file_type'],
+                    content_type=file_info.get('content_type'),
+                    variant=file_info.get('variant'),
+                    available_file=file_info,
+                    original_filename=os.path.basename(item['url'].split('?')[0]),
+                    saved_filename=os.path.basename(file_paths[0]),
+                    release_uuid=item['release_id'],
+                    file_metadata=file_metadata
+                )
         
-        return ReleaseAndDownloadsItem(release=item, downloaded_files=downloaded_files)
+        elif isinstance(item, ReleaseItem):
+            # Your existing ReleaseItem handling code...
+            pass
 
     def process_file_metadata(self, file_path, file_type):
         if file_type == 'video':

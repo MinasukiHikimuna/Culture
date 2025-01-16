@@ -6,6 +6,7 @@ import os
 from cultureextractorscrapy.items import SiteItem, SitePerformerItem, SiteTagItem  # Make sure to import SiteItem
 import newnewid
 from sqlalchemy.orm.exc import NoResultFound
+import json
 
 load_dotenv()
 
@@ -160,3 +161,40 @@ def get_or_create_tag(site_uuid, short_name, name, url):
         )
         session.close()
         return site_tag_item
+
+def get_existing_releases_with_status(site_uuid):
+    session = get_session()
+    releases = session.query(
+        Release.short_name, 
+        Release.uuid,
+        Release.available_files,
+        DownloadedFile.file_type,
+        DownloadedFile.content_type,
+        DownloadedFile.variant
+    ).outerjoin(
+        DownloadedFile
+    ).filter(
+        Release.site_uuid == site_uuid
+    ).all()
+    
+    result = {}
+    for r in releases:
+        if r.short_name not in result:
+            if isinstance(r.available_files, str):
+                available_files = json.loads(r.available_files)
+            else:
+                available_files = r.available_files or []
+                
+            result[r.short_name] = {
+                'uuid': r.uuid,
+                'available_files': available_files,
+                'downloaded_files': set()
+            }
+        
+        if r.file_type and r.content_type and r.variant:
+            result[r.short_name]['downloaded_files'].add(
+                (r.file_type, r.content_type, r.variant)
+            )
+    
+    session.close()
+    return result

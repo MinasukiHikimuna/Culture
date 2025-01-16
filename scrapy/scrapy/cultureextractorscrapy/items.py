@@ -134,3 +134,8 @@ class DownloadedFileItem(scrapy.Item):
 class ReleaseAndDownloadsItem:
     release: ReleaseItem
     downloaded_files: list[DownloadedFileItem]
+
+class DirectDownloadItem(scrapy.Item):
+    release_id = scrapy.Field()
+    file_info = scrapy.Field()
+    url = scrapy.Field()

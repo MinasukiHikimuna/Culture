@@ -4,10 +4,10 @@ import newnewid
 from datetime import datetime, timezone
 from dotenv import load_dotenv
 import scrapy
-from cultureextractorscrapy.spiders.database import get_site_item, get_existing_release_short_names, get_or_create_performer, get_or_create_tag
+from cultureextractorscrapy.spiders.database import get_site_item, get_existing_release_short_names, get_or_create_performer, get_or_create_tag, get_existing_releases_with_status
 from cultureextractorscrapy.items import (
     AvailableGalleryZipFile, AvailableImageFile, AvailableVideoFile, AvailableVttFile,
-    AvailableFileEncoder, available_file_decoder, ReleaseItem, SiteItem
+    AvailableFileEncoder, available_file_decoder, ReleaseItem, SiteItem, DirectDownloadItem
 )
 from cultureextractorscrapy.utils import parse_resolution_height, parse_resolution_width, get_log_filename
 
@@ -33,11 +33,16 @@ class HegreSpider(scrapy.Spider):
         # Set the log file using the spider name
         crawler.settings.set('LOG_FILE', get_log_filename(spider.name))
         
+        # Get force_update from crawler settings or default to False
+        spider.force_update = crawler.settings.getbool('FORCE_UPDATE', False)
+        
         site_item = get_site_item(spider.site_short_name)
         if site_item is None:
             raise ValueError(f"Site with short_name '{spider.site_short_name}' not found in the database.")
         spider.site = site_item
-        spider.existing_releases = get_existing_release_short_names(site_item.id)
+        
+        # Get existing releases with their download status
+        spider.existing_releases = get_existing_releases_with_status(site_item.id)
         return spider
 
     def parse(self, response):
@@ -71,9 +76,42 @@ class HegreSpider(scrapy.Spider):
         posts = response.css('div.item')
         for post in posts:
             external_id = "gallery-" + post.css('a::attr(data-id)').get()
-            title = post.css('a::attr(title)').get()
             
-            # Get URLs from the cover-links div inside details
+            # Check if we have this release in database
+            existing_release = self.existing_releases.get(external_id)
+            
+            if existing_release and not self.force_update:
+                # Compare available files with downloaded files
+                available_files = existing_release['available_files']
+                downloaded_files = existing_release['downloaded_files']
+                
+                needed_files = set(
+                    (f['file_type'], f['content_type'], f['variant']) 
+                    for f in available_files
+                )
+                
+                if not needed_files.issubset(downloaded_files):
+                    # We have missing files - yield DirectDownloadItems
+                    missing_files = [f for f in available_files if 
+                        (f['file_type'], f['content_type'], f['variant']) not in downloaded_files]
+                    
+                    for file in missing_files:
+                        yield DirectDownloadItem(
+                            release_id=existing_release['uuid'],
+                            file_info=file,
+                            url=file['url']
+                        )
+                    self.logger.info(f"Release {external_id} exists but missing {len(missing_files)} files. Downloading them.")
+                    continue
+                
+                self.logger.info(f"Release {external_id} already exists with all files downloaded. Skipping.")
+                continue
+            
+            # If we get here, either:
+            # 1. This is a new release
+            # 2. We're force updating an existing release
+            # In both cases, we need to fetch the full release page
+            title = post.css('a::attr(title)').get()
             cover_url = post.css('div.details div.cover-links a[data-lightbox="lightbox--poster_image"]::attr(href)').get()
             board_url = post.css('div.details div.cover-links a[data-lightbox="lightbox--board_image"]::attr(href)').get()
             
@@ -105,7 +143,6 @@ class HegreSpider(scrapy.Spider):
                 url=f"{base_url}{post_url}",
                 callback=self.parse_photoset,
                 cookies=cookies,
-                # TODO: priority=10,
                 meta={
                     "post_data": post_data
                 }
