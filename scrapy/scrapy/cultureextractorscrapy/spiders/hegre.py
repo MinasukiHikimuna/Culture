@@ -384,6 +384,29 @@ class HegreSpider(scrapy.Spider):
         post_data = response.meta["post_data"]
         external_id = post_data["external_id"]
         
+        # Get the release date from the title section
+        raw_release_date = response.css('div.record-toolbar div.date-and-covers span.date::text').get()
+        if not raw_release_date:
+            raise ValueError(f"No release date found for movie {external_id}")
+            
+        try:
+            parsed_release_date = datetime.strptime(raw_release_date.strip(), '%B %d, %Y').date()
+            post_data['release_date'] = parsed_release_date.isoformat()
+        except ValueError as e:
+            raise ValueError(f"Failed to parse release date '{raw_release_date}' for movie {external_id}: {str(e)}")
+
+        # Get duration from format details
+        runtime_text = response.css('ul.format-details li:first-child strong::text').get()
+        if not runtime_text:
+            raise ValueError(f"No runtime found for movie {external_id}")
+            
+        try:
+            # Parse "21:07 Minutes" format
+            minutes, seconds = map(int, runtime_text.split(' ')[0].split(':'))
+            duration = minutes * 60 + seconds
+        except (ValueError, IndexError) as e:
+            raise ValueError(f"Failed to parse runtime '{runtime_text}' for movie {external_id}: {str(e)}")
+
         # Check if this release already exists
         existing_release_id = self.existing_releases.get(external_id)
         release_id = existing_release_id if existing_release_id else newnewid.uuid7()
@@ -541,7 +564,8 @@ class HegreSpider(scrapy.Spider):
         # Update post_data with additional information
         post_data.update({
             "additional_performers": additional_performers,
-            "raw_html": response.text
+            "duration": duration,
+            "raw_html": response.text,
         })
 
         # First yield the ReleaseItem to ensure it's saved to database
@@ -552,7 +576,7 @@ class HegreSpider(scrapy.Spider):
             name=post_data.get('title'),
             url=response.url,
             description="",
-            duration=0,
+            duration=0, # Intentionally left at 0. Deprecated field.
             created=datetime.now(tz=timezone.utc).astimezone(),
             last_updated=datetime.now(tz=timezone.utc).astimezone(),
             performers=performers,
@@ -577,23 +601,13 @@ class HegreSpider(scrapy.Spider):
         # Get URLs from the cover-links div inside details
         cover_url = post.css('div.details div.cover-links a[data-lightbox="lightbox--poster_image"]::attr(href)').get()
         board_url = post.css('div.details div.cover-links a[data-lightbox="lightbox--board_image"]::attr(href)').get()
-        
-        # Get the release date from the details section and parse it
-        raw_release_date = post.css('div.details h4 small.right::text').get()
-        if raw_release_date:
-            # Remove the ordinal indicators (st, nd, rd, th) before parsing
-            cleaned_date = raw_release_date.replace('st,', ',').replace('nd,', ',').replace('rd,', ',').replace('th,', ',')
-            parsed_release_date = datetime.strptime(cleaned_date.strip(), '%b %d, %Y').date()
-            release_date = parsed_release_date.isoformat()
-        else:
-            release_date = None
 
         return {
             "external_id": external_id,
             "title": title,
             "cover_url": cover_url,
             "board_url": board_url,
-            "release_date": release_date
+            "release_date": None  # Will be set in parse_movie
         }
 
     def extract_photo_post_data(self, post):

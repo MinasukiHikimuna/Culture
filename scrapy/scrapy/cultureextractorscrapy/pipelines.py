@@ -27,6 +27,8 @@ import hashlib
 
 from .spiders.database import Site, Release, DownloadedFile
 
+from twisted.internet import defer
+
 
 class PostgresPipeline:
     def __init__(self):
@@ -35,95 +37,60 @@ class PostgresPipeline:
     def process_item(self, item, spider):
         if isinstance(item, ReleaseAndDownloadsItem):
             return self.process_release_and_downloads(item, spider)
-        return item
+        elif isinstance(item, ReleaseItem):
+            try:
+                site = self.session.query(Site).filter_by(uuid=item.site_uuid).first()
+                if not site:
+                    spider.logger.error(f"Site not found for UUID: {item.site_uuid}")
+                    return item
 
-    def process_release_and_downloads(self, item, spider):
-        release_item = item.release
-        downloaded_files = item.downloaded_files
+                existing_release = self.session.query(Release).filter_by(uuid=str(item.id)).first()
 
-        try:
-            site = self.session.query(Site).filter_by(uuid=release_item.site_uuid).first()
-            if not site:
-                spider.logger.error(f"Site not found for UUID: {release_item.site_uuid}")
-                return item
-
-            existing_release = self.session.query(Release).filter_by(uuid=str(release_item.id)).first()
-
-            if existing_release:
-                # Update existing release
-                existing_release.release_date = datetime.fromisoformat(release_item.release_date) if release_item.release_date else None
-                existing_release.short_name = release_item.short_name
-                existing_release.name = release_item.name
-                existing_release.url = release_item.url
-                existing_release.description = release_item.description
-                existing_release.duration = release_item.duration
-                existing_release.last_updated = release_item.last_updated
-                existing_release.available_files = release_item.available_files
-                existing_release.json_document = release_item.json_document
-                spider.logger.info(f"Updating existing release with ID: {release_item.id}")
-            else:
-                # Create new release
-                new_release = Release(
-                    uuid=str(release_item.id),
-                    release_date=datetime.fromisoformat(release_item.release_date) if release_item.release_date else None,
-                    short_name=release_item.short_name,
-                    name=release_item.name,
-                    url=release_item.url,
-                    description=release_item.description,
-                    duration=release_item.duration,
-                    created=release_item.created,
-                    last_updated=release_item.last_updated,
-                    available_files=release_item.available_files,
-                    json_document=release_item.json_document,
-                    site_uuid=str(release_item.site_uuid)
-                )
-                self.session.add(new_release)
-                spider.logger.info(f"Creating new release with ID: {release_item.id}")
-
-            # Process downloaded files
-            for file_item in downloaded_files:
-                existing_file = self.session.query(DownloadedFile).filter_by(
-                    release_uuid=str(release_item.id),
-                    file_type=file_item['file_type'],
-                    content_type=file_item['content_type'],
-                    variant=file_item['variant']
-                ).first()
-
-                if existing_file:
-                    # Existing file, do nothing
-                    pass
+                if existing_release:
+                    # Update existing release
+                    existing_release.release_date = datetime.fromisoformat(item.release_date) if item.release_date else None
+                    existing_release.short_name = item.short_name
+                    existing_release.name = item.name
+                    existing_release.url = item.url
+                    existing_release.description = item.description
+                    existing_release.duration = item.duration
+                    existing_release.last_updated = item.last_updated
+                    existing_release.available_files = item.available_files
+                    existing_release.json_document = item.json_document
+                    spider.logger.info(f"Updating existing release with ID: {item.id}")
                 else:
-                    # Create new file
-                    new_file = DownloadedFile(
-                        uuid=newnewid.uuid7(),
-                        downloaded_at=datetime.now(),
-                        file_type=file_item['file_type'],
-                        content_type=file_item['content_type'],
-                        variant=file_item['variant'],
-                        available_file=file_item['available_file'],
-                        original_filename=file_item['original_filename'],
-                        saved_filename=file_item['saved_filename'],
-                        release_uuid=str(file_item['release_uuid']),
-                        file_metadata=file_item['file_metadata']
+                    # Create new release
+                    new_release = Release(
+                        uuid=str(item.id),
+                        release_date=datetime.fromisoformat(item.release_date) if item.release_date else None,
+                        short_name=item.short_name,
+                        name=item.name,
+                        url=item.url,
+                        description=item.description,
+                        duration=item.duration,
+                        created=item.created,
+                        last_updated=item.last_updated,
+                        available_files=item.available_files,
+                        json_document=item.json_document,
+                        site_uuid=str(item.site_uuid)
                     )
-                    self.session.add(new_file)
-                    spider.logger.info(f"Creating new downloaded file: {file_item['saved_filename']}")
+                    self.session.add(new_release)
+                    spider.logger.info(f"Creating new release with ID: {item.id}")
 
-            # Commit the transaction
-            self.session.commit()
-            spider.logger.info(f"Successfully processed release and downloads for ID: {release_item.id}")
+                # Commit the transaction
+                self.session.commit()
+                spider.logger.info(f"Successfully processed release with ID: {item.id}")
 
-        except IntegrityError as e:
-            self.session.rollback()
-            spider.logger.error(f"IntegrityError while processing release and downloads with ID: {release_item.id}")
-            spider.logger.error(str(e))
-        except Exception as e:
-            self.session.rollback()
-            spider.logger.error(f"Error processing release and downloads with ID: {release_item.id}")
-            spider.logger.error(str(e))
-        finally:
-            self.session.close()
+            except Exception as e:
+                self.session.rollback()
+                spider.logger.error(f"Error processing release with ID: {item.id}")
+                spider.logger.error(str(e))
+                raise
+            finally:
+                self.session.close()
 
+            # Return a deferred that has already fired
+            return defer.succeed(item)
         return item
 
     def close_spider(self, spider):
@@ -131,10 +98,12 @@ class PostgresPipeline:
 
 
 class AvailableFilesPipeline(FilesPipeline):
+    @defer.inlineCallbacks
     def get_media_requests(self, item, info):
-        logging.info(f"get_media_requests called for item: {item}")
-        
         if isinstance(item, DirectDownloadItem):
+            # Wait a bit to ensure the release is in the database
+            yield defer.succeed(None)
+            
             file_path = self.file_path(None, None, info, 
                 release_id=item['release_id'], 
                 file_info=item['file_info'])
