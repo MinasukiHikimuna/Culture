@@ -457,6 +457,7 @@ class HegreSpider(scrapy.Spider):
             tags.append(tag)
         
         available_files = []
+        download_items = []  # Store DirectDownloadItems for later
         
         # Extract video download links - only main video files (not trailers)
         video_links = response.css('div.film-downloads h2.download-type:contains("Full feature film") + div.resolution.content a')
@@ -485,7 +486,7 @@ class HegreSpider(scrapy.Spider):
                         'height': height
                     }
         
-        # Add only the highest quality video to available_files
+        # Process video files
         if highest_quality_video:
             video_file = AvailableVideoFile(
                 file_type='video',
@@ -497,14 +498,14 @@ class HegreSpider(scrapy.Spider):
             )
             available_files.append(video_file)
             
-            # Yield DirectDownloadItem for video
-            yield DirectDownloadItem(
+            # Store DirectDownloadItem for later
+            download_items.append(DirectDownloadItem(
                 release_id=release_id,
                 file_info=ItemAdapter(video_file).asdict(),
                 url=video_file.url
-            )
+            ))
         
-        # Add and download cover and board images
+        # Process cover and board images
         cover_url = post_data.get('cover_url')
         if cover_url:
             cover_file = AvailableImageFile(
@@ -515,11 +516,11 @@ class HegreSpider(scrapy.Spider):
             )
             available_files.append(cover_file)
             
-            yield DirectDownloadItem(
+            download_items.append(DirectDownloadItem(
                 release_id=release_id,
                 file_info=ItemAdapter(cover_file).asdict(),
                 url=cover_file.url
-            )
+            ))
             
         board_url = post_data.get('board_url')
         if board_url:
@@ -531,11 +532,11 @@ class HegreSpider(scrapy.Spider):
             )
             available_files.append(board_file)
             
-            yield DirectDownloadItem(
+            download_items.append(DirectDownloadItem(
                 release_id=release_id,
                 file_info=ItemAdapter(board_file).asdict(),
                 url=board_file.url
-            )
+            ))
             
         # Update post_data with additional information
         post_data.update({
@@ -543,7 +544,7 @@ class HegreSpider(scrapy.Spider):
             "raw_html": response.text
         })
 
-        # Create and yield the ReleaseItem (without downloading files)
+        # First yield the ReleaseItem to ensure it's saved to database
         release_item = ReleaseItem(
             id=release_id,
             release_date=post_data.get('release_date'),
@@ -563,6 +564,10 @@ class HegreSpider(scrapy.Spider):
         )
         
         yield release_item
+        
+        # Now yield all the DirectDownloadItems
+        for download_item in download_items:
+            yield download_item
 
     def extract_movie_post_data(self, post):
         """Extract metadata from a post element on the movie list page."""
