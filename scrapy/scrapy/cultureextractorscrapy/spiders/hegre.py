@@ -9,6 +9,7 @@ from cultureextractorscrapy.items import (
     AvailableGalleryZipFile, AvailableImageFile, AvailableVideoFile, AvailableFileEncoder, ReleaseItem, DirectDownloadItem
 )
 from cultureextractorscrapy.utils import parse_resolution_height, parse_resolution_width, get_log_filename
+from itemadapter import ItemAdapter
 
 
 load_dotenv()
@@ -499,7 +500,7 @@ class HegreSpider(scrapy.Spider):
             # Yield DirectDownloadItem for video
             yield DirectDownloadItem(
                 release_id=release_id,
-                file_info=dict(video_file),
+                file_info=ItemAdapter(video_file).asdict(),
                 url=video_file.url
             )
         
@@ -516,7 +517,7 @@ class HegreSpider(scrapy.Spider):
             
             yield DirectDownloadItem(
                 release_id=release_id,
-                file_info=dict(cover_file),
+                file_info=ItemAdapter(cover_file).asdict(),
                 url=cover_file.url
             )
             
@@ -532,7 +533,7 @@ class HegreSpider(scrapy.Spider):
             
             yield DirectDownloadItem(
                 release_id=release_id,
-                file_info=dict(board_file),
+                file_info=ItemAdapter(board_file).asdict(),
                 url=board_file.url
             )
             
