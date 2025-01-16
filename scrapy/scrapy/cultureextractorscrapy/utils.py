@@ -1,4 +1,5 @@
 import re
+import logging
 
 def parse_resolution_width(resolution_string):
     # Try to find the resolution in the form of width x height
@@ -52,3 +53,39 @@ def parse_resolution_height(resolution_string):
         return int(match.group(1))
 
     return -1
+
+def get_log_filename(spider_name):
+    import datetime
+    import os
+    from scrapy.utils.project import get_project_settings
+    
+    settings = get_project_settings()
+    log_dir = settings.get('LOG_DIR', 'logs')
+    
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+        
+    timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+    log_file = os.path.join(log_dir, f"{spider_name}_{timestamp}.log")
+    
+    # Set up logging to both file and console
+    logger = logging.getLogger()
+    logger.setLevel(settings.get('LOG_LEVEL', 'INFO'))
+    
+    # File handler
+    fh = logging.FileHandler(log_file)
+    fh.setFormatter(logging.Formatter(
+        settings.get('LOG_FORMAT', '%(asctime)s [%(name)s] %(levelname)s: %(message)s'),
+        settings.get('LOG_DATEFORMAT', '%Y-%m-%d %H:%M:%S')
+    ))
+    logger.addHandler(fh)
+    
+    # Console handler
+    ch = logging.StreamHandler()
+    ch.setFormatter(logging.Formatter(
+        settings.get('LOG_FORMAT', '%(asctime)s [%(name)s] %(levelname)s: %(message)s'),
+        settings.get('LOG_DATEFORMAT', '%Y-%m-%d %H:%M:%S')
+    ))
+    logger.addHandler(ch)
+    
+    return log_file

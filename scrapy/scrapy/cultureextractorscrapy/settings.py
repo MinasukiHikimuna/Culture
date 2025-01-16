@@ -99,3 +99,10 @@ FILES_STORE = 'F:/Ripping/'
 MEDIA_ALLOW_REDIRECTS = True
 DOWNLOAD_MAXSIZE = 0
 DOWNLOAD_WARNSIZE = 0
+
+# Logging configuration
+LOG_DIR = 'logs'
+LOG_ENABLED = True
+LOG_LEVEL = 'INFO'
+LOG_FORMAT = '%(asctime)s [%(name)s] %(levelname)s: %(message)s'
+LOG_DATEFORMAT = '%Y-%m-%d %H:%M:%S'

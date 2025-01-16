@@ -9,7 +9,7 @@ from cultureextractorscrapy.items import (
     AvailableGalleryZipFile, AvailableImageFile, AvailableVideoFile, AvailableVttFile,
     AvailableFileEncoder, available_file_decoder, ReleaseItem, SiteItem
 )
-from cultureextractorscrapy.utils import parse_resolution_height, parse_resolution_width
+from cultureextractorscrapy.utils import parse_resolution_height, parse_resolution_width, get_log_filename
 
 
 load_dotenv()
@@ -29,6 +29,10 @@ class HegreSpider(scrapy.Spider):
     @classmethod
     def from_crawler(cls, crawler, *args, **kwargs):
         spider = super(HegreSpider, cls).from_crawler(crawler, *args, **kwargs)
+        
+        # Set the log file using the spider name
+        crawler.settings.set('LOG_FILE', get_log_filename(spider.name))
+        
         site_item = get_site_item(spider.site_short_name)
         if site_item is None:
             raise ValueError(f"Site with short_name '{spider.site_short_name}' not found in the database.")
