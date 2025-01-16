@@ -4,10 +4,9 @@ import newnewid
 from datetime import datetime, timezone
 from dotenv import load_dotenv
 import scrapy
-from cultureextractorscrapy.spiders.database import get_site_item, get_existing_release_short_names, get_or_create_performer, get_or_create_tag, get_existing_releases_with_status
+from cultureextractorscrapy.spiders.database import get_site_item, get_or_create_performer, get_or_create_tag, get_existing_releases_with_status
 from cultureextractorscrapy.items import (
-    AvailableGalleryZipFile, AvailableImageFile, AvailableVideoFile, AvailableVttFile,
-    AvailableFileEncoder, available_file_decoder, ReleaseItem, SiteItem, DirectDownloadItem
+    AvailableGalleryZipFile, AvailableImageFile, AvailableVideoFile, AvailableFileEncoder, ReleaseItem, DirectDownloadItem
 )
 from cultureextractorscrapy.utils import parse_resolution_height, parse_resolution_width, get_log_filename
 
@@ -77,10 +76,20 @@ class HegreSpider(scrapy.Spider):
         for post in posts:
             external_id = "gallery-" + post.css('a::attr(data-id)').get()
             
+            # If force update is enabled, we need to fetch the full page to update metadata
+            if self.force_update:
+                post_url = post.css('a::attr(href)').get()
+                yield scrapy.Request(
+                    url=f"{base_url}{post_url}",
+                    callback=self.parse_photoset,
+                    cookies=cookies,
+                    meta={"post_data": self.extract_post_data(post)}
+                )
+                continue
+            
             # Check if we have this release in database
             existing_release = self.existing_releases.get(external_id)
-            
-            if existing_release and not self.force_update:
+            if existing_release:
                 # Compare available files with downloaded files
                 available_files = existing_release['available_files']
                 downloaded_files = existing_release['downloaded_files']
@@ -102,51 +111,17 @@ class HegreSpider(scrapy.Spider):
                             url=file['url']
                         )
                     self.logger.info(f"Release {external_id} exists but missing {len(missing_files)} files. Downloading them.")
-                    continue
-                
-                self.logger.info(f"Release {external_id} already exists with all files downloaded. Skipping.")
-                continue
-            
-            # If we get here, either:
-            # 1. This is a new release
-            # 2. We're force updating an existing release
-            # In both cases, we need to fetch the full release page
-            title = post.css('a::attr(title)').get()
-            cover_url = post.css('div.details div.cover-links a[data-lightbox="lightbox--poster_image"]::attr(href)').get()
-            board_url = post.css('div.details div.cover-links a[data-lightbox="lightbox--board_image"]::attr(href)').get()
-            
-            # Get the release date from the details section and parse it
-            raw_release_date = post.css('div.details h4 small.right::text').get()
-            if raw_release_date:
-                # Remove the ordinal indicators (st, nd, rd, th) before parsing
-                cleaned_date = raw_release_date.replace('st,', ',').replace('nd,', ',').replace('rd,', ',').replace('th,', ',')
-                parsed_release_date = datetime.strptime(cleaned_date.strip(), '%b %d, %Y').date()
-                release_date = parsed_release_date.isoformat()
+                else:
+                    self.logger.info(f"Release {external_id} already exists with all files downloaded. Skipping.")
             else:
-                release_date = None
-
-            post_url = post.css('a::attr(href)').get()
-
-            post_data = {
-                "external_id": external_id,
-                "title": title,
-                "cover_url": cover_url,
-                "board_url": board_url,
-                "release_date": release_date
-            }
-            
-            # Check if any of the desired performers are in this release
-            # if self.desired_performers and not any(model['short_name'] in self.desired_performers for model in models):
-            #     continue  # Skip this release if it doesn't contain any desired performers
-
-            yield scrapy.Request(
-                url=f"{base_url}{post_url}",
-                callback=self.parse_photoset,
-                cookies=cookies,
-                meta={
-                    "post_data": post_data
-                }
-            )
+                # If we get here, this is a new release - need to fetch the full page
+                post_url = post.css('a::attr(href)').get()
+                yield scrapy.Request(
+                    url=f"{base_url}{post_url}",
+                    callback=self.parse_photoset,
+                    cookies=cookies,
+                    meta={"post_data": self.extract_post_data(post)}
+                )
         
         # Request the next page
         current_page = response.meta["page"]
@@ -534,3 +509,30 @@ class HegreSpider(scrapy.Spider):
         )
         
         yield release_item
+
+    def extract_post_data(self, post):
+        """Extract metadata from a post element on the gallery list page."""
+        external_id = "gallery-" + post.css('a::attr(data-id)').get()
+        title = post.css('a::attr(title)').get()
+        
+        # Get URLs from the cover-links div inside details
+        cover_url = post.css('div.details div.cover-links a[data-lightbox="lightbox--poster_image"]::attr(href)').get()
+        board_url = post.css('div.details div.cover-links a[data-lightbox="lightbox--board_image"]::attr(href)').get()
+        
+        # Get the release date from the details section and parse it
+        raw_release_date = post.css('div.details h4 small.right::text').get()
+        if raw_release_date:
+            # Remove the ordinal indicators (st, nd, rd, th) before parsing
+            cleaned_date = raw_release_date.replace('st,', ',').replace('nd,', ',').replace('rd,', ',').replace('th,', ',')
+            parsed_release_date = datetime.strptime(cleaned_date.strip(), '%b %d, %Y').date()
+            release_date = parsed_release_date.isoformat()
+        else:
+            release_date = None
+
+        return {
+            "external_id": external_id,
+            "title": title,
+            "cover_url": cover_url,
+            "board_url": board_url,
+            "release_date": release_date
+        }
