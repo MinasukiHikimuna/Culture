@@ -135,7 +135,6 @@ class AvailableFilesPipeline(FilesPipeline):
         logging.info(f"get_media_requests called for item: {item}")
         
         if isinstance(item, DirectDownloadItem):
-            # Handle direct download items
             file_path = self.file_path(None, None, info, 
                 release_id=item['release_id'], 
                 file_info=item['file_info'])
@@ -151,10 +150,6 @@ class AvailableFilesPipeline(FilesPipeline):
                 )
             else:
                 logging.info(f"File already exists, skipping download: {full_path}")
-                
-        elif isinstance(item, ReleaseItem):
-            # Your existing ReleaseItem handling code...
-            pass
 
     def file_path(self, request, response=None, info=None, *, item=None, release_id=None, file_info=None):
         if request:
@@ -252,7 +247,6 @@ class AvailableFilesPipeline(FilesPipeline):
 
     def item_completed(self, results, item, info):
         if isinstance(item, DirectDownloadItem):
-            # Handle completed direct downloads
             file_paths = [x['path'] for ok, x in results if ok]
             if file_paths:
                 file_info = item['file_info']
@@ -270,10 +264,7 @@ class AvailableFilesPipeline(FilesPipeline):
                     release_uuid=item['release_id'],
                     file_metadata=file_metadata
                 )
-        
-        elif isinstance(item, ReleaseItem):
-            # Your existing ReleaseItem handling code...
-            pass
+        return item
 
     def process_file_metadata(self, file_path, file_type):
         if file_type == 'video':
