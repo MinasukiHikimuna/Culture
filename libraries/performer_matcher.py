@@ -209,6 +209,7 @@ class PerformerMatcher:
                     for stash_id in perf["stashapp_performers_stash_ids"]:
                         if stash_id["endpoint"] == "https://stashdb.org/graphql":
                             stashdb_uuid = stash_id["stash_id"]
+                            stashdb_name = perf["stashapp_performers_name"]
                             break
 
                 best_match = PerformerMatch(
