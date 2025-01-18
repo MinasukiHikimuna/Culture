@@ -734,6 +734,7 @@ class StashAppClient:
         fragment = """
         id
         name
+        alias_list
         urls
         gender
         stash_ids {
