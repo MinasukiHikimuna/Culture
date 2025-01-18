@@ -14,6 +14,15 @@ class PerformerMatch:
     reason: str  # Reason for the match/confidence
     source: str  # Where the match came from: "stashapp_scene", "stashdb_scene", or "stashapp_all"
 
+@dataclass
+class UnmatchedPerformerMatch:
+    ce_uuid: str  # Culture Extractor UUID
+    ce_name: str  # Culture Extractor name
+    stashapp_id: int  # Stashapp ID
+    stashapp_name: str  # Stashapp name
+    confidence: float  # Match confidence score
+    reason: str  # Reason for the match/confidence
+
 class PerformerMatcher:
     def __init__(self, all_stashapp_performers: Optional[pl.DataFrame] = None):
         self.matches: List[PerformerMatch] = []
@@ -300,5 +309,72 @@ class PerformerMatcher:
             f"StashDB: {match.stashdb_uuid}\n"
             f"Confidence: {match.confidence:.2f}\n"
             f"Source: {match.source}\n"
+            f"Reason: {match.reason}\n"
+        )
+    
+    def match_unmatched_performers(self, unmatched_performers: pl.DataFrame) -> List[UnmatchedPerformerMatch]:
+        """
+        Try to match previously unmatched performers against all Stashapp performers
+        
+        Args:
+            unmatched_performers: DataFrame with columns 'performer_uuid' and 'performer_name'
+            
+        Returns:
+            List of UnmatchedPerformerMatch objects for any new matches found
+        """
+        if self.all_stashapp_performers is None:
+            return []
+        
+        matches = []
+        
+        # Convert all Stashapp performers to list format for matching
+        all_performers_list = [
+            {
+                "stashapp_performers_id": row["stashapp_id"],
+                "stashapp_performers_name": row["stashapp_name"],
+                "stashapp_performers_alias_list": row["stashapp_alias_list"],
+            }
+            for row in self.all_stashapp_performers.iter_rows(named=True)
+        ]
+        
+        # Try to match each unmatched performer
+        for row in unmatched_performers.iter_rows(named=True):
+            ce_performer = {
+                "uuid": row["performer_uuid"],
+                "name": row["performer_name"]
+            }
+            
+            best_match = None
+            best_confidence = 0.5  # Minimum confidence threshold for unmatched performers
+            
+            for perf in all_performers_list:
+                confidence, reason = self._calculate_match_confidence(
+                    ce_performer["name"],
+                    perf["stashapp_performers_name"],
+                    perf["stashapp_performers_alias_list"]
+                )
+                
+                if confidence > best_confidence:
+                    best_match = UnmatchedPerformerMatch(
+                        ce_uuid=ce_performer["uuid"],
+                        ce_name=ce_performer["name"],
+                        stashapp_id=perf["stashapp_performers_id"],
+                        stashapp_name=perf["stashapp_performers_name"],
+                        confidence=confidence,
+                        reason=reason
+                    )
+                    best_confidence = confidence
+            
+            if best_match:
+                matches.append(best_match)
+        
+        return matches
+
+    def format_unmatched_match_for_review(self, match: UnmatchedPerformerMatch) -> str:
+        """Format an unmatched performer match for manual review"""
+        return (
+            f"CE: {match.ce_name} ({match.ce_uuid})\n"
+            f"Stashapp: {match.stashapp_name} (ID: {match.stashapp_id})\n"
+            f"Confidence: {match.confidence:.2f}\n"
             f"Reason: {match.reason}\n"
         )
