@@ -319,7 +319,7 @@ class HegreSpider(scrapy.Spider):
         
         # Process posts on the current page
         posts = response.css('div.item')
-        for post in posts[0:1]:
+        for post in posts:
             external_id = "movie-" + post.css('a::attr(data-id)').get()
             
             # If force update is enabled, we need to fetch the full page to update metadata
@@ -373,12 +373,12 @@ class HegreSpider(scrapy.Spider):
         current_page = response.meta["page"]
         next_page = current_page + 1
         
-        # yield scrapy.Request(
-        #     url=f"{base_url}/movies?films_sort=most_recent&films_page={next_page}",
-        #     callback=self.parse_movies_page,
-        #     cookies=cookies,
-        #     meta={"page": next_page}
-        # )
+        yield scrapy.Request(
+            url=f"{base_url}/movies?films_sort=most_recent&films_page={next_page}",
+            callback=self.parse_movies_page,
+            cookies=cookies,
+            meta={"page": next_page}
+        )
 
     def parse_movie(self, response):
         post_data = response.meta["post_data"]
