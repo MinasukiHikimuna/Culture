@@ -98,6 +98,10 @@ class PostgresPipeline:
 
 
 class AvailableFilesPipeline(FilesPipeline):
+    def __init__(self, store_uri, download_func=None, settings=None):
+        super().__init__(store_uri, download_func, settings)
+        self.store_uri = store_uri  # This is the FILES_STORE setting
+
     def get_media_requests(self, item, info):
         if isinstance(item, DirectDownloadItem):
             file_path = self.file_path(None, None, info, 
@@ -170,7 +174,9 @@ class AvailableFilesPipeline(FilesPipeline):
             file_paths = [x['path'] for ok, x in results if ok]
             if file_paths:
                 file_info = item['file_info']
-                file_metadata = self.process_file_metadata(file_paths[0], file_info['file_type'])
+                # Get full path by combining store_uri with relative path
+                full_path = os.path.join(self.store_uri, file_paths[0])
+                file_metadata = self.process_file_metadata(full_path, file_info['file_type'])
                 
                 return DownloadedFileItem(
                     uuid=newnewid.uuid7(),
@@ -205,7 +211,7 @@ class AvailableFilesPipeline(FilesPipeline):
                 "md5": video_hashes.get("md5")
             }
         else:
-            self.logger.error(f"Failed to get video hashes: {result.stderr}")
+            logging.error(f"Failed to get video hashes: {result.stderr}")
             return {}
 
     def process_generic_metadata(self, file_path, file_type):
