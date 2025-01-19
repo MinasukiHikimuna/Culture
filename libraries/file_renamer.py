@@ -62,7 +62,9 @@ def get_performers_value(performers: List[Dict]) -> str:
     gender_priority = {
         'TRANSGENDER_FEMALE': 1,
         'FEMALE': 2,
-        'MALE': 3
+        'NON_BINARY': 3,
+        'TRANSGENDER_MALE': 4,
+        'MALE': 5
     }
 
     # Sort performers by gender priority, favorite status (True comes before False), and name
