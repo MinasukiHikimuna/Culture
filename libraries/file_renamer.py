@@ -17,10 +17,9 @@ def get_studio_value(studio: Optional[Dict]) -> str:
     if studio is None:
         return "Unknown Studio"
     
+    if studio.get("parent_studio") is None:
+        return studio["name"]
+    
     studio_name = studio["name"]
     parent_studio = studio.get("parent_studio")
-
-    if parent_studio:
-        return f"{parent_studio['name']}꞉ {studio_name}"
-    
-    return studio_name
+    return f"{parent_studio['name']}꞉ {studio_name}"
