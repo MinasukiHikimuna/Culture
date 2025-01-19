@@ -161,6 +161,7 @@ class TestGetPerformersValue:
                 "stashapp_performers_disambiguation": "",
                 "stashapp_performers_alias_list": [],
                 "stashapp_performers_gender": "FEMALE",
+                "stashapp_performers_favorite": True,
                 "stashapp_performers_stash_ids": [],
                 "stashapp_performers_custom_fields": [],
             },
@@ -170,6 +171,7 @@ class TestGetPerformersValue:
                 "stashapp_performers_disambiguation": "",
                 "stashapp_performers_alias_list": [],
                 "stashapp_performers_gender": "FEMALE",
+                "stashapp_performers_favorite": True,
                 "stashapp_performers_stash_ids": [],
                 "stashapp_performers_custom_fields": [],
             },
@@ -180,6 +182,37 @@ class TestGetPerformersValue:
 
         # Assert
         assert result == "Alexis Crystal, Nancy Ace"
+
+    def test_with_one_female_and_one_male_performer(self):
+        # Arrange
+        performers = [
+            {
+                "stashapp_performers_id": 412,
+                "stashapp_performers_name": "Charlie Dean",
+                "stashapp_performers_disambiguation": "",
+                "stashapp_performers_alias_list": [],
+                "stashapp_performers_gender": "MALE",
+                "stashapp_performers_favorite": False,
+                "stashapp_performers_stash_ids": [],
+                "stashapp_performers_custom_fields": [],
+            },
+            {
+                "stashapp_performers_id": 157,
+                "stashapp_performers_name": "Sybil A",
+                "stashapp_performers_disambiguation": "",
+                "stashapp_performers_alias_list": [],
+                "stashapp_performers_gender": "FEMALE",
+                "stashapp_performers_favorite": True,
+                "stashapp_performers_stash_ids": [],
+                "stashapp_performers_custom_fields": [],
+            },
+        ]
+        
+        # Act
+        result = get_performers_value(performers)
+
+        # Assert
+        assert result == "Sybil A, Charlie Dean"
 
 
 if __name__ == "__main__":

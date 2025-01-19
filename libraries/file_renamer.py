@@ -35,8 +35,38 @@ def has_studio_code_tag(use_studio_code_tag: Dict, studio: Dict) -> bool:
     return use_studio_code_tag["id"] in tag_ids
 
 def get_performers_value(performers: List[Dict]) -> str:
+    """
+    Format performers list with gender-based sorting.
+    
+    Args:
+        performers: List of dictionaries containing performer information
+                  Example: [{"stashapp_performers_name": "Name", "stashapp_performers_gender": "FEMALE"}]
+    
+    Returns:
+        Comma-separated string of performer names, sorted by gender priority and name
+        Example: "Female Name, Male Name"
+        Raises ValueError if performers is None
+    """
     if performers is None:
         raise ValueError("performers is required")
     
-    performers_list = [performer["stashapp_performers_name"] for performer in performers]
-    return ", ".join(performers_list)
+    if len(performers) == 0:
+        return "Unknown performers"
+
+    # Define gender priority
+    gender_priority = {
+        'TRANSGENDER_FEMALE': 1,
+        'FEMALE': 2,
+        'MALE': 3
+    }
+
+    # Sort performers by gender priority and name
+    sorted_performers = sorted(
+        performers,
+        key=lambda x: (
+            gender_priority.get(x["stashapp_performers_gender"], 4),
+            x["stashapp_performers_name"]
+        )
+    )
+
+    return ", ".join(p["stashapp_performers_name"] for p in sorted_performers)
