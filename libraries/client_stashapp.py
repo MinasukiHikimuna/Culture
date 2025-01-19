@@ -191,149 +191,7 @@ class StashAppClient:
         for oshash in oshashes:
             stash_scene = self.stash.find_scene_by_hash({"oshash": oshash}, fragment=scenes_fragment)
             if stash_scene:
-                # Extract fields according to our schema
-                scene_data = {
-                    "stashapp_id": int(stash_scene.get("id")),
-                    "stashapp_title": stash_scene.get("title", ""),
-                    "stashapp_details": stash_scene.get("details", ""),
-                    "stashapp_date": (
-                        datetime.strptime(
-                            stash_scene.get("date", ""), "%Y-%m-%d"
-                        ).date()
-                        if stash_scene.get("date")
-                        else None
-                    ),
-                    "stashapp_urls": stash_scene.get("urls", []),
-                    "stashapp_created_at": (
-                        datetime.fromisoformat(
-                            stash_scene.get("created_at").replace("Z", "+00:00")
-                        )
-                        if stash_scene.get("created_at")
-                        else None
-                    ),
-                    "stashapp_updated_at": (
-                        datetime.fromisoformat(
-                            stash_scene.get("updated_at").replace("Z", "+00:00")
-                        )
-                        if stash_scene.get("updated_at")
-                        else None
-                    ),
-                    "stashapp_performers": [
-                        {
-                            "stashapp_performers_id": int(p.get("id")),
-                            "stashapp_performers_name": p.get("name"),
-                            "stashapp_performers_disambiguation": p.get(
-                                "disambiguation"
-                            ),
-                            "stashapp_performers_alias_list": p.get("alias_list", []),
-                            "stashapp_performers_gender": p.get("gender"),
-                            "stashapp_performers_stash_ids": [
-                                {
-                                    "endpoint": x["endpoint"],
-                                    "stash_id": x["stash_id"],
-                                    "updated_at": x["updated_at"],
-                                }
-                                for x in p.get("stash_ids", [])
-                            ],
-                            "stashapp_performers_custom_fields": [
-                                {"key": k, "value": v}
-                                for k, v in p.get("custom_fields", {}).items()
-                            ],
-                        }
-                        for p in stash_scene.get("performers", [])
-                    ],
-                    "stashapp_studio": stash_scene.get("studio", {}),
-                    "stashapp_files": [
-                        {
-                            "id": int(f.get("id")),
-                            "path": f.get("path", ""),
-                            "basename": f.get("basename", ""),
-                            "size": int(f.get("size", 0)),
-                            "duration": int(
-                                f.get("duration", 0) * 1000
-                            ),  # Convert seconds to milliseconds
-                            "fingerprints": [
-                                {
-                                    "type": fp.get("type", ""),
-                                    "value": fp.get("value", ""),
-                                }
-                                for fp in f.get("fingerprints", [])
-                            ],
-                        }
-                        for f in stash_scene.get("files", [])
-                    ],
-                    "stashapp_primary_file_path": stash_scene.get("files", [])[0].get(
-                        "path", ""
-                    ),
-                    "stashapp_primary_file_basename": stash_scene.get("files", [])[0].get(
-                        "basename", ""
-                    ),
-                    "stashapp_primary_file_oshash": next(
-                        (
-                            fp["value"]
-                            for fp in stash_scene.get("files", [])[0].get(
-                                "fingerprints", []
-                            )
-                            if fp["type"] == "oshash"
-                        ),
-                        None,
-                    ),
-                    "stashapp_primary_file_phash": next(
-                        (
-                            fp["value"]
-                            for fp in stash_scene.get("files", [])[0].get(
-                                "fingerprints", []
-                            )
-                            if fp["type"] == "phash"
-                        ),
-                        None,
-                    ),
-                    "stashapp_primary_file_xxhash": next(
-                        (
-                            fp["value"]
-                            for fp in stash_scene.get("files", [])[0].get(
-                                "fingerprints", []
-                            )
-                            if fp["type"] == "xxhash"
-                        ),
-                        None,
-                    ),
-                    "stashapp_primary_file_duration": stash_scene.get("files", [])[
-                        0
-                    ].get("duration", 0)
-                    * 1000,
-                    "stashapp_tags": stash_scene.get("tags", []),
-                    "stashapp_organized": stash_scene.get("organized", False),
-                    "stashapp_interactive": stash_scene.get("interactive", False),
-                    "stashapp_play_duration": stash_scene.get("play_duration", 0),
-                    "stashapp_play_count": stash_scene.get("play_count", 0),
-                    "stashapp_o_counter": stash_scene.get("o_counter", 0),
-                    "stashapp_stash_ids": stash_scene.get("stash_ids", []),
-                    "stashapp_stashdb_id": next(
-                        (
-                            x["stash_id"]
-                            for x in stash_scene.get("stash_ids", [])
-                            if x["endpoint"] == "https://stashdb.org/graphql"
-                        ),
-                        None,
-                    ),
-                    "stashapp_tpdb_id": next(
-                        (
-                            x["stash_id"]
-                            for x in stash_scene.get("stash_ids", [])
-                            if x["endpoint"] == "https://theporndb.net/graphql"
-                        ),
-                        None,
-                    ),
-                    "stashapp_ce_id": next(
-                        (
-                            x["stash_id"]
-                            for x in stash_scene.get("stash_ids", [])
-                            if x["endpoint"] == "https://culture.extractor/graphql"
-                        ),
-                        None,
-                    ),
-                }
+                scene_data = self._map_scene_data(stash_scene)
                 scenes.append(scene_data)
 
         schema = {
@@ -434,6 +292,151 @@ class StashAppClient:
 
         return df_scenes
 
+    def _map_scene_data(self, stash_scene):
+        scene_data = {
+            "stashapp_id": int(stash_scene.get("id")),
+            "stashapp_title": stash_scene.get("title", ""),
+            "stashapp_details": stash_scene.get("details", ""),
+            "stashapp_date": (
+                datetime.strptime(
+                    stash_scene.get("date", ""), "%Y-%m-%d"
+                ).date()
+                if stash_scene.get("date")
+                else None
+            ),
+            "stashapp_urls": stash_scene.get("urls", []),
+            "stashapp_created_at": (
+                datetime.fromisoformat(
+                    stash_scene.get("created_at").replace("Z", "+00:00")
+                )
+                if stash_scene.get("created_at")
+                else None
+            ),
+            "stashapp_updated_at": (
+                datetime.fromisoformat(
+                    stash_scene.get("updated_at").replace("Z", "+00:00")
+                )
+                if stash_scene.get("updated_at")
+                else None
+            ),
+            "stashapp_performers": [
+                {
+                    "stashapp_performers_id": int(p.get("id")),
+                    "stashapp_performers_name": p.get("name"),
+                    "stashapp_performers_disambiguation": p.get(
+                        "disambiguation"
+                    ),
+                    "stashapp_performers_alias_list": p.get("alias_list", []),
+                    "stashapp_performers_gender": p.get("gender"),
+                    "stashapp_performers_stash_ids": [
+                        {
+                            "endpoint": x["endpoint"],
+                            "stash_id": x["stash_id"],
+                            "updated_at": x["updated_at"],
+                        }
+                        for x in p.get("stash_ids", [])
+                    ],
+                    "stashapp_performers_custom_fields": [
+                        {"key": k, "value": v}
+                        for k, v in p.get("custom_fields", {}).items()
+                    ],
+                }
+                for p in stash_scene.get("performers", [])
+            ],
+            "stashapp_studio": stash_scene.get("studio", {}),
+            "stashapp_files": [
+                {
+                    "id": int(f.get("id")),
+                    "path": f.get("path", ""),
+                    "basename": f.get("basename", ""),
+                    "size": int(f.get("size", 0)),
+                    "duration": int(
+                        f.get("duration", 0) * 1000
+                    ),  # Convert seconds to milliseconds
+                    "fingerprints": [
+                        {
+                            "type": fp.get("type", ""),
+                            "value": fp.get("value", ""),
+                        }
+                        for fp in f.get("fingerprints", [])
+                    ],
+                }
+                for f in stash_scene.get("files", [])
+            ],
+            "stashapp_primary_file_path": stash_scene.get("files", [])[0].get(
+                "path", ""
+            ),
+            "stashapp_primary_file_basename": stash_scene.get("files", [])[0].get(
+                "basename", ""
+            ),
+            "stashapp_primary_file_oshash": next(
+                (
+                    fp["value"]
+                    for fp in stash_scene.get("files", [])[0].get(
+                        "fingerprints", []
+                    )
+                    if fp["type"] == "oshash"
+                ),
+                None,
+            ),
+            "stashapp_primary_file_phash": next(
+                (
+                    fp["value"]
+                    for fp in stash_scene.get("files", [])[0].get(
+                        "fingerprints", []
+                    )
+                    if fp["type"] == "phash"
+                ),
+                None,
+            ),
+            "stashapp_primary_file_xxhash": next(
+                (
+                    fp["value"]
+                    for fp in stash_scene.get("files", [])[0].get(
+                        "fingerprints", []
+                    )
+                    if fp["type"] == "xxhash"
+                ),
+                None,
+            ),
+            "stashapp_primary_file_duration": stash_scene.get("files", [])[
+                0
+            ].get("duration", 0)
+            * 1000,
+            "stashapp_tags": stash_scene.get("tags", []),
+            "stashapp_organized": stash_scene.get("organized", False),
+            "stashapp_interactive": stash_scene.get("interactive", False),
+            "stashapp_play_duration": stash_scene.get("play_duration", 0),
+            "stashapp_play_count": stash_scene.get("play_count", 0),
+            "stashapp_o_counter": stash_scene.get("o_counter", 0),
+            "stashapp_stash_ids": stash_scene.get("stash_ids", []),
+            "stashapp_stashdb_id": next(
+                (
+                    x["stash_id"]
+                    for x in stash_scene.get("stash_ids", [])
+                    if x["endpoint"] == "https://stashdb.org/graphql"
+                ),
+                None,
+            ),
+            "stashapp_tpdb_id": next(
+                (
+                    x["stash_id"]
+                    for x in stash_scene.get("stash_ids", [])
+                    if x["endpoint"] == "https://theporndb.net/graphql"
+                ),
+                None,
+            ),
+            "stashapp_ce_id": next(
+                (
+                    x["stash_id"]
+                    for x in stash_scene.get("stash_ids", [])
+                    if x["endpoint"] == "https://culture.extractor/graphql"
+                ),
+                None,
+            ),
+        }
+        return scene_data
+        
     def find_galleries_by_sha256(self, sha256s: List[str]) -> pl.DataFrame:
         fragment = """
         id
