@@ -1,5 +1,3 @@
-import json
-from pathlib import Path
 import pytest
 from libraries.file_renamer import get_studio_value
 
@@ -51,3 +49,7 @@ def test_get_studio_value_none():
 def test_get_studio_value_empty_dict():
     with pytest.raises(KeyError):
         get_studio_value({})
+
+
+if __name__ == "__main__":
+    pytest.main()
