@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 import pytest
-from libraries.file_renamer import FileRenamer
+from libraries.file_renamer import get_studio_value
 
 @pytest.fixture
 def sample_data():
@@ -9,21 +9,17 @@ def sample_data():
     with open(sample_file, 'r', encoding='utf-8') as f:
         return json.load(f)
 
-@pytest.fixture
-def file_renamer():
-    return FileRenamer()
-
-def test_get_studio_value_with_parent(file_renamer, sample_data):
+def test_get_studio_value_with_parent(sample_data):
     # Get studio from sample data
     studio = sample_data[0]["stashapp_studio"]
     
     # Test
-    result = file_renamer.get_studio_value(studio)
+    result = get_studio_value(studio)
     
     # Verify
     assert result == "VIPissy Cash꞉ VIPissy"
 
-def test_get_studio_value_without_parent(file_renamer):
+def test_get_studio_value_without_parent():
     # Studio without parent
     studio = {
         "name": "Solo Studio",
@@ -31,13 +27,13 @@ def test_get_studio_value_without_parent(file_renamer):
         "url": "https://example.com"
     }
     
-    result = file_renamer.get_studio_value(studio)
+    result = get_studio_value(studio)
     assert result == "Solo Studio"
 
-def test_get_studio_value_none(file_renamer):
-    result = file_renamer.get_studio_value(None)
+def test_get_studio_value_none():
+    result = get_studio_value(None)
     assert result == "Unknown Studio"
 
-def test_get_studio_value_empty_dict(file_renamer):
+def test_get_studio_value_empty_dict():
     with pytest.raises(KeyError):
-        file_renamer.get_studio_value({})
+        get_studio_value({})
