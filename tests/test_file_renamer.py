@@ -132,7 +132,27 @@ class TestGetPerformersValue:
         with pytest.raises(ValueError):
             get_performers_value(None)
 
-    def test_with_performers(self):
+    def test_with_one_female_performer(self):
+        # Arrange
+        performers = [
+            {
+                "stashapp_performers_id": 179,
+                "stashapp_performers_name": "Stacy Cruz",
+                "stashapp_performers_disambiguation": "",
+                "stashapp_performers_alias_list": [],
+                "stashapp_performers_gender": "FEMALE",
+                "stashapp_performers_stash_ids": [],
+                "stashapp_performers_custom_fields": [],
+            }
+        ]
+
+        # Act
+        result = get_performers_value(performers)
+
+        # Assert
+        assert result == "Stacy Cruz"
+
+    def test_with_two_female_performers(self):
         # Arrange
         performers = [
             {
