@@ -152,7 +152,7 @@ class TestGetPerformersValue:
         # Assert
         assert result == "Stacy Cruz"
 
-    def test_with_two_female_performers(self):
+    def test_with_1f(self):
         # Arrange
         performers = [
             {
@@ -183,7 +183,7 @@ class TestGetPerformersValue:
         # Assert
         assert result == "Alexis Crystal, Nancy Ace"
 
-    def test_with_one_female_and_one_male_performer(self):
+    def test_with_1f1m(self):
         # Arrange
         performers = [
             {
@@ -214,7 +214,7 @@ class TestGetPerformersValue:
         # Assert
         assert result == "Sybil A, Charlie Dean"
 
-    def test_with_one_female_and_one_male_performer_and_one_favorite(self):
+    def test_with_2f1m(self):
         # Arrange
         performers = [
             {
@@ -254,6 +254,48 @@ class TestGetPerformersValue:
 
         # Assert
         assert result == "Paula Shy, Marilyn Sugar, Daniel G"
+
+    def test_with_1tf1f1m(self):
+        # Arrange
+        performers = [
+            {
+                "stashapp_performers_id": 530,
+                "stashapp_performers_name": "Whitney Wright",
+                "stashapp_performers_disambiguation": "",
+                "stashapp_performers_alias_list": [],
+                "stashapp_performers_gender": "FEMALE",
+                "stashapp_performers_favorite": False,
+                "stashapp_performers_stash_ids": [],
+                "stashapp_performers_custom_fields": [],
+            },
+            {
+                "stashapp_performers_id": 982,
+                "stashapp_performers_name": "Jade Venus",
+                "stashapp_performers_disambiguation": "",
+                "stashapp_performers_alias_list": [],
+                "stashapp_performers_gender": "TRANSGENDER_FEMALE",
+                "stashapp_performers_favorite": False,
+                "stashapp_performers_stash_ids": [],
+                "stashapp_performers_custom_fields": [],
+            },
+            {
+                "stashapp_performers_id": 983,
+                "stashapp_performers_name": "Roman Todd",
+                "stashapp_performers_disambiguation": "",
+                "stashapp_performers_alias_list": [],
+                "stashapp_performers_gender": "MALE",
+                "stashapp_performers_favorite": False,
+                "stashapp_performers_stash_ids": [],
+                "stashapp_performers_custom_fields": [],
+            },
+        ]
+
+        # Act
+        result = get_performers_value(performers)
+
+        # Assert
+        assert result == "Jade Venus, Whitney Wright, Roman Todd"
+
 
 if __name__ == "__main__":
     pytest.main()
