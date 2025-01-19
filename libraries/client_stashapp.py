@@ -12,6 +12,64 @@ import polars as pl
 load_dotenv()
 
 
+scenes_fragment = """
+    id
+    title
+    details
+    date
+    urls
+    created_at
+    updated_at
+    organized
+    interactive
+    play_duration
+    play_count
+    o_counter
+    performers {
+        id
+        name
+        disambiguation
+        alias_list
+        gender
+        stash_ids {
+            endpoint
+            stash_id
+            updated_at
+        }
+        custom_fields
+    }
+    studio {
+        id
+        name
+        url
+        parent_studio {
+            id
+            name
+            url
+        }
+    }
+    files {
+        id
+        path
+        basename
+        size
+        duration
+        fingerprints {
+            type
+            value
+        }
+    }
+    tags {
+        id
+        name
+    }
+    stash_ids {
+        endpoint
+        stash_id
+        updated_at
+    }
+"""
+
 def get_stashapp_client(prefix=""):
     # Use the provided prefix to get environment variables
     scheme = os.getenv(f"{prefix}STASHAPP_SCHEME")
@@ -129,67 +187,9 @@ class StashAppClient:
         return result
 
     def find_scenes_by_oshash(self, oshashes: List[str]) -> pl.DataFrame:
-        fragment = """
-        id
-        title
-        details
-        date
-        urls
-        created_at
-        updated_at
-        organized
-        interactive
-        play_duration
-        play_count
-        o_counter
-        performers {
-            id
-            name
-            disambiguation
-            alias_list
-            gender
-            stash_ids {
-                endpoint
-                stash_id
-                updated_at
-            }
-            custom_fields
-        }
-        studio {
-            id
-            name
-            url
-            parent_studio {
-                id
-                name
-                url
-            }
-        }
-        files {
-            id
-            path
-            basename
-            size
-            duration
-            fingerprints {
-                type
-                value
-            }
-        }
-        tags {
-            id
-            name
-        }
-        stash_ids {
-            endpoint
-            stash_id
-            updated_at
-        }
-        """
-
         scenes = []
         for oshash in oshashes:
-            stash_scene = self.stash.find_scene_by_hash({"oshash": oshash}, fragment)
+            stash_scene = self.stash.find_scene_by_hash({"oshash": oshash}, fragment=scenes_fragment)
             if stash_scene:
                 # Extract fields according to our schema
                 scene_data = {
