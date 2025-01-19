@@ -1,5 +1,9 @@
 import pytest
-from libraries.file_renamer import get_studio_value, has_studio_code_tag
+from libraries.file_renamer import (
+    get_performers_value,
+    get_studio_value,
+    has_studio_code_tag,
+)
 
 
 class TestGetStudioValue:
@@ -121,6 +125,41 @@ class TestHasStudioCodeTag:
         # Act & Assert
         with pytest.raises(ValueError):
             has_studio_code_tag(None, studio)
+
+
+class TestGetPerformersValue:
+    def test_none(self):
+        with pytest.raises(ValueError):
+            get_performers_value(None)
+
+    def test_with_performers(self):
+        # Arrange
+        performers = [
+            {
+                "stashapp_performers_id": 139,
+                "stashapp_performers_name": "Alexis Crystal",
+                "stashapp_performers_disambiguation": "",
+                "stashapp_performers_alias_list": [],
+                "stashapp_performers_gender": "FEMALE",
+                "stashapp_performers_stash_ids": [],
+                "stashapp_performers_custom_fields": [],
+            },
+            {
+                "stashapp_performers_id": 230,
+                "stashapp_performers_name": "Nancy Ace",
+                "stashapp_performers_disambiguation": "",
+                "stashapp_performers_alias_list": [],
+                "stashapp_performers_gender": "FEMALE",
+                "stashapp_performers_stash_ids": [],
+                "stashapp_performers_custom_fields": [],
+            },
+        ]
+
+        # Act
+        result = get_performers_value(performers)
+
+        # Assert
+        assert result == "Alexis Crystal, Nancy Ace"
 
 
 if __name__ == "__main__":

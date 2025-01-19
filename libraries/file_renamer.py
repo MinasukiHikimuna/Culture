@@ -1,4 +1,4 @@
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 def get_studio_value(studio: Optional[Dict]) -> str:
     """
@@ -33,3 +33,10 @@ def has_studio_code_tag(use_studio_code_tag: Dict, studio: Dict) -> bool:
 
     tag_ids = [tag["id"] for tag in studio.get("tags")]
     return use_studio_code_tag["id"] in tag_ids
+
+def get_performers_value(performers: List[Dict]) -> str:
+    if performers is None:
+        raise ValueError("performers is required")
+    
+    performers_list = [performer["stashapp_performers_name"] for performer in performers]
+    return ", ".join(performers_list)
