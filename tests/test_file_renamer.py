@@ -207,13 +207,53 @@ class TestGetPerformersValue:
                 "stashapp_performers_custom_fields": [],
             },
         ]
-        
+
         # Act
         result = get_performers_value(performers)
 
         # Assert
         assert result == "Sybil A, Charlie Dean"
 
+    def test_with_one_female_and_one_male_performer_and_one_favorite(self):
+        # Arrange
+        performers = [
+            {
+                "stashapp_performers_id": 155,
+                "stashapp_performers_name": "Paula Shy",
+                "stashapp_performers_disambiguation": "",
+                "stashapp_performers_alias_list": [],
+                "stashapp_performers_gender": "FEMALE",
+                "stashapp_performers_favorite": True,
+                "stashapp_performers_stash_ids": [],
+                "stashapp_performers_custom_fields": [],
+            },
+            {
+                "stashapp_performers_id": 182,
+                "stashapp_performers_name": "Marilyn Sugar",
+                "stashapp_performers_disambiguation": "",
+                "stashapp_performers_alias_list": ["Marylin Sugar"],
+                "stashapp_performers_gender": "FEMALE",
+                "stashapp_performers_favorite": False,
+                "stashapp_performers_stash_ids": [],
+                "stashapp_performers_custom_fields": [],
+            },
+            {
+                "stashapp_performers_id": 439,
+                "stashapp_performers_name": "Daniel G",
+                "stashapp_performers_disambiguation": "",
+                "stashapp_performers_alias_list": [],
+                "stashapp_performers_gender": "MALE",
+                "stashapp_performers_favorite": False,
+                "stashapp_performers_stash_ids": [],
+                "stashapp_performers_custom_fields": [],
+            },
+        ]
+
+        # Act
+        result = get_performers_value(performers)
+
+        # Assert
+        assert result == "Paula Shy, Marilyn Sugar, Daniel G"
 
 if __name__ == "__main__":
     pytest.main()
