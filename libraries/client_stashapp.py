@@ -42,10 +42,18 @@ scenes_fragment = """
         id
         name
         url
+        tags {
+            id
+            name
+        }
         parent_studio {
             id
             name
             url
+            tags {
+                id
+                name
+            }
         }
     }
     files {
@@ -114,8 +122,9 @@ scenes_schema = {
             "id": pl.Int64,
             "name": pl.Utf8,
             "url": pl.Utf8,
+            "tags": pl.List(pl.Struct({"id": pl.Int64, "name": pl.Utf8})),
             "parent_studio": pl.Struct(
-                {"id": pl.Int64, "name": pl.Utf8, "url": pl.Utf8}
+                {"id": pl.Int64, "name": pl.Utf8, "url": pl.Utf8, "tags": pl.List(pl.Struct({"id": pl.Int64, "name": pl.Utf8}))}
             ),
         }
     ),
@@ -197,10 +206,18 @@ class StashAppClient:
             stash_id
             updated_at
         }
+        tags {
+            id
+            name
+        }
         parent_studio {
             id
             name
             url
+            tags {
+                id
+                name
+            }
             stash_ids {
                 endpoint
                 stash_id
@@ -217,6 +234,7 @@ class StashAppClient:
                 "stash_studios_id": int(studio.get("id")),
                 "stash_studios_name": studio.get("name"),
                 "stash_studios_url": studio.get("url"),
+                "stash_studios_tags": studio.get("tags", []),
                 **self._get_stash_ids(studio.get("stash_ids", [])),
             }
             parent_studio = studio.get("parent_studio")
@@ -230,6 +248,7 @@ class StashAppClient:
                 studio_data["stash_studios_parent_studio_url"] = parent_studio.get(
                     "url"
                 )
+                studio_data["stash_studios_parent_studio_tags"] = parent_studio.get("tags", [])
                 parent_stash_ids = self._get_stash_ids(
                     parent_studio.get("stash_ids", [])
                 )
@@ -245,6 +264,7 @@ class StashAppClient:
                 studio_data["stash_studios_parent_studio_url"] = None
                 studio_data["stash_studios_parent_studio_stashdb_id"] = None
                 studio_data["stash_studios_parent_studio_tpdb_id"] = None
+                studio_data["stash_studios_parent_studio_tags"] = None
             studios.append(studio_data)
 
         schema = {
@@ -254,9 +274,11 @@ class StashAppClient:
             "stash_studios_stashdb_id": pl.Utf8,
             "stash_studios_tpdb_id": pl.Utf8,
             "stash_studios_ce_id": pl.Utf8,
+            "stash_studios_tags": pl.List(pl.Struct({"id": pl.Int64, "name": pl.Utf8})),
             "stash_studios_parent_studio_id": pl.Int64,
             "stash_studios_parent_studio_name": pl.Utf8,
             "stash_studios_parent_studio_url": pl.Utf8,
+            "stash_studios_parent_studio_tags": pl.List(pl.Struct({"id": pl.Int64, "name": pl.Utf8})),
             "stash_studios_parent_studio_stashdb_id": pl.Utf8,
             "stash_studios_parent_studio_tpdb_id": pl.Utf8,
             "stash_studios_parent_studio_ce_id": pl.Utf8,
