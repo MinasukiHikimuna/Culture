@@ -175,6 +175,61 @@ scenes_schema = {
     "stashapp_ce_id": pl.Utf8,
 }
 
+galleries_fragment = """
+id
+title
+details
+date
+code
+urls
+photographer
+created_at
+updated_at
+organized
+performers {
+    id
+    name
+    disambiguation
+    alias_list
+    gender
+    stash_ids {
+        endpoint
+        stash_id
+        updated_at
+    }
+    custom_fields
+}
+studio {
+    id
+    name
+    url
+    parent_studio {
+        id
+        name
+        url
+    }
+}
+files {
+    id
+    path
+    basename
+    size
+    fingerprints {
+        type
+        value
+    }
+}
+tags {
+    id
+    name
+}
+scenes {
+    id
+    title
+}
+image_count
+"""
+
 def get_stashapp_client(prefix=""):
     # Use the provided prefix to get environment variables
     scheme = os.getenv(f"{prefix}STASHAPP_SCHEME")
@@ -470,63 +525,8 @@ class StashAppClient:
         return scene_data
         
     def find_galleries_by_sha256(self, sha256s: List[str]) -> pl.DataFrame:
-        fragment = """
-        id
-        title
-        details
-        date
-        code
-        urls
-        photographer
-        created_at
-        updated_at
-        organized
-        performers {
-            id
-            name
-            disambiguation
-            alias_list
-            gender
-            stash_ids {
-                endpoint
-                stash_id
-                updated_at
-            }
-            custom_fields
-        }
-        studio {
-            id
-            name
-            url
-            parent_studio {
-                id
-                name
-                url
-            }
-        }
-        files {
-            id
-            path
-            basename
-            size
-            fingerprints {
-                type
-                value
-            }
-        }
-        tags {
-            id
-            name
-        }
-        scenes {
-            id
-            title
-        }
-        image_count
-        """
-
         # Get all galleries in one request
-        stash_galleries = self.stash.find_galleries(f={}, fragment=fragment)
+        stash_galleries = self.stash.find_galleries(f={}, fragment=galleries_fragment)
         
         # Create a lookup of sha256 -> gallery
         gallery_by_sha256 = {}
