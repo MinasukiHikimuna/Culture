@@ -23,3 +23,13 @@ def get_studio_value(studio: Optional[Dict]) -> str:
     studio_name = studio["name"]
     parent_studio = studio.get("parent_studio")
     return f"{parent_studio['name']}꞉ {studio_name}"
+
+def has_studio_code_tag(use_studio_code_tag: Dict, studio: Dict) -> bool:
+    if use_studio_code_tag is None:
+        raise ValueError("use_studio_code_tag is required")
+    
+    if studio is None or studio.get("tags") is None or len(studio.get("tags")) == 0:
+        return False
+
+    tag_ids = [tag["id"] for tag in studio.get("tags")]
+    return use_studio_code_tag["id"] in tag_ids
