@@ -70,6 +70,100 @@ scenes_fragment = """
     }
 """
 
+scenes_schema = {
+    "stashapp_id": pl.Int64,
+    "stashapp_title": pl.Utf8,
+    "stashapp_details": pl.Utf8,
+    "stashapp_date": pl.Date,
+    "stashapp_urls": pl.List(pl.Utf8),
+    "stashapp_created_at": pl.Datetime,
+    "stashapp_updated_at": pl.Datetime,
+    "stashapp_performers": pl.List(
+        pl.Struct(
+            {
+                "stashapp_performers_id": pl.Int64,
+                "stashapp_performers_name": pl.Utf8,
+                "stashapp_performers_disambiguation": pl.Utf8,
+                "stashapp_performers_alias_list": pl.List(pl.Utf8),
+                "stashapp_performers_gender": pl.Enum(
+                    [
+                        "MALE",
+                        "FEMALE",
+                        "TRANSGENDER_MALE",
+                        "TRANSGENDER_FEMALE",
+                        "NON_BINARY",
+                    ]
+                ),
+                "stashapp_performers_stash_ids": pl.List(
+                    pl.Struct(
+                        {
+                            "endpoint": pl.Utf8,
+                            "stash_id": pl.Utf8,
+                            "updated_at": pl.Datetime,
+                        }
+                    )
+                ),
+                "stashapp_performers_custom_fields": pl.List(
+                    pl.Struct({"key": pl.Utf8, "value": pl.Utf8})
+                ),
+            }
+        )
+    ),
+    "stashapp_studio": pl.Struct(
+        {
+            "id": pl.Int64,
+            "name": pl.Utf8,
+            "url": pl.Utf8,
+            "parent_studio": pl.Struct(
+                {"id": pl.Int64, "name": pl.Utf8, "url": pl.Utf8}
+            ),
+        }
+    ),
+    "stashapp_files": pl.List(
+        pl.Struct(
+            {
+                "id": pl.Int64,
+                "path": pl.Utf8,
+                "basename": pl.Utf8,
+                "size": pl.Int64,
+                "duration": pl.Duration(time_unit="ms"),
+                "fingerprints": pl.List(
+                    pl.Struct(
+                        {
+                            "type": pl.Utf8,
+                            "value": pl.Utf8,
+                        }
+                    )
+                ),
+            }
+        )
+    ),
+    "stashapp_primary_file_path": pl.Utf8,
+    "stashapp_primary_file_basename": pl.Utf8,
+    "stashapp_primary_file_oshash": pl.Utf8,
+    "stashapp_primary_file_phash": pl.Utf8,
+    "stashapp_primary_file_xxhash": pl.Utf8,
+    "stashapp_primary_file_duration": pl.Duration(time_unit="ms"),
+    "stashapp_tags": pl.List(pl.Struct({"id": pl.Int64, "name": pl.Utf8})),
+    "stashapp_organized": pl.Boolean,
+    "stashapp_interactive": pl.Boolean,
+    "stashapp_play_duration": pl.Int64,
+    "stashapp_play_count": pl.Int64,
+    "stashapp_o_counter": pl.Int64,
+    "stashapp_stash_ids": pl.List(
+        pl.Struct(
+            {
+                "endpoint": pl.Utf8,
+                "stash_id": pl.Utf8,
+                "updated_at": pl.Datetime,
+            }
+        )
+    ),
+    "stashapp_stashdb_id": pl.Utf8,
+    "stashapp_tpdb_id": pl.Utf8,
+    "stashapp_ce_id": pl.Utf8,
+}
+
 def get_stashapp_client(prefix=""):
     # Use the provided prefix to get environment variables
     scheme = os.getenv(f"{prefix}STASHAPP_SCHEME")
@@ -194,101 +288,7 @@ class StashAppClient:
                 scene_data = self._map_scene_data(stash_scene)
                 scenes.append(scene_data)
 
-        schema = {
-            "stashapp_id": pl.Int64,
-            "stashapp_title": pl.Utf8,
-            "stashapp_details": pl.Utf8,
-            "stashapp_date": pl.Date,
-            "stashapp_urls": pl.List(pl.Utf8),
-            "stashapp_created_at": pl.Datetime,
-            "stashapp_updated_at": pl.Datetime,
-            "stashapp_performers": pl.List(
-                pl.Struct(
-                    {
-                        "stashapp_performers_id": pl.Int64,
-                        "stashapp_performers_name": pl.Utf8,
-                        "stashapp_performers_disambiguation": pl.Utf8,
-                        "stashapp_performers_alias_list": pl.List(pl.Utf8),
-                        "stashapp_performers_gender": pl.Enum(
-                            [
-                                "MALE",
-                                "FEMALE",
-                                "TRANSGENDER_MALE",
-                                "TRANSGENDER_FEMALE",
-                                "NON_BINARY",
-                            ]
-                        ),
-                        "stashapp_performers_stash_ids": pl.List(
-                            pl.Struct(
-                                {
-                                    "endpoint": pl.Utf8,
-                                    "stash_id": pl.Utf8,
-                                    "updated_at": pl.Datetime,
-                                }
-                            )
-                        ),
-                        "stashapp_performers_custom_fields": pl.List(
-                            pl.Struct({"key": pl.Utf8, "value": pl.Utf8})
-                        ),
-                    }
-                )
-            ),
-            "stashapp_studio": pl.Struct(
-                {
-                    "id": pl.Int64,
-                    "name": pl.Utf8,
-                    "url": pl.Utf8,
-                    "parent_studio": pl.Struct(
-                        {"id": pl.Int64, "name": pl.Utf8, "url": pl.Utf8}
-                    ),
-                }
-            ),
-            "stashapp_files": pl.List(
-                pl.Struct(
-                    {
-                        "id": pl.Int64,
-                        "path": pl.Utf8,
-                        "basename": pl.Utf8,
-                        "size": pl.Int64,
-                        "duration": pl.Duration(time_unit="ms"),
-                        "fingerprints": pl.List(
-                            pl.Struct(
-                                {
-                                    "type": pl.Utf8,
-                                    "value": pl.Utf8,
-                                }
-                            )
-                        ),
-                    }
-                )
-            ),
-            "stashapp_primary_file_path": pl.Utf8,
-            "stashapp_primary_file_basename": pl.Utf8,
-            "stashapp_primary_file_oshash": pl.Utf8,
-            "stashapp_primary_file_phash": pl.Utf8,
-            "stashapp_primary_file_xxhash": pl.Utf8,
-            "stashapp_primary_file_duration": pl.Duration(time_unit="ms"),
-            "stashapp_tags": pl.List(pl.Struct({"id": pl.Int64, "name": pl.Utf8})),
-            "stashapp_organized": pl.Boolean,
-            "stashapp_interactive": pl.Boolean,
-            "stashapp_play_duration": pl.Int64,
-            "stashapp_play_count": pl.Int64,
-            "stashapp_o_counter": pl.Int64,
-            "stashapp_stash_ids": pl.List(
-                pl.Struct(
-                    {
-                        "endpoint": pl.Utf8,
-                        "stash_id": pl.Utf8,
-                        "updated_at": pl.Datetime,
-                    }
-                )
-            ),
-            "stashapp_stashdb_id": pl.Utf8,
-            "stashapp_tpdb_id": pl.Utf8,
-            "stashapp_ce_id": pl.Utf8,
-        }
-
-        df_scenes = pl.DataFrame(scenes, schema=schema)
+        df_scenes = pl.DataFrame(scenes, schema=scenes_schema)
 
         return df_scenes
 
