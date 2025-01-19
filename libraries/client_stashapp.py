@@ -31,6 +31,7 @@ scenes_fragment = """
         disambiguation
         alias_list
         gender
+        favorite
         stash_ids {
             endpoint
             stash_id
@@ -102,6 +103,7 @@ scenes_schema = {
                         "NON_BINARY",
                     ]
                 ),
+                "stashapp_performers_favorite": pl.Boolean,
                 "stashapp_performers_stash_ids": pl.List(
                     pl.Struct(
                         {
@@ -357,6 +359,7 @@ class StashAppClient:
                     ),
                     "stashapp_performers_alias_list": p.get("alias_list", []),
                     "stashapp_performers_gender": p.get("gender"),
+                    "stashapp_performers_favorite": p.get("favorite", False),
                     "stashapp_performers_stash_ids": [
                         {
                             "endpoint": x["endpoint"],
@@ -769,6 +772,7 @@ class StashAppClient:
         alias_list
         urls
         gender
+        favorite
         stash_ids {
             endpoint
             stash_id
@@ -787,6 +791,7 @@ class StashAppClient:
                     "stashapp_alias_list": performer.get("alias_list", []),
                     "stashapp_urls": performer.get("urls", []),
                     "stashapp_gender": performer.get("gender"),
+                    "stashapp_favorite": performer.get("favorite", False),
                     "stashapp_stash_ids": [
                         {
                             "endpoint": x["endpoint"],
@@ -816,6 +821,7 @@ class StashAppClient:
                     "NON_BINARY",
                 ]
             ),
+            "stashapp_favorite": pl.Boolean,
             "stashapp_stash_ids": pl.List(
                 pl.Struct(
                     {
