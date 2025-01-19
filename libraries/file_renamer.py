@@ -1,4 +1,99 @@
+import os
 from typing import Dict, List, Optional
+
+MAX_LENGTH = 255
+
+def create_filename(use_studio_code_tag: Dict, row: Dict) -> str:
+    """
+    Create a filename from a Polars DataFrame row dictionary.
+    
+    Args:
+        row: Dictionary containing scene information with stashapp_ prefixed keys
+    
+    Returns:
+        Formatted filename string
+    """
+    xxhash = row.get('stashapp_primary_file_xxhash')
+    if not xxhash:
+        return None
+        
+    xxhash_fmt = f" [{xxhash}]"
+    
+    # Get the file suffix
+    suffix = get_suffix(row.get('stashapp_primary_file_basename'))
+    if not suffix:
+        return None
+
+    ce_uuid = row.get('stashapp_ce_id')
+    if ce_uuid:
+        ce_uuid_fmt = f" [{ce_uuid}]"
+        ce_uuid_length = len(ce_uuid_fmt)
+    else:
+        ce_uuid_fmt = ""
+        ce_uuid_length = 0
+
+    suffix_length = len(suffix)
+    max_length_wo_ce_uuid_suffix = MAX_LENGTH - ce_uuid_length - suffix_length
+
+    # Get studio and format it
+    studio = get_studio_value(row.get('stashapp_studio'))
+    
+    # Get date
+    date = row.get('stashapp_date')
+    date_str = date if isinstance(date, str) else date.strftime("%Y-%m-%d") if date else "Unknown Date"
+    
+    # Get performers
+    performers_str = get_performers_value(row.get('stashapp_performers'))
+    
+    # Get title
+    title = row.get('stashapp_title', 'Unknown Title')
+    
+    # Build base filename
+    base_filename = f"{studio} – {date_str} – "
+    
+    # Add studio code if needed
+    if has_studio_code_tag(use_studio_code_tag, row.get('stashapp_studio')) and row.get('code'):
+        base_filename += f"{_clean_for_filename(row['code'])} – "
+    
+    base_filename += _clean_for_filename(f"{title} – {performers_str}")
+
+    # Check if the generated filename exceeds the maximum length
+    if len(base_filename) + len(suffix) > max_length_wo_ce_uuid_suffix:
+        # Truncate the base filename to fit within limits
+        base_filename = base_filename[:max_length_wo_ce_uuid_suffix]
+        
+    return base_filename + ce_uuid_fmt + suffix
+
+def _title_case_except_acronyms(text):
+    words = text.split()
+    title_cased_words = []
+    for word in words:
+        # Check if the word contains an apostrophe
+        if "'" in word:
+            # Split the word at the apostrophe and process each part
+            parts = word.split("'")
+            new_parts = [parts[0].title()]  # Always capitalize the part before the apostrophe
+            if len(parts) > 1:
+                # Never capitalize after the apostrophe
+                new_parts.append(parts[1])
+            # Rejoin the parts with an apostrophe
+            title_cased_words.append("'".join(new_parts))
+        else:
+            # Apply the original logic if there's no apostrophe
+            title_cased_words.append(word if word.isupper() and len(word) > 1 else word.title())
+
+    return ' '.join(title_cased_words)
+
+def _clean_for_filename(input):
+    input = _title_case_except_acronyms(input)
+    return input.replace(":", "꞉").replace("?", "？").replace("/", "∕").replace("\\", "＼").replace("*", "＊").replace("\"", "＂").replace("<", "＜").replace(">", "＞").replace("|", "｜").replace("  ", " ")
+
+def get_suffix(primary_file_basename: str) -> str:
+    if primary_file_basename is None:
+        return None
+    
+    file_suffix = os.path.splitext(primary_file_basename)[1]
+    return file_suffix
 
 def get_studio_value(studio: Optional[Dict]) -> str:
     """
@@ -71,10 +166,31 @@ def get_performers_value(performers: List[Dict]) -> str:
     sorted_performers = sorted(
         performers,
         key=lambda x: (
-            gender_priority.get(x["stashapp_performers_gender"], 4),
+            gender_priority.get(x["stashapp_performers_gender"]),
             not x.get("stashapp_performers_favorite", False),
             x["stashapp_performers_name"]
         )
     )
 
     return ", ".join(p["stashapp_performers_name"] for p in sorted_performers)
+
+def process_scene_row(row: Dict) -> Dict:
+    """
+    Example function showing how to process an entire row from a Polars DataFrame.
+    
+    Args:
+        row: Dictionary containing all fields from a Polars DataFrame row
+             The row is automatically converted to a dictionary when using map_elements
+             
+    Returns:
+        Dictionary with processed values
+        
+    Example usage from Polars:
+        df.map_elements(process_scene_row)
+    """
+    return {
+        "studio": get_studio_value(row.get("stashapp_studio")),
+        "performers": get_performers_value(row.get("stashapp_performers")),
+        "suffix": get_suffix(row.get("stashapp_primary_file_basename")),
+        # Add any other fields you need to process
+    }
