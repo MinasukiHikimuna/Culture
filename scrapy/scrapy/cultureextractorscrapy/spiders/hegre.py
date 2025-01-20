@@ -401,9 +401,18 @@ class HegreSpider(scrapy.Spider):
             raise ValueError(f"No runtime found for movie {external_id}")
             
         try:
-            # Parse "21:07 Minutes" format
-            minutes, seconds = map(int, runtime_text.split(' ')[0].split(':'))
-            duration = minutes * 60 + seconds
+            # Split time and unit
+            time_parts = runtime_text.split(' ')[0].split(':')
+            
+            if len(time_parts) == 2:  # MM:SS format
+                minutes, seconds = map(int, time_parts)
+                duration = minutes * 60 + seconds
+            elif len(time_parts) == 3:  # HH:MM:SS format
+                hours, minutes, seconds = map(int, time_parts)
+                duration = hours * 3600 + minutes * 60 + seconds
+            else:
+                raise ValueError(f"Unexpected time format: {runtime_text}")
+                
         except (ValueError, IndexError) as e:
             raise ValueError(f"Failed to parse runtime '{runtime_text}' for movie {external_id}: {str(e)}")
 
