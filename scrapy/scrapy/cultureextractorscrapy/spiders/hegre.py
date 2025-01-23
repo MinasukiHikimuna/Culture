@@ -51,10 +51,10 @@ class HegreSpider(scrapy.Spider):
             callback=self.parse_movies,
             cookies=cookies)
 
-        # yield scrapy.Request(
-        #     url=f"{base_url}/photos",
-        #     callback=self.parse_photos,
-        #     cookies=cookies)
+        yield scrapy.Request(
+            url=f"{base_url}/photos",
+            callback=self.parse_photos,
+            cookies=cookies)
 
     def parse_movies(self, response):
         yield scrapy.Request(
