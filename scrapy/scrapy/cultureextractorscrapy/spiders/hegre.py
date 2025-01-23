@@ -402,16 +402,33 @@ class HegreSpider(scrapy.Spider):
             
         try:
             # Split time and unit
-            time_parts = runtime_text.split(' ')[0].split(':')
+            parts = runtime_text.split(' ')
+            time_str = parts[0]
+            unit = parts[1].lower()
             
-            if len(time_parts) == 2:  # MM:SS format
-                minutes, seconds = map(int, time_parts)
-                duration = minutes * 60 + seconds
-            elif len(time_parts) == 3:  # HH:MM:SS format
-                hours, minutes, seconds = map(int, time_parts)
-                duration = hours * 3600 + minutes * 60 + seconds
-            else:
-                raise ValueError(f"Unexpected time format: {runtime_text}")
+            if ':' in time_str:  # Handle MM:SS or HH:MM:SS formats
+                time_parts = time_str.split(':')
+                if len(time_parts) == 2:  # MM:SS format
+                    minutes, seconds = map(int, time_parts)
+                    duration = minutes * 60 + seconds
+                elif len(time_parts) == 3:  # HH:MM:SS format
+                    hours, minutes, seconds = map(int, time_parts)
+                    duration = hours * 3600 + minutes * 60 + seconds
+                else:
+                    raise ValueError(f"Unexpected time format: {runtime_text}")
+            else:  # Handle "X Hour(s)" format
+                try:
+                    value = float(time_str)
+                    if unit.startswith('hour'):
+                        duration = int(value * 3600)
+                    elif unit.startswith('minute'):
+                        duration = int(value * 60)
+                    elif unit.startswith('second'):
+                        duration = int(value)
+                    else:
+                        raise ValueError(f"Unexpected time unit: {unit}")
+                except ValueError:
+                    raise ValueError(f"Could not parse time value: {time_str}")
                 
         except (ValueError, IndexError) as e:
             raise ValueError(f"Failed to parse runtime '{runtime_text}' for movie {external_id}: {str(e)}")
