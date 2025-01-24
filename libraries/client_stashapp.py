@@ -650,6 +650,12 @@ class StashAppClient:
 
         return df_galleries
 
+    def find_galleries_by_studio(self, studio_ids: List[int]) -> pl.DataFrame:
+        galleries = self.stash.find_galleries({"studios": {"value": studio_ids, "excludes": [], "modifier": "INCLUDES"}}, fragment=galleries_fragment)
+        galleries_data = [self._map_gallery_data(gallery) for gallery in galleries]
+        df_galleries = pl.DataFrame(galleries_data, schema=galleries_schema)
+        return df_galleries
+
     def _map_gallery_data(self, stash_gallery):
         return {
             "stashapp_id": int(stash_gallery.get("id")),
