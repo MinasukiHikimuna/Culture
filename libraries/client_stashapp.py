@@ -347,6 +347,34 @@ class StashAppClient:
     def __init__(self, prefix=""):
         self.stash = get_stashapp_client(prefix)
 
+    def get_tags(self) -> pl.DataFrame:
+        fragment = """
+        id
+        name
+        aliases
+        """
+        
+        schema = {
+            "id": pl.Int64,
+            "name": pl.Utf8,
+            "stashdb_id": pl.Utf8,
+        }
+        
+        tags = self.stash.find_tags({}, fragment=fragment)
+        
+        tags_data = []
+        for tag in tags:
+            tag_data = {
+                "id": tag.get("id"),
+                "name": tag.get("name"),
+                "stashdb_id": next((alias[11:] for alias in tag.get("aliases", []) if alias.startswith("StashDB ID: ")), None),
+            }
+            tags_data.append(tag_data)
+        
+        df_tags = pl.DataFrame(tags_data, schema=schema)
+        return df_tags
+
+
     def get_studios(self) -> pl.DataFrame:
         fragment = """
         id
@@ -809,6 +837,22 @@ class StashAppClient:
                         }
                         for x in performer.get("stash_ids", [])
                     ],
+                    "stashapp_stashdb_id": next(
+                        (
+                            x["stash_id"]
+                            for x in performer.get("stash_ids", [])
+                            if x["endpoint"] == "https://stashdb.org/graphql"
+                        ),
+                        None,
+                    ),
+                    "stashapp_tpdb_id": next(
+                        (
+                            x["stash_id"]
+                            for x in performer.get("stash_ids", [])
+                            if x["endpoint"] == "https://theporndb.net/graphql"
+                        ),
+                        None,
+                    ),
                     "stashapp_custom_fields": [
                         {"key": k, "value": v}
                         for k, v in performer.get("custom_fields", {}).items()
@@ -840,6 +884,8 @@ class StashAppClient:
                     }
                 )
             ),
+            "stashapp_stashdb_id": pl.Utf8,
+            "stashapp_tpdb_id": pl.Utf8,
             "stashapp_custom_fields": pl.List(
                 pl.Struct({"key": pl.Utf8, "value": pl.Utf8})
             ),
