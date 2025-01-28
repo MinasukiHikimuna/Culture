@@ -177,13 +177,22 @@ class StashDbClient(StashboxClient):
     def query_scenes_by_phash_optimized(self, scenes: List[Dict]) -> pl.DataFrame:
         """
         Query StashDB for multiple scenes using their phash fingerprints in a single request.
+        Verifies phash matches against provided StashDB IDs.
 
         Args:
-            scenes (list[dict]): List of scene objects
+            scenes (list[dict]): List of scene objects with phash and stashdb_id (required)
 
         Returns:
-            pl.DataFrame: DataFrame with phash, id, title, code, duration, date, urls, images, studio, tags, performers
+            pl.DataFrame: DataFrame with scene data
+        
+        Raises:
+            ValueError: If any scene is missing a StashDB ID
         """
+        # Validate that all scenes have StashDB IDs
+        scenes_without_ids = [scene for scene in scenes if not scene.get("stashdb_id")]
+        if scenes_without_ids:
+            raise ValueError(f"All scenes must have StashDB IDs. Found {len(scenes_without_ids)} scenes without IDs.")
+
         fragment = """
             id
             title
@@ -285,14 +294,6 @@ class StashDbClient(StashboxClient):
             }
         """
         
-        find_scene = f"""
-            query FindScene($id: ID!) {{
-                findScene(id: $id) {{
-                    {fragment}
-                }}
-            }}
-        """
-        
         find_scenes_by_full_fingerprints = f"""
             query FindScenesByFullFingerprints($fingerprints: [FingerprintQueryInput!]!) {{
                 findScenesByFullFingerprints(fingerprints: $fingerprints) {{
@@ -300,44 +301,51 @@ class StashDbClient(StashboxClient):
                 }}
             }}
         """
-    
-        scenes_with_stashdb_id = [scene for scene in scenes if scene["stashdb_id"]]
-        scenes_without_stashdb_id = [scene for scene in scenes if not scene["stashdb_id"]]
 
-        results_with_stashdb_id = {}
-        for scene in scenes_with_stashdb_id:
-            find_scene_result = self._gql_query(find_scene, {"id": scene["stashdb_id"]})
-            if find_scene_result:
-                results_with_stashdb_id[scene["phash"]] = find_scene_result["data"]["findScene"]
-
+        # Query all scenes by phash first
         find_scenes_by_full_fingerprints_variables = {
             "fingerprints": [
-                {"algorithm": "PHASH", "hash": scene["phash"]} for scene in scenes_without_stashdb_id
+                {"algorithm": "PHASH", "hash": scene["phash"]} for scene in scenes
             ]
         }
 
-        results_without_stashdb_id = self._gql_query(find_scenes_by_full_fingerprints, find_scenes_by_full_fingerprints_variables)
+        results = self._gql_query(find_scenes_by_full_fingerprints, find_scenes_by_full_fingerprints_variables)
 
         if (
-            not results_without_stashdb_id
-            or "data" not in results_without_stashdb_id
-            or "findScenesByFullFingerprints" not in results_without_stashdb_id["data"]
+            not results
+            or "data" not in results
+            or "findScenesByFullFingerprints" not in results["data"]
         ):
             raise Exception("Failed to query scenes by phash")
 
-        # Save to file for debugging/testing
-        # import json
-        # time_in_ticks = datetime.now().timestamp()
-        # with open(f"phash_to_scene_{time_in_ticks}.json", "w") as f:
-        #     f.write(json.dumps({ "input_scenes": scenes, "results": results_without_stashdb_id }, indent=4))
-
-        stashdb_scenes = results_without_stashdb_id["data"]["findScenesByFullFingerprints"]
-        matched_scenes = self.scene_matcher.match_scenes(scenes, stashdb_scenes)
+        stashdb_scenes = results["data"]["findScenesByFullFingerprints"]
+        
+        # Create a mapping of phash to scenes that also considers stashdb_id for verification
+        matched_scenes = {}
+        for scene in scenes:
+            phash = scene["phash"]
+            stashdb_id = scene["stashdb_id"]  # We can safely access this now
+            
+            # Find all matching scenes for this phash
+            matching_scenes = [s for s in stashdb_scenes if any(
+                fp["algorithm"] == "PHASH" and fp["hash"] == phash 
+                for fp in s.get("fingerprints", [])
+            )]
+            
+            if not matching_scenes:
+                matched_scenes[phash] = None
+                continue
+            
+            # Try to find an exact match with the known StashDB ID
+            exact_match = next((s for s in matching_scenes if s["id"] == stashdb_id), None)
+            if exact_match:
+                matched_scenes[phash] = exact_match
+                continue
+            
+            # If phash match doesn't correspond to the known StashDB ID, treat as no match
+            matched_scenes[phash] = None
 
         # Combined results
-        for phash, scene_data in results_with_stashdb_id.items():
-            matched_scenes[phash] = scene_data
-
         matched_scenes_list = [
             (
                 {
