@@ -367,7 +367,7 @@ class StashAppClient:
             tag_data = {
                 "id": tag.get("id"),
                 "name": tag.get("name"),
-                "stashdb_id": next((alias[11:] for alias in tag.get("aliases", []) if alias.startswith("StashDB ID: ")), None),
+                "stashdb_id": next((alias[len("StashDB ID: "):] for alias in tag.get("aliases", []) if alias.startswith("StashDB ID: ")), None),
             }
             tags_data.append(tag_data)
         
