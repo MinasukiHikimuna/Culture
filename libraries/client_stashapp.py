@@ -77,7 +77,12 @@ scenes_fragment = """
         stash_id
         updated_at
     }
+    galleries {
+        id
+        title
+    }
 """
+
 
 scenes_schema = {
     "stashapp_id": pl.Int64,
@@ -173,6 +178,7 @@ scenes_schema = {
     "stashapp_stashdb_id": pl.Utf8,
     "stashapp_tpdb_id": pl.Utf8,
     "stashapp_ce_id": pl.Utf8,
+    "stashapp_galleries": pl.List(pl.Struct({"id": pl.Int64, "title": pl.Utf8})),
 }
 
 galleries_fragment = """
@@ -323,6 +329,7 @@ galleries_schema = {
     ),
     "stashapp_ce_id": pl.Utf8,
     "stashapp_image_count": pl.Int64,
+    "stashapp_scenes": pl.List(pl.Struct({"id": pl.Int64, "title": pl.Utf8})),
 }
 
 def get_stashapp_client(prefix=""):
@@ -644,6 +651,13 @@ class StashAppClient:
                 ),
                 None,
             ),
+            "stashapp_galleries": [
+                {
+                    "id": int(g.get("id")),
+                    "title": g.get("title", ""),
+                }
+                for g in stash_scene.get("galleries", [])
+            ],
         }
         return scene_data
         
@@ -802,6 +816,13 @@ class StashAppClient:
                 None,
             ),
             "stashapp_image_count": stash_gallery.get("image_count", 0),
+            "stashapp_scenes": [
+                {
+                    "id": int(s.get("id")),
+                    "title": s.get("title", ""),
+                }
+                for s in stash_gallery.get("scenes", [])
+            ],
         }
 
     def get_performers(self) -> pl.DataFrame:
