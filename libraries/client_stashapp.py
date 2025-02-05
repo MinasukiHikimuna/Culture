@@ -322,6 +322,7 @@ galleries_schema = {
         )
     ),
     "stashapp_ce_id": pl.Utf8,
+    "stashapp_image_count": pl.Int64,
 }
 
 def get_stashapp_client(prefix=""):
@@ -800,6 +801,7 @@ class StashAppClient:
                 ),
                 None,
             ),
+            "stashapp_image_count": stash_gallery.get("image_count", 0),
         }
 
     def get_performers(self) -> pl.DataFrame:
