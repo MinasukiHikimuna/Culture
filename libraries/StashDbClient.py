@@ -1090,6 +1090,30 @@ class StashDbClient(StashboxClient):
 
         return all_tags
 
+    def submit_scene_draft(self, draft_input: dict) -> dict:
+        """
+        Submit a scene draft with just the title field.
+        
+        Args:
+            draft_input: The draft input to submit
+            
+        Returns:
+            dict: The response from the server containing the draft submission status
+        """
+        query = """
+        mutation SubmitSceneDraft($input: SceneDraftInput!) {
+            submitSceneDraft(input: $input) {
+                id
+            }
+        }
+        """
+        
+        variables = {
+            "input": draft_input
+        }
+
+        return self._gql_query(query, variables)
+
     def _gql_query(self, query, variables=None):
         headers = {"Content-Type": "application/json"}
         if self.api_key:
