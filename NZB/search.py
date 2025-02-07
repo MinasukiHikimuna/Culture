@@ -31,6 +31,10 @@ class NZBSearch:
         response = requests.get(url)
         response_json = response.json()
         
+        # Handle ninja response format which wraps everything in a channel
+        if api_url == "https://ninjacentral.co.za/api":
+            response_json = response_json["channel"]
+        
         # Handle various response formats
         if "error" in response_json:
             print(f"API returned error: {response_json['error']}")
@@ -73,33 +77,52 @@ class NZBSearch:
         for api_name, api_url in self.api_urls.items():
             try:
                 api_key = self.drunkenslug_api_key if api_name == "drunkenslug" else self.ninjacentral_api_key
-                nzb_results = self.get_nzb_results(api_url, api_key, query)
-                
-                if not nzb_results["item"]:
-                    print(f"No results found from {api_name}")
-                    continue
                 
                 try:
-                    nzb_results_df = pl.DataFrame(nzb_results["item"])
+                    results = self.get_nzb_results(api_url, api_key, query)
                     
-                    # Check if required columns exist
-                    required_cols = ["newznab:attr", "title", "guid", "link"]
-                    missing_cols = [col for col in required_cols if col not in nzb_results_df.columns]
-                    if missing_cols:
-                        print(f"Missing required columns in {api_name} response: {missing_cols}")
+                    if not results["item"]:
                         continue
+                        
+                    # Convert results to DataFrame
+                    nzb_results_df = pl.DataFrame(results["item"])
                     
-                    # Safely access newznab attributes with error handling
-                    nzb_results_df = nzb_results_df.with_columns([
-                        pl.col("newznab:attr").list.get(0).struct.field("_value").fill_null("0").alias("category_id"),
-                        pl.col("newznab:attr")
-                            .list.get(1)
-                            .struct.field("_value")
-                            .cast(pl.Int64)
-                            .fill_null(0)
-                            .alias("size"),
-                        pl.col("guid").struct.field("text").fill_null("").alias("item_url"),
-                        pl.lit(api_name).alias("api_name"),
+                    # Extract size and category based on API format
+                    if api_name == "drunkenslug":
+                        # Drunken Slug has newznab:attr array with name/value pairs
+                        nzb_results_df = nzb_results_df.with_columns([
+                            pl.col("newznab:attr").map_elements(
+                                lambda attrs: next((attr["_value"] for attr in attrs if attr["_name"] == "size"), "0"),
+                                return_dtype=pl.Utf8
+                            ).cast(pl.Int64).fill_null(0).alias("size"),
+                            pl.col("newznab:attr").map_elements(
+                                lambda attrs: next((attr["_value"] for attr in attrs if attr["_name"] == "category"), ""),
+                                return_dtype=pl.Utf8
+                            ).alias("category_id"),
+                            pl.col("guid").struct.field("text").fill_null("").alias("item_url")
+                        ])
+                    else:
+                        # Ninja Central has attr array with @attributes containing name/value
+                        nzb_results_df = nzb_results_df.with_columns([
+                            pl.col("attr").map_elements(
+                                lambda attrs: next((attr["@attributes"]["value"] for attr in attrs if attr["@attributes"]["name"] == "size"), "0"),
+                                return_dtype=pl.Utf8
+                            ).cast(pl.Int64).fill_null(0).alias("size"),
+                            pl.col("attr").map_elements(
+                                lambda attrs: next((attr["@attributes"]["value"] for attr in attrs if attr["@attributes"]["name"] == "category"), ""),
+                                return_dtype=pl.Utf8
+                            ).alias("category_id"),
+                            pl.col("guid").alias("item_url")
+                        ])
+                    
+                    # Select only the columns we need
+                    nzb_results_df = nzb_results_df.select([
+                        pl.col("title"),
+                        pl.col("size"),
+                        pl.col("link"),
+                        pl.col("category_id"),
+                        pl.col("item_url"),
+                        pl.lit(api_name).alias("api_name")
                     ])
                     
                     # Add human-readable category names
@@ -121,7 +144,6 @@ class NZBSearch:
                 continue
         
         if not all_results:
-            print("No results found from any source")
             return pl.DataFrame(schema={
                 "title": pl.Utf8,
                 "size": pl.Int64,
@@ -133,15 +155,7 @@ class NZBSearch:
             })
             
         combined_df = pl.concat(all_results)
-        return combined_df.sort(by="size", descending=True).select(
-            pl.col("title"), 
-            pl.col("size"), 
-            pl.col("link"), 
-            pl.col("category_id"),
-            pl.col("category_name"),
-            pl.col("item_url"),
-            pl.col("api_name")
-        )
+        return combined_df.sort(by="size", descending=True)
 
 def main():
     searcher = NZBSearch()
