@@ -1,4 +1,5 @@
 from typing import Dict, List, Optional
+import json
 import polars as pl
 import requests
 from datetime import datetime
@@ -490,6 +491,7 @@ class StashDbClient(StashboxClient):
                         }
                         for fingerprint in scene_data.get("fingerprints") or []
                     ],
+                    "stashdb_data": json.dumps(scene_data)
                 }
                 if scene_data
                 else {"queried_phash": phash}
@@ -604,6 +606,7 @@ class StashDbClient(StashboxClient):
                     {"algorithm": pl.Utf8, "hash": pl.Utf8, "duration": pl.Int64}
                 )
             ),
+            "stashdb_data": pl.Utf8,
         }
 
         df_matched_scenes = pl.DataFrame(matched_scenes_list, schema=schema)
