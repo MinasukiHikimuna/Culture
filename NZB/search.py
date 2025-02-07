@@ -30,8 +30,22 @@ class NZBSearch:
         url = f"{api_url}?t=search&o=json&apikey={api_key}&q={encoded_query}"
         response = requests.get(url)
         response_json = response.json()
-        if "item" not in response_json or not response_json["item"]:
+        
+        # Handle various response formats
+        if "error" in response_json:
+            print(f"API returned error: {response_json['error']}")
             return {"item": []}
+        if not isinstance(response_json, dict):
+            print(f"Unexpected response format")
+            return {"item": []}
+        if "item" not in response_json:
+            return {"item": []}
+        # Handle case where item might be None instead of empty list
+        if response_json["item"] is None:
+            return {"item": []}
+        # Ensure item is always a list
+        if isinstance(response_json["item"], dict):
+            response_json["item"] = [response_json["item"]]
         return response_json
 
     def get_category_info(self, api_name: str, cat_id: str) -> str:
@@ -62,36 +76,61 @@ class NZBSearch:
                 nzb_results = self.get_nzb_results(api_url, api_key, query)
                 
                 if not nzb_results["item"]:
+                    print(f"No results found from {api_name}")
                     continue
+                
+                try:
+                    nzb_results_df = pl.DataFrame(nzb_results["item"])
                     
-                nzb_results_df = pl.DataFrame(nzb_results["item"])
-                nzb_results_df = nzb_results_df.with_columns([
-                    pl.col("newznab:attr").list.get(0).struct.field("_value").alias("category_id"),
-                    pl.col("newznab:attr")
-                        .list.get(1)
-                        .struct.field("_value")
-                        .cast(pl.Int64)
-                        .alias("size"), 
-                    pl.col("guid").struct.field("text").alias("item_url"),
-                    pl.lit(api_name).alias("api_name"),
-                ])
-                
-                # Add human-readable category names
-                nzb_results_df = nzb_results_df.with_columns([
-                    pl.col("category_id").map_elements(
-                        lambda x: self.get_category_info(api_name, x),
-                        return_dtype=pl.Utf8
-                    ).alias("category_name")
-                ])
-                
-                all_results.append(nzb_results_df)
+                    # Check if required columns exist
+                    required_cols = ["newznab:attr", "title", "guid", "link"]
+                    missing_cols = [col for col in required_cols if col not in nzb_results_df.columns]
+                    if missing_cols:
+                        print(f"Missing required columns in {api_name} response: {missing_cols}")
+                        continue
+                    
+                    # Safely access newznab attributes with error handling
+                    nzb_results_df = nzb_results_df.with_columns([
+                        pl.col("newznab:attr").list.get(0).struct.field("_value").fill_null("0").alias("category_id"),
+                        pl.col("newznab:attr")
+                            .list.get(1)
+                            .struct.field("_value")
+                            .cast(pl.Int64)
+                            .fill_null(0)
+                            .alias("size"),
+                        pl.col("guid").struct.field("text").fill_null("").alias("item_url"),
+                        pl.lit(api_name).alias("api_name"),
+                    ])
+                    
+                    # Add human-readable category names
+                    nzb_results_df = nzb_results_df.with_columns([
+                        pl.col("category_id").map_elements(
+                            lambda x: self.get_category_info(api_name, x),
+                            return_dtype=pl.Utf8
+                        ).alias("category_name")
+                    ])
+                    
+                    all_results.append(nzb_results_df)
+                    
+                except Exception as e:
+                    print(f"Error processing results from {api_name}: {str(e)}")
+                    continue
                 
             except Exception as e:
                 print(f"Error fetching results from {api_name}: {str(e)}")
                 continue
         
         if not all_results:
-            return pl.DataFrame()
+            print("No results found from any source")
+            return pl.DataFrame(schema={
+                "title": pl.Utf8,
+                "size": pl.Int64,
+                "link": pl.Utf8,
+                "category_id": pl.Utf8,
+                "category_name": pl.Utf8,
+                "item_url": pl.Utf8,
+                "api_name": pl.Utf8
+            })
             
         combined_df = pl.concat(all_results)
         return combined_df.sort(by="size", descending=True).select(
