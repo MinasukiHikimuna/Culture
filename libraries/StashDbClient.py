@@ -175,26 +175,115 @@ class StashDbClient(StashboxClient):
 
         return scenes
 
+    def query_scenes_by_phash(self, scenes: List[Dict]) -> pl.DataFrame:
+        """Legacy method for querying scenes by phash"""
+        phashes = [scene["phash"] for scene in scenes]
+        scene_ids = [scene["stashdb_id"] for scene in scenes if scene.get("stashdb_id")]
+        return self.query_scenes(scene_ids=scene_ids, phashes=phashes)
+
     def query_scenes_by_phash_optimized(self, scenes: List[Dict]) -> pl.DataFrame:
-        """
-        Query StashDB for multiple scenes using their phash fingerprints in a single request.
-        Verifies phash matches against provided StashDB IDs.
-
-        Args:
-            scenes (list[dict]): List of scene objects with phash and stashdb_id (required)
-
-        Returns:
-            pl.DataFrame: DataFrame with scene data
-        
-        Raises:
-            ValueError: If any scene is missing a StashDB ID
-        """
+        """Optimized method for querying scenes by phash"""
         # Validate that all scenes have StashDB IDs
         scenes_without_ids = [scene for scene in scenes if not scene.get("stashdb_id")]
         if scenes_without_ids:
             raise ValueError(f"All scenes must have StashDB IDs. Found {len(scenes_without_ids)} scenes without IDs.")
+        
+        scene_ids = [scene["stashdb_id"] for scene in scenes]
+        return self.query_scenes(scene_ids=scene_ids)
 
-        fragment = """
+    def query_tags(self):
+        query = """
+            query QueryTags($page: Int!, $per_page: Int!) {
+                queryTags(input: {
+                    page: $page
+                    per_page: $per_page
+                }) {
+                    count
+                    tags {
+                        id
+                        name
+                        description
+                        aliases
+                        deleted
+                        created
+                        updated
+                        category {
+                            id
+                            name
+                            group
+                            description
+                        }
+                    }
+                }
+            }
+        """
+        per_page = 25
+        page = 1
+        all_tags = []
+        total_count = None
+
+        while True:
+            result = self._gql_query(query, {"page": page, "per_page": per_page})
+            if result is None or 'data' not in result or 'queryTags' not in result['data']:
+                break
+
+            tags_data = result['data']['queryTags']
+            all_tags.extend(tags_data['tags'])
+
+            if total_count is None:
+                total_count = tags_data['count']
+
+            if len(all_tags) >= total_count:
+                break
+
+            page += 1
+
+        return all_tags
+
+    def submit_scene_draft(self, draft_input: dict) -> dict:
+        """
+        Submit a scene draft with just the title field.
+        
+        Args:
+            draft_input: The draft input to submit
+            
+        Returns:
+            dict: The response from the server containing the draft submission status
+        """
+        query = """
+        mutation SubmitSceneDraft($input: SceneDraftInput!) {
+            submitSceneDraft(input: $input) {
+                id
+            }
+        }
+        """
+        
+        variables = {
+            "input": draft_input
+        }
+
+        return self._gql_query(query, variables)
+
+    def _gql_query(self, query, variables=None):
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["Apikey"] = self.api_key
+        response = requests.post(
+            self.endpoint,
+            json={"query": query, "variables": variables},
+            headers=headers,
+        )
+        if response.status_code == 200:
+            return response.json()
+        else:
+            logger.error(
+                f"Query failed with status code {response.status_code}: {response.text}"
+            )
+            return None
+
+    def _get_scene_fragment(self):
+        """Returns the GraphQL fragment for querying scene data"""
+        return """
             id
             title
             code
@@ -294,91 +383,59 @@ class StashDbClient(StashboxClient):
                 duration
             }
         """
+
+    def _transform_scene_data(self, scene_data: dict, queried_phash: Optional[str] = None) -> dict:
+        """Transform raw GraphQL scene data into standardized format"""
+        if not scene_data:
+            return {"queried_phash": queried_phash} if queried_phash else {}
         
-        find_scenes_by_full_fingerprints = f"""
-            query FindScenesByFullFingerprints($fingerprints: [FingerprintQueryInput!]!) {{
-                findScenesByFullFingerprints(fingerprints: $fingerprints) {{
-                    {fragment}
-                }}
-            }}
-        """
-
-        # Query all scenes by phash first
-        find_scenes_by_full_fingerprints_variables = {
-            "fingerprints": [
-                {"algorithm": "PHASH", "hash": scene["phash"]} for scene in scenes
-            ]
-        }
-
-        results = self._gql_query(find_scenes_by_full_fingerprints, find_scenes_by_full_fingerprints_variables)
-
-        if (
-            not results
-            or "data" not in results
-            or "findScenesByFullFingerprints" not in results["data"]
-        ):
-            raise Exception("Failed to query scenes by phash")
-
-        stashdb_scenes = results["data"]["findScenesByFullFingerprints"]
-        
-        # Create a mapping of phash to scenes that also considers stashdb_id for verification
-        matched_scenes = {}
-        for scene in scenes:
-            phash = scene["phash"]
-            stashdb_id = scene["stashdb_id"]  # We can safely access this now
-            
-            # Find all matching scenes for this phash
-            matching_scenes = [s for s in stashdb_scenes if any(
-                fp["algorithm"] == "PHASH" and fp["hash"] == phash 
-                for fp in s.get("fingerprints", [])
-            )]
-            
-            if not matching_scenes:
-                matched_scenes[phash] = None
-                continue
-            
-            # Try to find an exact match with the known StashDB ID
-            exact_match = next((s for s in matching_scenes if s["id"] == stashdb_id), None)
-            if exact_match:
-                matched_scenes[phash] = exact_match
-                continue
-            
-            # If phash match doesn't correspond to the known StashDB ID, treat as no match
-            matched_scenes[phash] = None
-
-        # Combined results
-        matched_scenes_list = [
-            (
+        return {
+            **({"queried_phash": queried_phash} if queried_phash else {}),
+            "id": scene_data["id"],
+            "title": scene_data["title"],
+            "code": scene_data["code"],
+            "duration": scene_data["duration"] * 1000 if scene_data["duration"] else None,
+            "date": (
+                datetime.strptime(scene_data.get("date", ""), "%Y-%m-%d").date()
+                if scene_data.get("date")
+                else None
+            ),
+            "urls": [
+                {"url": url["url"], "type": url["type"]}
+                for url in scene_data.get("urls", [])
+            ],
+            "images": [
                 {
-                    "queried_phash": phash,
-                    "id": scene_data["id"],
-                    "title": scene_data["title"],
-                    "code": scene_data["code"],
-                    "duration": scene_data["duration"] * 1000 if scene_data["duration"] else None,
-                    "date": (
-                        datetime.strptime(scene_data.get("date", ""), "%Y-%m-%d").date()
-                        if scene_data.get("date")
-                        else None
-                    ),
-                    "urls": [
-                        {"url": url["url"], "type": url["type"]}
-                        for url in scene_data.get("urls", [])
-                    ],
-                    "images": [
-                        {
-                            "id": image["id"],
-                            "url": image["url"],
-                            "width": image["width"],
-                            "height": image["height"],
-                        }
-                        for image in scene_data.get("images", [])
-                    ],
-                    "studio": {
-                        "id": scene_data["studio"]["id"],
-                        "name": scene_data["studio"]["name"],
+                    "id": image["id"],
+                    "url": image["url"],
+                    "width": image["width"],
+                    "height": image["height"],
+                }
+                for image in scene_data.get("images", [])
+            ],
+            "studio": {
+                "id": scene_data["studio"]["id"],
+                "name": scene_data["studio"]["name"],
+                "urls": [
+                    {"url": url["url"], "type": url["type"]}
+                    for url in scene_data["studio"].get("urls", [])
+                ],
+                "images": [
+                    {
+                        "id": image["id"],
+                        "url": image["url"],
+                        "width": image["width"],
+                        "height": image["height"],
+                    }
+                    for image in scene_data["studio"].get("images", [])
+                ],
+                "parent": (
+                    {
+                        "id": scene_data["studio"]["parent"]["id"],
+                        "name": scene_data["studio"]["parent"]["name"],
                         "urls": [
                             {"url": url["url"], "type": url["type"]}
-                            for url in scene_data["studio"].get("urls", [])
+                            for url in scene_data["studio"]["parent"].get("urls", [])
                         ],
                         "images": [
                             {
@@ -387,118 +444,149 @@ class StashDbClient(StashboxClient):
                                 "width": image["width"],
                                 "height": image["height"],
                             }
-                            for image in scene_data["studio"].get("images", [])
+                            for image in scene_data["studio"]["parent"].get("images", [])
                         ],
-                        "parent": (
+                    }
+                    if scene_data["studio"].get("parent")
+                    else None
+                ),
+            },
+            "tags": [
+                {"name": tag["name"], "id": tag["id"]}
+                for tag in scene_data.get("tags", [])
+            ],
+            "performers": [
+                {
+                    "as": performer["as"],
+                    "performer": {
+                        "id": performer["performer"]["id"],
+                        "name": performer["performer"]["name"],
+                        "disambiguation": performer["performer"]["disambiguation"],
+                        "aliases": performer["performer"]["aliases"],
+                        "gender": performer["performer"]["gender"],
+                        "merged_ids": performer["performer"]["merged_ids"],
+                        "urls": [
+                            {"url": url["url"], "type": url["type"]}
+                            for url in performer["performer"].get("urls", [])
+                        ],
+                        "images": [
                             {
-                                "id": scene_data["studio"]["parent"]["id"],
-                                "name": scene_data["studio"]["parent"]["name"],
-                                "urls": [
-                                    {"url": url["url"], "type": url["type"]}
-                                    for url in scene_data["studio"]["parent"].get(
-                                        "urls", []
-                                    )
-                                ],
-                                "images": [
-                                    {
-                                        "id": image["id"],
-                                        "url": image["url"],
-                                        "width": image["width"],
-                                        "height": image["height"],
-                                    }
-                                    for image in scene_data["studio"]["parent"].get(
-                                        "images", []
-                                    )
-                                ],
+                                "id": image["id"],
+                                "url": image["url"],
+                                "width": image["width"],
+                                "height": image["height"],
                             }
-                            if scene_data["studio"].get("parent")
-                            else None
-                        ),
+                            for image in performer["performer"].get("images", [])
+                        ],
+                        "birth_date": performer["performer"]["birth_date"],
+                        "ethnicity": performer["performer"]["ethnicity"],
+                        "country": performer["performer"]["country"],
+                        "eye_color": performer["performer"]["eye_color"],
+                        "hair_color": performer["performer"]["hair_color"],
+                        "height": performer["performer"]["height"],
+                        "measurements": {
+                            "band_size": performer["performer"]["measurements"]["band_size"],
+                            "cup_size": performer["performer"]["measurements"]["cup_size"],
+                            "waist": performer["performer"]["measurements"]["waist"],
+                            "hip": performer["performer"]["measurements"]["hip"],
+                        },
+                        "breast_type": performer["performer"]["breast_type"],
+                        "career_start_year": performer["performer"]["career_start_year"],
+                        "career_end_year": performer["performer"]["career_end_year"],
+                        "tattoos": [
+                            {
+                                "location": tattoo.get("location"),
+                                "description": tattoo.get("description"),
+                            }
+                            for tattoo in performer["performer"].get("tattoos") or []
+                        ],
+                        "piercings": [
+                            {
+                                "location": piercing["location"],
+                                "description": piercing["description"],
+                            }
+                            for piercing in performer["performer"].get("piercings") or []
+                        ],
                     },
-                    "tags": [
-                        {"name": tag["name"], "id": tag["id"]}
-                        for tag in scene_data.get("tags", [])
-                    ],
-                    "performers": [
-                        {
-                            "as": performer["as"],
-                            "performer": {
-                                "id": performer["performer"]["id"],
-                                "name": performer["performer"]["name"],
-                                "disambiguation": performer["performer"]["disambiguation"],
-                                "aliases": performer["performer"]["aliases"],
-                                "gender": performer["performer"]["gender"],
-                                "merged_ids": performer["performer"]["merged_ids"],
-                                "urls": [
-                                    {"url": url["url"], "type": url["type"]}
-                                    for url in performer["performer"].get("urls", [])
-                                ],
-                                "images": [
-                                    {
-                                        "id": image["id"],
-                                        "url": image["url"],
-                                        "width": image["width"],
-                                        "height": image["height"],
-                                    }
-                                    for image in performer["performer"].get("images", [])
-                                ],
-                                "birth_date": performer["performer"]["birth_date"],
-                                "ethnicity": performer["performer"]["ethnicity"],
-                                "country": performer["performer"]["country"],
-                                "eye_color": performer["performer"]["eye_color"],
-                                "hair_color": performer["performer"]["hair_color"],
-                                "height": performer["performer"]["height"],
-                                "measurements": {
-                                    "band_size": performer["performer"]["measurements"]["band_size"],
-                                    "cup_size": performer["performer"]["measurements"]["cup_size"],
-                                    "waist": performer["performer"]["measurements"]["waist"],
-                                    "hip": performer["performer"]["measurements"]["hip"],
-                                },
-                                "breast_type": performer["performer"]["breast_type"],
-                                "career_start_year": performer["performer"]["career_start_year"],
-                                "career_end_year": performer["performer"]["career_end_year"],
-                                "tattoos": [
-                                    {
-                                        "location": tattoo.get("location"),
-                                        "description": tattoo.get("description"),
-                                    }
-                                    for tattoo in performer["performer"].get("tattoos") or []
-                                ],
-                                "piercings": [
-                                    {
-                                        "location": piercing["location"],
-                                        "description": piercing["description"],
-                                    }
-                                    for piercing in performer["performer"].get("piercings") or []
-                                ],
-                                "fingerprints": [
-                                    {
-                                        "algorithm": fingerprint["algorithm"],
-                                        "hash": fingerprint["hash"],
-                                        "duration": fingerprint["duration"],
-                                    }
-                                    for fingerprint in performer["performer"].get("fingerprints") or []
-                                ],
-                            },
-                        }
-                        for performer in scene_data.get("performers", [])
-                    ],
-                    "fingerprints": [
-                        {
-                            "algorithm": fingerprint["algorithm"],
-                            "hash": fingerprint["hash"],
-                            "duration": fingerprint["duration"],
-                        }
-                        for fingerprint in scene_data.get("fingerprints") or []
-                    ],
-                    "stashdb_data": json.dumps(scene_data)
                 }
-                if scene_data
-                else {"queried_phash": phash}
-            )
-            for phash, scene_data in matched_scenes.items()
-        ]
+                for performer in scene_data.get("performers", [])
+            ],
+            "fingerprints": [
+                {
+                    "algorithm": fingerprint["algorithm"],
+                    "hash": fingerprint["hash"],
+                    "duration": fingerprint["duration"],
+                }
+                for fingerprint in scene_data.get("fingerprints") or []
+            ],
+            "stashdb_data": json.dumps(scene_data)
+        }
 
+    def query_scenes(self, scene_ids: Optional[List[str]] = None, phashes: Optional[List[str]] = None) -> pl.DataFrame:
+        """
+        Query scenes by either their StashDB IDs or phash values.
+        
+        Args:
+            scene_ids: Optional list of StashDB scene IDs
+            phashes: Optional list of phash values
+            
+        Returns:
+            pl.DataFrame: DataFrame containing the scene data
+        """
+        if not scene_ids and not phashes:
+            raise ValueError("Must provide either scene_ids or phashes")
+
+        fragment = self._get_scene_fragment()
+        
+        # Query scenes by ID
+        scenes_by_id = {}
+        if scene_ids:
+            find_scene_query = f"""
+                query FindScene($id: ID!) {{
+                    findScene(id: $id) {{
+                        {fragment}
+                    }}
+                }}
+            """
+            
+            for scene_id in scene_ids:
+                result = self._gql_query(find_scene_query, {"id": scene_id})
+                if result and "data" in result and "findScene" in result["data"]:
+                    scenes_by_id[scene_id] = result["data"]["findScene"]
+
+        # Query scenes by phash
+        scenes_by_phash = {}
+        if phashes:
+            find_scenes_query = f"""
+                query FindScenesByFullFingerprints($fingerprints: [FingerprintQueryInput!]!) {{
+                    findScenesByFullFingerprints(fingerprints: $fingerprints) {{
+                        {fragment}
+                    }}
+                }}
+            """
+            
+            variables = {
+                "fingerprints": [{"algorithm": "PHASH", "hash": phash} for phash in phashes]
+            }
+            
+            result = self._gql_query(find_scenes_query, variables)
+            if result and "data" in result and "findScenesByFullFingerprints" in result["data"]:
+                stashdb_scenes = result["data"]["findScenesByFullFingerprints"]
+                scenes_by_phash = self.scene_matcher.match_scenes(
+                    [{"phash": phash} for phash in phashes], 
+                    stashdb_scenes
+                )
+
+        # Transform results
+        transformed_scenes = []
+        
+        for scene_id, scene_data in scenes_by_id.items():
+            transformed_scenes.append(self._transform_scene_data(scene_data))
+            
+        for phash, scene_data in scenes_by_phash.items():
+            transformed_scenes.append(self._transform_scene_data(scene_data, phash))
+
+        # Create DataFrame with schema
         schema = {
             "queried_phash": pl.Utf8,
             "id": pl.Utf8,
@@ -609,524 +697,4 @@ class StashDbClient(StashboxClient):
             "stashdb_data": pl.Utf8,
         }
 
-        df_matched_scenes = pl.DataFrame(matched_scenes_list, schema=schema)
-
-        return df_matched_scenes
-
-    def query_scenes_by_phash(self, scenes: List[Dict]) -> pl.DataFrame:
-        """
-        Query StashDB for multiple scenes using their phash fingerprints in a single request.
-
-        Args:
-            scenes (list[dict]): List of scene objects
-
-        Returns:
-            pl.DataFrame: DataFrame with phash, id, title, code, duration, date, urls, images, studio, tags, performers
-        """
-        fragment = """
-            id
-            title
-            code
-            details
-            director
-            duration
-            date
-            urls {
-                url
-                type
-            }
-            images {
-                id
-                url
-                width
-                height
-            }
-            studio {
-                id
-                name
-                urls {
-                    url
-                    type
-                }
-                images {
-                    id
-                    url
-                    width
-                    height
-                }
-                parent {
-                    id
-                    name
-                    urls {
-                        url
-                        type
-                    }
-                    images {
-                        id
-                        url
-                        width
-                        height
-                    }
-                }
-            }
-            tags {
-                name
-                id
-            }
-            performers {
-                as
-                performer {
-                    id
-                    name
-                    disambiguation
-                    aliases
-                    gender
-                    merged_ids
-                    urls {
-                        url
-                        type
-                    }
-                    images {
-                        id
-                        url
-                        width
-                        height
-                    }
-                    birth_date
-                    ethnicity
-                    country
-                    eye_color
-                    hair_color
-                    height
-                    measurements {
-                        band_size
-                        cup_size
-                        waist
-                        hip
-                    }
-                    breast_type
-                    career_start_year
-                    career_end_year
-                    tattoos {
-                        location
-                        description
-                    }
-                    piercings {
-                        location
-                        description
-                    }
-                }
-            }
-            fingerprints {
-                algorithm
-                hash
-                duration
-            }
-        """
-        
-        find_scene = f"""
-            query FindScene($id: ID!) {{
-                findScene(id: $id) {{
-                    {fragment}
-                }}
-            }}
-        """
-        
-        find_scenes_by_full_fingerprints = f"""
-            query FindScenesByFullFingerprints($fingerprints: [FingerprintQueryInput!]!) {{
-                findScenesByFullFingerprints(fingerprints: $fingerprints) {{
-                    {fragment}
-                }}
-            }}
-        """
-    
-        scenes_with_stashdb_id = [scene for scene in scenes if scene["stashdb_id"]]
-        scenes_without_stashdb_id = [scene for scene in scenes if not scene["stashdb_id"]]
-
-        results_with_stashdb_id = {}
-        for scene in scenes_with_stashdb_id:
-            find_scene_result = self._gql_query(find_scene, {"id": scene["stashdb_id"]})
-            if find_scene_result:
-                results_with_stashdb_id[scene["phash"]] = find_scene_result["data"]["findScene"]
-
-        find_scenes_by_full_fingerprints_variables = {
-            "fingerprints": [
-                {"algorithm": "PHASH", "hash": scene["phash"]} for scene in scenes_without_stashdb_id
-            ]
-        }
-
-        results_without_stashdb_id = self._gql_query(find_scenes_by_full_fingerprints, find_scenes_by_full_fingerprints_variables)
-
-        if (
-            not results_without_stashdb_id
-            or "data" not in results_without_stashdb_id
-            or "findScenesByFullFingerprints" not in results_without_stashdb_id["data"]
-        ):
-            raise Exception("Failed to query scenes by phash")
-
-        # Save to file for debugging/testing
-        # import json
-        # time_in_ticks = datetime.now().timestamp()
-        # with open(f"phash_to_scene_{time_in_ticks}.json", "w") as f:
-        #     f.write(json.dumps({ "input_scenes": scenes, "results": results_without_stashdb_id }, indent=4))
-
-        stashdb_scenes = results_without_stashdb_id["data"]["findScenesByFullFingerprints"]
-        matched_scenes = self.scene_matcher.match_scenes(scenes, stashdb_scenes)
-
-        # Combined results
-        for phash, scene_data in results_with_stashdb_id.items():
-            matched_scenes[phash] = scene_data
-
-        matched_scenes_list = [
-            (
-                {
-                    "queried_phash": phash,
-                    "id": scene_data["id"],
-                    "title": scene_data["title"],
-                    "code": scene_data["code"],
-                    "duration": scene_data["duration"] * 1000 if scene_data["duration"] else None,
-                    "date": (
-                        datetime.strptime(scene_data.get("date", ""), "%Y-%m-%d").date()
-                        if scene_data.get("date")
-                        else None
-                    ),
-                    "urls": [
-                        {"url": url["url"], "type": url["type"]}
-                        for url in scene_data.get("urls", [])
-                    ],
-                    "images": [
-                        {
-                            "id": image["id"],
-                            "url": image["url"],
-                            "width": image["width"],
-                            "height": image["height"],
-                        }
-                        for image in scene_data.get("images", [])
-                    ],
-                    "studio": {
-                        "id": scene_data["studio"]["id"],
-                        "name": scene_data["studio"]["name"],
-                        "urls": [
-                            {"url": url["url"], "type": url["type"]}
-                            for url in scene_data["studio"].get("urls", [])
-                        ],
-                        "images": [
-                            {
-                                "id": image["id"],
-                                "url": image["url"],
-                                "width": image["width"],
-                                "height": image["height"],
-                            }
-                            for image in scene_data["studio"].get("images", [])
-                        ],
-                        "parent": (
-                            {
-                                "id": scene_data["studio"]["parent"]["id"],
-                                "name": scene_data["studio"]["parent"]["name"],
-                                "urls": [
-                                    {"url": url["url"], "type": url["type"]}
-                                    for url in scene_data["studio"]["parent"].get(
-                                        "urls", []
-                                    )
-                                ],
-                                "images": [
-                                    {
-                                        "id": image["id"],
-                                        "url": image["url"],
-                                        "width": image["width"],
-                                        "height": image["height"],
-                                    }
-                                    for image in scene_data["studio"]["parent"].get(
-                                        "images", []
-                                    )
-                                ],
-                            }
-                            if scene_data["studio"].get("parent")
-                            else None
-                        ),
-                    },
-                    "tags": [
-                        {"name": tag["name"], "id": tag["id"]}
-                        for tag in scene_data.get("tags", [])
-                    ],
-                    "performers": [
-                        {
-                            "as": performer["as"],
-                            "performer": {
-                                "id": performer["performer"]["id"],
-                                "name": performer["performer"]["name"],
-                                "disambiguation": performer["performer"]["disambiguation"],
-                                "aliases": performer["performer"]["aliases"],
-                                "gender": performer["performer"]["gender"],
-                                "merged_ids": performer["performer"]["merged_ids"],
-                                "urls": [
-                                    {"url": url["url"], "type": url["type"]}
-                                    for url in performer["performer"].get("urls", [])
-                                ],
-                                "images": [
-                                    {
-                                        "id": image["id"],
-                                        "url": image["url"],
-                                        "width": image["width"],
-                                        "height": image["height"],
-                                    }
-                                    for image in performer["performer"].get("images", [])
-                                ],
-                                "birth_date": performer["performer"]["birth_date"],
-                                "ethnicity": performer["performer"]["ethnicity"],
-                                "country": performer["performer"]["country"],
-                                "eye_color": performer["performer"]["eye_color"],
-                                "hair_color": performer["performer"]["hair_color"],
-                                "height": performer["performer"]["height"],
-                                "measurements": {
-                                    "band_size": performer["performer"]["measurements"]["band_size"],
-                                    "cup_size": performer["performer"]["measurements"]["cup_size"],
-                                    "waist": performer["performer"]["measurements"]["waist"],
-                                    "hip": performer["performer"]["measurements"]["hip"],
-                                },
-                                "breast_type": performer["performer"]["breast_type"],
-                                "career_start_year": performer["performer"]["career_start_year"],
-                                "career_end_year": performer["performer"]["career_end_year"],
-                                "tattoos": [
-                                    {
-                                        "location": tattoo.get("location"),
-                                        "description": tattoo.get("description"),
-                                    }
-                                    for tattoo in performer["performer"].get("tattoos") or []
-                                ],
-                                "piercings": [
-                                    {
-                                        "location": piercing["location"],
-                                        "description": piercing["description"],
-                                    }
-                                    for piercing in performer["performer"].get("piercings") or []
-                                ],
-                                "fingerprints": [
-                                    {
-                                        "algorithm": fingerprint["algorithm"],
-                                        "hash": fingerprint["hash"],
-                                        "duration": fingerprint["duration"],
-                                    }
-                                    for fingerprint in performer["performer"].get("fingerprints") or []
-                                ],
-                            },
-                        }
-                        for performer in scene_data.get("performers", [])
-                    ],
-                    "fingerprints": [
-                        {
-                            "algorithm": fingerprint["algorithm"],
-                            "hash": fingerprint["hash"],
-                            "duration": fingerprint["duration"],
-                        }
-                        for fingerprint in scene_data.get("fingerprints") or []
-                    ],
-                }
-                if scene_data
-                else {"queried_phash": phash}
-            )
-            for phash, scene_data in matched_scenes.items()
-        ]
-
-        schema = {
-            "queried_phash": pl.Utf8,
-            "id": pl.Utf8,
-            "title": pl.Utf8,
-            "code": pl.Utf8,
-            "duration": pl.Duration(time_unit="ms"),
-            "date": pl.Date,
-            "urls": pl.List(pl.Struct({"url": pl.Utf8, "type": pl.Utf8})),
-            "images": pl.List(
-                pl.Struct(
-                    {
-                        "id": pl.Utf8,
-                        "url": pl.Utf8,
-                        "width": pl.Int64,
-                        "height": pl.Int64,
-                    }
-                )
-            ),
-            "studio": pl.Struct(
-                {
-                    "id": pl.Utf8,
-                    "name": pl.Utf8,
-                    "urls": pl.List(pl.Struct({"url": pl.Utf8, "type": pl.Utf8})),
-                    "images": pl.List(
-                        pl.Struct(
-                            {
-                                "id": pl.Utf8,
-                                "url": pl.Utf8,
-                                "width": pl.Int64,
-                                "height": pl.Int64,
-                            }
-                        )
-                    ),
-                    "parent": pl.Struct(
-                        {
-                            "id": pl.Utf8,
-                            "name": pl.Utf8,
-                            "urls": pl.List(
-                                pl.Struct({"url": pl.Utf8, "type": pl.Utf8})
-                            ),
-                        }
-                    ),
-                }
-            ),
-            "tags": pl.List(pl.Struct({"name": pl.Utf8, "id": pl.Utf8})),
-            "performers": pl.List(
-                pl.Struct(
-                    {
-                        "as": pl.Utf8,
-                        "performer": pl.Struct(
-                            {
-                                "id": pl.Utf8,
-                                "name": pl.Utf8,
-                                "disambiguation": pl.Utf8,
-                                "aliases": pl.List(pl.Utf8),
-                                "gender": pl.Utf8,
-                                "merged_ids": pl.List(pl.Utf8),
-                                "urls": pl.List(
-                                    pl.Struct({"url": pl.Utf8, "type": pl.Utf8})
-                                ),
-                                "images": pl.List(
-                                    pl.Struct(
-                                        {
-                                            "id": pl.Utf8,
-                                            "url": pl.Utf8,
-                                            "width": pl.Int64,
-                                            "height": pl.Int64,
-                                        }
-                                    )
-                                ),
-                                "birth_date": pl.Date,
-                                "ethnicity": pl.Utf8,
-                                "country": pl.Utf8,
-                                "eye_color": pl.Utf8,
-                                "hair_color": pl.Utf8,
-                                "height": pl.Int64,
-                                "measurements": pl.Struct(
-                                    {
-                                        "band_size": pl.Utf8,
-                                        "cup_size": pl.Utf8,
-                                        "waist": pl.Utf8,
-                                        "hip": pl.Utf8,
-                                    }
-                                ),
-                                "breast_type": pl.Utf8,
-                                "career_start_year": pl.Int64,
-                                "career_end_year": pl.Int64,
-                                "tattoos": pl.List(
-                                    pl.Struct(
-                                        {"location": pl.Utf8, "description": pl.Utf8}
-                                    )
-                                ),
-                                "piercings": pl.List(
-                                    pl.Struct(
-                                        {"location": pl.Utf8, "description": pl.Utf8}
-                                    )
-                                ),
-                            }
-                        ),
-                    }
-                )
-            ),
-            "fingerprints": pl.List(
-                pl.Struct(
-                    {"algorithm": pl.Utf8, "hash": pl.Utf8, "duration": pl.Int64}
-                )
-            ),
-        }
-
-        df_matched_scenes = pl.DataFrame(matched_scenes_list, schema=schema)
-
-        return df_matched_scenes
-
-    def query_tags(self):
-        query = """
-            query QueryTags($page: Int!, $per_page: Int!) {
-                queryTags(input: {
-                    page: $page
-                    per_page: $per_page
-                }) {
-                    count
-                    tags {
-                        id
-                        name
-                        description
-                        aliases
-                        deleted
-                        created
-                        updated
-                        category {
-                            id
-                            name
-                            group
-                            description
-                        }
-                    }
-                }
-            }
-        """
-        per_page = 25
-        page = 1
-        all_tags = []
-        total_count = None
-
-        while True:
-            result = self._gql_query(query, {"page": page, "per_page": per_page})
-            if result is None or 'data' not in result or 'queryTags' not in result['data']:
-                break
-
-            tags_data = result['data']['queryTags']
-            all_tags.extend(tags_data['tags'])
-
-            if total_count is None:
-                total_count = tags_data['count']
-
-            if len(all_tags) >= total_count:
-                break
-
-            page += 1
-
-        return all_tags
-
-    def submit_scene_draft(self, draft_input: dict) -> dict:
-        """
-        Submit a scene draft with just the title field.
-        
-        Args:
-            draft_input: The draft input to submit
-            
-        Returns:
-            dict: The response from the server containing the draft submission status
-        """
-        query = """
-        mutation SubmitSceneDraft($input: SceneDraftInput!) {
-            submitSceneDraft(input: $input) {
-                id
-            }
-        }
-        """
-        
-        variables = {
-            "input": draft_input
-        }
-
-        return self._gql_query(query, variables)
-
-    def _gql_query(self, query, variables=None):
-        headers = {"Content-Type": "application/json"}
-        if self.api_key:
-            headers["Apikey"] = self.api_key
-        response = requests.post(
-            self.endpoint,
-            json={"query": query, "variables": variables},
-            headers=headers,
-        )
-        if response.status_code == 200:
-            return response.json()
-        else:
-            logger.error(
-                f"Query failed with status code {response.status_code}: {response.text}"
-            )
-            return None
+        return pl.DataFrame(transformed_scenes, schema=schema)
