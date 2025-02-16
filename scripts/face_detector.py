@@ -8,13 +8,16 @@ from pathlib import Path
 import cv2
 from mtcnn import MTCNN
 import tensorflow as tf
-from libraries.scene_states import SceneState
+from libraries.scene_states import SceneState, DatasetStructure
 
 class FaceDetector:
     def __init__(self, base_dir: str, max_concurrent: int = 4):
         self.base_dir = Path(base_dir)
         self.detector = MTCNN()
         self.max_concurrent = max_concurrent
+        
+        # Initialize dataset structure
+        self.dataset = DatasetStructure(base_dir)
         
         # Enable GPU growth
         physical_devices = tf.config.list_physical_devices('GPU')
@@ -26,6 +29,15 @@ class FaceDetector:
             os.makedirs(self.base_dir / 'scenes' / state.value, exist_ok=True)
     
     def process_scene(self, scene_id: str):
+        # Check current state
+        if self.dataset.is_scene_processed(scene_id) and \
+           self.dataset.info['processed_scenes'][scene_id] in [
+               SceneState.FACES_EXTRACTED.value,
+               SceneState.VERIFIED.value
+           ]:
+            print(f"Skipping {scene_id} - already processed faces")
+            return
+        
         try:
             # Load scene data from permanent storage
             metadata_path = self.base_dir / 'metadata' / 'scenes' / f"{scene_id}.json"
@@ -84,6 +96,9 @@ class FaceDetector:
             
             # Clean up frames
             shutil.rmtree(working_dir)
+            
+            # Update scene state after successful processing
+            self.dataset.update_scene_state(scene_id, SceneState.FACES_EXTRACTED)
             
         except Exception as e:
             print(f"Error processing scene {scene_id}: {str(e)}")

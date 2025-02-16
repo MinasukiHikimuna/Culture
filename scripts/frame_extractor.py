@@ -18,6 +18,11 @@ class FrameExtractor:
         self.dataset = DatasetStructure(base_dir)
         
     def process_scene(self, scene_id: str, scene_data: Dict):
+        # Check if already processed
+        if self.dataset.is_scene_processed(scene_id):
+            print(f"Skipping {scene_id} - already processed")
+            return
+        
         # Store scene metadata permanently
         with open(self.dataset.scene_data / f"{scene_id}.json", 'w') as f:
             json.dump(scene_data, f, indent=2)
@@ -57,6 +62,9 @@ class FrameExtractor:
                 shutil.move(str(scene_dir), str(target_dir))
                 
                 print(f"[{drive}] {scene_id}: Completed frame extraction")
+                
+                # Update scene state after successful processing
+                self.dataset.update_scene_state(scene_id, SceneState.FRAMES_EXTRACTED)
                 
             except Exception as e:
                 print(f"[{drive}] {scene_id}: Failed - {str(e)}")

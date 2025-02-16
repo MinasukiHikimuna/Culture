@@ -5,35 +5,14 @@ import json
 import time
 import shutil
 from pathlib import Path
-from libraries.scene_states import SceneState
+from libraries.scene_states import SceneState, DatasetStructure
 
 class SceneVerifier:
     def __init__(self, base_dir: str):
         self.base_dir = Path(base_dir)
         
-        # Create all required directories
-        for state in SceneState:
-            os.makedirs(self.base_dir / 'scenes' / state.value, exist_ok=True)
-        
-        self.metadata_file = self.base_dir / 'metadata.json'
-        self.load_metadata()
-    
-    def load_metadata(self):
-        """Load or initialize metadata"""
-        if self.metadata_file.exists():
-            with open(self.metadata_file, 'r') as f:
-                self.metadata = json.load(f)
-        else:
-            self.metadata = {
-                'processed_scenes': {},
-                'face_entries': {},
-                'verification_status': {}
-            }
-    
-    def save_metadata(self):
-        """Save metadata to file"""
-        with open(self.metadata_file, 'w') as f:
-            json.dump(self.metadata, f, indent=2)
+        # Initialize dataset structure
+        self.dataset = DatasetStructure(base_dir)
     
     def is_scene_ready_for_verification(self, scene_dir: Path) -> bool:
         """Check if all faces have been sorted into performer directories"""
@@ -56,11 +35,17 @@ class SceneVerifier:
     
     def verify_scene(self, scene_id: str, scene_dir: Path):
         """Process a verified scene and move it to final state"""
+        # Check if already verified
+        if self.dataset.is_scene_processed(scene_id) and \
+           self.dataset.info['processed_scenes'][scene_id] == SceneState.VERIFIED.value:
+            print(f"Skipping {scene_id} - already verified")
+            return
+        
         try:
             print(f"Verifying scene {scene_id}")
             
             # Load scene metadata
-            metadata_path = self.base_dir / 'metadata' / 'scenes' / f"{scene_id}.json"
+            metadata_path = self.dataset.scene_data / f"{scene_id}.json"
             if not metadata_path.exists():
                 raise ValueError(f"No metadata found for scene {scene_id}")
             
@@ -68,7 +53,7 @@ class SceneVerifier:
                 scene_data = json.load(f)
             
             # Create verified scene directory
-            verified_dir = self.base_dir / 'scenes' / SceneState.VERIFIED.value / scene_id
+            verified_dir = self.dataset.scenes[SceneState.VERIFIED.value] / scene_id
             os.makedirs(verified_dir, exist_ok=True)
             
             # Move faces to performer directories
@@ -92,16 +77,11 @@ class SceneVerifier:
             if unknown_dir.exists():
                 shutil.move(str(unknown_dir), str(verified_dir / 'unknown'))
             
-            # Update metadata
-            self.metadata['processed_scenes'][scene_id] = {
-                'status': SceneState.VERIFIED.value,
-                'verified': True,
-                'verification_timestamp': time.strftime('%Y-%m-%d %H:%M:%S')
-            }
-            self.save_metadata()
-            
             # Clean up original directory
             shutil.rmtree(scene_dir)
+            
+            # Update scene state after successful verification
+            self.dataset.update_scene_state(scene_id, SceneState.VERIFIED)
             
             print(f"Scene {scene_id} verified and faces moved to performer directories")
             
@@ -109,11 +89,11 @@ class SceneVerifier:
             print(f"Error verifying scene {scene_id}: {str(e)}")
     
     def run(self):
-        print(f"Starting scene verifier (monitoring {self.base_dir / 'scenes' / SceneState.FACES_EXTRACTED.value})")
+        print(f"Starting scene verifier (monitoring {self.dataset.scenes[SceneState.FACES_EXTRACTED.value]})")
         while True:
             try:
                 # Check for scenes with sorted faces
-                faces_dir = self.base_dir / 'scenes' / SceneState.FACES_EXTRACTED.value
+                faces_dir = self.dataset.scenes[SceneState.FACES_EXTRACTED.value]
                 
                 for scene_dir in faces_dir.iterdir():
                     if not scene_dir.is_dir():
