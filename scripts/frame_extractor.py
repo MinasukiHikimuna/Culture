@@ -6,7 +6,7 @@ import threading
 from pathlib import Path
 import ffmpeg
 from typing import Dict
-from libraries.scene_states import SceneState
+from libraries.scene_states import SceneState, DatasetStructure
 
 class FrameExtractor:
     def __init__(self, base_dir: str, max_per_drive: int = 2):
@@ -14,11 +14,18 @@ class FrameExtractor:
         self.max_per_drive = max_per_drive
         self.drive_semaphores = {}
         
+        # Initialize dataset structure
+        self.dataset = DatasetStructure(base_dir)
+        
     def process_scene(self, scene_id: str, scene_data: Dict):
+        # Store scene metadata permanently
+        with open(self.dataset.scene_data / f"{scene_id}.json", 'w') as f:
+            json.dump(scene_data, f, indent=2)
+        
         video_path = scene_data['video_path']
         drive = os.path.splitdrive(video_path)[0].upper()
         
-        print(f"Processing scene {scene_id} from drive {drive}")
+        print(f"[{drive}] {scene_id}: Starting frame extraction...")
         
         # Get/create semaphore for this drive
         if drive not in self.drive_semaphores:
@@ -27,10 +34,8 @@ class FrameExtractor:
         with self.drive_semaphores[drive]:
             try:
                 # Move to extracting state
-                scene_dir = self.base_dir / 'scenes' / SceneState.EXTRACTING_FRAMES.value / scene_id
+                scene_dir = self.dataset.scenes[SceneState.EXTRACTING_FRAMES.value] / scene_id
                 os.makedirs(scene_dir, exist_ok=True)
-                
-                print(f"Extracting frames to {scene_dir}")
                 
                 # Extract frames
                 (
@@ -48,15 +53,15 @@ class FrameExtractor:
                 )
                 
                 # Move to frames extracted state
-                target_dir = self.base_dir / 'scenes' / SceneState.FRAMES_EXTRACTED.value / scene_id
+                target_dir = self.dataset.scenes[SceneState.FRAMES_EXTRACTED.value] / scene_id
                 shutil.move(str(scene_dir), str(target_dir))
                 
-                print(f"Completed processing scene {scene_id}")
+                print(f"[{drive}] {scene_id}: Completed frame extraction")
                 
             except Exception as e:
-                print(f"Error processing scene {scene_id}: {str(e)}")
+                print(f"[{drive}] {scene_id}: Failed - {str(e)}")
                 # Move to failed state
-                failed_dir = self.base_dir / 'scenes' / SceneState.FAILED.value / scene_id
+                failed_dir = self.dataset.scenes[SceneState.FAILED.value] / scene_id
                 os.makedirs(failed_dir, exist_ok=True)
                 with open(failed_dir / 'error.txt', 'w') as f:
                     f.write(str(e))
@@ -64,30 +69,23 @@ class FrameExtractor:
                     shutil.rmtree(scene_dir)
 
     def run(self):
-        print(f"Starting frame extractor (monitoring {self.base_dir / 'scenes' / SceneState.PENDING.value})")
+        print(f"Starting frame extractor (monitoring {self.dataset.scenes[SceneState.PENDING.value]})")
         while True:
             try:
-                # Check pending directory for new scenes
-                pending_dir = self.base_dir / 'scenes' / SceneState.PENDING.value
-                if not pending_dir.exists():
-                    print(f"Creating pending directory: {pending_dir}")
-                    os.makedirs(pending_dir, exist_ok=True)
-                
+                # Check for pending scenes with JSON data
+                pending_dir = self.dataset.scenes[SceneState.PENDING.value]
                 for json_file in pending_dir.glob('*.json'):
-                    try:
-                        print(f"Found new scene to process: {json_file}")
-                        with open(json_file, 'r') as f:
-                            scene_data = json.load(f)
-                        scene_id = json_file.stem
-                        
-                        # Process the scene
-                        self.process_scene(scene_id, scene_data)
-                        
-                        # Remove the JSON file
-                        json_file.unlink()
-                        
-                    except Exception as e:
-                        print(f"Error processing {json_file}: {e}")
+                    scene_id = json_file.stem
+                    
+                    # Load scene data
+                    with open(json_file, 'r') as f:
+                        scene_data = json.load(f)
+                    
+                    # Process the scene
+                    self.process_scene(scene_id, scene_data)
+                    
+                    # Remove JSON file after processing
+                    json_file.unlink()
                 
                 time.sleep(1)  # Wait before checking again
                 

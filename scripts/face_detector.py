@@ -27,14 +27,32 @@ class FaceDetector:
     
     def process_scene(self, scene_id: str):
         try:
+            # Load scene data from permanent storage
+            metadata_path = self.base_dir / 'metadata' / 'scenes' / f"{scene_id}.json"
+            if metadata_path.exists():
+                with open(metadata_path, 'r') as f:
+                    scene_data = json.load(f)
+                    performers = scene_data.get('performers', [])
+            else:
+                print(f"Warning: No metadata found for scene {scene_id}")
+                performers = []
+            
             # Move to extracting faces state
             source_dir = self.base_dir / 'scenes' / SceneState.FRAMES_EXTRACTED.value / scene_id
             working_dir = self.base_dir / 'scenes' / SceneState.EXTRACTING_FACES.value / scene_id
             shutil.move(str(source_dir), str(working_dir))
             
-            # Create output directory
+            # Create output directory structure
             output_dir = self.base_dir / 'scenes' / SceneState.FACES_EXTRACTED.value / scene_id
-            os.makedirs(output_dir, exist_ok=True)
+            os.makedirs(output_dir, exist_ok=True)  # Faces will go directly here
+            
+            # Create performer directories for manual sorting
+            for performer in performers:
+                performer_dir = output_dir / performer
+                os.makedirs(performer_dir, exist_ok=True)
+            
+            # Create unknown directory
+            os.makedirs(output_dir / 'unknown', exist_ok=True)
             
             print(f"Processing scene {scene_id}")
             
@@ -58,7 +76,8 @@ class FaceDetector:
                     ]
                     
                     face_id = f"{scene_id}_{frame_file.stem}_face_{face_idx}"
-                    cv2.imwrite(str(output_dir / f"{face_id}.jpg"), face_img)
+                    face_path = output_dir / f"{face_id}.jpg"  # Save directly to scene directory
+                    cv2.imwrite(str(face_path), face_img)
                     faces_extracted += 1
             
             print(f"Completed scene {scene_id} - extracted {faces_extracted} faces")
