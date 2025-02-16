@@ -11,6 +11,8 @@ from multiprocessing import cpu_count
 import queue as thread_queue
 import concurrent.futures
 import subprocess
+import threading
+from libraries.scene_states import SceneState
 
 class FaceDatasetBuilder:
     def __init__(self, max_concurrent_scenes=4):
@@ -23,10 +25,13 @@ class FaceDatasetBuilder:
         self.base_dir = "H:\\Faces\\dataset"
         self.structure = {
             'scenes': {
-                '1_extracting_frames': os.path.join(self.base_dir, 'scenes', '1_extracting_frames'),
-                '2_extracting_faces': os.path.join(self.base_dir, 'scenes', '2_extracting_faces'),
-                '3_unverified': os.path.join(self.base_dir, 'scenes', '3_unverified'),
-                '4_verified': os.path.join(self.base_dir, 'scenes', '4_verified'),
+                SceneState.PENDING.value: os.path.join(self.base_dir, 'scenes', SceneState.PENDING.value),
+                SceneState.EXTRACTING_FRAMES.value: os.path.join(self.base_dir, 'scenes', SceneState.EXTRACTING_FRAMES.value),
+                SceneState.FRAMES_EXTRACTED.value: os.path.join(self.base_dir, 'scenes', SceneState.FRAMES_EXTRACTED.value),
+                SceneState.EXTRACTING_FACES.value: os.path.join(self.base_dir, 'scenes', SceneState.EXTRACTING_FACES.value),
+                SceneState.FACES_EXTRACTED.value: os.path.join(self.base_dir, 'scenes', SceneState.FACES_EXTRACTED.value),
+                SceneState.VERIFIED.value: os.path.join(self.base_dir, 'scenes', SceneState.VERIFIED.value),
+                SceneState.FAILED.value: os.path.join(self.base_dir, 'scenes', SceneState.FAILED.value),
             },
             'performers': {
                 'verified': os.path.join(self.base_dir, 'performers', 'verified'),
@@ -36,6 +41,8 @@ class FaceDatasetBuilder:
         self.setup_directories()
         self.load_metadata()
         self.max_concurrent_scenes = max_concurrent_scenes
+        self.max_per_drive = 2  # Maximum concurrent processes per drive
+        self.drive_semaphores = {}  # Semaphores to limit concurrent access per drive
         self.scene_queue = thread_queue.Queue()
         self.results = thread_queue.Queue()
 
@@ -197,15 +204,30 @@ class FaceDatasetBuilder:
         return faces_metadata
 
     def process_multiple_scenes(self, scenes: List[Dict]) -> List[Dict]:
-        """Process multiple scenes in parallel"""
+        """Process multiple scenes in parallel, balanced across drives"""
         results = []
         
+        # Group scenes by drive
+        drive_scenes = {}
+        for scene in scenes:
+            video_path = scene.get('video_path', scene.get('stashapp_primary_file_path'))
+            drive = os.path.splitdrive(video_path)[0].upper()
+            if drive not in drive_scenes:
+                drive_scenes[drive] = []
+                # Create semaphore for this drive if it doesn't exist
+                if drive not in self.drive_semaphores:
+                    self.drive_semaphores[drive] = threading.Semaphore(self.max_per_drive)
+            drive_scenes[drive].append(scene)
+        
         with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_concurrent_scenes) as executor:
-            # Submit all scenes for processing
-            future_to_scene = {
-                executor.submit(self._process_scene_wrapper, scene): scene 
-                for scene in scenes
-            }
+            # Submit scenes for processing, using drive semaphores
+            future_to_scene = {}
+            for drive, drive_scene_list in drive_scenes.items():
+                for scene in drive_scene_list:
+                    future = executor.submit(self._process_scene_with_semaphore, 
+                                          scene, 
+                                          self.drive_semaphores[drive])
+                    future_to_scene[future] = scene
             
             # Process results as they complete
             for future in concurrent.futures.as_completed(future_to_scene):
@@ -222,6 +244,11 @@ class FaceDatasetBuilder:
         
         return results
 
+    def _process_scene_with_semaphore(self, scene: Dict, drive_semaphore: threading.Semaphore) -> Dict:
+        """Process a scene while respecting drive semaphore"""
+        with drive_semaphore:
+            return self._process_scene_wrapper(scene)
+
     def _process_scene_wrapper(self, scene: Dict) -> Dict:
         """Wrapper method to handle scene processing for parallel execution"""
         scene_id = scene.get('stashapp_stashdb_id')
@@ -232,7 +259,7 @@ class FaceDatasetBuilder:
             return {'scene_id': scene_id, 'error': 'Missing required scene data', 'status': 'error'}
 
         # Create scene directory in extracting_frames
-        scene_frames_dir = os.path.join(self.structure['scenes']['1_extracting_frames'], scene_id)
+        scene_frames_dir = os.path.join(self.structure['scenes'][SceneState.EXTRACTING_FRAMES.value], scene_id)
         os.makedirs(scene_frames_dir, exist_ok=True)
 
         try:
@@ -256,7 +283,7 @@ class FaceDatasetBuilder:
                 raise
 
             # Move to extracting_faces state
-            scene_faces_dir = os.path.join(self.structure['scenes']['2_extracting_faces'], scene_id)
+            scene_faces_dir = os.path.join(self.structure['scenes'][SceneState.EXTRACTING_FACES.value], scene_id)
             shutil.move(scene_frames_dir, scene_faces_dir)
 
             # Process frames and detect faces
@@ -265,7 +292,7 @@ class FaceDatasetBuilder:
                                 if f.endswith('.jpg')])
 
             # Create unverified directory structure
-            scene_unverified_dir = os.path.join(self.structure['scenes']['3_unverified'], scene_id)
+            scene_unverified_dir = os.path.join(self.structure['scenes'][SceneState.FACES_EXTRACTED.value], scene_id)
             os.makedirs(scene_unverified_dir, exist_ok=True)
 
             # Create directories for each performer
@@ -309,7 +336,7 @@ class FaceDatasetBuilder:
             self.metadata['processed_scenes'][scene_id] = {
                 'performers': performers,
                 'faces_extracted': faces_extracted,
-                'state': '3_unverified',
+                'state': SceneState.FACES_EXTRACTED.value,
                 'verified': False,
                 'timestamp': datetime.now().isoformat()
             }
@@ -323,7 +350,7 @@ class FaceDatasetBuilder:
 
         except Exception as e:
             # Clean up any leftover directories in case of error
-            for state_dir in ['1_extracting_frames', '2_extracting_faces']:
+            for state_dir in [SceneState.EXTRACTING_FRAMES.value, SceneState.EXTRACTING_FACES.value]:
                 error_dir = os.path.join(self.structure['scenes'][state_dir], scene_id)
                 if os.path.exists(error_dir):
                     shutil.rmtree(error_dir)
@@ -338,7 +365,7 @@ class FaceDatasetBuilder:
         face_filename = os.path.basename(face_path)
         scene_id = face_filename.split('_')[0]  # Extract scene_id from filename
         
-        rejected_dir = os.path.join(self.structure['scenes']['unverified'], scene_id)
+        rejected_dir = os.path.join(self.structure['scenes'][SceneState.FACES_EXTRACTED.value], scene_id)
         os.makedirs(rejected_dir, exist_ok=True)
         
         rejected_path = os.path.join(rejected_dir, face_filename)
@@ -403,7 +430,7 @@ class FaceDatasetBuilder:
         if not current_status:
             raise ValueError(f"Scene not found: {scene_id}")
         
-        if current_status == 'verified':
+        if current_status == SceneState.VERIFIED.value:
             print(f"Scene {scene_id} is already verified")
             return
 
@@ -420,7 +447,7 @@ class FaceDatasetBuilder:
                 self.metadata['verification_status'][face_id] = 'verified'
 
         # Move scene to verified status
-        self.move_scene_to_status(scene_id, 'verified')
+        self.move_scene_to_status(scene_id, SceneState.VERIFIED.value)
         print(f"Scene {scene_id} verification completed")
 
     def get_performer_face_count(self, performer_id: str = None) -> Dict[str, int]:

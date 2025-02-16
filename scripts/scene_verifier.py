@@ -59,12 +59,38 @@ class SceneVerifier:
         try:
             print(f"Verifying scene {scene_id}")
             
+            # Load scene metadata
+            metadata_path = self.base_dir / 'metadata' / 'scenes' / f"{scene_id}.json"
+            if not metadata_path.exists():
+                raise ValueError(f"No metadata found for scene {scene_id}")
+            
+            with open(metadata_path, 'r') as f:
+                scene_data = json.load(f)
+            
             # Create verified scene directory
             verified_dir = self.base_dir / 'scenes' / SceneState.VERIFIED.value / scene_id
             os.makedirs(verified_dir, exist_ok=True)
             
-            # Move the entire directory structure
-            shutil.move(str(scene_dir), str(verified_dir))
+            # Move faces to performer directories
+            performers_dir = self.base_dir / 'performers' / 'verified'
+            
+            for subdir in scene_dir.iterdir():
+                if not subdir.is_dir() or subdir.name == 'unknown':
+                    continue
+                
+                # subdir.name should be like "d5061b46-796b-4204-8e4f-cff4569fdea6 - Alexis Crystal"
+                performer_dir = performers_dir / subdir.name
+                os.makedirs(performer_dir, exist_ok=True)
+                
+                # Move all faces to performer directory
+                for face_file in subdir.glob('*.jpg'):
+                    target_path = performer_dir / face_file.name
+                    shutil.move(str(face_file), str(target_path))
+            
+            # Move unknown faces to verified scene directory
+            unknown_dir = scene_dir / 'unknown'
+            if unknown_dir.exists():
+                shutil.move(str(unknown_dir), str(verified_dir / 'unknown'))
             
             # Update metadata
             self.metadata['processed_scenes'][scene_id] = {
@@ -74,7 +100,10 @@ class SceneVerifier:
             }
             self.save_metadata()
             
-            print(f"Scene {scene_id} verified and moved to {SceneState.VERIFIED.value}")
+            # Clean up original directory
+            shutil.rmtree(scene_dir)
+            
+            print(f"Scene {scene_id} verified and faces moved to performer directories")
             
         except Exception as e:
             print(f"Error verifying scene {scene_id}: {str(e)}")
