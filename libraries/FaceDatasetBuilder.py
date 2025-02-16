@@ -22,10 +22,11 @@ class FaceDatasetBuilder:
         self.detector = MTCNN()
         self.base_dir = "H:\\Faces\\dataset"
         self.structure = {
-            'temp': os.path.join(self.base_dir, 'temp'),
             'scenes': {
-                'unverified': os.path.join(self.base_dir, 'scenes', 'unverified'),
-                'verified': os.path.join(self.base_dir, 'scenes', 'verified'),
+                '1_extracting_frames': os.path.join(self.base_dir, 'scenes', '1_extracting_frames'),
+                '2_extracting_faces': os.path.join(self.base_dir, 'scenes', '2_extracting_faces'),
+                '3_unverified': os.path.join(self.base_dir, 'scenes', '3_unverified'),
+                '4_verified': os.path.join(self.base_dir, 'scenes', '4_verified'),
             },
             'performers': {
                 'verified': os.path.join(self.base_dir, 'performers', 'verified'),
@@ -40,9 +41,6 @@ class FaceDatasetBuilder:
 
     def setup_directories(self):
         """Create necessary directory structure"""
-        # Create temp directory
-        os.makedirs(self.structure['temp'], exist_ok=True)
-        
         # Create scene status directories
         for status_dir in self.structure['scenes'].values():
             os.makedirs(status_dir, exist_ok=True)
@@ -233,19 +231,19 @@ class FaceDatasetBuilder:
         if not all([scene_id, video_path, performers]):
             return {'scene_id': scene_id, 'error': 'Missing required scene data', 'status': 'error'}
 
-        # Create temp directory for this scene
-        scene_temp_dir = os.path.join(self.structure['temp'], scene_id)
-        os.makedirs(scene_temp_dir, exist_ok=True)
+        # Create scene directory in extracting_frames
+        scene_frames_dir = os.path.join(self.structure['scenes']['1_extracting_frames'], scene_id)
+        os.makedirs(scene_frames_dir, exist_ok=True)
 
         try:
-            # Use ffmpeg-python instead of raw ffmpeg command
+            # Extract frames using ffmpeg
             try:
                 (
                     ffmpeg
                     .input(video_path, skip_frame='nokey')
                     .filter('select', 'not(mod(n,10))')
                     .output(
-                        os.path.join(scene_temp_dir, 'frame_%04d.jpg'),
+                        os.path.join(scene_frames_dir, 'frame_%04d.jpg'),
                         qscale=3,
                         vsync=0,
                         threads=10
@@ -257,61 +255,61 @@ class FaceDatasetBuilder:
                 print(f"ffmpeg stderr:\n{e.stderr.decode()}")
                 raise
 
-            # Process extracted frames
-            frame_files = sorted([os.path.join(scene_temp_dir, f) 
-                                for f in os.listdir(scene_temp_dir) 
+            # Move to extracting_faces state
+            scene_faces_dir = os.path.join(self.structure['scenes']['2_extracting_faces'], scene_id)
+            shutil.move(scene_frames_dir, scene_faces_dir)
+
+            # Process frames and detect faces
+            frame_files = sorted([os.path.join(scene_faces_dir, f) 
+                                for f in os.listdir(scene_faces_dir) 
                                 if f.endswith('.jpg')])
-            
-            # Create scene directory and per-performer directories
-            scene_dir = os.path.join(self.structure['scenes']['unverified'], scene_id)
-            os.makedirs(scene_dir, exist_ok=True)
-            
+
+            # Create unverified directory structure
+            scene_unverified_dir = os.path.join(self.structure['scenes']['3_unverified'], scene_id)
+            os.makedirs(scene_unverified_dir, exist_ok=True)
+
             # Create directories for each performer
             for performer in performers:
-                performer_dir = os.path.join(scene_dir, performer)
+                performer_dir = os.path.join(scene_unverified_dir, performer)
                 os.makedirs(performer_dir, exist_ok=True)
-            
-            # Also create an "unknown" directory for faces we're not sure about
-            unknown_dir = os.path.join(scene_dir, "unknown")
+
+            # Create unknown directory
+            unknown_dir = os.path.join(scene_unverified_dir, "unknown")
             os.makedirs(unknown_dir, exist_ok=True)
-            
+
             # Process frames and detect faces
             faces_extracted = 0
             for frame_path in frame_files:
-                # Read frame
                 frame = cv2.imread(frame_path)
                 if frame is None:
                     continue
-                    
-                # Detect faces
+
                 faces = self.detector.detect_faces(frame)
-                
-                # Save detected faces
                 for face_idx, face in enumerate(faces):
                     if face['confidence'] < 0.95:
                         continue
-                        
-                    # Extract face with margin
+
                     x, y, width, height = face['box']
                     margin = int(max(width, height) * 0.2)
                     face_img = frame[
                         max(0, y-margin):min(frame.shape[0], y+height+margin),
                         max(0, x-margin):min(frame.shape[1], x+width+margin)
                     ]
-                    
-                    # Generate unique face ID using frame number
+
                     frame_number = os.path.splitext(os.path.basename(frame_path))[0].split('_')[1]
                     face_id = f"{scene_id}_{frame_number}_face_{face_idx}"
-                    
-                    # Initially save all faces to the unknown directory
-                    face_path = os.path.join(unknown_dir, f"{face_id}.jpg")
+                    face_path = os.path.join(scene_unverified_dir, f"{face_id}.jpg")
                     cv2.imwrite(face_path, face_img)
                     faces_extracted += 1
+
+            # Clean up frames directory
+            shutil.rmtree(scene_faces_dir)
 
             # Update metadata
             self.metadata['processed_scenes'][scene_id] = {
                 'performers': performers,
                 'faces_extracted': faces_extracted,
+                'state': '3_unverified',
                 'verified': False,
                 'timestamp': datetime.now().isoformat()
             }
@@ -324,15 +322,16 @@ class FaceDatasetBuilder:
             }
 
         except Exception as e:
+            # Clean up any leftover directories in case of error
+            for state_dir in ['1_extracting_frames', '2_extracting_faces']:
+                error_dir = os.path.join(self.structure['scenes'][state_dir], scene_id)
+                if os.path.exists(error_dir):
+                    shutil.rmtree(error_dir)
             return {
                 'scene_id': scene_id,
                 'error': str(e),
                 'status': 'error'
             }
-        finally:
-            # Clean up temp directory
-            if os.path.exists(scene_temp_dir):
-                shutil.rmtree(scene_temp_dir)
 
     def move_to_rejected(self, face_path: str):
         """Move a face image to the rejected directory"""
