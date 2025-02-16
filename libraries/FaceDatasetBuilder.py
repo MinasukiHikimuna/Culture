@@ -10,6 +10,7 @@ import tensorflow as tf
 from multiprocessing import cpu_count
 import queue as thread_queue
 import concurrent.futures
+import subprocess
 
 class FaceDatasetBuilder:
     def __init__(self, max_concurrent_scenes=4):
@@ -22,7 +23,13 @@ class FaceDatasetBuilder:
         self.base_dir = "H:\\Faces\\dataset"
         self.structure = {
             'temp': os.path.join(self.base_dir, 'temp'),
-            'unverified': os.path.join(self.base_dir, 'unverified'),
+            'scenes': {
+                'unverified': os.path.join(self.base_dir, 'scenes', 'unverified'),
+                'verified': os.path.join(self.base_dir, 'scenes', 'verified'),
+            },
+            'performers': {
+                'verified': os.path.join(self.base_dir, 'performers', 'verified'),
+            }
         }
         self.metadata_file = os.path.join(self.base_dir, 'metadata.json')
         self.setup_directories()
@@ -33,8 +40,16 @@ class FaceDatasetBuilder:
 
     def setup_directories(self):
         """Create necessary directory structure"""
-        for dir_path in self.structure.values():
-            os.makedirs(dir_path, exist_ok=True)
+        # Create temp directory
+        os.makedirs(self.structure['temp'], exist_ok=True)
+        
+        # Create scene status directories
+        for status_dir in self.structure['scenes'].values():
+            os.makedirs(status_dir, exist_ok=True)
+            
+        # Create performer directories
+        for performer_dir in self.structure['performers'].values():
+            os.makedirs(performer_dir, exist_ok=True)
 
     def get_performer_directory_name(self, performer: Union[Dict, str]) -> str:
         """Create directory name from performer data or ID"""
@@ -184,7 +199,7 @@ class FaceDatasetBuilder:
         return faces_metadata
 
     def process_multiple_scenes(self, scenes: List[Dict]) -> List[Dict]:
-        """Process multiple scenes in parallel using ThreadPoolExecutor"""
+        """Process multiple scenes in parallel"""
         results = []
         
         with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_concurrent_scenes) as executor:
@@ -194,7 +209,7 @@ class FaceDatasetBuilder:
                 for scene in scenes
             }
             
-            # Collect results as they complete
+            # Process results as they complete
             for future in concurrent.futures.as_completed(future_to_scene):
                 scene = future_to_scene[future]
                 try:
@@ -202,7 +217,7 @@ class FaceDatasetBuilder:
                     results.append(result)
                 except Exception as e:
                     results.append({
-                        'scene_id': scene["stashapp_stashdb_id"],
+                        'scene_id': scene.get('stashapp_stashdb_id'),
                         'error': str(e),
                         'status': 'error'
                     })
@@ -211,111 +226,120 @@ class FaceDatasetBuilder:
 
     def _process_scene_wrapper(self, scene: Dict) -> Dict:
         """Wrapper method to handle scene processing for parallel execution"""
-        try:
-            faces = self.process_scene(
-                video_path=scene["stashapp_primary_file_path"],
-                scene_id=scene["stashapp_stashdb_id"],
-                performers=scene["performers"]
-            )
-            return {
-                'scene_id': scene["stashapp_stashdb_id"],
-                'faces_extracted': faces,
-                'status': 'success'
-            }
-        except Exception as e:
-            raise  # Re-raise the exception to be caught by the executor
+        scene_id = scene.get('stashapp_stashdb_id')
+        video_path = scene.get('video_path', scene.get('stashapp_primary_file_path'))
+        performers = scene.get('performers', [])
 
-    def process_scene(self, video_path: str, scene_id: str, performers: List[Union[Dict, str]]):
-        """Process a single scene"""
-        print(f"\nProcessing scene: {scene_id}")
-        
-        # Create scene-specific directories
-        scene_dir = os.path.join(self.structure['unverified'], scene_id)
+        if not all([scene_id, video_path, performers]):
+            return {'scene_id': scene_id, 'error': 'Missing required scene data', 'status': 'error'}
+
+        # Create temp directory for this scene
         scene_temp_dir = os.path.join(self.structure['temp'], scene_id)
-        frames_dir = os.path.join(scene_temp_dir, 'frames')
-        
-        # Check if scene was already processed
-        if os.path.exists(scene_dir):
-            print(f"Scene {scene_id} already processed, skipping...")
-            return
-        
-        # Create necessary directories
-        os.makedirs(frames_dir, exist_ok=True)
-        os.makedirs(scene_dir, exist_ok=True)
-
-        # Create performer directories under scene directory
-        for performer in performers:
-            dir_name = self.get_performer_directory_name(performer)
-            performer_dir = os.path.join(scene_dir, dir_name)
-            print(f"Creating performer directory: {performer_dir}")
-            os.makedirs(performer_dir, exist_ok=True)
-
-        # Create rejected directory
-        rejected_dir = os.path.join(scene_dir, 'rejected')
-        os.makedirs(rejected_dir, exist_ok=True)
+        os.makedirs(scene_temp_dir, exist_ok=True)
 
         try:
-            # Extract frames
-            output_pattern = os.path.join(frames_dir, 'frame_%04d.png')
-            stream = (
-                ffmpeg
-                .input(video_path)
-                .filter('fps', fps=1/24)
-                .output(output_pattern, 
-                    **{
-                        'c:v': 'png',
-                        'compression_level': 3,
-                        'threads': str(cpu_count() // self.max_concurrent_scenes),
-                        'loglevel': 'error'
-                    })
-            )
-            stream.run(capture_stdout=True, capture_stderr=True)
+            # Use ffmpeg-python instead of raw ffmpeg command
+            try:
+                (
+                    ffmpeg
+                    .input(video_path, skip_frame='nokey')
+                    .filter('select', 'not(mod(n,10))')
+                    .output(
+                        os.path.join(scene_temp_dir, 'frame_%04d.jpg'),
+                        qscale=3,
+                        vsync=0,
+                        threads=10
+                    )
+                    .overwrite_output()
+                    .run(capture_stdout=True, capture_stderr=True)
+                )
+            except ffmpeg.Error as e:
+                print(f"ffmpeg stderr:\n{e.stderr.decode()}")
+                raise
 
-            # Process frames in batches
-            frame_files = [os.path.join(frames_dir, f) for f in os.listdir(frames_dir) 
-                         if f.endswith('.png')]
+            # Process extracted frames
+            frame_files = sorted([os.path.join(scene_temp_dir, f) 
+                                for f in os.listdir(scene_temp_dir) 
+                                if f.endswith('.jpg')])
             
-            # Create batches
-            batch_size = 4
-            frame_batches = [frame_files[i:i + batch_size] 
-                           for i in range(0, len(frame_files), batch_size)]
+            # Create scene directory and per-performer directories
+            scene_dir = os.path.join(self.structure['scenes']['unverified'], scene_id)
+            os.makedirs(scene_dir, exist_ok=True)
             
-            # Process batches
-            all_faces_metadata = []
-            for batch in frame_batches:
-                faces = self.process_frame_batch(batch, scene_dir, scene_id, performers)
-                all_faces_metadata.extend(faces)
+            # Create directories for each performer
+            for performer in performers:
+                performer_dir = os.path.join(scene_dir, performer)
+                os.makedirs(performer_dir, exist_ok=True)
+            
+            # Also create an "unknown" directory for faces we're not sure about
+            unknown_dir = os.path.join(scene_dir, "unknown")
+            os.makedirs(unknown_dir, exist_ok=True)
+            
+            # Process frames and detect faces
+            faces_extracted = 0
+            for frame_path in frame_files:
+                # Read frame
+                frame = cv2.imread(frame_path)
+                if frame is None:
+                    continue
+                    
+                # Detect faces
+                faces = self.detector.detect_faces(frame)
+                
+                # Save detected faces
+                for face_idx, face in enumerate(faces):
+                    if face['confidence'] < 0.95:
+                        continue
+                        
+                    # Extract face with margin
+                    x, y, width, height = face['box']
+                    margin = int(max(width, height) * 0.2)
+                    face_img = frame[
+                        max(0, y-margin):min(frame.shape[0], y+height+margin),
+                        max(0, x-margin):min(frame.shape[1], x+width+margin)
+                    ]
+                    
+                    # Generate unique face ID using frame number
+                    frame_number = os.path.splitext(os.path.basename(frame_path))[0].split('_')[1]
+                    face_id = f"{scene_id}_{frame_number}_face_{face_idx}"
+                    
+                    # Initially save all faces to the unknown directory
+                    face_path = os.path.join(unknown_dir, f"{face_id}.jpg")
+                    cv2.imwrite(face_path, face_img)
+                    faces_extracted += 1
 
             # Update metadata
             self.metadata['processed_scenes'][scene_id] = {
-                'processed_date': datetime.now().isoformat(),
-                'performer_ids': [p if isinstance(p, str) else p.get('stashapp_performers_id') for p in performers],
-                'faces_extracted': len(all_faces_metadata)
+                'performers': performers,
+                'faces_extracted': faces_extracted,
+                'verified': False,
+                'timestamp': datetime.now().isoformat()
             }
-            
-            for face_meta in all_faces_metadata:
-                self.metadata['face_entries'][face_meta['face_id']] = face_meta
-                self.metadata['verification_status'][face_meta['face_id']] = 'unverified'
+            self._save_metadata()
 
-            self.save_metadata()
-            
-            # Cleanup
-            shutil.rmtree(scene_temp_dir)
-            
-            return len(all_faces_metadata)
+            return {
+                'scene_id': scene_id,
+                'faces_extracted': faces_extracted,
+                'status': 'success'
+            }
 
         except Exception as e:
-            print(f"Error processing scene {scene_id}: {str(e)}")
+            return {
+                'scene_id': scene_id,
+                'error': str(e),
+                'status': 'error'
+            }
+        finally:
+            # Clean up temp directory
             if os.path.exists(scene_temp_dir):
                 shutil.rmtree(scene_temp_dir)
-            raise
 
     def move_to_rejected(self, face_path: str):
         """Move a face image to the rejected directory"""
         face_filename = os.path.basename(face_path)
         scene_id = face_filename.split('_')[0]  # Extract scene_id from filename
         
-        rejected_dir = os.path.join(self.structure['rejected'], scene_id)
+        rejected_dir = os.path.join(self.structure['scenes']['unverified'], scene_id)
         os.makedirs(rejected_dir, exist_ok=True)
         
         rejected_path = os.path.join(rejected_dir, face_filename)
@@ -334,7 +358,7 @@ class FaceDatasetBuilder:
                 self.metadata = json.load(f)
         else:
             self.metadata = {
-                'processed_scenes': {},
+                'processed_scenes': {},  # Now includes 'status' field
                 'face_entries': {},
                 'verification_status': {}
             }
@@ -344,66 +368,67 @@ class FaceDatasetBuilder:
         with open(self.metadata_file, 'w') as f:
             json.dump(self.metadata, f, indent=2)
 
+    def get_scene_status(self, scene_id: str) -> str:
+        """Get the current status of a scene"""
+        for status, directory in self.structure['scenes'].items():
+            if os.path.exists(os.path.join(directory, scene_id)):
+                return status
+        return None
+
+    def move_scene_to_status(self, scene_id: str, new_status: str):
+        """Move a scene directory to a new status"""
+        if new_status not in self.structure['scenes']:
+            raise ValueError(f"Invalid status: {new_status}")
+
+        current_status = self.get_scene_status(scene_id)
+        if not current_status:
+            raise ValueError(f"Scene not found: {scene_id}")
+
+        current_path = os.path.join(self.structure['scenes'][current_status], scene_id)
+        new_path = os.path.join(self.structure['scenes'][new_status], scene_id)
+
+        # Move the directory
+        shutil.move(current_path, new_path)
+
+        # Update metadata
+        if scene_id in self.metadata['processed_scenes']:
+            self.metadata['processed_scenes'][scene_id]['status'] = new_status
+            self.metadata['processed_scenes'][scene_id]['status_updated'] = datetime.now().isoformat()
+            self.save_metadata()
+
     def verify_scene(self, scene_id: str):
         """
         Verify a scene's face assignments and organize them into performer collections.
-        This method:
-        1. Checks each performer directory in the scene
-        2. Copies verified faces to a central performer directory
-        3. Updates metadata for verified faces
         """
-        scene_dir = os.path.join(self.structure['unverified'], scene_id)
-        if not os.path.exists(scene_dir):
-            raise ValueError(f"Scene directory not found: {scene_id}")
+        current_status = self.get_scene_status(scene_id)
+        if not current_status:
+            raise ValueError(f"Scene not found: {scene_id}")
+        
+        if current_status == 'verified':
+            print(f"Scene {scene_id} is already verified")
+            return
 
-        # Create verified directory if it doesn't exist
-        verified_base = os.path.join(self.base_dir, 'verified')
-        os.makedirs(verified_base, exist_ok=True)
+        scene_dir = os.path.join(self.structure['scenes'][current_status], scene_id)
 
-        # Process each subdirectory in the scene directory
-        for dir_name in os.listdir(scene_dir):
-            dir_path = os.path.join(scene_dir, dir_name)
-            if not os.path.isdir(dir_path) or dir_name == 'rejected':
+        # Process each face in the scene directory
+        for face_file in os.listdir(scene_dir):
+            if not face_file.endswith('.jpg'):
                 continue
 
-            # If this is a performer directory (not rejected or unassigned)
-            if ' - ' in dir_name:  # Format: "stashdb_id - name"
-                performer_id = dir_name.split(' - ')[0]
-                
-                # Create/get performer's collection directory
-                performer_collection = os.path.join(verified_base, dir_name)
-                os.makedirs(performer_collection, exist_ok=True)
+            # Update metadata
+            face_id = os.path.splitext(face_file)[0]
+            if face_id in self.metadata['face_entries']:
+                self.metadata['verification_status'][face_id] = 'verified'
 
-                # Copy all faces from scene's performer directory to collection
-                for face_file in os.listdir(dir_path):
-                    if not face_file.endswith('.jpg'):
-                        continue
-
-                    # Copy face to performer's collection
-                    src_path = os.path.join(dir_path, face_file)
-                    dst_path = os.path.join(performer_collection, face_file)
-                    shutil.copy2(src_path, dst_path)
-
-                    # Update metadata
-                    face_id = os.path.splitext(face_file)[0]
-                    if face_id in self.metadata['face_entries']:
-                        self.metadata['verification_status'][face_id] = 'verified'
-                        self.metadata['face_entries'][face_id]['verified_performer'] = performer_id
-
-        # Update scene metadata
-        if scene_id in self.metadata['processed_scenes']:
-            self.metadata['processed_scenes'][scene_id]['verified'] = True
-            self.metadata['processed_scenes'][scene_id]['verification_date'] = datetime.now().isoformat()
-
-        self.save_metadata()
+        # Move scene to verified status
+        self.move_scene_to_status(scene_id, 'verified')
         print(f"Scene {scene_id} verification completed")
 
     def get_performer_face_count(self, performer_id: str = None) -> Dict[str, int]:
         """
         Get count of verified faces for performers.
-        If performer_id is provided, returns count for that performer only.
         """
-        verified_base = os.path.join(self.base_dir, 'verified')
+        verified_base = self.structure['performers']['verified']
         counts = {}
 
         if performer_id:
