@@ -176,3 +176,83 @@ class FaceDatasetBuilder:
         """Save metadata to file"""
         with open(self.metadata_file, 'w') as f:
             json.dump(self.metadata, f, indent=2)
+
+    def verify_scene(self, scene_id: str):
+        """
+        Verify a scene's face assignments and organize them into performer collections.
+        This method:
+        1. Checks each performer directory in the scene
+        2. Copies verified faces to a central performer directory
+        3. Updates metadata for verified faces
+        """
+        scene_dir = os.path.join(self.structure['unverified'], scene_id)
+        if not os.path.exists(scene_dir):
+            raise ValueError(f"Scene directory not found: {scene_id}")
+
+        # Create verified directory if it doesn't exist
+        verified_base = os.path.join(self.base_dir, 'verified')
+        os.makedirs(verified_base, exist_ok=True)
+
+        # Process each subdirectory in the scene directory
+        for dir_name in os.listdir(scene_dir):
+            dir_path = os.path.join(scene_dir, dir_name)
+            if not os.path.isdir(dir_path) or dir_name == 'rejected':
+                continue
+
+            # If this is a performer directory (not rejected or unassigned)
+            if ' - ' in dir_name:  # Format: "stashdb_id - name"
+                performer_id = dir_name.split(' - ')[0]
+                
+                # Create/get performer's collection directory
+                performer_collection = os.path.join(verified_base, dir_name)
+                os.makedirs(performer_collection, exist_ok=True)
+
+                # Copy all faces from scene's performer directory to collection
+                for face_file in os.listdir(dir_path):
+                    if not face_file.endswith('.jpg'):
+                        continue
+
+                    # Copy face to performer's collection
+                    src_path = os.path.join(dir_path, face_file)
+                    dst_path = os.path.join(performer_collection, face_file)
+                    shutil.copy2(src_path, dst_path)
+
+                    # Update metadata
+                    face_id = os.path.splitext(face_file)[0]
+                    if face_id in self.metadata['face_entries']:
+                        self.metadata['verification_status'][face_id] = 'verified'
+                        self.metadata['face_entries'][face_id]['verified_performer'] = performer_id
+
+        # Update scene metadata
+        if scene_id in self.metadata['processed_scenes']:
+            self.metadata['processed_scenes'][scene_id]['verified'] = True
+            self.metadata['processed_scenes'][scene_id]['verification_date'] = datetime.now().isoformat()
+
+        self.save_metadata()
+        print(f"Scene {scene_id} verification completed")
+
+    def get_performer_face_count(self, performer_id: str = None) -> Dict[str, int]:
+        """
+        Get count of verified faces for performers.
+        If performer_id is provided, returns count for that performer only.
+        """
+        verified_base = os.path.join(self.base_dir, 'verified')
+        counts = {}
+
+        if performer_id:
+            # Find specific performer directory
+            for dir_name in os.listdir(verified_base):
+                if dir_name.startswith(performer_id):
+                    dir_path = os.path.join(verified_base, dir_name)
+                    face_count = len([f for f in os.listdir(dir_path) if f.endswith('.jpg')])
+                    counts[dir_name] = face_count
+                    break
+        else:
+            # Count for all performers
+            for dir_name in os.listdir(verified_base):
+                dir_path = os.path.join(verified_base, dir_name)
+                if os.path.isdir(dir_path):
+                    face_count = len([f for f in os.listdir(dir_path) if f.endswith('.jpg')])
+                    counts[dir_name] = face_count
+
+        return counts
