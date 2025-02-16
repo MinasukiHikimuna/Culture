@@ -131,15 +131,17 @@ class FaceDetector:
         scene_start = time.time()
         frame_times = []
         detection_times = []
+        working_dir = None
         
         try:
             # State and metadata checks
             if self.dataset.is_scene_processed(scene_id) and \
                self.dataset.info['processed_scenes'][scene_id] in [
                    SceneState.FACES_EXTRACTED.value,
-                   SceneState.VERIFIED.value
+                   SceneState.VERIFIED.value,
+                   SceneState.NO_FACES_FOUND.value
                ]:
-                print(f"Skipping {scene_id} - already processed faces")
+                print(f"Skipping {scene_id} - already processed")
                 return
             
             metadata_start = time.time()
@@ -193,24 +195,31 @@ class FaceDetector:
                           f"Avg detection: {avg_detect:.2f}s, "
                           f"Faces so far: {total_faces}")
             
+            # Handle case where no faces were found
+            if total_faces == 0:
+                print(f"No faces found in scene {scene_id}")
+                self.dataset.update_scene_state(scene_id, SceneState.NO_FACES_FOUND)
+                if working_dir and working_dir.exists():
+                    shutil.rmtree(working_dir)
+                return
+            
             # Move to final location if faces found
-            if total_faces > 0:
-                move_start = time.time()
-                output_dir = self.dataset.scenes[SceneState.FACES_EXTRACTED.value] / scene_id
-                os.makedirs(output_dir, exist_ok=True)
-                
-                for performer in performers:
-                    performer_dir = output_dir / performer
-                    os.makedirs(performer_dir, exist_ok=True)
-                
-                os.makedirs(output_dir / 'unknown', exist_ok=True)
-                
-                for face_file in faces_dir.glob('*.jpg'):
-                    shutil.move(str(face_file), str(output_dir / face_file.name))
-                
-                print(f"Moving files took {time.time() - move_start:.2f}s")
-                
-                self.dataset.update_scene_state(scene_id, SceneState.FACES_EXTRACTED)
+            move_start = time.time()
+            output_dir = self.dataset.scenes[SceneState.FACES_EXTRACTED.value] / scene_id
+            os.makedirs(output_dir, exist_ok=True)
+            
+            for performer in performers:
+                performer_dir = output_dir / performer
+                os.makedirs(performer_dir, exist_ok=True)
+            
+            os.makedirs(output_dir / 'unknown', exist_ok=True)
+            
+            for face_file in faces_dir.glob('*.jpg'):
+                shutil.move(str(face_file), str(output_dir / face_file.name))
+            
+            print(f"Moving files took {time.time() - move_start:.2f}s")
+            
+            self.dataset.update_scene_state(scene_id, SceneState.FACES_EXTRACTED)
             
             # Cleanup
             cleanup_start = time.time()
@@ -231,7 +240,7 @@ class FaceDetector:
             os.makedirs(failed_dir, exist_ok=True)
             with open(failed_dir / 'error.txt', 'w') as f:
                 f.write(str(e))
-            if working_dir.exists():
+            if working_dir and working_dir.exists():
                 shutil.rmtree(working_dir)
     
     def run(self):
