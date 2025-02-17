@@ -195,27 +195,59 @@ class FaceDetector:
                           f"Avg detection: {avg_detect:.2f}s, "
                           f"Faces so far: {total_faces}")
             
+            print(f"Final face count for scene {scene_id}: {total_faces}")
+            
             # Handle case where no faces were found
             if total_faces == 0:
-                print(f"No faces found in scene {scene_id}")
+                print(f"No faces found in scene {scene_id} - marking as NO_FACES_FOUND")
                 self.dataset.update_scene_state(scene_id, SceneState.NO_FACES_FOUND)
                 if working_dir and working_dir.exists():
+                    print(f"Cleaning up working directory: {working_dir}")
                     shutil.rmtree(working_dir)
                 return
             
             # Move to final location if faces found
             move_start = time.time()
             output_dir = self.dataset.scenes[SceneState.FACES_EXTRACTED.value] / scene_id
+            print(f"\nMoving files for scene {scene_id}")
+            print(f"Total faces to move: {total_faces}")
+            print(f"Source directory (faces_dir): {faces_dir}")
+            print(f"Target directory (output_dir): {output_dir}")
+            
+            # List files before moving
+            face_files = list(faces_dir.glob('*.jpg'))
+            print(f"Files found in faces_dir: {len(face_files)}")
+            for file in face_files[:5]:  # Show first 5 files as sample
+                print(f"  - {file}")
+            if len(face_files) > 5:
+                print(f"  ... and {len(face_files)-5} more files")
+            
             os.makedirs(output_dir, exist_ok=True)
             
+            # Create performer directories
             for performer in performers:
                 performer_dir = output_dir / performer
                 os.makedirs(performer_dir, exist_ok=True)
+                print(f"Created performer directory: {performer_dir}")
             
             os.makedirs(output_dir / 'unknown', exist_ok=True)
             
+            # Move face files to the root of the scene directory
+            moved_count = 0
             for face_file in faces_dir.glob('*.jpg'):
-                shutil.move(str(face_file), str(output_dir / face_file.name))
+                target_path = output_dir / face_file.name
+                print(f"Moving {face_file} to {target_path}")
+                try:
+                    shutil.move(str(face_file), str(target_path))
+                    moved_count += 1
+                except Exception as e:
+                    print(f"Error moving file {face_file}: {str(e)}")
+            
+            print(f"Successfully moved {moved_count} files")
+            
+            # Verify files after moving
+            final_files = list(output_dir.glob('*.jpg'))
+            print(f"Files found in output_dir after move: {len(final_files)}")
             
             print(f"Moving files took {time.time() - move_start:.2f}s")
             
