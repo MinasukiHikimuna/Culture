@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
-from facenet_pytorch import InceptionResnetV1
+from facenet_pytorch import InceptionResnetV1, MTCNN
 from PIL import Image
 import os
 from pathlib import Path
@@ -15,9 +15,9 @@ class FaceDataset(Dataset):
     def __init__(self, root_dir, transform=None, min_scenes=2):
         """
         Args:
-            root_dir (string): Directory with all the face images organized in performer folders
-            transform (callable, optional): Optional transform to be applied on a sample
-            min_scenes (int): Minimum number of different scenes required for a performer
+            root_dir (string): Directory with preprocessed face images
+            transform (callable, optional): Optional transform to be applied
+            min_scenes (int): Minimum number of different scenes required
         """
         self.root_dir = Path(root_dir)
         self.transform = transform
@@ -25,86 +25,63 @@ class FaceDataset(Dataset):
         self.class_to_idx = {}
         self.samples = []
         
-        # First pass: collect scene information per performer
-        performer_scenes = {}  # {performer_id: set(scene_ids)}
-        valid_performers = []
-        
+        # Load preprocessed images (already aligned)
         for performer_dir in sorted(self.root_dir.iterdir()):
             if performer_dir.is_dir():
                 performer_id = performer_dir.name.split(" - ")[0]
                 scene_ids = set()
                 
-                for img_path in performer_dir.glob("*.jpg"):
+                for img_path in performer_dir.glob("*.[jp][pn][g]"):
                     scene_id = img_path.name.split("_")[0]
                     scene_ids.add(scene_id)
                 
                 if len(scene_ids) >= min_scenes:
-                    performer_scenes[performer_id] = scene_ids
-                    valid_performers.append(performer_dir)
-        
-        # Second pass: create dataset only with valid performers
-        for idx, performer_dir in enumerate(valid_performers):  # Use valid_performers list
-            performer_id, performer_name = performer_dir.name.split(" - ", 1)
-            self.classes.append(performer_name)
-            self.class_to_idx[performer_name] = idx
-            
-            # Collect all images for this performer
-            for img_path in performer_dir.glob("*.jpg"):
-                self.samples.append((str(img_path), idx))
-        
-        print(f"Loaded {len(self.classes)} performers with at least {min_scenes} scenes each")
-        print(f"Total samples: {len(self.samples)}")
-        
-        # Verify class indices
-        max_class_idx = max(idx for _, idx in self.samples)
-        assert max_class_idx < len(self.classes), f"Max class index {max_class_idx} >= number of classes {len(self.classes)}"
+                    performer_id, performer_name = performer_dir.name.split(" - ", 1)
+                    idx = len(self.classes)
+                    self.classes.append(performer_name)
+                    self.class_to_idx[performer_name] = idx
+                    
+                    for img_path in performer_dir.glob("*.{jpg,png,webp}"):
+                        self.samples.append((str(img_path), idx))
     
     def split_by_scenes(self, val_ratio=0.2):
-        """
-        Split dataset into training and validation sets based on scenes
-        
-        Args:
-            val_ratio (float): Ratio of scenes to use for validation
-            
-        Returns:
-            train_indices, val_indices
-        """
-        # Group samples by performer and scene
-        performer_scenes = {}  # {performer_idx: {scene_id: [sample_indices]}}
-        
-        for idx, (img_path, performer_idx) in enumerate(self.samples):
+        """Split dataset by scenes to prevent data leakage"""
+        # Group images by performer and scene
+        performer_scenes = {}
+        for img_path, label in self.samples:
+            performer = self.classes[label]
             scene_id = Path(img_path).name.split("_")[0]
             
-            if performer_idx not in performer_scenes:
-                performer_scenes[performer_idx] = {}
-            if scene_id not in performer_scenes[performer_idx]:
-                performer_scenes[performer_idx][scene_id] = []
-            
-            performer_scenes[performer_idx][scene_id].append(idx)
+            if performer not in performer_scenes:
+                performer_scenes[performer] = {}
+            if scene_id not in performer_scenes[performer]:
+                performer_scenes[performer][scene_id] = []
+            performer_scenes[performer][scene_id].append((img_path, label))
         
         train_indices = []
         val_indices = []
         
-        # For each performer, split their scenes into train/val
-        for performer_idx, scenes in performer_scenes.items():
+        # Split scenes for each performer
+        for performer, scenes in performer_scenes.items():
             scene_ids = list(scenes.keys())
-            num_val_scenes = max(1, int(len(scene_ids) * val_ratio))
+            random.shuffle(scene_ids)
             
-            # Randomly select validation scenes
-            val_scenes = set(random.sample(scene_ids, num_val_scenes))
+            # Calculate split point
+            val_scenes = max(1, int(len(scene_ids) * val_ratio))
+            train_scenes = scene_ids[val_scenes:]
+            val_scenes = scene_ids[:val_scenes]
             
-            # Assign indices to train/val based on scenes
-            for scene_id, indices in scenes.items():
-                if scene_id in val_scenes:
-                    val_indices.extend(indices)
-                else:
-                    train_indices.extend(indices)
+            # Add images to appropriate split
+            for scene_id in train_scenes:
+                for img_idx, (img_path, label) in enumerate(scenes[scene_id]):
+                    train_indices.append(self.samples.index((img_path, label)))
+            
+            for scene_id in val_scenes:
+                for img_idx, (img_path, label) in enumerate(scenes[scene_id]):
+                    val_indices.append(self.samples.index((img_path, label)))
         
         print(f"Split dataset into {len(train_indices)} training and {len(val_indices)} validation samples")
         return train_indices, val_indices
-
-    def __len__(self):
-        return len(self.samples)
 
     def __getitem__(self, idx):
         img_path, label = self.samples[idx]
@@ -121,15 +98,18 @@ class FaceRecognitionModel(nn.Module):
         # Load pretrained FaceNet model
         self.backbone = InceptionResnetV1(pretrained='vggface2')
         
-        # Freeze the backbone
-        for param in self.backbone.parameters():
+        # Freeze more layers to reduce overfitting (freeze 80%)
+        trainable_layers = int(len(list(self.backbone.parameters())) * 0.2)  # Changed from 0.4
+        for param in list(self.backbone.parameters())[:-trainable_layers]:
             param.requires_grad = False
             
-        # Add more sophisticated classifier layers
+        # Simplified classifier with stronger regularization
         self.classifier = nn.Sequential(
             nn.Linear(512, 256),
+            nn.BatchNorm1d(256, momentum=0.1),
             nn.ReLU(),
-            nn.Dropout(0.5),
+            nn.Dropout(0.5),  # Increased dropout
+            
             nn.Linear(256, num_classes)
         )
         
@@ -137,7 +117,30 @@ class FaceRecognitionModel(nn.Module):
         features = self.backbone(x)
         return self.classifier(features)
 
-def train_model(dataset_path, batch_size=32, num_epochs=10, learning_rate=0.0001, log_file=None):
+def copy_dataset_split(dataset, indices, output_dir: Path, split_name: str):
+    """Copy dataset split to a new directory for inspection"""
+    split_dir = output_dir / split_name
+    split_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Create performer directories and copy images
+    for idx in indices:
+        img_path, label = dataset.samples[idx]
+        performer_name = dataset.classes[label]
+        
+        # Create performer directory
+        performer_dir = split_dir / performer_name
+        performer_dir.mkdir(exist_ok=True)
+        
+        # Copy image
+        img_path = Path(img_path)
+        dest_path = performer_dir / img_path.name
+        if not dest_path.exists():  # Skip if already copied
+            dest_path.write_bytes(img_path.read_bytes())
+    
+    print(f"Copied {len(indices)} images to {split_dir}")
+    return split_dir
+
+def train_model(dataset_path, batch_size=32, num_epochs=50, learning_rate=0.0001, log_file=None):
     # Redirect stdout to both console and file
     if log_file:
         class Logger:
@@ -167,12 +170,23 @@ def train_model(dataset_path, batch_size=32, num_epochs=10, learning_rate=0.0001
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
     
-    # Define transforms with augmentation
+    # Enhanced data augmentation to improve generalization
     train_transform = transforms.Compose([
         transforms.Resize((160, 160)),
-        transforms.RandomHorizontalFlip(),
-        transforms.RandomRotation(10),
-        transforms.ColorJitter(brightness=0.2, contrast=0.2),
+        transforms.RandomHorizontalFlip(p=0.5),
+        transforms.RandomRotation(20),  # Increased rotation
+        transforms.ColorJitter(
+            brightness=0.3,  # Increased color augmentation
+            contrast=0.3,
+            saturation=0.3,
+            hue=0.15
+        ),
+        transforms.RandomAffine(
+            degrees=0,
+            translate=(0.15, 0.15),  # Increased translation
+            scale=(0.85, 1.15)  # Increased scale variation
+        ),
+        transforms.RandomPerspective(distortion_scale=0.2, p=0.5),  # Added perspective transform
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
     ])
@@ -184,34 +198,61 @@ def train_model(dataset_path, batch_size=32, num_epochs=10, learning_rate=0.0001
     ])
     
     # Create datasets with appropriate transforms
-    full_dataset = FaceDataset(dataset_path, transform=None, min_scenes=2)  # No transform yet
+    full_dataset = FaceDataset(dataset_path, transform=None, min_scenes=2)
     train_indices, val_indices = full_dataset.split_by_scenes(val_ratio=0.2)
     
-    # Create train/val datasets with different transforms
+    # Copy splits for inspection
+    output_dir = Path(os.path.dirname(log_file)).parent if log_file else Path("training_runs")
+    train_dir = copy_dataset_split(full_dataset, train_indices, output_dir, f"train_split_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+    val_dir = copy_dataset_split(full_dataset, val_indices, output_dir, f"val_split_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+    
+    print(f"\nDataset splits copied to:")
+    print(f"Training: {train_dir}")
+    print(f"Validation: {val_dir}\n")
+    
+    # Create train/val datasets with transforms
     train_dataset = TransformSubset(full_dataset, train_indices, train_transform)
     val_dataset = TransformSubset(full_dataset, val_indices, val_transform)
     
-    # Create data loaders
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size)
+    # Ensure we have enough samples for batch size
+    if len(train_dataset) < batch_size or len(val_dataset) < batch_size:
+        raise ValueError(f"Not enough samples for batch_size={batch_size}. "
+                       f"Got {len(train_dataset)} training and {len(val_dataset)} validation samples.")
+    
+    # Create data loaders with drop_last=True
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, drop_last=True)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, drop_last=True)
     
     # Initialize model
     model = FaceRecognitionModel(num_classes=len(full_dataset.classes))
     model = model.to(device)
     
-    # Define loss function and optimizer
-    criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.classifier.parameters(), lr=learning_rate)
+    # Use weighted loss for class imbalance
+    class_counts = torch.zeros(len(full_dataset.classes))
+    for _, label in full_dataset.samples:
+        class_counts[label] += 1
+    class_weights = 1.0 / class_counts
+    class_weights = class_weights / class_weights.sum()
+    criterion = nn.CrossEntropyLoss(weight=class_weights.to(device))
     
-    # Add learning rate scheduler without verbose flag
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode='max', factor=0.1, patience=2
+    # Use different optimizers for backbone and classifier
+    backbone_params = list(model.backbone.parameters())[-20:]  # Last few layers
+    classifier_params = model.classifier.parameters()
+    
+    optimizer = torch.optim.AdamW([
+        {'params': backbone_params, 'lr': learning_rate * 0.1},
+        {'params': classifier_params, 'lr': learning_rate}
+    ], weight_decay=0.01)  # Increased weight decay
+    
+    # Improved scheduler with longer cycles
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
+        optimizer, T_0=10, T_mult=2, eta_min=1e-7
     )
     
-    # Add early stopping
+    # Increased patience for early stopping
+    patience = 10
     best_val_acc = 0
     best_model_state = None
-    patience = 5
     patience_counter = 0
     
     # Training loop
@@ -276,7 +317,7 @@ def train_model(dataset_path, batch_size=32, num_epochs=10, learning_rate=0.0001
         print(f'Learning Rate: {optimizer.param_groups[0]["lr"]:.6f}')
         
         # Update learning rate
-        scheduler.step(val_accuracy)
+        scheduler.step()
         
         # Save best model
         if val_accuracy > best_val_acc:
@@ -338,10 +379,16 @@ if __name__ == "__main__":
     log_path = output_dir / f"training_log_{timestamp}.txt"
     
     # Convert Windows path to WSL path
-    dataset_path = "/mnt/h/Faces/dataset/performers/deduplicated"
+    dataset_path = "/mnt/h/Faces/dataset/performers/preprocessed"
     
-    # Train model with logging
-    model, classes = train_model(dataset_path, log_file=str(log_path))
+    # Train model with improved parameters
+    model, classes = train_model(
+        dataset_path,
+        batch_size=32,
+        num_epochs=50,
+        learning_rate=0.001,
+        log_file=str(log_path)
+    )
     
     # Save the model
     torch.save({
@@ -350,7 +397,7 @@ if __name__ == "__main__":
         'timestamp': timestamp,
         'training_params': {
             'batch_size': 32,
-            'learning_rate': 0.0001,
+            'learning_rate': 0.001,
             'architecture': 'FaceNet + Custom Classifier',
             'dataset_path': dataset_path
         }

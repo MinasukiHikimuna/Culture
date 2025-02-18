@@ -16,6 +16,9 @@ import cProfile
 import pstats
 from datetime import datetime
 import argparse
+from facenet_pytorch import MTCNN
+import torch
+from PIL import Image
 
 class FaceDetector:
     def __init__(self, base_dir: str, max_concurrent: int = 4):
@@ -79,6 +82,14 @@ class FaceDetector:
             dir_path = self.base_dir / 'scenes' / state.value
             print(f"Creating directory: {dir_path}")
             os.makedirs(dir_path, exist_ok=True)
+        
+        self.mtcnn = MTCNN(
+            image_size=160,
+            margin=10,
+            post_process=False,
+            select_largest=True,
+            device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        )
     
     def preprocess_frame(self, frame):
         """Preprocess frame for faster detection"""
@@ -293,6 +304,27 @@ class FaceDetector:
             except Exception as e:
                 print(f"Unexpected error: {e}")
                 time.sleep(1)
+
+    def detect_and_align(self, image):
+        """Detect faces and align them using eye landmarks"""
+        # Detect faces and landmarks
+        boxes, probs, landmarks = self.mtcnn.detect(image, landmarks=True)
+        
+        aligned_faces = []
+        if boxes is not None:
+            for i, (box, landmark) in enumerate(zip(boxes, landmarks)):
+                # Extract face using box
+                face = image.crop(box)
+                
+                # Align face using landmarks
+                aligned_face = align_face(face, landmark)
+                
+                # Resize to standard size
+                aligned_face = aligned_face.resize((160, 160), Image.Resampling.LANCZOS)
+                
+                aligned_faces.append(aligned_face)
+        
+        return aligned_faces
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Face Detector for WSL2')
