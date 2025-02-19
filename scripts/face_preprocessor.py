@@ -11,9 +11,10 @@ from concurrent.futures import ThreadPoolExecutor
 from tqdm import tqdm
 
 class FacePreprocessor:
-    def __init__(self, input_dir: Path, output_dir: Path):
+    def __init__(self, input_dir: Path, output_dir: Path, verbose: bool = False):
         self.input_dir = Path(input_dir)
         self.output_dir = Path(output_dir)
+        self.verbose = verbose
         
         # Initialize MTCNN with stricter face detection
         self.mtcnn = MTCNN(
@@ -21,8 +22,8 @@ class FacePreprocessor:
             margin=20,
             post_process=True,
             select_largest=True,
-            min_face_size=60,  # Increased minimum face size
-            thresholds=[0.7, 0.8, 0.8],  # Stricter detection thresholds
+            min_face_size=60,
+            thresholds=[0.7, 0.8, 0.8],
             device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         )
     
@@ -44,20 +45,27 @@ class FacePreprocessor:
     def process_image(self, image_path: Path):
         """Process a single image"""
         try:
-            # Load image
+            if self.verbose:
+                print(f"\nProcessing image: {image_path}")
+            
+            # Load image and ensure RGB
             image = Image.open(image_path).convert('RGB')
+            if self.verbose:
+                print(f"Loaded image mode: {image.mode}")
             
             # Get both face tensor and detection probability
             face_tensor, prob = self.mtcnn(image, return_prob=True)
             
             if face_tensor is None:
-                print(f"No face detected in {image_path}")
+                if self.verbose:
+                    print(f"No face detected in {image_path}")
                 return False
-                
-            if prob < 0.92:  # Increased confidence threshold
-                print(f"Low confidence detection ({prob:.2f}) in {image_path}")
+            
+            if prob < 0.92:
+                if self.verbose:
+                    print(f"Low confidence detection ({prob:.2f}) in {image_path}")
                 return False
-                
+            
             if not self._check_face_quality(face_tensor):
                 return False
             
@@ -71,10 +79,17 @@ class FacePreprocessor:
             output_path = self.output_dir / rel_path
             output_path.parent.mkdir(parents=True, exist_ok=True)
             face_image.save(output_path, quality=95)
+            
+            if self.verbose:
+                print(f"Saved face to: {output_path}")
+            
             return True
             
         except Exception as e:
-            print(f"Error processing {image_path}: {e}")
+            if self.verbose:
+                print(f"Error processing {image_path}: {e}")
+                import traceback
+                traceback.print_exc()
             return False
     
     def _check_face_quality(self, face_tensor):

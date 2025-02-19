@@ -10,14 +10,16 @@ import numpy as np
 import random
 from datetime import datetime
 import sys
+import argparse
 
 class FaceDataset(Dataset):
-    def __init__(self, root_dir, transform=None, min_scenes=2):
+    def __init__(self, root_dir, transform=None, min_images=2, source_type="scene"):
         """
         Args:
             root_dir (string): Directory with preprocessed face images
             transform (callable, optional): Optional transform to be applied
-            min_scenes (int): Minimum number of different scenes required
+            min_images (int): Minimum number of images required per performer
+            source_type (str): Either "scene" or "stashdb" to handle different naming patterns
         """
         self.root_dir = Path(root_dir)
         self.transform = transform
@@ -25,59 +27,57 @@ class FaceDataset(Dataset):
         self.class_to_idx = {}
         self.samples = []
         
-        # Load preprocessed images (already aligned)
+        # Load preprocessed images
         for performer_dir in sorted(self.root_dir.iterdir()):
             if performer_dir.is_dir():
-                performer_id = performer_dir.name.split(" - ")[0]
-                scene_ids = set()
-                
-                for img_path in performer_dir.glob("*.[jp][pn][g]"):
-                    scene_id = img_path.name.split("_")[0]
-                    scene_ids.add(scene_id)
-                
-                if len(scene_ids) >= min_scenes:
+                # Get performer ID and name based on source type
+                if source_type == "stashdb":
+                    # StashDB format: "uuid - Name"
                     performer_id, performer_name = performer_dir.name.split(" - ", 1)
+                else:
+                    # Scene format: Use directory name as both ID and name
+                    performer_id = performer_name = performer_dir.name
+                
+                # Count images for this performer
+                image_files = list(performer_dir.glob("*.jpg")) + \
+                            list(performer_dir.glob("*.png")) + \
+                            list(performer_dir.glob("*.webp"))
+                
+                if len(image_files) >= min_images:
                     idx = len(self.classes)
                     self.classes.append(performer_name)
                     self.class_to_idx[performer_name] = idx
                     
-                    for img_path in performer_dir.glob("*.{jpg,png,webp}"):
+                    for img_path in image_files:
                         self.samples.append((str(img_path), idx))
     
-    def split_by_scenes(self, val_ratio=0.2):
-        """Split dataset by scenes to prevent data leakage"""
-        # Group images by performer and scene
-        performer_scenes = {}
+    def split_dataset(self, val_ratio=0.2):
+        """Split dataset randomly since we don't need scene-based splitting for StashDB"""
+        # Group images by performer
+        performer_images = {}
         for img_path, label in self.samples:
             performer = self.classes[label]
-            scene_id = Path(img_path).name.split("_")[0]
-            
-            if performer not in performer_scenes:
-                performer_scenes[performer] = {}
-            if scene_id not in performer_scenes[performer]:
-                performer_scenes[performer][scene_id] = []
-            performer_scenes[performer][scene_id].append((img_path, label))
+            if performer not in performer_images:
+                performer_images[performer] = []
+            performer_images[performer].append((img_path, label))
         
         train_indices = []
         val_indices = []
         
-        # Split scenes for each performer
-        for performer, scenes in performer_scenes.items():
-            scene_ids = list(scenes.keys())
-            random.shuffle(scene_ids)
+        # Split images for each performer
+        for performer, images in performer_images.items():
+            # Shuffle images
+            random.shuffle(images)
             
             # Calculate split point
-            val_scenes = max(1, int(len(scene_ids) * val_ratio))
-            train_scenes = scene_ids[val_scenes:]
-            val_scenes = scene_ids[:val_scenes]
+            val_size = max(1, int(len(images) * val_ratio))
+            train_size = len(images) - val_size
             
             # Add images to appropriate split
-            for scene_id in train_scenes:
-                for img_idx, (img_path, label) in enumerate(scenes[scene_id]):
+            for img_idx, (img_path, label) in enumerate(images):
+                if img_idx < train_size:
                     train_indices.append(self.samples.index((img_path, label)))
-            
-            for scene_id in val_scenes:
-                for img_idx, (img_path, label) in enumerate(scenes[scene_id]):
+                else:
                     val_indices.append(self.samples.index((img_path, label)))
         
         print(f"Split dataset into {len(train_indices)} training and {len(val_indices)} validation samples")
@@ -140,7 +140,7 @@ def copy_dataset_split(dataset, indices, output_dir: Path, split_name: str):
     print(f"Copied {len(indices)} images to {split_dir}")
     return split_dir
 
-def train_model(dataset_path, batch_size=32, num_epochs=50, learning_rate=0.0001, log_file=None):
+def train_model(dataset_path, batch_size=32, num_epochs=50, learning_rate=0.0001, log_file=None, source_type="scene"):
     # Redirect stdout to both console and file
     if log_file:
         class Logger:
@@ -198,8 +198,8 @@ def train_model(dataset_path, batch_size=32, num_epochs=50, learning_rate=0.0001
     ])
     
     # Create datasets with appropriate transforms
-    full_dataset = FaceDataset(dataset_path, transform=None, min_scenes=2)
-    train_indices, val_indices = full_dataset.split_by_scenes(val_ratio=0.2)
+    full_dataset = FaceDataset(dataset_path, transform=None, min_images=2, source_type=source_type)
+    train_indices, val_indices = full_dataset.split_dataset(val_ratio=0.2)
     
     # Copy splits for inspection
     output_dir = Path(os.path.dirname(log_file)).parent if log_file else Path("training_runs")
@@ -378,16 +378,22 @@ if __name__ == "__main__":
     model_path = output_dir / f"face_recognition_model_{timestamp}.pth"
     log_path = output_dir / f"training_log_{timestamp}.txt"
     
-    # Convert Windows path to WSL path
-    dataset_path = "/mnt/h/Faces/dataset/performers/preprocessed"
+    # Set dataset path
+    dataset_path = "/mnt/h/Faces/StashDB_processed"
     
-    # Train model with improved parameters
+    parser = argparse.ArgumentParser(description='Train face recognition model')
+    parser.add_argument('--source', type=str, default="stashdb", choices=["scene", "stashdb"],
+                      help='Source type: "scene" or "stashdb"')
+    args = parser.parse_args()
+    
+    # Train model with source type parameter
     model, classes = train_model(
         dataset_path,
         batch_size=32,
         num_epochs=50,
         learning_rate=0.001,
-        log_file=str(log_path)
+        log_file=str(log_path),
+        source_type=args.source
     )
     
     # Save the model
