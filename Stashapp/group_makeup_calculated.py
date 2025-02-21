@@ -25,10 +25,6 @@ missing_performer_female_tag = stash.find_tag("Missing Performer (Female)")["id"
 excluded_tags = [full_movie_tag, compilation_tag, multiple_sex_scenes_in_a_scene_tag, behind_the_scenes_tag, tv_series_tag, non_sex_performer_tag, virtual_sex_tag, missing_performer_male_tag, missing_performer_female_tag]
 
 
-# %%
-group_makeup_verified_tag_id = stash.find_tag("Group Makeup Verified")["id"]
-group_makeup_calculated_parent_tag = stash.find_tag("Group Makeup Calculated", fragment="id name children { id name }")
-group_makeup_calculated_tag_ids = [tag["id"] for tag in group_makeup_calculated_parent_tag["children"]]
 
 
 # %%
@@ -39,18 +35,6 @@ for scene in excluded_scenes:
         matching_tag = next((tag for tag in scene["tags"] if tag["id"] in group_makeup_calculated_tag_ids), None)
         if matching_tag:
             print("Scene", scene["id"], "has group makeup calculated tag:", matching_tag["name"])
-
-
-# %%
-# Reset calculated group makeup tags
-all_scenes = pl.DataFrame(stash.find_scenes(fragment="id title date performers { id name gender } tags { id name }"))
-for scene in all_scenes.iter_rows(named=True):
-    existing_tag_ids = [tag["id"] for tag in scene["tags"]]
-    cleaned_tag_ids = [tag_id for tag_id in existing_tag_ids if tag_id not in group_makeup_calculated_tag_ids]
-    stash.update_scene({
-        "id": scene["id"],
-        "tag_ids": cleaned_tag_ids
-    })
 
 
 # %% [markdown]
