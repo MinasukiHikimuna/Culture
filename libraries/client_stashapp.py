@@ -357,6 +357,24 @@ class StashAppClient:
     def __init__(self, prefix=""):
         self.stash = get_stashapp_client(prefix)
 
+    def create_stash_url(self, base_url, include_tags, exclude_tags, sort_by="random", sort_dir="desc"):
+        # Create random number for sort if needed
+        import random
+        random_num = random.randint(10000000, 99999999) if sort_by == "random" else ""
+        
+        # Format tags into the required structure
+        included = ",".join([f'("id":"{tag["id"]}","label":"{tag["name"]}")' for tag in include_tags])
+        excluded = ",".join([f'("id":"{tag["id"]}","label":"{tag["name"]}")' for tag in exclude_tags])
+
+        # Build the criteria string
+        criteria = f'("type":"tags","value":("items":[{included}],"excluded":[{excluded}],"depth":0),"modifier":"INCLUDES_ALL")'
+        
+        # Construct the full URL
+        sort_by_with_random = f"{sort_by}_{random_num}" if random_num else sort_by
+        url = f"{base_url}/scenes?c={criteria}&sortby={sort_by_with_random}&sortdir={sort_dir}"
+        
+        return url
+
     def get_tags(self) -> pl.DataFrame:
         fragment = """
         id
