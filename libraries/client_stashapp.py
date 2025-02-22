@@ -528,6 +528,19 @@ class StashAppClient:
         
         return df_scenes
 
+    def find_scenes_by_performers(self, performer_ids: List[int]) -> pl.DataFrame:
+        scenes = self.stash.find_scenes({"performers": {"value": performer_ids, "excludes": [], "modifier": "INCLUDES"}}, fragment=scenes_fragment)
+        scenes_data = [self._map_scene_data(scene) for scene in scenes]
+        df_scenes = pl.DataFrame(scenes_data, schema=scenes_schema)
+        
+        return df_scenes
+
+    def find_scenes(self, filter) -> pl.DataFrame:
+        scenes = self.stash.find_scenes(filter, fragment=scenes_fragment)
+        scenes_data = [self._map_scene_data(scene) for scene in scenes]
+        df_scenes = pl.DataFrame(scenes_data, schema=scenes_schema)
+        return df_scenes
+
     def _map_scene_data(self, stash_scene):
         scene_data = {
             "stashapp_id": int(stash_scene.get("id")),
