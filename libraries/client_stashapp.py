@@ -118,6 +118,8 @@ scenes_schema = {
                         }
                     )
                 ),
+                "stashapp_performers_stashdb_id": pl.Utf8,
+                "stashapp_performers_tpdb_id": pl.Utf8,
                 "stashapp_performers_custom_fields": pl.List(
                     pl.Struct({"key": pl.Utf8, "value": pl.Utf8})
                 ),
@@ -553,6 +555,14 @@ class StashAppClient:
                         }
                         for x in p.get("stash_ids", [])
                     ],
+                    "stashapp_performers_stashdb_id": next(
+                        (x["stash_id"] for x in p.get("stash_ids", []) if x["endpoint"] == "https://stashdb.org/graphql"),
+                        None
+                    ),
+                    "stashapp_performers_tpdb_id": next(
+                        (x["stash_id"] for x in p.get("stash_ids", []) if x["endpoint"] == "https://theporndb.net/graphql"),
+                        None
+                    ),
                     "stashapp_performers_custom_fields": [
                         {"key": k, "value": v}
                         for k, v in p.get("custom_fields", {}).items()
