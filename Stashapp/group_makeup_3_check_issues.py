@@ -24,28 +24,10 @@ missing_performer_female_tag = stash.find_tag("Missing Performer (Female)")["id"
 
 excluded_tags = [full_movie_tag, compilation_tag, multiple_sex_scenes_in_a_scene_tag, behind_the_scenes_tag, tv_series_tag, non_sex_performer_tag, virtual_sex_tag, missing_performer_male_tag, missing_performer_female_tag]
 
+group_makeup_verified_tag_id = stash.find_tag("Group Makeup Verified")["id"]
+group_makeup_calculated_parent_tag = stash.find_tag("Group Makeup Calculated", fragment="id name children { id name }")
+group_makeup_calculated_tag_ids = [tag["id"] for tag in group_makeup_calculated_parent_tag["children"]]
 
-
-
-# %%
-excluded_scenes = stash.find_scenes({ "tags": { "value": excluded_tags, "modifier": "INCLUDES" } }, fragment="id title date tags { id name }")
-for scene in excluded_scenes:
-    scene_tag_ids = [tag["id"] for tag in scene["tags"]]
-    if any(tag_id in group_makeup_calculated_tag_ids for tag_id in scene_tag_ids):
-        matching_tag = next((tag for tag in scene["tags"] if tag["id"] in group_makeup_calculated_tag_ids), None)
-        if matching_tag:
-            print("Scene", scene["id"], "has group makeup calculated tag:", matching_tag["name"])
-
-
-# %% [markdown]
-# # Temp
-
-# %%
-all_tags = pl.DataFrame(stash.find_tags(fragment="id name"))
-all_tags
-
-
-# %%
 group_makeup_generic_parent_tag = stash.find_tag("Group Makeup Generic", fragment="id name children { id name }")
 group_makeup_generic_parent_tag
 
@@ -61,50 +43,34 @@ group_makeup_specific_tags = [
 ]
 group_makeup_specific_tag_ids = [tag["id"] for tag in group_makeup_specific_tags]
 
+
+
+
+
 # %%
-group_makeup_verified_tag_id = stash.find_tag("Group Makeup Verified")["id"]
+excluded_scenes = stash.find_scenes({ "tags": { "value": excluded_tags, "modifier": "INCLUDES" } }, fragment="id title date tags { id name }")
+for scene in excluded_scenes:
+    scene_tag_ids = [tag["id"] for tag in scene["tags"]]
+    if any(tag_id in group_makeup_calculated_tag_ids for tag_id in scene_tag_ids):
+        matching_tag = next((tag for tag in scene["tags"] if tag["id"] in group_makeup_calculated_tag_ids), None)
+        if matching_tag:
+            print("Scene", scene["id"], "has group makeup calculated tag:", matching_tag["name"])
 
-verified_scenes = stash.find_scenes({ "tags": { "value": [group_makeup_verified_tag_id], "modifier": "INCLUDES" } }, fragment="id title date tags { id name }")
 
-def check_group_makeup_tags(scene):
-    """Check if a scene has exactly one generic and one specific group makeup tag"""
-    scene_tag_ids = set(tag["id"] for tag in scene["tags"])
-    
-    # Count generic tags
-    generic_count = sum(1 for tag_id in group_makeup_generic_tag_ids if tag_id in scene_tag_ids)
-    
-    # Count specific tags
-    specific_count = sum(1 for tag_id in group_makeup_specific_tag_ids if tag_id in scene_tag_ids)
-    
-    return {
-        "generic_count": generic_count,
-        "specific_count": specific_count,
-        "has_correct_tags": generic_count == 1 and specific_count == 1
-    }
 
-# Analyze verified scenes
-results = []
-for scene in verified_scenes:
-    tag_counts = check_group_makeup_tags(scene)
-    if not tag_counts["has_correct_tags"]:
-        results.append({
-            "id": scene["id"],
-            "title": scene["title"],
-            "generic_count": tag_counts["generic_count"],
-            "specific_count": tag_counts["specific_count"],
-            "tags": [tag["name"] for tag in scene["tags"] 
-                    if tag["id"] in group_makeup_generic_tag_ids 
-                    or tag["id"] in group_makeup_specific_tag_ids]
-        })
 
-# Convert to DataFrame for better visualization
-issues_df = pl.DataFrame(results)
 
-if len(results) == 0:
-    print("All verified scenes have correct group makeup tag counts!")
-else:
-    print(f"Found {len(results)} scenes with incorrect tag counts:")
-    print(issues_df)
+# %% [markdown]
+# # Temp
+
+# %%
+all_tags = pl.DataFrame(stash.find_tags(fragment="id name"))
+all_tags
+
+
+
+
+
 
 
 # %%
@@ -189,7 +155,9 @@ makeup_mapping.add_mapping("1TF2F1M", "Foursome", "Foursome (BGGT)")
 makeup_mapping.add_mapping("1TF3F", "Foursome", "Foursome (GGGT)")
 makeup_mapping.add_mapping("1TF3M", "Foursome", "Foursome (BBBT)")
 makeup_mapping.add_mapping("2TF2F", "Foursome", "Foursome (GGTT)")
+makeup_mapping.add_mapping("2TF2M", "Foursome", "Foursome (BBTT)")
 makeup_mapping.add_mapping("3TF1F", "Foursome", "Foursome (GTTT)")
+
 
 # Add mappings for fivesomes
 makeup_mapping.add_mapping("3F2M", "Fivesome", "Fivesome (BBBGG)")
@@ -197,6 +165,7 @@ makeup_mapping.add_mapping("2F3M", "Fivesome", "Fivesome (BBBGG)")
 makeup_mapping.add_mapping("5F", "Fivesome", "Fivesome (Lesbian)")
 makeup_mapping.add_mapping("1TF4M", "Fivesome", "Fivesome (GGGGT)")
 makeup_mapping.add_mapping("1TF5M", "Fivesome", "Fivesome (BBBBT)")
+makeup_mapping.add_mapping("2TF3F", "Fivesome", "Fivesome (GGGTT)")
 
 
 # Sixsomes
@@ -204,6 +173,23 @@ makeup_mapping.add_mapping("3F3M", "Sixsome", "Sixsome (BBBGGG)")
 makeup_mapping.add_mapping("6F", "Sixsome", "Sixsome (Lesbian)")
 makeup_mapping.add_mapping("1F5M", "Sixsome", "Sixsome (BBBBBG)")
 makeup_mapping.add_mapping("2F4M", "Sixsome", "Sixsome (BBBBGG)")
+makeup_mapping.add_mapping("4F2M", "Sixsome", "Sixsome (BBGGGG)")
+
+
+# Sevensomes
+makeup_mapping.add_mapping("1TF6M", "Sevensome", "Sevensome (BBBBBBT)")
+makeup_mapping.add_mapping("2F5M", "Sevensome", "Sevensome (BBBBBGG)")
+makeup_mapping.add_mapping("3F4M", "Sevensome", "Sevensome (BBBBGGG)")
+makeup_mapping.add_mapping("5F2M", "Sevensome", "Sevensome (BBGGGGG)")
+makeup_mapping.add_mapping("4F3M", "Sevensome", "Sevensome (BBBGGGG)")
+
+
+# Eightsomes
+makeup_mapping.add_mapping("2F6M", "Eightsome", "Eightsome (BBBBBBGG)")
+makeup_mapping.add_mapping("3F5M", "Eightsome", "Eightsome (BBBBBGGG)")
+makeup_mapping.add_mapping("4F4M", "Eightsome", "Eightsome (BBBBGGGG)")
+makeup_mapping.add_mapping("6F2M", "Eightsome", "Eightsome (BBGGGGGG)")
+makeup_mapping.add_mapping("5F3M", "Eightsome", "Eightsome (BBBGGGGG)")
 
 
 # Add orgy mappings
@@ -216,10 +202,10 @@ makeup_mapping.add_mapping("8F5M", "Orgy", "Orgy (Mixed)")
 makeup_mapping.add_mapping("9F7M", "Orgy", "Orgy (Mixed)")
 makeup_mapping.add_mapping("9F8M", "Orgy", "Orgy (Mixed)")
 
-
 makeup_mapping.add_mapping("7F", "Orgy", "Orgy (Lesbian)")
 makeup_mapping.add_mapping("8F", "Orgy", "Orgy (Lesbian)")
 makeup_mapping.add_mapping("12F", "Orgy", "Orgy (Lesbian)")
+
 
 # Add gangbang mappings (only generic tags)
 makeup_mapping.add_mapping("1F4M", "Gangbang")
@@ -231,6 +217,7 @@ makeup_mapping.add_mapping("1F10M", "Gangbang")
 makeup_mapping.add_mapping("1F11M", "Gangbang")
 makeup_mapping.add_mapping("1F12M", "Gangbang")
 makeup_mapping.add_mapping("1F13M", "Gangbang")
+
 
 # Add reverse gangbang mappings (only generic tags)
 makeup_mapping.add_mapping("4F1M", "Reverse Gangbang")
@@ -259,6 +246,30 @@ for tag in calculated_tags_df.sort("name").iter_rows(named=True):
         else:
             # print(f"{name}: {generic} -> {specific}")
             pass
+
+
+
+
+# %%
+new_tag_generic = "Sevensome"
+new_tag_specific = "Sevensome (BBBGGGG)"
+description = "Exactly three male performers and four female performers, at the same time."
+
+
+category_group_makeup = stash.find_tag("Category: Group Makeup")
+print(category_group_makeup)
+
+xsome_specific = stash.find_tag("Group Makeup Specific: " + new_tag_generic)
+print(xsome_specific)
+
+stash.create_tag({
+    "name": new_tag_specific,
+    "description": description,
+    "parent_ids": [category_group_makeup["id"], xsome_specific["id"]]
+})
+
+
+
 
 
 # %%
@@ -346,6 +357,9 @@ for issue in issues:
     print(f"Calculated tag: {issue['calculated_tag']}")
     for problem in issue['issues']:
         print(f"- {problem}")
+
+
+
 
 
 # %%
