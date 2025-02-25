@@ -14,6 +14,7 @@ load_dotenv()
 
 scenes_fragment = """
     id
+    code
     title
     details
     date
@@ -86,6 +87,7 @@ scenes_fragment = """
 
 scenes_schema = {
     "stashapp_id": pl.Int64,
+    "stashapp_code": pl.Utf8,
     "stashapp_title": pl.Utf8,
     "stashapp_details": pl.Utf8,
     "stashapp_date": pl.Date,
@@ -544,6 +546,7 @@ class StashAppClient:
     def _map_scene_data(self, stash_scene):
         scene_data = {
             "stashapp_id": int(stash_scene.get("id")),
+            "stashapp_code": stash_scene.get("code", ""),
             "stashapp_title": stash_scene.get("title", ""),
             "stashapp_details": stash_scene.get("details", ""),
             "stashapp_date": (
@@ -1012,3 +1015,68 @@ class StashAppClient:
         self.stash.update_performer(
             {"id": performer_id, "custom_fields": {"partial": custom_fields}}
         )
+
+    def update_tags_for_scenes(self, scene_ids: List[int], add_tag_names: List[str], remove_tag_names: List[str]):
+        """Update tags for multiple scenes by adding and removing specified tags by name.
+        
+        Args:
+            scene_ids: List of scene IDs to update
+            add_tag_names: List of tag names to add
+            remove_tag_names: List of tag names to remove
+        
+        Returns:
+            Dict[int, bool]: Dictionary mapping scene IDs to success status
+        """
+        # Get all tags at once
+        all_tags = self.stash.find_tags(fragment="id name")
+        
+        # Create lookup dict for faster tag searching
+        tag_lookup = {tag["name"]: tag for tag in all_tags}
+        
+        # Get all tags that need to be added
+        add_tags = []
+        for tag_name in add_tag_names:
+            tag = tag_lookup.get(tag_name)
+            if not tag:
+                print(f"Warning: Tag '{tag_name}' not found")
+                return {scene_id: False for scene_id in scene_ids}
+            add_tags.append(tag)
+            
+        # Create set of tags to remove
+        remove_tag_names_set = set(remove_tag_names)
+        
+        results = {}
+        
+        # Process each scene
+        for scene_id in scene_ids:
+            scene = self.stash.find_scene(scene_id, fragment="id tags { id name }")
+            
+            try:
+                # Build new tag list:
+                # 1. Keep existing tags that aren't in remove list
+                # 2. Add new tags
+                new_tag_ids = []
+                
+                # Keep existing tags not marked for removal
+                for existing_tag in scene["tags"]:
+                    if existing_tag["name"] not in remove_tag_names_set:
+                        new_tag_ids.append(existing_tag["id"])
+                        
+                # Add new tags
+                for tag in add_tags:
+                    if tag["id"] not in new_tag_ids:  # Avoid duplicates
+                        new_tag_ids.append(tag["id"])
+                        
+                # Update the scene
+                self.stash.update_scene({
+                    "id": scene_id,
+                    "tag_ids": new_tag_ids
+                })
+                
+                results[scene_id] = True
+                
+            except Exception as e:
+                print(f"Error updating scene {scene_id}: {str(e)}")
+                results[scene_id] = False
+        
+        return results
