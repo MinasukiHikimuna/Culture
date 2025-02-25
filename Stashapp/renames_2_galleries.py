@@ -48,7 +48,7 @@ def trigger_metadata_scan(paths):
 
 # %%
 # current_studios = get_parent_studio_by_name("Vixen Media Group")
-current_studios = get_studio_by_name("X-Art")
+current_studios = get_studio_by_name("Sperm Mania")
 
 # exclusion_id_list = [774, 170]
 # current_studios = current_studios.filter(~pl.col("stash_studios_id").is_in(exclusion_id_list))
@@ -64,10 +64,6 @@ gallery_paths = ["W:\\Culture\\Photos"]
 trigger_metadata_scan(gallery_paths)
 
 
-
-
-# %% [markdown]
-# # Rename galleries
 
 
 
