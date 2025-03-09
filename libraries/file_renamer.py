@@ -13,12 +13,6 @@ def create_filename(use_studio_code_tag: Dict, row: Dict) -> str:
     Returns:
         Formatted filename string
     """
-    xxhash = row.get('stashapp_primary_file_xxhash')
-    if not xxhash:
-        return None
-        
-    xxhash_fmt = f" [{xxhash}]"
-    
     # Get the file suffix
     suffix = get_suffix(row.get('stashapp_primary_file_basename'))
     if not suffix:
@@ -36,7 +30,8 @@ def create_filename(use_studio_code_tag: Dict, row: Dict) -> str:
     max_length_wo_ce_uuid_suffix = MAX_LENGTH - ce_uuid_length - suffix_length
 
     # Get studio and format it
-    studio = get_studio_value(row.get('stashapp_studio'))
+    studio = row.get('stashapp_studio')
+    studio_name = get_studio_value(studio)
     
     # Get date
     date = row.get('stashapp_date')
@@ -49,11 +44,12 @@ def create_filename(use_studio_code_tag: Dict, row: Dict) -> str:
     title = row.get('stashapp_title', 'Unknown Title')
     
     # Build base filename
-    base_filename = f"{studio} – {date_str} – "
+    base_filename = f"{studio_name} – {date_str} – "
     
     # Add studio code if needed
-    if has_studio_code_tag(use_studio_code_tag, row.get('stashapp_studio')) and row.get('code'):
-        base_filename += f"{_clean_for_filename(row['code'])} – "
+    has_tag = has_studio_code_tag(use_studio_code_tag, studio)
+    if has_tag and row.get('stashapp_code'):
+        base_filename += f"{_clean_for_filename(row['stashapp_code'])} – "
     
     base_filename += _clean_for_filename(f"{title} – {performers_str}")
 
@@ -123,11 +119,22 @@ def has_studio_code_tag(use_studio_code_tag: Dict, studio: Dict) -> bool:
     if use_studio_code_tag is None:
         raise ValueError("use_studio_code_tag is required")
     
-    if studio is None or studio.get("tags") is None or len(studio.get("tags")) == 0:
+    if studio is None:
         return False
 
-    tag_ids = [tag["id"] for tag in studio.get("tags")]
-    return use_studio_code_tag["id"] in tag_ids
+    # Check studio's own tags
+    studio_tags = studio.get("tags", [])
+    if studio_tags and any(str(tag["id"]) == str(use_studio_code_tag["id"]) for tag in studio_tags):
+        return True
+
+    # Check parent studio's tags if they exist
+    parent_studio = studio.get("parent_studio")
+    if parent_studio and parent_studio.get("tags"):
+        parent_tags = parent_studio.get("tags", [])
+        if any(str(tag["id"]) == str(use_studio_code_tag["id"]) for tag in parent_tags):
+            return True
+
+    return False
 
 def get_performers_value(performers: List[Dict]) -> str:
     """
