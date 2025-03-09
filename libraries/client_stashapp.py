@@ -213,10 +213,18 @@ studio {
     id
     name
     url
+    tags {
+        id
+        name
+    }
     parent_studio {
         id
         name
         url
+        tags {
+            id
+            name
+        }
     }
 }
 files {
@@ -292,8 +300,9 @@ galleries_schema = {
             "id": pl.Int64,
             "name": pl.Utf8,
             "url": pl.Utf8,
+            "tags": pl.List(pl.Struct({"id": pl.Int64, "name": pl.Utf8})),
             "parent_studio": pl.Struct(
-                {"id": pl.Int64, "name": pl.Utf8, "url": pl.Utf8}
+                {"id": pl.Int64, "name": pl.Utf8, "url": pl.Utf8, "tags": pl.List(pl.Struct({"id": pl.Int64, "name": pl.Utf8}))}
             ),
         }
     ),
