@@ -27,7 +27,14 @@ from itemadapter import ItemAdapter
 
 load_dotenv()
 
-cookies = json.loads(os.getenv("LEZKISS_COOKIES"))
+# Load and format cookies properly
+raw_cookies = json.loads(os.getenv("LEZKISS_COOKIES", "[]"))
+cookies = {}
+if isinstance(raw_cookies, list):
+    for cookie in raw_cookies:
+        if isinstance(cookie, dict) and "name" in cookie and "value" in cookie:
+            cookies[cookie["name"]] = cookie["value"]
+
 base_url = os.getenv("LEZKISS_BASE_URL")
 
 
@@ -36,6 +43,11 @@ class LezKissSpider(scrapy.Spider):
     allowed_domains = os.getenv("LEZKISS_ALLOWED_DOMAINS").split(",")
     start_urls = [base_url]
     site_short_name = "lezkiss"
+
+    def __init__(self, *args, **kwargs):
+        super(LezKissSpider, self).__init__(*args, **kwargs)
+        self.performer_image_path = "F:\\Ripping\\LezKiss\\Performers"
+        os.makedirs(self.performer_image_path, exist_ok=True)
 
     @classmethod
     def from_crawler(cls, crawler, *args, **kwargs):
@@ -58,29 +70,52 @@ class LezKissSpider(scrapy.Spider):
         spider.existing_releases = get_existing_releases_with_status(site_item.id)
         return spider
 
-    def parse(self, response):
-        """Initial parse method - entry point for the spider."""
-        # Start crawling both videos and photos sections
+    def start_requests(self):
+        """Override start_requests to handle enter declaration."""
+        # First visit the enter.php page to handle age verification
+        yield scrapy.Request(
+            url=f"{base_url}/enter.php",
+            callback=self.handle_enter_declaration,
+            dont_filter=True,
+            meta={"dont_redirect": True, "handle_httpstatus_list": [302]},
+        )
+
+    def handle_enter_declaration(self, response):
+        """Handle the enter declaration page and set necessary cookies."""
+        # Set cookies for age verification
+        cookies_dict = {
+            "enter_declaration": "ok",  # This matches the localStorage requirement
+        }
+        cookies_dict.update(cookies)  # Add any other cookies from .env
+
+        # Now start the main crawl with proper cookies
         yield scrapy.Request(
             url=f"{base_url}/videos/",
             callback=self.parse_videos,
-            cookies=cookies,
+            cookies=cookies_dict,
             meta={"page": 1},
+            dont_filter=True,
         )
 
-        yield scrapy.Request(
-            url=f"{base_url}/photos/",
-            callback=self.parse_photos,
-            cookies=cookies,
-            meta={"page": 1},
-        )
+        # yield scrapy.Request(
+        #     url=f"{base_url}/photos/",
+        #     callback=self.parse_photos,
+        #     cookies=cookies_dict,
+        #     meta={"page": 1},
+        #     dont_filter=True
+        # )
+
+    def parse(self, response):
+        """Initial parse method - entry point for the spider."""
+        # This is now handled by start_requests
+        pass
 
     def parse_videos(self, response):
         """Parse the videos listing page."""
         # Extract video entries - each video is in a div.item-col
         video_entries = response.css("div.item-col")
 
-        for entry in video_entries:
+        for entry in video_entries[0:2]:
             # Extract basic information from the listing
             link = entry.css("div.item-inner-col a[href*=video]")
             if not link:
@@ -127,14 +162,14 @@ class LezKissSpider(scrapy.Spider):
 
         # Handle pagination - look for next page link
         next_page = response.css('a.next[rel="next"]::attr(href)').get()
-        if next_page:
-            current_page = response.meta["page"]
-            yield scrapy.Request(
-                url=response.urljoin(next_page),
-                callback=self.parse_videos,
-                cookies=cookies,
-                meta={"page": current_page + 1},
-            )
+        # if next_page:
+        #     current_page = response.meta["page"]
+        #     yield scrapy.Request(
+        #         url=response.urljoin(next_page),
+        #         callback=self.parse_videos,
+        #         cookies=cookies,
+        #         meta={"page": current_page + 1},
+        #     )
 
     def parse_photos(self, response):
         """Parse the photos listing page."""
@@ -224,6 +259,15 @@ class LezKissSpider(scrapy.Spider):
                 )
                 performers.append(performer)
 
+                # Create and yield performer image download
+                image_url = self.get_performer_image_url(performer_short_name)
+                if image_url:
+                    download_item = self.create_performer_image_download(
+                        performer, image_url
+                    )
+                    if download_item:
+                        yield download_item
+
         # Extract tags
         tags = []
         tag_elements = response.css("div.tags-block a[href*='search']")
@@ -260,37 +304,73 @@ class LezKissSpider(scrapy.Spider):
             )
 
         # Extract video files - look for download links in the tabs section
-        video_links = response.css("div.item-tabs-col ul.tabs-list li a[href*='.mp4']")
+        video_links = response.css(
+            "div.item-tabs-col ul.tabs-list li a[href*='.mp4'], div.item-tabs-col ul.tabs-list li a[href*='.wmv']"
+        )
+
+        # Sort links by quality preference (1080p first, then 720p, then others)
+        video_urls = []
         for link in video_links:
             url = link.css("::attr(href)").get()
             if not url:
                 continue
 
-            # Extract quality from the link text
-            variant = link.css("span.sub-label::text").get()
-            if not variant:
-                variant = "default"
-            else:
-                variant = variant.strip()
+            # Skip non-video links (like favorites, reports etc)
+            if not (url.endswith(".mp4") or url.endswith(".wmv")):
+                continue
 
-            # Try to extract resolution from the variant/filename
-            resolution = None
-            if "1080" in variant or "1080" in url:
+            # Get quality from either the sub-label or the URL
+            quality_text = link.css("span.sub-label::text").get() or url
+            quality_text = quality_text.lower()
+
+            # Determine priority (higher number = higher priority)
+            # Base priority on resolution
+            priority = 0
+            if "1080" in quality_text:
+                priority = 30  # Base priority for 1080p
                 width, height = 1920, 1080
-            elif "720" in variant or "720" in url:
+            elif "720" in quality_text:
+                priority = 20  # Base priority for 720p
                 width, height = 1280, 720
-            elif "480" in variant or "480" in url:
+            elif "480" in quality_text:
+                priority = 10  # Base priority for 480p
                 width, height = 854, 480
             else:
                 width = height = None
 
+            # Add format bonus - prefer MP4 over WMV at the same resolution
+            if url.endswith(".mp4"):
+                priority += 1
+
+            # Get the format for the variant name
+            format_suffix = "mp4" if url.endswith(".mp4") else "wmv"
+
+            video_urls.append(
+                {
+                    "url": url,
+                    "priority": priority,
+                    "width": width,
+                    "height": height,
+                    "variant": (
+                        f"{height}p_{format_suffix}"
+                        if height
+                        else f"default_{format_suffix}"
+                    ),
+                }
+            )
+
+        # Sort by priority (highest first) and take the best quality
+        if video_urls:
+            best_video = sorted(video_urls, key=lambda x: x["priority"], reverse=True)[
+                0
+            ]
             video_file = AvailableVideoFile(
                 file_type="video",
                 content_type="scene",
-                variant=variant,
-                url=url,
-                resolution_width=width,
-                resolution_height=height,
+                variant=best_video["variant"],
+                url=best_video["url"],
+                resolution_width=best_video["width"],
+                resolution_height=best_video["height"],
             )
             available_files.append(video_file)
 
@@ -370,6 +450,15 @@ class LezKissSpider(scrapy.Spider):
                     response.urljoin(performer_url),
                 )
                 performers.append(performer)
+
+                # Create and yield performer image download
+                image_url = self.get_performer_image_url(performer_short_name)
+                if image_url:
+                    download_item = self.create_performer_image_download(
+                        performer, image_url
+                    )
+                    if download_item:
+                        yield download_item
 
         # Extract tags
         tags = []
@@ -471,3 +560,35 @@ class LezKissSpider(scrapy.Spider):
                 file_info=ItemAdapter(file_info).asdict(),
                 url=file_info.url,
             )
+
+    def get_performer_image_url(self, performer_short_name):
+        """Get the performer image URL based on their short name."""
+        model_id = performer_short_name.split("-")[
+            1
+        ]  # Extract ID from short name like 'leony-40'
+        if model_id:
+            return f"{base_url}/media/misc/model{model_id}.jpg"
+        return None
+
+    def create_performer_image_download(self, performer, image_url):
+        """Create a DirectDownloadItem for a performer's image."""
+        if not image_url:
+            return None
+
+        # Create a unique ID for the download
+        download_id = newnewid.uuid7()
+
+        # Create file info for the performer image
+        file_info = {
+            "file_type": "image",
+            "content_type": "performer",
+            "variant": "profile",
+            "url": image_url,
+            "target_path": os.path.join(
+                self.performer_image_path, f"{performer.short_name}.jpg"
+            ),
+        }
+
+        return DirectDownloadItem(
+            release_id=download_id, file_info=file_info, url=image_url
+        )
