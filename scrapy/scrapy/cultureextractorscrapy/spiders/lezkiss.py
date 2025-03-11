@@ -188,10 +188,286 @@ class LezKissSpider(scrapy.Spider):
 
     def parse_video_detail(self, response):
         """Parse individual video detail page."""
-        # This will be implemented next
-        pass
+        external_id = response.meta["external_id"]
+        title = response.meta["title"]
+        duration_seconds = response.meta.get("duration", 0)
+
+        # Get release date from the stats container
+        release_date_text = response.css(
+            "div.stats-container span.icon.i-calendar + span.sub-label::text"
+        ).get()
+        if release_date_text:
+            try:
+                release_date = (
+                    datetime.strptime(release_date_text.strip(), "%Y-%m-%d %H:%M:%S")
+                    .date()
+                    .isoformat()
+                )
+            except ValueError:
+                release_date = None
+        else:
+            release_date = None
+
+        # Extract performers from the models section
+        performers = []
+        performer_elements = response.css("div.tags-block ul.models-list li a")
+        for performer_element in performer_elements:
+            performer_name = performer_element.css("span.sub-label::text").get()
+            performer_url = performer_element.css("::attr(href)").get()
+            if performer_url and performer_name:
+                performer_short_name = performer_url.split("/")[-1].replace(".html", "")
+                performer = get_or_create_performer(
+                    self.site.id,
+                    performer_short_name,
+                    performer_name,
+                    response.urljoin(performer_url),
+                )
+                performers.append(performer)
+
+        # Extract tags
+        tags = []
+        tag_elements = response.css("div.tags-block a[href*='search']")
+        for tag_element in tag_elements:
+            tag_name = tag_element.css("::text").get()
+            if tag_name:
+                tag_name = tag_name.strip()
+                tag_short_name = tag_name.lower().replace(" ", "-")
+                tag_url = tag_element.css("::attr(href)").get()
+                if tag_url:
+                    tag = get_or_create_tag(
+                        self.site.id,
+                        tag_short_name,
+                        tag_name,
+                        response.urljoin(tag_url),
+                    )
+                    tags.append(tag)
+
+        # Get cover image URL from meta tags
+        cover_url = response.css("meta[property='og:image']::attr(content)").get()
+
+        # Extract video download links
+        available_files = []
+
+        # Add cover image if available
+        if cover_url:
+            available_files.append(
+                AvailableImageFile(
+                    file_type="image",
+                    content_type="cover",
+                    variant="cover",
+                    url=cover_url,
+                )
+            )
+
+        # Extract video files - look for download links in the tabs section
+        video_links = response.css("div.item-tabs-col ul.tabs-list li a[href*='.mp4']")
+        for link in video_links:
+            url = link.css("::attr(href)").get()
+            if not url:
+                continue
+
+            # Extract quality from the link text
+            variant = link.css("span.sub-label::text").get()
+            if not variant:
+                variant = "default"
+            else:
+                variant = variant.strip()
+
+            # Try to extract resolution from the variant/filename
+            resolution = None
+            if "1080" in variant or "1080" in url:
+                width, height = 1920, 1080
+            elif "720" in variant or "720" in url:
+                width, height = 1280, 720
+            elif "480" in variant or "480" in url:
+                width, height = 854, 480
+            else:
+                width = height = None
+
+            video_file = AvailableVideoFile(
+                file_type="video",
+                content_type="scene",
+                variant=variant,
+                url=url,
+                resolution_width=width,
+                resolution_height=height,
+            )
+            available_files.append(video_file)
+
+        # Create the release item
+        release_id = self.existing_releases.get(external_id, {}).get(
+            "uuid", newnewid.uuid7()
+        )
+
+        release_item = ReleaseItem(
+            id=release_id,
+            release_date=release_date,
+            short_name=external_id,
+            name=title,
+            url=response.url,
+            description="",
+            duration=duration_seconds,
+            created=datetime.now(tz=timezone.utc).astimezone(),
+            last_updated=datetime.now(tz=timezone.utc).astimezone(),
+            performers=performers,
+            tags=tags,
+            available_files=json.dumps(available_files, cls=AvailableFileEncoder),
+            json_document=json.dumps(
+                {
+                    "external_id": external_id,
+                    "title": title,
+                    "duration": duration_seconds,
+                    "raw_html": response.text,
+                }
+            ),
+            site_uuid=self.site.id,
+            site=self.site,
+        )
+
+        yield release_item
+
+        # Generate DirectDownloadItems for each file
+        for file_info in available_files:
+            yield DirectDownloadItem(
+                release_id=release_id,
+                file_info=ItemAdapter(file_info).asdict(),
+                url=file_info.url,
+            )
 
     def parse_gallery_detail(self, response):
         """Parse individual gallery detail page."""
-        # This will be implemented next
-        pass
+        external_id = response.meta["external_id"]
+        title = response.meta["title"]
+
+        # Get release date from the stats container
+        release_date_text = response.css(
+            "div.stats-container ul.stats-list li span.icon.i-calendar + span.sub-label::text"
+        ).get()
+        if release_date_text:
+            try:
+                release_date = (
+                    datetime.strptime(release_date_text.strip(), "%Y-%m-%d %H:%M:%S")
+                    .date()
+                    .isoformat()
+                )
+            except ValueError:
+                release_date = None
+        else:
+            release_date = None
+
+        # Extract performers from the models section
+        performers = []
+        performer_elements = response.css("div.tags-block ul.models-list li a")
+        for performer_element in performer_elements:
+            performer_name = performer_element.css("span.sub-label::text").get()
+            performer_url = performer_element.css("::attr(href)").get()
+            if performer_url and performer_name:
+                performer_short_name = performer_url.split("/")[-1].replace(".html", "")
+                performer = get_or_create_performer(
+                    self.site.id,
+                    performer_short_name,
+                    performer_name,
+                    response.urljoin(performer_url),
+                )
+                performers.append(performer)
+
+        # Extract tags
+        tags = []
+        tag_elements = response.css("div.tags-block a[href*='search']")
+        for tag_element in tag_elements:
+            tag_name = tag_element.css("::text").get()
+            if tag_name:
+                tag_name = tag_name.strip()
+                tag_short_name = tag_name.lower().replace(" ", "-")
+                tag_url = tag_element.css("::attr(href)").get()
+                if tag_url:
+                    tag = get_or_create_tag(
+                        self.site.id,
+                        tag_short_name,
+                        tag_name,
+                        response.urljoin(tag_url),
+                    )
+                    tags.append(tag)
+
+        # Get cover image URL from meta tags
+        cover_url = response.css("meta[property='og:image']::attr(content)").get()
+
+        # Extract gallery images
+        available_files = []
+
+        # Add cover image if available
+        if cover_url:
+            available_files.append(
+                AvailableImageFile(
+                    file_type="image",
+                    content_type="cover",
+                    variant="cover",
+                    url=cover_url,
+                )
+            )
+
+        # Extract gallery images
+        gallery_images = response.css(
+            "div#galleryImages div.gallery-item-col a img::attr(src)"
+        ).getall()
+        for idx, image_url in enumerate(gallery_images, 1):
+            available_files.append(
+                AvailableImageFile(
+                    file_type="image",
+                    content_type="gallery",
+                    variant=f"image_{idx}",
+                    url=image_url,
+                )
+            )
+
+        # Extract zip file download if available
+        zip_download = response.css("ul.tabs-list li a[download]::attr(href)").get()
+        if zip_download:
+            zip_url = response.urljoin(zip_download)
+            available_files.append(
+                AvailableGalleryZipFile(
+                    file_type="zip",
+                    content_type="gallery",
+                    variant="gallery_zip",
+                    url=zip_url,
+                )
+            )
+
+        # Create the release item
+        release_id = self.existing_releases.get(external_id, {}).get(
+            "uuid", newnewid.uuid7()
+        )
+
+        release_item = ReleaseItem(
+            id=release_id,
+            release_date=release_date,
+            short_name=external_id,
+            name=title,
+            url=response.url,
+            description="",
+            duration=0,
+            created=datetime.now(tz=timezone.utc).astimezone(),
+            last_updated=datetime.now(tz=timezone.utc).astimezone(),
+            performers=performers,
+            tags=tags,
+            available_files=json.dumps(available_files, cls=AvailableFileEncoder),
+            json_document=json.dumps(
+                {
+                    "external_id": external_id,
+                    "title": title,
+                    "raw_html": response.text,
+                }
+            ),
+            site_uuid=self.site.id,
+            site=self.site,
+        )
+
+        yield release_item
+
+        # Generate DirectDownloadItems for each file
+        for file_info in available_files:
+            yield DirectDownloadItem(
+                release_id=release_id,
+                file_info=ItemAdapter(file_info).asdict(),
+                url=file_info.url,
+            )
