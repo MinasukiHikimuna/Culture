@@ -77,49 +77,56 @@ class LezKissSpider(scrapy.Spider):
 
     def parse_videos(self, response):
         """Parse the videos listing page."""
-        # Extract video entries
-        video_entries = response.css(
-            "div.update-item"
-        )  # Adjust selector based on actual HTML structure
+        # Extract video entries - each video is in a div.item-col
+        video_entries = response.css("div.item-col")
 
         for entry in video_entries:
             # Extract basic information from the listing
-            title = entry.css("h2::text").get()
-            if not title:
+            link = entry.css("div.item-inner-col a[href*=video]")
+            if not link:
                 continue
 
-            # Extract performer names from title (assuming format "Performer1 & Performer2")
+            # Get the URL and title
+            detail_url = link.css("::attr(href)").get()
+            title = link.css("span.item-info span.title::text").get().strip()
+
+            # Extract duration
+            duration_text = link.css("span.image span.time::text").get()
+            if duration_text:
+                # Convert MM:SS to seconds
+                try:
+                    minutes, seconds = map(int, duration_text.split(":"))
+                    duration = minutes * 60 + seconds
+                except ValueError:
+                    duration = 0
+
+            # Extract video ID from URL
+            video_id = detail_url.split("-")[-1].replace(".html", "")
+            external_id = f"video-{video_id}"
+
+            # Extract performer names from title (format "Performer1 & Performer2")
             performers = [p.strip() for p in title.split("&")]
-
-            # Generate a unique external ID for the video
-            external_id = f"video-{entry.css('::attr(data-id)').get()}"  # Adjust based on actual HTML
-
-            # Get the detail page URL
-            detail_url = entry.css("a::attr(href)").get()
-            if detail_url and not detail_url.startswith(("http://", "https://")):
-                detail_url = response.urljoin(detail_url)
 
             # Check if we already have this release
             existing_release = self.existing_releases.get(external_id)
 
             if self.force_update or not existing_release:
                 yield scrapy.Request(
-                    url=detail_url,
+                    url=response.urljoin(detail_url),
                     callback=self.parse_video_detail,
                     cookies=cookies,
                     meta={
                         "external_id": external_id,
                         "title": title,
                         "performers": performers,
+                        "duration": duration,
                     },
                 )
             else:
                 self.logger.info(f"Skipping existing video release: {external_id}")
 
-        # Handle pagination
-        next_page = response.css(
-            "a.next-page::attr(href)"
-        ).get()  # Adjust selector based on actual HTML
+        # Handle pagination - look for next page link
+        next_page = response.css('a.next[rel="next"]::attr(href)').get()
         if next_page:
             current_page = response.meta["page"]
             yield scrapy.Request(
@@ -131,34 +138,32 @@ class LezKissSpider(scrapy.Spider):
 
     def parse_photos(self, response):
         """Parse the photos listing page."""
-        # Extract photo gallery entries
-        gallery_entries = response.css(
-            "div.update-item"
-        )  # Adjust selector based on actual HTML structure
+        # Extract photo gallery entries - each gallery is in a div.item-col
+        gallery_entries = response.css("div.item-col")
 
         for entry in gallery_entries:
             # Extract basic information from the listing
-            title = entry.css("h2::text").get()
-            if not title:
+            link = entry.css("div.item-inner-col a[href*=photo]")
+            if not link:
                 continue
 
-            # Extract performer names from title (assuming format "Performer1 & Performer2")
+            # Get the URL and title
+            detail_url = link.css("::attr(href)").get()
+            title = link.css("span.item-info span.title::text").get().strip()
+
+            # Extract gallery ID from URL
+            gallery_id = detail_url.split("-")[-1].replace(".html", "")
+            external_id = f"gallery-{gallery_id}"
+
+            # Extract performer names from title (format "Performer1 & Performer2")
             performers = [p.strip() for p in title.split("&")]
-
-            # Generate a unique external ID for the gallery
-            external_id = f"gallery-{entry.css('::attr(data-id)').get()}"  # Adjust based on actual HTML
-
-            # Get the detail page URL
-            detail_url = entry.css("a::attr(href)").get()
-            if detail_url and not detail_url.startswith(("http://", "https://")):
-                detail_url = response.urljoin(detail_url)
 
             # Check if we already have this release
             existing_release = self.existing_releases.get(external_id)
 
             if self.force_update or not existing_release:
                 yield scrapy.Request(
-                    url=detail_url,
+                    url=response.urljoin(detail_url),
                     callback=self.parse_gallery_detail,
                     cookies=cookies,
                     meta={
@@ -170,10 +175,8 @@ class LezKissSpider(scrapy.Spider):
             else:
                 self.logger.info(f"Skipping existing gallery release: {external_id}")
 
-        # Handle pagination
-        next_page = response.css(
-            "a.next-page::attr(href)"
-        ).get()  # Adjust selector based on actual HTML
+        # Handle pagination - look for next page link
+        next_page = response.css('a.next[rel="next"]::attr(href)').get()
         if next_page:
             current_page = response.meta["page"]
             yield scrapy.Request(
