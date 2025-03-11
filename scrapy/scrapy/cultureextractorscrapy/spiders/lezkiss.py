@@ -245,6 +245,7 @@ class LezKissSpider(scrapy.Spider):
 
         # Extract performers from the models section
         performers = []
+        performer_downloads = []  # Store performer image downloads for later
         performer_elements = response.css("div.tags-block ul.models-list li a")
         for performer_element in performer_elements:
             performer_name = performer_element.css("span.sub-label::text").get()
@@ -259,14 +260,16 @@ class LezKissSpider(scrapy.Spider):
                 )
                 performers.append(performer)
 
-                # Create and yield performer image download
+                # Create performer image download info but don't yield yet
                 image_url = self.get_performer_image_url(performer_short_name)
                 if image_url:
-                    download_item = self.create_performer_image_download(
-                        performer, image_url
-                    )
-                    if download_item:
-                        yield download_item
+                    file_info = {
+                        "file_type": "image",
+                        "content_type": "performer",
+                        "variant": f"profile_{performer_name.replace(' ', '_')}",
+                        "url": image_url,
+                    }
+                    performer_downloads.append(file_info)
 
         # Extract tags
         tags = []
@@ -305,8 +308,9 @@ class LezKissSpider(scrapy.Spider):
 
         # Extract video files - look for download links in the tabs section
         video_links = response.css(
-            "div.item-tabs-col ul.tabs-list li a[href*='.mp4'], div.item-tabs-col ul.tabs-list li a[href*='.wmv']"
+            'div.item-tabs-col ul.tabs-list li a[href*="/videos/"], div.item-tabs-col ul.tabs-list li a[href*="/files/"]'
         )
+        self.logger.info(f"Found {len(video_links)} video links")
 
         # Sort links by quality preference (1080p first, then 720p, then others)
         video_urls = []
@@ -316,12 +320,16 @@ class LezKissSpider(scrapy.Spider):
                 continue
 
             # Skip non-video links (like favorites, reports etc)
-            if not (url.endswith(".mp4") or url.endswith(".wmv")):
+            if not ("videos" in url or "files" in url):
                 continue
 
             # Get quality from either the sub-label or the URL
             quality_text = link.css("span.sub-label::text").get() or url
             quality_text = quality_text.lower()
+
+            self.logger.info(
+                f"Processing video link: {url} with quality: {quality_text}"
+            )
 
             # Determine priority (higher number = higher priority)
             # Base priority on resolution
@@ -336,7 +344,18 @@ class LezKissSpider(scrapy.Spider):
                 priority = 10  # Base priority for 480p
                 width, height = 854, 480
             else:
-                width = height = None
+                # Try to extract resolution from URL
+                if "1080" in url:
+                    priority = 30
+                    width, height = 1920, 1080
+                elif "720" in url:
+                    priority = 20
+                    width, height = 1280, 720
+                elif "480" in url:
+                    priority = 10
+                    width, height = 854, 480
+                else:
+                    width = height = None
 
             # Add format bonus - prefer MP4 over WMV at the same resolution
             if url.endswith(".mp4"):
@@ -361,9 +380,13 @@ class LezKissSpider(scrapy.Spider):
 
         # Sort by priority (highest first) and take the best quality
         if video_urls:
+            self.logger.info(f"Found {len(video_urls)} valid video URLs")
             best_video = sorted(video_urls, key=lambda x: x["priority"], reverse=True)[
                 0
             ]
+            self.logger.info(
+                f"Selected best video: {best_video['url']} ({best_video['variant']})"
+            )
             video_file = AvailableVideoFile(
                 file_type="video",
                 content_type="scene",
@@ -373,6 +396,18 @@ class LezKissSpider(scrapy.Spider):
                 resolution_height=best_video["height"],
             )
             available_files.append(video_file)
+        else:
+            self.logger.warning(f"No valid video URLs found for {external_id}")
+
+        # Add performer images to available files
+        for file_info in performer_downloads:
+            image = AvailableImageFile(
+                file_type=file_info["file_type"],
+                content_type=file_info["content_type"],
+                variant=file_info["variant"],
+                url=file_info["url"],
+            )
+            available_files.append(image)
 
         # Create the release item
         release_id = self.existing_releases.get(external_id, {}).get(
@@ -437,6 +472,7 @@ class LezKissSpider(scrapy.Spider):
 
         # Extract performers from the models section
         performers = []
+        performer_downloads = []  # Store performer image downloads for later
         performer_elements = response.css("div.tags-block ul.models-list li a")
         for performer_element in performer_elements:
             performer_name = performer_element.css("span.sub-label::text").get()
@@ -451,14 +487,16 @@ class LezKissSpider(scrapy.Spider):
                 )
                 performers.append(performer)
 
-                # Create and yield performer image download
+                # Create performer image download info but don't yield yet
                 image_url = self.get_performer_image_url(performer_short_name)
                 if image_url:
-                    download_item = self.create_performer_image_download(
-                        performer, image_url
-                    )
-                    if download_item:
-                        yield download_item
+                    file_info = {
+                        "file_type": "image",
+                        "content_type": "performer",
+                        "variant": f"profile_{performer_name.replace(' ', '_')}",
+                        "url": image_url,
+                    }
+                    performer_downloads.append(file_info)
 
         # Extract tags
         tags = []
@@ -522,6 +560,16 @@ class LezKissSpider(scrapy.Spider):
                 )
             )
 
+        # Add performer images to available files
+        for file_info in performer_downloads:
+            image = AvailableImageFile(
+                file_type=file_info["file_type"],
+                content_type=file_info["content_type"],
+                variant=file_info["variant"],
+                url=file_info["url"],
+            )
+            available_files.append(image)
+
         # Create the release item
         release_id = self.existing_releases.get(external_id, {}).get(
             "uuid", newnewid.uuid7()
@@ -563,12 +611,31 @@ class LezKissSpider(scrapy.Spider):
 
     def get_performer_image_url(self, performer_short_name):
         """Get the performer image URL based on their short name."""
-        model_id = performer_short_name.split("-")[
-            1
-        ]  # Extract ID from short name like 'leony-40'
-        if model_id:
+        try:
+            # Split by hyphen and take the last part which should be the ID
+            parts = performer_short_name.split("-")
+            if not parts:
+                self.logger.warning(
+                    f"Could not extract model ID from performer short name: {performer_short_name}"
+                )
+                return None
+
+            model_id = parts[-1]  # Take the last part after splitting
+            if not model_id.isdigit():
+                self.logger.warning(
+                    f"Invalid model ID (not a number) from performer short name: {performer_short_name}"
+                )
+                return None
+
+            self.logger.info(
+                f"Extracted model ID {model_id} from performer short name: {performer_short_name}"
+            )
             return f"{base_url}/media/misc/model{model_id}.jpg"
-        return None
+        except Exception as e:
+            self.logger.error(
+                f"Error extracting model ID from performer short name: {performer_short_name} - {str(e)}"
+            )
+            return None
 
     def create_performer_image_download(self, performer, image_url):
         """Create a DirectDownloadItem for a performer's image."""
