@@ -242,9 +242,27 @@ class AvailableFilesPipeline(FilesPipeline):
             release_name = release.name
             site_name = site.name
 
-            # Extract file extension from the URL
+            # Extract file extension from the URL or use original filename from json_document
             url_path = urlparse(file_info["url"]).path
-            file_extension = os.path.splitext(url_path)[1]
+
+            # Get the release to check json_document for original filename
+            if not release:
+                raise ValueError(f"Release with ID {release_id} not found")
+
+            # Try to get original filename from json_document
+            try:
+                if isinstance(release.json_document, str):
+                    json_data = json.loads(release.json_document)
+                else:
+                    json_data = release.json_document
+
+                original_filename = json_data.get("original_filename")
+                if original_filename and file_info["content_type"] == "gallery":
+                    file_extension = os.path.splitext(original_filename)[1]
+                else:
+                    file_extension = os.path.splitext(url_path)[1]
+            except (json.JSONDecodeError, AttributeError):
+                file_extension = os.path.splitext(url_path)[1]
 
             # Create filename in the specified format
             if file_info["file_type"] == "video":

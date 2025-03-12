@@ -24,6 +24,7 @@ from cultureextractorscrapy.utils import (
     get_log_filename,
 )
 from itemadapter import ItemAdapter
+from urllib.parse import parse_qs, urlparse
 
 load_dotenv()
 
@@ -97,13 +98,13 @@ class LezKissSpider(scrapy.Spider):
             dont_filter=True,
         )
 
-        # yield scrapy.Request(
-        #     url=f"{base_url}/photos/",
-        #     callback=self.parse_photos,
-        #     cookies=cookies_dict,
-        #     meta={"page": 1},
-        #     dont_filter=True
-        # )
+        yield scrapy.Request(
+            url=f"{base_url}/photos/",
+            callback=self.parse_photos,
+            cookies=cookies_dict,
+            meta={"page": 1},
+            dont_filter=True,
+        )
 
     def parse(self, response):
         """Initial parse method - entry point for the spider."""
@@ -176,9 +177,9 @@ class LezKissSpider(scrapy.Spider):
         # Extract photo gallery entries - each gallery is in a div.item-col
         gallery_entries = response.css("div.item-col")
 
-        for entry in gallery_entries:
+        for entry in gallery_entries[0:1]:
             # Extract basic information from the listing
-            link = entry.css("div.item-inner-col a[href*=photo]")
+            link = entry.css("div.item-inner-col a[href*=galleries]")
             if not link:
                 continue
 
@@ -212,14 +213,14 @@ class LezKissSpider(scrapy.Spider):
 
         # Handle pagination - look for next page link
         next_page = response.css('a.next[rel="next"]::attr(href)').get()
-        if next_page:
-            current_page = response.meta["page"]
-            yield scrapy.Request(
-                url=response.urljoin(next_page),
-                callback=self.parse_photos,
-                cookies=cookies,
-                meta={"page": current_page + 1},
-            )
+        # if next_page:
+        #     current_page = response.meta["page"]
+        #     yield scrapy.Request(
+        #         url=response.urljoin(next_page),
+        #         callback=self.parse_photos,
+        #         cookies=cookies,
+        #         meta={"page": current_page + 1},
+        #     )
 
     def parse_video_detail(self, response):
         """Parse individual video detail page."""
@@ -533,78 +534,153 @@ class LezKissSpider(scrapy.Spider):
                 )
             )
 
-        # Extract gallery images
-        gallery_images = response.css(
-            "div#galleryImages div.gallery-item-col a img::attr(src)"
-        ).getall()
-        for idx, image_url in enumerate(gallery_images, 1):
-            available_files.append(
-                AvailableImageFile(
-                    file_type="image",
-                    content_type="gallery",
-                    variant=f"image_{idx}",
-                    url=image_url,
-                )
-            )
+        # Create release_id first
+        release_id = self.existing_releases.get(external_id, {}).get(
+            "uuid", newnewid.uuid7()
+        )
 
         # Extract zip file download if available
         zip_download = response.css("ul.tabs-list li a[download]::attr(href)").get()
         if zip_download:
             zip_url = response.urljoin(zip_download)
-            available_files.append(
-                AvailableGalleryZipFile(
-                    file_type="zip",
-                    content_type="gallery",
-                    variant="gallery_zip",
-                    url=zip_url,
-                )
-            )
-
-        # Add performer images to available files
-        for file_info in performer_downloads:
-            image = AvailableImageFile(
-                file_type=file_info["file_type"],
-                content_type=file_info["content_type"],
-                variant=file_info["variant"],
-                url=file_info["url"],
-            )
-            available_files.append(image)
-
-        # Create the release item
-        release_id = self.existing_releases.get(external_id, {}).get(
-            "uuid", newnewid.uuid7()
-        )
-
-        release_item = ReleaseItem(
-            id=release_id,
-            release_date=release_date,
-            short_name=external_id,
-            name=title,
-            url=response.url,
-            description="",
-            duration=0,
-            created=datetime.now(tz=timezone.utc).astimezone(),
-            last_updated=datetime.now(tz=timezone.utc).astimezone(),
-            performers=performers,
-            tags=tags,
-            available_files=json.dumps(available_files, cls=AvailableFileEncoder),
-            json_document=json.dumps(
-                {
+            # First make a request to get the actual download URL with cookies
+            yield scrapy.Request(
+                url=zip_url,
+                callback=self.handle_gallery_download,
+                cookies=cookies,  # Pass the cookies from .env
+                meta={
+                    "dont_redirect": False,
+                    "handle_httpstatus_list": [302],
+                    "release_id": release_id,
+                    "available_files": available_files,
                     "external_id": external_id,
                     "title": title,
-                    "raw_html": response.text,
-                }
-            ),
-            site_uuid=self.site.id,
-            site=self.site,
-        )
+                    "release_date": release_date,
+                    "performers": performers,
+                    "tags": tags,
+                    "description": "",
+                    "duration": 0,
+                },
+                dont_filter=True,  # Important to not filter this request
+            )
+        else:
+            # If no zip download, just yield the release item as before
+            release_item = ReleaseItem(
+                id=release_id,
+                release_date=release_date,
+                short_name=external_id,
+                name=title,
+                url=response.url,
+                description="",
+                duration=0,
+                created=datetime.now(tz=timezone.utc).astimezone(),
+                last_updated=datetime.now(tz=timezone.utc).astimezone(),
+                performers=performers,
+                tags=tags,
+                available_files=json.dumps(available_files, cls=AvailableFileEncoder),
+                json_document=json.dumps(
+                    {
+                        "external_id": external_id,
+                        "title": title,
+                    }
+                ),
+                site_uuid=self.site.id,
+                site=self.site,
+            )
+            yield release_item
+
+            # Yield DirectDownloadItems for each available file
+            for file_info in available_files:
+                yield DirectDownloadItem(
+                    release_id=str(release_id),
+                    file_info=ItemAdapter(file_info).asdict(),
+                    url=file_info.url,
+                )
+
+    def handle_gallery_download(self, response):
+        """Handle the gallery download response and create the release item."""
+        meta = response.meta
+        available_files = meta["available_files"]
+
+        # Check if we got redirected to login
+        if "login" in response.url:
+            self.logger.error(
+                f"Got redirected to login for gallery download: {response.url}"
+            )
+            # Still create the release without the zip file
+            release_item = ReleaseItem(
+                id=meta["release_id"],
+                release_date=meta["release_date"],
+                short_name=meta["external_id"],
+                name=meta["title"],
+                url=response.url,
+                description=meta["description"],
+                duration=meta["duration"],
+                created=datetime.now(tz=timezone.utc).astimezone(),
+                last_updated=datetime.now(tz=timezone.utc).astimezone(),
+                performers=meta["performers"],
+                tags=meta["tags"],
+                available_files=json.dumps(available_files, cls=AvailableFileEncoder),
+                json_document=json.dumps(
+                    {
+                        "external_id": meta["external_id"],
+                        "title": meta["title"],
+                    }
+                ),
+                site_uuid=self.site.id,
+                site=self.site,
+            )
+        else:
+            # Extract the original filename from the URL parameters
+            parsed_url = urlparse(response.url)
+            query_params = parse_qs(parsed_url.query)
+            original_filename = query_params.get("file", [""])[0]
+
+            # Ensure filename ends with .zip
+            if original_filename and not original_filename.lower().endswith(".zip"):
+                original_filename += ".zip"
+
+            # We got the actual download URL, add it to available files
+            zip_file = AvailableGalleryZipFile(
+                file_type="zip",
+                content_type="gallery",
+                variant="gallery_zip",
+                url=response.url,
+            )
+            available_files.append(zip_file)
+
+            release_item = ReleaseItem(
+                id=meta["release_id"],
+                release_date=meta["release_date"],
+                short_name=meta["external_id"],
+                name=meta["title"],
+                url=response.url,
+                description=meta["description"],
+                duration=meta["duration"],
+                created=datetime.now(tz=timezone.utc).astimezone(),
+                last_updated=datetime.now(tz=timezone.utc).astimezone(),
+                performers=meta["performers"],
+                tags=meta["tags"],
+                available_files=json.dumps(available_files, cls=AvailableFileEncoder),
+                json_document=json.dumps(
+                    {
+                        "external_id": meta["external_id"],
+                        "title": meta["title"],
+                        "original_filename": (
+                            original_filename if original_filename else None
+                        ),
+                    }
+                ),
+                site_uuid=self.site.id,
+                site=self.site,
+            )
 
         yield release_item
 
-        # Now yield DirectDownloadItems for each available file
+        # Yield DirectDownloadItems for each available file
         for file_info in available_files:
             yield DirectDownloadItem(
-                release_id=str(release_id),
+                release_id=str(meta["release_id"]),
                 file_info=ItemAdapter(file_info).asdict(),
                 url=file_info.url,
             )
