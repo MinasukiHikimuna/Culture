@@ -395,7 +395,7 @@ class LezKissSpider(scrapy.Spider):
                 resolution_width=best_video["width"],
                 resolution_height=best_video["height"],
             )
-            # available_files.append(video_file)
+            available_files.append(video_file)
         else:
             self.logger.warning(f"No valid video URLs found for {external_id}")
 
