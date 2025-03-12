@@ -115,7 +115,7 @@ class LezKissSpider(scrapy.Spider):
         # Extract video entries - each video is in a div.item-col
         video_entries = response.css("div.item-col")
 
-        for entry in video_entries[0:2]:
+        for entry in video_entries[0:1]:
             # Extract basic information from the listing
             link = entry.css("div.item-inner-col a[href*=video]")
             if not link:
@@ -395,7 +395,7 @@ class LezKissSpider(scrapy.Spider):
                 resolution_width=best_video["width"],
                 resolution_height=best_video["height"],
             )
-            available_files.append(video_file)
+            # available_files.append(video_file)
         else:
             self.logger.warning(f"No valid video URLs found for {external_id}")
 
@@ -441,10 +441,10 @@ class LezKissSpider(scrapy.Spider):
 
         yield release_item
 
-        # Generate DirectDownloadItems for each file
+        # Now yield DirectDownloadItems for each available file
         for file_info in available_files:
             yield DirectDownloadItem(
-                release_id=release_id,
+                release_id=str(release_id),
                 file_info=ItemAdapter(file_info).asdict(),
                 url=file_info.url,
             )
@@ -601,10 +601,10 @@ class LezKissSpider(scrapy.Spider):
 
         yield release_item
 
-        # Generate DirectDownloadItems for each file
+        # Now yield DirectDownloadItems for each available file
         for file_info in available_files:
             yield DirectDownloadItem(
-                release_id=release_id,
+                release_id=str(release_id),
                 file_info=ItemAdapter(file_info).asdict(),
                 url=file_info.url,
             )
