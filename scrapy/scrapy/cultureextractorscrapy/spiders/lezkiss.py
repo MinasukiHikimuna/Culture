@@ -113,10 +113,16 @@ class LezKissSpider(scrapy.Spider):
 
     def parse_videos(self, response):
         """Parse the videos listing page."""
+        # Check for "no results" notification
+        no_results = response.css("div.notification.alert::text").get()
+        if no_results and "Sorry, no results were found" in no_results:
+            self.logger.info("No more video results found, stopping pagination")
+            return
+
         # Extract video entries - each video is in a div.item-col
         video_entries = response.css("div.item-col")
 
-        for entry in video_entries[0:1]:
+        for entry in video_entries:
             # Extract basic information from the listing
             link = entry.css("div.item-inner-col a[href*=video]")
             if not link:
@@ -163,21 +169,27 @@ class LezKissSpider(scrapy.Spider):
 
         # Handle pagination - look for next page link
         next_page = response.css('a.next[rel="next"]::attr(href)').get()
-        # if next_page:
-        #     current_page = response.meta["page"]
-        #     yield scrapy.Request(
-        #         url=response.urljoin(next_page),
-        #         callback=self.parse_videos,
-        #         cookies=cookies,
-        #         meta={"page": current_page + 1},
-        #     )
+        if next_page:
+            current_page = response.meta["page"]
+            yield scrapy.Request(
+                url=response.urljoin(next_page),
+                callback=self.parse_videos,
+                cookies=cookies,
+                meta={"page": current_page + 1},
+            )
 
     def parse_photos(self, response):
         """Parse the photos listing page."""
+        # Check for "no results" notification
+        no_results = response.css("div.notification.alert::text").get()
+        if no_results and "Sorry, no results were found" in no_results:
+            self.logger.info("No more photo results found, stopping pagination")
+            return
+
         # Extract photo gallery entries - each gallery is in a div.item-col
         gallery_entries = response.css("div.item-col")
 
-        for entry in gallery_entries[0:1]:
+        for entry in gallery_entries:
             # Extract basic information from the listing
             link = entry.css("div.item-inner-col a[href*=galleries]")
             if not link:
@@ -213,14 +225,14 @@ class LezKissSpider(scrapy.Spider):
 
         # Handle pagination - look for next page link
         next_page = response.css('a.next[rel="next"]::attr(href)').get()
-        # if next_page:
-        #     current_page = response.meta["page"]
-        #     yield scrapy.Request(
-        #         url=response.urljoin(next_page),
-        #         callback=self.parse_photos,
-        #         cookies=cookies,
-        #         meta={"page": current_page + 1},
-        #     )
+        if next_page:
+            current_page = response.meta["page"]
+            yield scrapy.Request(
+                url=response.urljoin(next_page),
+                callback=self.parse_photos,
+                cookies=cookies,
+                meta={"page": current_page + 1},
+            )
 
     def parse_video_detail(self, response):
         """Parse individual video detail page."""
