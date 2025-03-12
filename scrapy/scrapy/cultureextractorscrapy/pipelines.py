@@ -13,7 +13,7 @@ from scrapy.exceptions import DropItem
 import logging
 from scrapy.utils.project import get_project_settings
 
-from .spiders.database import get_session, Site, Release, DownloadedFile
+from .spiders.database import get_session, Site, Release, DownloadedFile, Performer, Tag
 from .items import (
     ReleaseAndDownloadsItem,
     ReleaseItem,
@@ -32,8 +32,6 @@ from itemadapter import ItemAdapter
 
 import subprocess
 import hashlib
-
-from .spiders.database import Site, Release, DownloadedFile
 
 from twisted.internet import defer
 
@@ -71,10 +69,15 @@ class PostgresPipeline:
                     existing_release.last_updated = item.last_updated
                     existing_release.available_files = item.available_files
                     existing_release.json_document = item.json_document
+
+                    # Clear existing relationships
+                    existing_release.performers = []
+                    existing_release.tags = []
                     spider.logger.info(f"Updating existing release with ID: {item.id}")
+                    release = existing_release
                 else:
                     # Create new release
-                    new_release = Release(
+                    release = Release(
                         uuid=str(item.id),
                         release_date=(
                             datetime.fromisoformat(item.release_date)
@@ -92,8 +95,36 @@ class PostgresPipeline:
                         json_document=item.json_document,
                         site_uuid=str(item.site_uuid),
                     )
-                    self.session.add(new_release)
+                    self.session.add(release)
                     spider.logger.info(f"Creating new release with ID: {item.id}")
+
+                # Add performers
+                if item.performers:
+                    for performer_item in item.performers:
+                        performer = (
+                            self.session.query(Performer)
+                            .filter_by(uuid=str(performer_item.id))
+                            .first()
+                        )
+                        if performer:
+                            release.performers.append(performer)
+                            spider.logger.info(
+                                f"Added performer {performer.name} to release {item.id}"
+                            )
+
+                # Add tags
+                if item.tags:
+                    for tag_item in item.tags:
+                        tag = (
+                            self.session.query(Tag)
+                            .filter_by(uuid=str(tag_item.id))
+                            .first()
+                        )
+                        if tag:
+                            release.tags.append(tag)
+                            spider.logger.info(
+                                f"Added tag {tag.name} to release {item.id}"
+                            )
 
                 # Commit the transaction
                 self.session.commit()
