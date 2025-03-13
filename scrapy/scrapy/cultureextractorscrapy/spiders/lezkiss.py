@@ -47,8 +47,6 @@ class LezKissSpider(scrapy.Spider):
 
     def __init__(self, *args, **kwargs):
         super(LezKissSpider, self).__init__(*args, **kwargs)
-        self.performer_image_path = "F:\\Ripping\\LezKiss\\Performers"
-        os.makedirs(self.performer_image_path, exist_ok=True)
 
     @classmethod
     def from_crawler(cls, crawler, *args, **kwargs):
