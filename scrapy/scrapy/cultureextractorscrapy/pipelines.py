@@ -194,6 +194,11 @@ class AvailableFilesPipeline(FilesPipeline):
             )
 
             full_path = os.path.join(self.store.basedir, file_path)
+            spider.logger.info(f"[AvailableFilesPipeline] Full file path: {full_path}")
+            spider.logger.info(
+                f"[AvailableFilesPipeline] File info: {item['file_info']}"
+            )
+
             if not os.path.exists(full_path):
                 spider.logger.info(
                     f"[AvailableFilesPipeline] File does not exist, requesting download: {full_path}"
@@ -204,6 +209,8 @@ class AvailableFilesPipeline(FilesPipeline):
                         meta={
                             "release_id": item["release_id"],
                             "file_info": item["file_info"],
+                            "dont_redirect": True,
+                            "handle_httpstatus_list": [302],
                         },
                     )
                 ]
@@ -244,25 +251,9 @@ class AvailableFilesPipeline(FilesPipeline):
 
             # Extract file extension from the URL or use original filename from json_document
             url_path = urlparse(file_info["url"]).path
-
-            # Get the release to check json_document for original filename
-            if not release:
-                raise ValueError(f"Release with ID {release_id} not found")
-
-            # Try to get original filename from json_document
-            try:
-                if isinstance(release.json_document, str):
-                    json_data = json.loads(release.json_document)
-                else:
-                    json_data = release.json_document
-
-                original_filename = json_data.get("original_filename")
-                if original_filename and file_info["content_type"] == "gallery":
-                    file_extension = os.path.splitext(original_filename)[1]
-                else:
-                    file_extension = os.path.splitext(url_path)[1]
-            except (json.JSONDecodeError, AttributeError):
-                file_extension = os.path.splitext(url_path)[1]
+            file_extension = os.path.splitext(url_path)[1]
+            if not file_extension:
+                file_extension = ".mp4"  # Default to .mp4 for video files
 
             # Create filename in the specified format
             if file_info["file_type"] == "video":
@@ -276,7 +267,11 @@ class AvailableFilesPipeline(FilesPipeline):
             # Create a folder structure based on site and release ID
             folder = f"{site_name}/Metadata/{release_id}"
 
-            return f"{folder}/{filename}"
+            file_path = f"{folder}/{filename}"
+            info.spider.logger.info(
+                f"[AvailableFilesPipeline] Generated file path: {file_path}"
+            )
+            return file_path
         finally:
             session.close()
 

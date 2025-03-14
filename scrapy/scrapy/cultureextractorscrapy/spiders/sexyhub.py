@@ -26,6 +26,7 @@ from cultureextractorscrapy.utils import (
 from itemadapter import ItemAdapter
 from urllib.parse import parse_qs, urlparse
 import uuid
+import re
 
 load_dotenv()
 
@@ -246,9 +247,14 @@ class SexyHubSpider(scrapy.Spider):
             highest_resolution = 0
 
             self.logger.info(f"Found {len(video_files)} video files")
+            self.logger.debug(
+                f"Video data structure: {json.dumps(result['videos'], indent=2)}"
+            )
 
-            # Get the video ID for the download API
-            video_id = result["videos"]["full"].get("id")
+            # Get the video ID directly from the release ID
+            video_id = str(release_data["id"])
+            self.logger.info(f"Using release ID as video ID: {video_id}")
+
             if video_id:
                 # Make request to video download API
                 video_download_url = f"{base_url}/v1/video-download/{video_id}"
@@ -363,11 +369,9 @@ class SexyHubSpider(scrapy.Spider):
                     self.logger.info(f"Using AV1 codec at {resolution}p resolution")
 
         if highest_quality:
-            video_url = highest_quality["urls"][
-                "download"
-            ]  # Use download URL instead of view URL
-            width = highest_quality["width"]
-            height = highest_quality["height"]
+            video_url = highest_quality["urls"]["download"]  # Use download URL
+            width = parse_resolution_width(highest_quality["format"])
+            height = parse_resolution_height(highest_quality["format"])
 
             self.logger.info(f"Creating video file object with URL: {video_url}")
             video_file = AvailableVideoFile(
