@@ -4,6 +4,7 @@ import newnewid
 from datetime import datetime, timezone
 from dotenv import load_dotenv
 import scrapy
+from scrapy.exceptions import CloseSpider
 from cultureextractorscrapy.spiders.database import (
     get_site_item,
     get_or_create_performer,
@@ -49,6 +50,7 @@ class SexyHubSpider(scrapy.Spider):
 
     def __init__(self, *args, **kwargs):
         super(SexyHubSpider, self).__init__(*args, **kwargs)
+        self.handle_httpstatus_list = [401]  # Add 401 to handled status codes
 
     @classmethod
     def from_crawler(cls, crawler, *args, **kwargs):
@@ -110,12 +112,30 @@ class SexyHubSpider(scrapy.Spider):
             dont_filter=True,
             meta={
                 "dont_redirect": True,
-                "handle_httpstatus_list": [302],
+                "handle_httpstatus_list": [302, 401],  # Add 401 to handled status codes
                 "headers": headers,
             },
+            errback=self.handle_error,
         )
 
+    def handle_error(self, failure):
+        """Handle request errors."""
+        if failure.value.response.status == 401:
+            self.logger.error(
+                "Received 401 Unauthorized response. Authentication failed. Stopping spider."
+            )
+            raise CloseSpider("authentication_failed")
+
     def parse(self, response):
+        """Parse the response."""
+        # Check for 401 response
+        if response.status == 401:
+            self.logger.error(
+                "Received 401 Unauthorized response. Authentication failed. Stopping spider."
+            )
+            raise CloseSpider("authentication_failed")
+
+        # Continue with normal parsing if status is 200
         data = json.loads(response.text)
 
         # Process each release in the listing
@@ -163,7 +183,13 @@ class SexyHubSpider(scrapy.Spider):
                 url=f"{base_url}/v2/releases/{release['id']}",
                 callback=self.parse_scene_detail,
                 headers=response.meta["headers"],
-                meta={"release_data": release, "headers": response.meta["headers"]},
+                meta={
+                    "release_data": release,
+                    "headers": response.meta["headers"],
+                    "dont_redirect": True,
+                    "handle_httpstatus_list": [302, 401],
+                },
+                errback=self.handle_error,
             )
 
         # Handle pagination
@@ -181,10 +207,23 @@ class SexyHubSpider(scrapy.Spider):
                 url=next_url,
                 callback=self.parse,
                 headers=response.meta["headers"],
-                meta={"headers": response.meta["headers"]},
+                meta={
+                    "headers": response.meta["headers"],
+                    "dont_redirect": True,
+                    "handle_httpstatus_list": [302, 401],
+                },
+                errback=self.handle_error,
             )
 
     def parse_scene_detail(self, response):
+        """Parse the scene detail response."""
+        # Check for 401 response
+        if response.status == 401:
+            self.logger.error(
+                "Received 401 Unauthorized response. Authentication failed. Stopping spider."
+            )
+            raise CloseSpider("authentication_failed")
+
         data = json.loads(response.text)
         result = data["result"]
         release_data = response.meta["release_data"]
@@ -289,12 +328,22 @@ class SexyHubSpider(scrapy.Spider):
                 "headers": response.meta["headers"],
                 "has_gallery": has_gallery,
                 "result": result,
+                "dont_redirect": True,
+                "handle_httpstatus_list": [302, 401],
             },
+            errback=self.handle_error,
             dont_filter=True,
         )
 
     def parse_video_download(self, response):
         """Parse the video download API response and add video files to metadata."""
+        # Check for 401 response
+        if response.status == 401:
+            self.logger.error(
+                "Received 401 Unauthorized response. Authentication failed. Stopping spider."
+            )
+            raise CloseSpider("authentication_failed")
+
         self.logger.info("Parsing video download response")
         data = json.loads(response.text)
         release_meta = response.meta["release_meta"]
@@ -369,7 +418,10 @@ class SexyHubSpider(scrapy.Spider):
                             "release_meta": release_meta,
                             "download_items": download_items,
                             "headers": response.meta["headers"],
+                            "dont_redirect": True,
+                            "handle_httpstatus_list": [302, 401],
                         },
+                        errback=self.handle_error,
                     )
                     return
 
@@ -380,6 +432,13 @@ class SexyHubSpider(scrapy.Spider):
 
     def parse_gallery_detail(self, response):
         """Parse the gallery details and yield the final release item with all files."""
+        # Check for 401 response
+        if response.status == 401:
+            self.logger.error(
+                "Received 401 Unauthorized response. Authentication failed. Stopping spider."
+            )
+            raise CloseSpider("authentication_failed")
+
         data = json.loads(response.text)
         result = data["result"]
         release_meta = response.meta["release_meta"]
