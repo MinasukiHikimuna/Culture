@@ -94,8 +94,14 @@ class SexyHubSpider(scrapy.Spider):
         }
 
         # Scrapy will automatically handle gzip decompression
+        girlfriends_id = 289
+        dane_jones_id = 290
         lesbea_id = 291
-        per_page = 4
+        massage_rooms_id = 292
+        mom_id = 293
+        fitness_rooms_id = 294
+
+        per_page = 20
         offset = 0
         yield scrapy.Request(
             url=f"{base_url}/v2/releases?adaptiveStreamingOnly=false&dateReleased=%3C2025-03-13&orderBy=dateReleased&type=scene&groupFilter=primary&collectionId={lesbea_id}&limit={per_page}&offset={offset}",
