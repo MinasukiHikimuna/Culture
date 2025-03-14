@@ -177,6 +177,56 @@ class AvailableFilesPipeline(FilesPipeline):
     def __init__(self, store_uri, download_func=None, settings=None):
         super().__init__(store_uri, download_func, settings)
         self.store_uri = store_uri  # This is the FILES_STORE setting
+        # Add Windows invalid characters list
+        self.INVALID_CHARS = r'<>:"/\|?*'
+        self.INVALID_NAMES = {
+            "CON",
+            "PRN",
+            "AUX",
+            "NUL",
+            "COM1",
+            "COM2",
+            "COM3",
+            "COM4",
+            "COM5",
+            "COM6",
+            "COM7",
+            "COM8",
+            "COM9",
+            "LPT1",
+            "LPT2",
+            "LPT3",
+            "LPT4",
+            "LPT5",
+            "LPT6",
+            "LPT7",
+            "LPT8",
+            "LPT9",
+        }
+
+    def sanitize_path(self, path):
+        """Sanitize the path to be Windows-compatible."""
+        # Split path into parts
+        parts = path.split(os.sep)
+
+        # Sanitize each part
+        sanitized_parts = []
+        for part in parts:
+            # Replace invalid characters with underscore
+            for char in self.INVALID_CHARS:
+                part = part.replace(char, "_")
+
+            # Remove any leading/trailing spaces or dots
+            part = part.strip(" .")
+
+            # Check if this part is a reserved name
+            if part.upper() in self.INVALID_NAMES:
+                part = f"_{part}"
+
+            sanitized_parts.append(part)
+
+        # Rejoin path
+        return os.sep.join(sanitized_parts)
 
     def get_media_requests(self, item, info):
         if isinstance(item, DirectDownloadItem):
@@ -210,7 +260,7 @@ class AvailableFilesPipeline(FilesPipeline):
                             "release_id": item["release_id"],
                             "file_info": item["file_info"],
                             "dont_redirect": True,
-                            "handle_httpstatus_list": [302],
+                            "handle_httpstatus_list": [302, 401],
                         },
                     )
                 ]
@@ -246,7 +296,7 @@ class AvailableFilesPipeline(FilesPipeline):
                 raise ValueError(f"Site with ID {release.site_uuid} not found")
 
             release_date = release.release_date.isoformat()
-            release_name = release.name
+            release_name = release.name  # Original name from database
             site_name = site.name
 
             # Extract file extension from the URL or use original filename from json_document
@@ -261,19 +311,42 @@ class AvailableFilesPipeline(FilesPipeline):
             else:
                 filename = f"{site_name} - {release_date} - {release_name} - {file_info['variant']} - {release_id}{file_extension}"
 
-            # Remove path separators from filename
-            filename = filename.replace("/", "").replace("\\", "")
-
             # Create a folder structure based on site and release ID
             folder = f"{site_name}/Metadata/{release_id}"
 
-            file_path = f"{folder}/{filename}"
+            # Sanitize each component separately to maintain structure
+            sanitized_site = self.sanitize_component(site_name)
+            sanitized_filename = self.sanitize_component(filename)
+
+            # Combine into final path
+            file_path = f"{sanitized_site}/Metadata/{release_id}/{sanitized_filename}"
+
             info.spider.logger.info(
                 f"[AvailableFilesPipeline] Generated file path: {file_path}"
             )
             return file_path
         finally:
             session.close()
+
+    def sanitize_component(self, text):
+        """Sanitize a single component of a path to be Windows-compatible."""
+        # Replace invalid characters with underscore
+        for char in self.INVALID_CHARS:
+            text = text.replace(char, "_")
+
+        # Remove any leading/trailing spaces or dots
+        text = text.strip(" .")
+
+        # Check if this is a reserved name
+        if text.upper() in self.INVALID_NAMES:
+            text = f"_{text}"
+
+        # Ensure component is not too long (Windows MAX_PATH is 260)
+        if len(text) > 240:  # Leave some room for the path
+            name, ext = os.path.splitext(text)
+            text = name[:236] + ext  # 236 + 4 char extension
+
+        return text
 
     def item_completed(self, results, item, info):
         if isinstance(item, DirectDownloadItem):
