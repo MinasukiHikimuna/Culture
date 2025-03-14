@@ -70,8 +70,10 @@ class Release(Base):
     site_uuid = Column(String(36), ForeignKey("sites.uuid"), nullable=False)
     site = relationship("Site", back_populates="releases")
     downloads = relationship("DownloadedFile", back_populates="release")
-    performers = relationship("Performer", secondary=release_performer)
-    tags = relationship("Tag", secondary=release_tag)
+    performers = relationship(
+        "Performer", secondary=release_performer, back_populates="releases"
+    )
+    tags = relationship("Tag", secondary=release_tag, back_populates="releases")
 
 
 class Performer(Base):
@@ -81,7 +83,12 @@ class Performer(Base):
     name = Column(String, nullable=False)
     url = Column(String, nullable=False)
     site_uuid = Column(String(36), ForeignKey("sites.uuid"), nullable=False)
-    releases = relationship("Release", secondary=release_performer)
+    releases = relationship(
+        "Release",
+        secondary=release_performer,
+        back_populates="performers",
+        overlaps="performers",
+    )
 
 
 class Tag(Base):
@@ -91,7 +98,9 @@ class Tag(Base):
     name = Column(String, nullable=False)
     url = Column(String, nullable=False)
     site_uuid = Column(String(36), ForeignKey("sites.uuid"), nullable=False)
-    releases = relationship("Release", secondary=release_tag)
+    releases = relationship(
+        "Release", secondary=release_tag, back_populates="tags", overlaps="tags"
+    )
 
 
 class DownloadedFile(Base):
