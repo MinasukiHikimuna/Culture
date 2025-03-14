@@ -113,7 +113,8 @@ class SexyHubSpider(scrapy.Spider):
         data = json.loads(response.text)
 
         # Process each release in the listing
-        for release in data["result"]:
+        # TEMPORARY: Only process the first release to get the scraping working.
+        for release in data["result"][0:1]:
             external_id = f"scene-{release['id']}"
 
             # Check if we have this release in database
@@ -240,107 +241,62 @@ class SexyHubSpider(scrapy.Spider):
                         )
                         break  # Only get highest quality poster
 
-        # Process video files
-        if "videos" in result and "full" in result["videos"]:
-            video_files = result["videos"]["full"]["files"]
-            highest_quality = None
-            highest_resolution = 0
-
-            self.logger.info(f"Found {len(video_files)} video files")
-            self.logger.debug(
-                f"Video data structure: {json.dumps(result['videos'], indent=2)}"
-            )
-
-            # Get the video ID directly from the release ID
-            video_id = str(release_data["id"])
-            self.logger.info(f"Using release ID as video ID: {video_id}")
-
-            if video_id:
-                # Make request to video download API
-                video_download_url = f"{base_url}/v1/video-download/{video_id}"
-                self.logger.info(
-                    f"Requesting video download info from: {video_download_url}"
-                )
-
-                video_download_request = scrapy.Request(
-                    url=video_download_url,
-                    callback=self.parse_video_download,
-                    headers=response.meta["headers"],
-                    meta={
-                        "release_id": release_id,
-                        "available_files": available_files,
-                        "download_items": download_items,
-                        "release_data": release_data,
-                        "performers": performers,
-                        "tags": tags,
-                        "headers": response.meta["headers"],
-                    },
-                    dont_filter=True,
-                )
-                yield video_download_request
-                return
-
-            self.logger.warning("No video ID found for download API")
-
-        # For galleries, we need to make an additional request to get the download URLs
-        for child in result.get("children", []):
-            if child["type"] == "gallery":
-                yield scrapy.Request(
-                    url=f"{base_url}/v2/releases/{child['id']}",
-                    callback=self.parse_gallery_detail,
-                    headers=response.meta["headers"],
-                    meta={
-                        "release_id": release_id,
-                        "available_files": available_files,
-                        "download_items": download_items,
-                        "release_data": release_data,
-                        "performers": performers,
-                        "tags": tags,
-                        "headers": response.meta["headers"],
-                    },
-                )
-                return  # Return here as we'll create the release item after getting gallery info
-
-        # If no gallery to process, create and yield the release item directly
+        # Prepare the release metadata
         release_date = datetime.fromisoformat(
             release_data["dateReleased"].replace("Z", "+00:00")
         ).date()
 
-        release_item = ReleaseItem(
-            id=release_id,
-            release_date=release_date.isoformat(),
-            short_name=external_id,
-            name=release_data.get("title", ""),
-            url=f"https://site-ma.sexyhub.com/scene/{release_data['id']}",
-            description=release_data.get("description", ""),
-            duration=0,  # Duration not provided in API
-            created=datetime.now(tz=timezone.utc).astimezone(),
-            last_updated=datetime.now(tz=timezone.utc).astimezone(),
-            performers=performers,
-            tags=tags,
-            available_files=json.dumps(available_files, cls=AvailableFileEncoder),
-            json_document=json.dumps(release_data),
-            site_uuid=self.site.id,
-            site=self.site,
+        release_meta = {
+            "id": release_id,
+            "release_date": release_date.isoformat(),
+            "short_name": external_id,
+            "name": release_data.get("title", ""),
+            "url": f"https://site-ma.sexyhub.com/scene/{release_data['id']}",
+            "description": release_data.get("description", ""),
+            "duration": 0,  # Duration not provided in API
+            "created": datetime.now(tz=timezone.utc).astimezone(),
+            "last_updated": datetime.now(tz=timezone.utc).astimezone(),
+            "performers": performers,
+            "tags": tags,
+            "available_files": available_files,
+            "json_document": release_data,
+            "site_uuid": self.site.id,
+            "site": self.site,
+        }
+
+        # Get video download info - video always exists
+        video_id = str(release_data["id"])
+        video_download_url = f"{base_url}/v1/video-download/{video_id}"
+        self.logger.info(f"Requesting video download info from: {video_download_url}")
+
+        # Check if there's a gallery to process
+        has_gallery = any(
+            child["type"] == "gallery" for child in result.get("children", [])
         )
 
-        yield release_item
-
-        # Yield download items after the release is created
-        for download_item in download_items:
-            yield download_item
+        # Pass all metadata to video download parser
+        yield scrapy.Request(
+            url=video_download_url,
+            callback=self.parse_video_download,
+            headers=response.meta["headers"],
+            meta={
+                "release_meta": release_meta,
+                "download_items": download_items,
+                "headers": response.meta["headers"],
+                "has_gallery": has_gallery,
+                "result": result,
+            },
+            dont_filter=True,
+        )
 
     def parse_video_download(self, response):
-        """Parse the video download API response and create video file objects."""
+        """Parse the video download API response and add video files to metadata."""
         self.logger.info("Parsing video download response")
         data = json.loads(response.text)
-
-        release_id = response.meta["release_id"]
-        available_files = response.meta["available_files"]
+        release_meta = response.meta["release_meta"]
         download_items = response.meta["download_items"]
-        release_data = response.meta["release_data"]
-        performers = response.meta["performers"]
-        tags = response.meta["tags"]
+        result = response.meta["result"]
+        has_gallery = response.meta["has_gallery"]
 
         # Find the highest quality MP4 download
         highest_quality = None
@@ -385,109 +341,92 @@ class SexyHubSpider(scrapy.Spider):
                 fps=highest_quality.get("fps"),
                 codec=highest_quality.get("codec"),
             )
-            available_files.append(video_file)
+            release_meta["available_files"].append(video_file)
 
             # Create DirectDownloadItem for video
-            download_item = DirectDownloadItem(
-                release_id=release_id,
-                file_info=ItemAdapter(video_file).asdict(),
-                url=video_url,
+            download_items.append(
+                DirectDownloadItem(
+                    release_id=release_meta["id"],
+                    file_info=ItemAdapter(video_file).asdict(),
+                    url=video_url,
+                )
             )
-            download_items.append(download_item)
             self.logger.info(f"Added video file for download: {video_url}")
-        else:
-            self.logger.warning("No valid video files found in download API response")
 
-        # Create the release item with all files
-        release_date = datetime.fromisoformat(
-            release_data["dateReleased"].replace("Z", "+00:00")
-        ).date()
+        # If there's a gallery, chain to gallery processing
+        if has_gallery:
+            for child in result.get("children", []):
+                if child["type"] == "gallery":
+                    yield scrapy.Request(
+                        url=f"{base_url}/v2/releases/{child['id']}",
+                        callback=self.parse_gallery_detail,
+                        headers=response.meta["headers"],
+                        meta={
+                            "release_meta": release_meta,
+                            "download_items": download_items,
+                            "headers": response.meta["headers"],
+                        },
+                    )
+                    return
 
-        release_item = ReleaseItem(
-            id=release_id,
-            release_date=release_date.isoformat(),
-            short_name=f"scene-{release_data['id']}",
-            name=release_data.get("title", ""),
-            url=f"https://site-ma.sexyhub.com/scene/{release_data['id']}",
-            description=release_data.get("description", ""),
-            duration=0,  # Duration not provided in API
-            created=datetime.now(tz=timezone.utc).astimezone(),
-            last_updated=datetime.now(tz=timezone.utc).astimezone(),
-            performers=performers,
-            tags=tags,
-            available_files=json.dumps(available_files, cls=AvailableFileEncoder),
-            json_document=json.dumps(release_data),
-            site_uuid=self.site.id,
-            site=self.site,
-        )
-
-        yield release_item
-
-        # Yield download items after the release is created
+        # If no gallery, yield the release item here
+        yield self._create_release_item(release_meta)
         for download_item in download_items:
             yield download_item
 
     def parse_gallery_detail(self, response):
-        """Parse the gallery details and create release item with gallery downloads."""
+        """Parse the gallery details and yield the final release item with all files."""
         data = json.loads(response.text)
         result = data["result"]
-
-        release_id = response.meta["release_id"]
-        available_files = response.meta["available_files"]
+        release_meta = response.meta["release_meta"]
         download_items = response.meta["download_items"]
-        release_data = response.meta["release_data"]
-        performers = response.meta["performers"]
-        tags = response.meta["tags"]
 
         # Process gallery downloads
-        # DISABLE temporarily to get the scraping working first.
-        # for gallery in result.get("galleries", []):
-        #     if (
-        #         gallery["format"] == "download"
-        #         and "urls" in gallery
-        #         and "download" in gallery["urls"]
-        #     ):
-        #         gallery_file = AvailableGalleryZipFile(
-        #             file_type="zip",
-        #             content_type="gallery",
-        #             variant="original",
-        #             url=gallery["urls"]["download"],
-        #         )
-        #         available_files.append(gallery_file)
-        #
-        #         download_items.append(
-        #             DirectDownloadItem(
-        #                 release_id=release_id,
-        #                 file_info=ItemAdapter(gallery_file).asdict(),
-        #                 url=gallery_file.url,
-        #             )
-        #         )
+        for gallery in result.get("galleries", []):
+            if (
+                gallery["format"] == "download"
+                and "urls" in gallery
+                and "download" in gallery["urls"]
+            ):
+                gallery_file = AvailableGalleryZipFile(
+                    file_type="zip",
+                    content_type="gallery",
+                    variant="original",
+                    url=gallery["urls"]["download"],
+                )
+                release_meta["available_files"].append(gallery_file)
 
-        # Create the release item with all files (video + gallery)
-        release_date = datetime.fromisoformat(
-            release_data["dateReleased"].replace("Z", "+00:00")
-        ).date()
+                download_items.append(
+                    DirectDownloadItem(
+                        release_id=release_meta["id"],
+                        file_info=ItemAdapter(gallery_file).asdict(),
+                        url=gallery_file.url,
+                    )
+                )
 
-        release_item = ReleaseItem(
-            id=release_id,
-            release_date=release_date.isoformat(),
-            short_name=f"scene-{release_data['id']}",
-            name=release_data.get("title", ""),
-            url=f"https://site-ma.sexyhub.com/scene/{release_data['id']}",
-            description=release_data.get("description", ""),
-            duration=0,  # Duration not provided in API
-            created=datetime.now(tz=timezone.utc).astimezone(),
-            last_updated=datetime.now(tz=timezone.utc).astimezone(),
-            performers=performers,
-            tags=tags,
-            available_files=json.dumps(available_files, cls=AvailableFileEncoder),
-            json_document=json.dumps(release_data),
-            site_uuid=self.site.id,
-            site=self.site,
-        )
-
-        yield release_item
-
-        # Yield download items after the release is created
+        # This is always the final step, yield the complete release item
+        yield self._create_release_item(release_meta)
         for download_item in download_items:
             yield download_item
+
+    def _create_release_item(self, release_meta):
+        """Helper method to create a ReleaseItem from metadata."""
+        return ReleaseItem(
+            id=release_meta["id"],
+            release_date=release_meta["release_date"],
+            short_name=release_meta["short_name"],
+            name=release_meta["name"],
+            url=release_meta["url"],
+            description=release_meta["description"],
+            duration=release_meta["duration"],
+            created=release_meta["created"],
+            last_updated=release_meta["last_updated"],
+            performers=release_meta["performers"],
+            tags=release_meta["tags"],
+            available_files=json.dumps(
+                release_meta["available_files"], cls=AvailableFileEncoder
+            ),
+            json_document=json.dumps(release_meta["json_document"]),
+            site_uuid=release_meta["site_uuid"],
+            site=release_meta["site"],
+        )
