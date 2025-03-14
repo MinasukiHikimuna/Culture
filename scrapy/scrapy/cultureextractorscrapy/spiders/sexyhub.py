@@ -119,8 +119,7 @@ class SexyHubSpider(scrapy.Spider):
         data = json.loads(response.text)
 
         # Process each release in the listing
-        # TEMPORARY: Only process the first release to get the scraping working.
-        for release in data["result"][0:1]:
+        for release in data["result"]:
             external_id = f"scene-{release['id']}"
 
             # Check if we have this release in database
@@ -168,23 +167,22 @@ class SexyHubSpider(scrapy.Spider):
             )
 
         # Handle pagination
-        # DISABLE pagination traversal for now to get the scraping and the downloads working first.
-        # total = data["meta"]["total"]
-        # current_offset = int(
-        #     parse_qs(urlparse(response.url).query).get("offset", [0])[0]
-        # )
-        # per_page = int(parse_qs(urlparse(response.url).query).get("limit", [4])[0])
-        #
-        # if current_offset + per_page < total:
-        #     next_offset = current_offset + per_page
-        #     next_url = f"{base_url}/v2/releases?adaptiveStreamingOnly=false&dateReleased=%3C2025-03-13&orderBy=dateReleased&type=scene&groupFilter=primary&collectionId=291&limit={per_page}&offset={next_offset}"
-        #
-        #     yield scrapy.Request(
-        #         url=next_url,
-        #         callback=self.parse,
-        #         headers=response.meta["headers"],
-        #         meta={"headers": response.meta["headers"]},
-        #     )
+        total = data["meta"]["total"]
+        current_offset = int(
+            parse_qs(urlparse(response.url).query).get("offset", [0])[0]
+        )
+        per_page = int(parse_qs(urlparse(response.url).query).get("limit", [4])[0])
+
+        if current_offset + per_page < total:
+            next_offset = current_offset + per_page
+            next_url = f"{base_url}/v2/releases?adaptiveStreamingOnly=false&dateReleased=%3C2025-03-13&orderBy=dateReleased&type=scene&groupFilter=primary&collectionId=291&limit={per_page}&offset={next_offset}"
+
+            yield scrapy.Request(
+                url=next_url,
+                callback=self.parse,
+                headers=response.meta["headers"],
+                meta={"headers": response.meta["headers"]},
+            )
 
     def parse_scene_detail(self, response):
         data = json.loads(response.text)
