@@ -110,6 +110,93 @@ class ClientCultureExtractor:
             
             return pl.DataFrame(sub_sites, schema=schema)
 
+    def get_releases(self, site_uuid: str) -> pl.DataFrame:
+        with self.connection.cursor() as cursor:
+            # Get site info
+            cursor.execute("""
+                SELECT name, uuid 
+                FROM sites 
+                WHERE sites.uuid = %s
+            """, (site_uuid,))
+            site_row = cursor.fetchone()
+            if not site_row:
+                return pl.DataFrame()
+            site_name = site_row[0]
+
+            # Get all releases for the site
+            cursor.execute("""
+                SELECT 
+                    uuid,
+                    NULLIF(release_date, '-infinity') as release_date,
+                    short_name,
+                    name,
+                    url,
+                    description,
+                    NULLIF(created, '-infinity') as created,
+                    NULLIF(last_updated, '-infinity') as last_updated,
+                    available_files::text,
+                    json_document::text,
+                    site_uuid
+                FROM releases 
+                WHERE site_uuid = %s
+            """, (site_uuid,))
+            releases_rows = cursor.fetchall()
+
+            # Combine all data
+            releases = []
+            for row in releases_rows:
+                release_uuid = row[0]
+                
+                # Parse available_file JSON if it's a string
+                available_files = row[8]
+                if isinstance(available_files, str):
+                    try:
+                        available_files = json.loads(available_files)
+                    except json.JSONDecodeError:
+                        available_files = None
+
+                # Parse file_metadata JSON if it's a string
+                file_metadata = row[9]
+                if isinstance(file_metadata, str):
+                    try:
+                        file_metadata = json.loads(file_metadata)
+                    except json.JSONDecodeError:
+                        file_metadata = {}
+
+                release_data = {
+                    "ce_site_uuid": str(row[10]),
+                    "ce_site_name": site_name,
+                    "ce_release_uuid": str(release_uuid),
+                    "ce_release_date": row[1],
+                    "ce_release_short_name": row[2],
+                    "ce_release_name": row[3],
+                    "ce_release_url": row[4],
+                    "ce_release_description": row[5],
+                    "ce_release_created": row[6],
+                    "ce_release_last_updated": row[7],
+                    "ce_release_available_files": row[8],
+                    "ce_release_json_document": row[9],
+                }
+                releases.append(release_data)
+
+            # Schema remains the same as before
+            schema = {
+                "ce_site_uuid": pl.Utf8,
+                "ce_site_name": pl.Utf8,
+                "ce_release_uuid": pl.Utf8,
+                "ce_release_date": pl.Date,
+                "ce_release_short_name": pl.Utf8,
+                "ce_release_name": pl.Utf8,
+                "ce_release_url": pl.Utf8,
+                "ce_release_description": pl.Utf8,
+                "ce_release_created": pl.Datetime,
+                "ce_release_last_updated": pl.Datetime,
+                "ce_release_available_files": pl.Utf8,
+                "ce_release_json_document": pl.Utf8,
+            }
+
+            return pl.DataFrame(releases, schema=schema)
+
     def get_downloads(self, site_uuid: str) -> pl.DataFrame:
         with self.connection.cursor() as cursor:
             # Get site info
