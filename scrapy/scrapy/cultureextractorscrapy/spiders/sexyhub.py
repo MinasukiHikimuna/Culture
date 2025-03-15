@@ -451,21 +451,29 @@ class SexyHubSpider(scrapy.Spider):
                 and "urls" in gallery
                 and "download" in gallery["urls"]
             ):
-                gallery_file = AvailableGalleryZipFile(
-                    file_type="zip",
-                    content_type="gallery",
-                    variant="original",
-                    url=gallery["urls"]["download"],
-                )
-                release_meta["available_files"].append(gallery_file)
+                # Transform the media URL to the correct download URL format
+                media_url = gallery["urls"]["download"]
+                # Extract the path components from the media URL
+                path_parts = media_url.split("/")
+                if len(path_parts) >= 8:
+                    # Reconstruct the download URL with the correct format
+                    download_url = f"https://download-private-ht.project1content.com/{'/'.join(path_parts[3:])}"
 
-                download_items.append(
-                    DirectDownloadItem(
-                        release_id=release_meta["id"],
-                        file_info=ItemAdapter(gallery_file).asdict(),
-                        url=gallery_file.url,
+                    gallery_file = AvailableGalleryZipFile(
+                        file_type="zip",
+                        content_type="gallery",
+                        variant="original",
+                        url=download_url,
                     )
-                )
+                    release_meta["available_files"].append(gallery_file)
+
+                    download_items.append(
+                        DirectDownloadItem(
+                            release_id=release_meta["id"],
+                            file_info=ItemAdapter(gallery_file).asdict(),
+                            url=gallery_file.url,
+                        )
+                    )
 
         # This is always the final step, yield the complete release item
         yield self._create_release_item(release_meta)
