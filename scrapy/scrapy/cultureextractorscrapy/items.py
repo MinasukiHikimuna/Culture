@@ -8,12 +8,22 @@ import scrapy
 import uuid
 from dataclasses import dataclass
 
+
 @dataclass
 class SiteItem:
     id: uuid.UUID
     short_name: str
     name: str
     url: str
+
+
+@dataclass
+class SubSiteItem:
+    id: uuid.UUID
+    short_name: str
+    name: str
+    site_uuid: uuid.UUID
+
 
 @dataclass
 class SiteTagItem:
@@ -23,6 +33,7 @@ class SiteTagItem:
     url: str
     site_uuid: uuid.UUID
 
+
 @dataclass
 class SitePerformerItem:
     id: uuid.UUID
@@ -30,6 +41,7 @@ class SitePerformerItem:
     name: str
     url: str
     site_uuid: uuid.UUID
+
 
 @dataclass
 class ReleaseItem:
@@ -48,16 +60,21 @@ class ReleaseItem:
     json_document: str
     site_uuid: uuid.UUID
     site: SiteItem
+    sub_site_uuid: uuid.UUID = None  # Optional field for subsite UUID
+    sub_site: SubSiteItem = None  # Optional field for subsite object
+
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Optional
+
 
 class IAvailableFile(ABC):
     file_type: str
     content_type: str
     variant: str
     url: str
+
 
 @dataclass
 class AvailableGalleryZipFile(IAvailableFile):
@@ -69,6 +86,7 @@ class AvailableGalleryZipFile(IAvailableFile):
     resolution_height: Optional[int] = None
     file_size: Optional[float] = None
 
+
 @dataclass
 class AvailableImageFile(IAvailableFile):
     file_type: str
@@ -78,6 +96,7 @@ class AvailableImageFile(IAvailableFile):
     resolution_width: Optional[int] = None
     resolution_height: Optional[int] = None
     file_size: Optional[float] = None
+
 
 @dataclass
 class AvailableVideoFile(IAvailableFile):
@@ -91,6 +110,7 @@ class AvailableVideoFile(IAvailableFile):
     fps: Optional[float] = None
     codec: Optional[str] = None
 
+
 @dataclass
 class AvailableVttFile(IAvailableFile):
     file_type: str
@@ -98,25 +118,31 @@ class AvailableVttFile(IAvailableFile):
     variant: str
     url: str
 
+
 import json
 from typing import Union
 
-AvailableFileType = Union[AvailableGalleryZipFile, AvailableImageFile, AvailableVideoFile, AvailableVttFile]
+AvailableFileType = Union[
+    AvailableGalleryZipFile, AvailableImageFile, AvailableVideoFile, AvailableVttFile
+]
+
 
 class AvailableFileEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, IAvailableFile):
             result = obj.__dict__.copy()
-            result['__type__'] = obj.__class__.__name__
+            result["__type__"] = obj.__class__.__name__
             return result
         return super().default(obj)
 
+
 def available_file_decoder(dct):
-    if '__type__' in dct:
-        class_name = dct.pop('__type__')
+    if "__type__" in dct:
+        class_name = dct.pop("__type__")
         cls = globals()[class_name]
         return cls(**dct)
     return dct
+
 
 class DownloadedFileItem(scrapy.Item):
     uuid = scrapy.Field()
@@ -130,10 +156,12 @@ class DownloadedFileItem(scrapy.Item):
     release_uuid = scrapy.Field()
     file_metadata = scrapy.Field()
 
+
 @dataclass
 class ReleaseAndDownloadsItem:
     release: ReleaseItem
     downloaded_files: list[DownloadedFileItem]
+
 
 class DirectDownloadItem(scrapy.Item):
     release_id = scrapy.Field()

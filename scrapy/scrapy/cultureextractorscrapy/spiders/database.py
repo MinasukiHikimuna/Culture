@@ -19,10 +19,12 @@ from cultureextractorscrapy.items import (
     SiteItem,
     SitePerformerItem,
     SiteTagItem,
-)  # Make sure to import SiteItem
+    SubSiteItem,
+)  # Make sure to import SiteItem and SubSiteItem
 import newnewid
 from sqlalchemy.orm.exc import NoResultFound
 import json
+import uuid
 
 load_dotenv()
 
@@ -52,6 +54,7 @@ class Site(Base):
     name = Column(String, nullable=False)
     url = Column(String, nullable=False)
     releases = relationship("Release", back_populates="site")
+    sub_sites = relationship("SubSite", back_populates="site")
 
 
 class Release(Base):
@@ -68,7 +71,9 @@ class Release(Base):
     available_files = Column(String, nullable=False)
     json_document = Column(String, nullable=False)
     site_uuid = Column(String(36), ForeignKey("sites.uuid"), nullable=False)
+    sub_site_uuid = Column(String(36), ForeignKey("sub_sites.uuid"), nullable=True)
     site = relationship("Site", back_populates="releases")
+    sub_site = relationship("SubSite", back_populates="releases")
     downloads = relationship("DownloadedFile", back_populates="release")
     performers = relationship(
         "Performer", secondary=release_performer, back_populates="releases"
@@ -118,6 +123,17 @@ class DownloadedFile(Base):
     file_metadata = Column(JSON, nullable=False, default="{}")
 
     release = relationship("Release", back_populates="downloads")
+
+
+class SubSite(Base):
+    __tablename__ = "sub_sites"
+    uuid = Column(String(36), primary_key=True)
+    short_name = Column(String, nullable=False)
+    name = Column(String, nullable=False)
+    site_uuid = Column(String(36), ForeignKey("sites.uuid"), nullable=False)
+    json_document = Column(JSON, nullable=True)
+    site = relationship("Site", back_populates="sub_sites")
+    releases = relationship("Release", back_populates="sub_site")
 
 
 def get_engine():
@@ -265,3 +281,34 @@ def get_existing_releases_with_status(site_uuid):
 
     session.close()
     return result
+
+
+def get_or_create_sub_site(site_uuid: str, short_name: str, name: str) -> SubSiteItem:
+    """Get or create a sub site."""
+    with get_session() as session:
+        sub_site = (
+            session.query(SubSite)
+            .filter(
+                SubSite.site_uuid == site_uuid,
+                SubSite.short_name == short_name,
+            )
+            .first()
+        )
+
+        if sub_site is None:
+            new_uuid = str(newnewid.uuid7())
+            sub_site = SubSite(
+                uuid=new_uuid,
+                site_uuid=site_uuid,
+                short_name=short_name,
+                name=name,
+            )
+            session.add(sub_site)
+            session.commit()
+
+        return SubSiteItem(
+            id=sub_site.uuid,
+            short_name=sub_site.short_name,
+            name=sub_site.name,
+            site_uuid=sub_site.site_uuid,
+        )

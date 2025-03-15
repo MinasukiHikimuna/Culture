@@ -10,6 +10,7 @@ from cultureextractorscrapy.spiders.database import (
     get_or_create_performer,
     get_or_create_tag,
     get_existing_releases_with_status,
+    get_or_create_sub_site,
 )
 from cultureextractorscrapy.items import (
     AvailableGalleryZipFile,
@@ -18,6 +19,7 @@ from cultureextractorscrapy.items import (
     AvailableFileEncoder,
     ReleaseItem,
     DirectDownloadItem,
+    SubSiteItem,
 )
 from cultureextractorscrapy.utils import (
     parse_resolution_height,
@@ -40,6 +42,15 @@ if isinstance(raw_cookies, list):
             cookies[cookie["name"]] = cookie["value"]
 
 base_url = os.getenv("SEXYHUB_BASE_URL")
+
+girlfriends_id = 289
+dane_jones_id = 290
+lesbea_id = 291
+massage_rooms_id = 292
+mom_id = 293
+fitness_rooms_id = 294
+
+remote_site_id = girlfriends_id
 
 
 class SexyHubSpider(scrapy.Spider):
@@ -96,17 +107,10 @@ class SexyHubSpider(scrapy.Spider):
         }
 
         # Scrapy will automatically handle gzip decompression
-        girlfriends_id = 289
-        dane_jones_id = 290
-        lesbea_id = 291
-        massage_rooms_id = 292
-        mom_id = 293
-        fitness_rooms_id = 294
-
         per_page = 20
         offset = 0
         yield scrapy.Request(
-            url=f"{base_url}/v2/releases?adaptiveStreamingOnly=false&dateReleased=%3C2025-03-13&orderBy=dateReleased&type=scene&groupFilter=primary&collectionId={lesbea_id}&limit={per_page}&offset={offset}",
+            url=f"{base_url}/v2/releases?adaptiveStreamingOnly=false&dateReleased=%3C2025-03-13&orderBy=dateReleased&type=scene&groupFilter=primary&collectionId={remote_site_id}&limit={per_page}&offset={offset}",
             callback=self.parse,
             headers=headers,
             dont_filter=True,
@@ -201,7 +205,7 @@ class SexyHubSpider(scrapy.Spider):
 
         if current_offset + per_page < total:
             next_offset = current_offset + per_page
-            next_url = f"{base_url}/v2/releases?adaptiveStreamingOnly=false&dateReleased=%3C2025-03-13&orderBy=dateReleased&type=scene&groupFilter=primary&collectionId=291&limit={per_page}&offset={next_offset}"
+            next_url = f"{base_url}/v2/releases?adaptiveStreamingOnly=false&dateReleased=%3C2025-03-13&orderBy=dateReleased&type=scene&groupFilter=primary&collectionId={remote_site_id}&limit={per_page}&offset={next_offset}"
 
             yield scrapy.Request(
                 url=next_url,
@@ -236,11 +240,9 @@ class SexyHubSpider(scrapy.Spider):
         for actor in release_data.get("actors", []):
             performer = get_or_create_performer(
                 self.site.id,
-                str(
-                    actor["id"]
-                ),  # Using ID as short_name since we don't have a better option
+                str(actor["id"]),
                 actor["name"],
-                "",  # No URL available
+                "",
             )
             performers.append(performer)
 
@@ -249,11 +251,32 @@ class SexyHubSpider(scrapy.Spider):
         for tag in release_data.get("tags", []):
             tag_obj = get_or_create_tag(
                 self.site.id,
-                str(tag["id"]),  # Using ID as short_name
+                str(tag["id"]),
                 tag["name"],
-                "",  # No URL available
+                "",
             )
             tags.append(tag_obj)
+
+        # Extract subsite from collections
+        sub_site = None
+        sub_site_uuid = None
+        if "collections" in release_data and release_data["collections"]:
+            valid_collections = [
+                c for c in release_data["collections"] if c.get("id") and c.get("name")
+            ]
+            if len(valid_collections) > 1:
+                raise ValueError(
+                    f"Found multiple subsites in release {release_data.get('id', 'unknown')}: "
+                    f"{[c['name'] for c in valid_collections]}"
+                )
+            elif len(valid_collections) == 1:
+                collection = valid_collections[0]
+                sub_site = get_or_create_sub_site(
+                    site_uuid=str(self.site.id),
+                    short_name=str(collection["id"]),
+                    name=collection["name"],
+                )
+                sub_site_uuid = sub_site.id
 
         available_files = []
         download_items = []
@@ -305,6 +328,8 @@ class SexyHubSpider(scrapy.Spider):
             "json_document": release_data,
             "site_uuid": self.site.id,
             "site": self.site,
+            "sub_site_uuid": sub_site_uuid,
+            "sub_site": sub_site,
         }
 
         # Get video download info - video always exists
@@ -500,4 +525,6 @@ class SexyHubSpider(scrapy.Spider):
             json_document=json.dumps(release_meta["json_document"]),
             site_uuid=release_meta["site_uuid"],
             site=release_meta["site"],
+            sub_site_uuid=release_meta.get("sub_site_uuid"),
+            sub_site=release_meta.get("sub_site"),
         )

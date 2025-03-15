@@ -69,6 +69,9 @@ class PostgresPipeline:
                     existing_release.last_updated = item.last_updated
                     existing_release.available_files = item.available_files
                     existing_release.json_document = item.json_document
+                    existing_release.sub_site_uuid = (
+                        str(item.sub_site_uuid) if item.sub_site_uuid else None
+                    )
 
                     # Clear existing relationships
                     existing_release.performers = []
@@ -94,6 +97,9 @@ class PostgresPipeline:
                         available_files=item.available_files,
                         json_document=item.json_document,
                         site_uuid=str(item.site_uuid),
+                        sub_site_uuid=(
+                            str(item.sub_site_uuid) if item.sub_site_uuid else None
+                        ),
                     )
                     self.session.add(release)
                     spider.logger.info(f"Creating new release with ID: {item.id}")
@@ -109,7 +115,9 @@ class PostgresPipeline:
                         if performer:
                             release.performers.append(performer)
                             spider.logger.info(
-                                f"Added performer {performer.name} to release {item.id}"
+                                "Added performer %s to release %s",
+                                performer.name,
+                                item.id,
                             )
 
                 # Add tags
@@ -123,16 +131,18 @@ class PostgresPipeline:
                         if tag:
                             release.tags.append(tag)
                             spider.logger.info(
-                                f"Added tag {tag.name} to release {item.id}"
+                                "Added tag %s to release %s", tag.name, item.id
                             )
 
                 # Commit the transaction
                 self.session.commit()
-                spider.logger.info(f"Successfully processed release with ID: {item.id}")
+                spider.logger.info(
+                    "Successfully processed release with ID: %s", item.id
+                )
 
             except Exception as e:
                 self.session.rollback()
-                spider.logger.error(f"Error processing release with ID: {item.id}")
+                spider.logger.error("Error processing release with ID: %s", item.id)
                 spider.logger.error(str(e))
                 raise
 
@@ -140,7 +150,8 @@ class PostgresPipeline:
         elif isinstance(item, DownloadedFileItem):
             try:
                 spider.logger.info(
-                    f"[PostgresPipeline] Processing DownloadedFileItem: {item['saved_filename']}"
+                    "[PostgresPipeline] Processing DownloadedFileItem: %s",
+                    item["saved_filename"],
                 )
                 # Create new downloaded file record
                 downloaded_file = DownloadedFile(
@@ -158,12 +169,13 @@ class PostgresPipeline:
                 self.session.add(downloaded_file)
                 self.session.commit()
                 spider.logger.info(
-                    f"[PostgresPipeline] Successfully stored download record for file: {item['saved_filename']}"
+                    "[PostgresPipeline] Successfully stored download record for file: %s",
+                    item["saved_filename"],
                 )
             except Exception as e:
                 self.session.rollback()
                 spider.logger.error(
-                    f"[PostgresPipeline] Error storing download record: {str(e)}"
+                    "[PostgresPipeline] Error storing download record: %s", str(e)
                 )
                 raise
             return item
@@ -232,7 +244,8 @@ class AvailableFilesPipeline(FilesPipeline):
         if isinstance(item, DirectDownloadItem):
             spider = info.spider
             spider.logger.info(
-                f"[AvailableFilesPipeline] Processing DirectDownloadItem for URL: {item['url']}"
+                "[AvailableFilesPipeline] Processing DirectDownloadItem for URL: %s",
+                item["url"],
             )
 
             file_path = self.file_path(
@@ -244,14 +257,16 @@ class AvailableFilesPipeline(FilesPipeline):
             )
 
             full_path = os.path.join(self.store.basedir, file_path)
-            spider.logger.info(f"[AvailableFilesPipeline] Full file path: {full_path}")
+            # Use %s formatting to avoid encoding issues in logging
+            spider.logger.info("[AvailableFilesPipeline] Full file path: %s", full_path)
             spider.logger.info(
-                f"[AvailableFilesPipeline] File info: {item['file_info']}"
+                "[AvailableFilesPipeline] File info: %s", item["file_info"]
             )
 
             if not os.path.exists(full_path):
                 spider.logger.info(
-                    f"[AvailableFilesPipeline] File does not exist, requesting download: {full_path}"
+                    "[AvailableFilesPipeline] File does not exist, requesting download: %s",
+                    full_path,
                 )
                 return [
                     Request(
@@ -266,7 +281,8 @@ class AvailableFilesPipeline(FilesPipeline):
                 ]
             else:
                 spider.logger.info(
-                    f"[AvailableFilesPipeline] File already exists, skipping: {full_path}"
+                    "[AvailableFilesPipeline] File already exists, skipping: %s",
+                    full_path,
                 )
         return []
 
@@ -299,6 +315,11 @@ class AvailableFilesPipeline(FilesPipeline):
             release_name = release.name  # Original name from database
             site_name = site.name
 
+            # Format site name with subsite if available
+            formatted_site_name = site_name
+            if release.sub_site_uuid is not None:
+                formatted_site_name = f"{site_name}꞉ {release.sub_site.name}"
+
             # Extract file extension from the URL or use original filename from json_document
             url_path = urlparse(file_info["url"]).path
             file_extension = os.path.splitext(url_path)[1]
@@ -307,22 +328,22 @@ class AvailableFilesPipeline(FilesPipeline):
 
             # Create filename in the specified format
             if file_info["file_type"] == "video":
-                filename = f"{site_name} - {release_date} - {release_name} - {file_info['resolution_width']}x{file_info['resolution_height']} - {release_id}{file_extension}"
+                filename = f"{formatted_site_name} - {release_date} - {release_name} - {file_info['resolution_width']}x{file_info['resolution_height']} - {release_id}{file_extension}"
             else:
-                filename = f"{site_name} - {release_date} - {release_name} - {file_info['variant']} - {release_id}{file_extension}"
+                filename = f"{formatted_site_name} - {release_date} - {release_name} - {file_info['variant']} - {release_id}{file_extension}"
 
             # Create a folder structure based on site and release ID
-            folder = f"{site_name}/Metadata/{release_id}"
+            folder = f"{formatted_site_name}/Metadata/{release_id}"
 
             # Sanitize each component separately to maintain structure
-            sanitized_site = self.sanitize_component(site_name)
+            sanitized_site = self.sanitize_component(formatted_site_name)
             sanitized_filename = self.sanitize_component(filename)
 
             # Combine into final path
             file_path = f"{sanitized_site}/Metadata/{release_id}/{sanitized_filename}"
 
             info.spider.logger.info(
-                f"[AvailableFilesPipeline] Generated file path: {file_path}"
+                "[AvailableFilesPipeline] Generated file path: %s", file_path
             )
             return file_path
         finally:
@@ -352,13 +373,13 @@ class AvailableFilesPipeline(FilesPipeline):
         if isinstance(item, DirectDownloadItem):
             spider = info.spider
             spider.logger.info(
-                f"[AvailableFilesPipeline] Item completed for URL: {item['url']}"
+                "[AvailableFilesPipeline] Item completed for URL: %s", item["url"]
             )
-            spider.logger.info(f"[AvailableFilesPipeline] Download results: {results}")
+            spider.logger.info("[AvailableFilesPipeline] Download results: %s", results)
 
             file_paths = [x["path"] for ok, x in results if ok]
             spider.logger.info(
-                f"[AvailableFilesPipeline] File paths from results: {file_paths}"
+                "[AvailableFilesPipeline] File paths from results: %s", file_paths
             )
 
             if file_paths:
@@ -366,7 +387,7 @@ class AvailableFilesPipeline(FilesPipeline):
                 # Get full path by combining store_uri with relative path
                 full_path = os.path.join(self.store_uri, file_paths[0])
                 spider.logger.info(
-                    f"[AvailableFilesPipeline] Processing completed file: {full_path}"
+                    "[AvailableFilesPipeline] Processing completed file: %s", full_path
                 )
 
                 file_metadata = self.process_file_metadata(
@@ -386,7 +407,8 @@ class AvailableFilesPipeline(FilesPipeline):
                     file_metadata=file_metadata,
                 )
                 spider.logger.info(
-                    f"[AvailableFilesPipeline] Created DownloadedFileItem for: {downloaded_item['saved_filename']}"
+                    "[AvailableFilesPipeline] Created DownloadedFileItem for: %s",
+                    downloaded_item["saved_filename"],
                 )
                 return downloaded_item
             else:
