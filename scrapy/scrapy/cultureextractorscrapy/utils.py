@@ -1,5 +1,48 @@
 import re
 import logging
+import sys
+
+
+class WindowsSafeFormatter(logging.Formatter):
+    def format(self, record):
+        # Convert Unicode colon (꞉) to standard colon (:) in the message
+        if hasattr(record, "msg"):
+            if isinstance(record.msg, str):
+                record.msg = record.msg.replace("꞉", ":")
+
+            # Handle string formatting arguments
+            if hasattr(record, "args"):
+                if isinstance(record.args, dict):
+                    # Handle dictionary style formatting
+                    args = {}
+                    for key, value in record.args.items():
+                        if isinstance(value, str):
+                            args[key] = value.replace("꞉", ":")
+                        else:
+                            args[key] = value
+                    record.args = args
+                elif record.args:
+                    # Handle sequence style formatting
+                    args = list(record.args)
+                    for i, arg in enumerate(args):
+                        if isinstance(arg, str):
+                            args[i] = arg.replace("꞉", ":")
+                    record.args = tuple(args)
+
+        # Format the message
+        formatted = super().format(record)
+
+        # Ensure the output is compatible with Windows console
+        if sys.platform == "win32":
+            try:
+                # Test if the string can be encoded in cp1252
+                formatted.encode("cp1252")
+            except UnicodeEncodeError:
+                # If it can't, replace problematic characters with their closest ASCII equivalent
+                formatted = formatted.encode("ascii", "replace").decode("ascii")
+
+        return formatted
+
 
 def parse_resolution_width(resolution_string):
     # Try to find the resolution in the form of width x height
