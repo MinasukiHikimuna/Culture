@@ -14,7 +14,8 @@ class ClientCultureExtractor:
 
     def get_database_schema(self) -> pl.DataFrame:
         with self.connection.cursor() as cursor:
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT
                     table_name,
                     column_name,
@@ -22,15 +23,16 @@ class ClientCultureExtractor:
                 FROM information_schema.columns
                 WHERE table_schema = 'public'
                 ORDER BY table_name, column_name
-            """)
+            """
+            )
             schema_rows = cursor.fetchall()
-            
+
             schema = {
                 "table_name": pl.Utf8,
                 "column_name": pl.Utf8,
                 "data_type": pl.Utf8,
             }
-            
+
             return pl.DataFrame(schema_rows, schema=schema, orient="row")
 
     def get_sites(self) -> pl.DataFrame:
@@ -67,10 +69,11 @@ class ClientCultureExtractor:
 
             df_sites = pl.DataFrame(sites, schema=schema)
             return df_sites
-        
+
     def get_sub_sites(self) -> pl.DataFrame:
         with self.connection.cursor() as cursor:
-            cursor.execute("""
+            cursor.execute(
+                """
                            SELECT
                                 sites.uuid AS ce_sites_uuid,
                                 sites.short_name AS ce_sites_short_name,
@@ -82,9 +85,10 @@ class ClientCultureExtractor:
                                 FROM sub_sites
                                 JOIN sites ON sub_sites.site_uuid = sites.uuid
                                 ORDER BY sites.name, sub_sites.name
-                           """)
+                           """
+            )
             sub_sites_rows = cursor.fetchall()
-            
+
             sub_sites = [
                 {
                     "ce_sites_uuid": str(row[0]),
@@ -97,7 +101,7 @@ class ClientCultureExtractor:
                 }
                 for row in sub_sites_rows
             ]
-            
+
             schema = {
                 "ce_sites_uuid": pl.Utf8,
                 "ce_sites_short_name": pl.Utf8,
@@ -107,24 +111,28 @@ class ClientCultureExtractor:
                 "ce_sub_sites_short_name": pl.Utf8,
                 "ce_sub_sites_name": pl.Utf8,
             }
-            
+
             return pl.DataFrame(sub_sites, schema=schema)
 
     def get_releases(self, site_uuid: str) -> pl.DataFrame:
         with self.connection.cursor() as cursor:
             # Get site info
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT name, uuid 
                 FROM sites 
                 WHERE sites.uuid = %s
-            """, (site_uuid,))
+            """,
+                (site_uuid,),
+            )
             site_row = cursor.fetchone()
             if not site_row:
                 return pl.DataFrame()
             site_name = site_row[0]
 
             # Get all releases for the site
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT 
                     uuid,
                     NULLIF(release_date, '-infinity') as release_date,
@@ -139,14 +147,16 @@ class ClientCultureExtractor:
                     site_uuid
                 FROM releases 
                 WHERE site_uuid = %s
-            """, (site_uuid,))
+            """,
+                (site_uuid,),
+            )
             releases_rows = cursor.fetchall()
 
             # Combine all data
             releases = []
             for row in releases_rows:
                 release_uuid = row[0]
-                
+
                 # Parse available_file JSON if it's a string
                 available_files = row[8]
                 if isinstance(available_files, str):
@@ -200,18 +210,22 @@ class ClientCultureExtractor:
     def get_downloads(self, site_uuid: str) -> pl.DataFrame:
         with self.connection.cursor() as cursor:
             # Get site info
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT name, uuid 
                 FROM sites 
                 WHERE sites.uuid = %s
-            """, (site_uuid,))
+            """,
+                (site_uuid,),
+            )
             site_row = cursor.fetchone()
             if not site_row:
                 return pl.DataFrame()
             site_name = site_row[0]
 
             # Get all releases for the site
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT 
                     uuid,
                     NULLIF(release_date, '-infinity') as release_date,
@@ -226,22 +240,30 @@ class ClientCultureExtractor:
                     sub_site_uuid
                 FROM releases 
                 WHERE site_uuid = %s
-            """, (site_uuid,))
+            """,
+                (site_uuid,),
+            )
             releases = {row[0]: row for row in cursor.fetchall()}
 
             # Get sub_sites info
-            sub_site_uuids = {row[10] for row in releases.values() if row[10] is not None}
+            sub_site_uuids = {
+                row[10] for row in releases.values() if row[10] is not None
+            }
             sub_sites = {}
             if sub_site_uuids:
-                cursor.execute("""
+                cursor.execute(
+                    """
                     SELECT uuid, name 
                     FROM sub_sites 
                     WHERE uuid = ANY(%s)
-                """, (list(sub_site_uuids),))
+                """,
+                    (list(sub_site_uuids),),
+                )
                 sub_sites = dict(cursor.fetchall())
 
             # Get downloads
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT r.uuid AS release_uuid,
                     d.uuid AS download_uuid,
                     d.downloaded_at,
@@ -256,11 +278,14 @@ class ClientCultureExtractor:
                 JOIN releases r ON r.uuid = d.release_uuid
                 WHERE r.site_uuid = %s
                 ORDER BY r.uuid
-            """, (site_uuid,))
+            """,
+                (site_uuid,),
+            )
             downloads_rows = cursor.fetchall()
 
             # Get performers
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT r.uuid, json_agg(
                     json_build_object(
                         'uuid', p.uuid,
@@ -274,11 +299,14 @@ class ClientCultureExtractor:
                 JOIN releases r ON resp.releases_uuid = r.uuid
                 WHERE r.site_uuid = %s
                 GROUP BY r.uuid
-            """, (site_uuid,))
+            """,
+                (site_uuid,),
+            )
             performers = dict(cursor.fetchall())
 
             # Get tags
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT r.uuid, json_agg(
                     json_build_object(
                         'uuid', t.uuid,
@@ -292,7 +320,9 @@ class ClientCultureExtractor:
                 JOIN releases r ON rest.releases_uuid = r.uuid
                 WHERE r.site_uuid = %s
                 GROUP BY r.uuid
-            """, (site_uuid,))
+            """,
+                (site_uuid,),
+            )
             tags = dict(cursor.fetchall())
 
             # Combine all data
@@ -300,7 +330,7 @@ class ClientCultureExtractor:
             for row in downloads_rows:
                 release_uuid = row[0]
                 release = releases[release_uuid]
-                
+
                 # Parse available_file JSON if it's a string
                 available_file = row[6]
                 if isinstance(available_file, str):
@@ -320,7 +350,9 @@ class ClientCultureExtractor:
                 download_data = {
                     "ce_downloads_site_uuid": site_uuid,
                     "ce_downloads_site_name": site_name,
-                    "ce_downloads_sub_site_name": sub_sites.get(release[10]) if release[10] else None,
+                    "ce_downloads_sub_site_name": (
+                        sub_sites.get(release[10]) if release[10] else None
+                    ),
                     "ce_downloads_release_uuid": str(release_uuid),
                     "ce_downloads_release_date": release[1],
                     "ce_downloads_release_short_name": release[2],
@@ -336,15 +368,25 @@ class ClientCultureExtractor:
                     "ce_downloads_file_type": row[3],
                     "ce_downloads_content_type": row[4],
                     "ce_downloads_variant": row[5],
-                    "ce_downloads_available_file": json.dumps(available_file) if available_file else None,
+                    "ce_downloads_available_file": (
+                        json.dumps(available_file) if available_file else None
+                    ),
                     "ce_downloads_original_filename": row[7],
                     "ce_downloads_saved_filename": row[8],
-                    "ce_downloads_file_metadata": json.dumps(file_metadata) if file_metadata else None,
+                    "ce_downloads_file_metadata": (
+                        json.dumps(file_metadata) if file_metadata else None
+                    ),
                     "ce_downloads_performers": performers.get(release_uuid, []),
                     "ce_downloads_tags": tags.get(release_uuid, []),
-                    "ce_downloads_hash_oshash": file_metadata.get("oshash") if file_metadata else None,
-                    "ce_downloads_hash_phash": file_metadata.get("phash") if file_metadata else None,
-                    "ce_downloads_hash_sha256": file_metadata.get("sha256Sum") if file_metadata else None,
+                    "ce_downloads_hash_oshash": (
+                        file_metadata.get("oshash") if file_metadata else None
+                    ),
+                    "ce_downloads_hash_phash": (
+                        file_metadata.get("phash") if file_metadata else None
+                    ),
+                    "ce_downloads_hash_sha256": (
+                        file_metadata.get("sha256Sum") if file_metadata else None
+                    ),
                 }
                 downloads.append(download_data)
 
