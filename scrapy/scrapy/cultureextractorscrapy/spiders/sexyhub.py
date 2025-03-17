@@ -33,13 +33,23 @@ import re
 
 load_dotenv()
 
-# Load and format cookies properly
+# Load and parse tokens from cookies
 raw_cookies = json.loads(os.getenv("SEXYHUB_COOKIES", "[]"))
-cookies = {}
+auth_token = None
+instance_token = None
+
 if isinstance(raw_cookies, list):
     for cookie in raw_cookies:
         if isinstance(cookie, dict) and "name" in cookie and "value" in cookie:
-            cookies[cookie["name"]] = cookie["value"]
+            if cookie["name"] == "access_token_ma":
+                auth_token = cookie["value"]
+            elif cookie["name"] == "instance_token":
+                instance_token = cookie["value"]
+
+if not auth_token or not instance_token:
+    raise ValueError(
+        "Required cookies (access_token_ma or instance_token) not found in SEXYHUB_COOKIES"
+    )
 
 base_url = os.getenv("SEXYHUB_BASE_URL")
 
@@ -91,9 +101,9 @@ class SexyHubSpider(scrapy.Spider):
             "accept": "application/json, text/plain, */*",
             "accept-encoding": "gzip",  # Simplified to just gzip
             "accept-language": "en-US,en;q=0.9",
-            "authorization": os.getenv("SEXYHUB_AUTH_TOKEN"),
+            "authorization": auth_token,
             "cache-control": "no-cache",
-            "instance": os.getenv("SEXYHUB_INSTANCE_TOKEN"),
+            "instance": instance_token,
             "origin": "https://site-ma.sexyhub.com",
             "pragma": "no-cache",
             "referer": "https://site-ma.sexyhub.com/",
