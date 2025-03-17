@@ -134,10 +134,8 @@ class SexyHubSpider(scrapy.Spider):
         """Parse the response."""
         # Check for 401 response
         if response.status == 401:
-            self.logger.error(
-                "Received 401 Unauthorized response. Authentication failed. Stopping spider."
-            )
-            raise CloseSpider("authentication_failed")
+            yield from self.handle_401_response(response)
+            return
 
         # Continue with normal parsing if status is 200
         data = json.loads(response.text)
@@ -223,10 +221,8 @@ class SexyHubSpider(scrapy.Spider):
         """Parse the scene detail response."""
         # Check for 401 response
         if response.status == 401:
-            self.logger.error(
-                "Received 401 Unauthorized response. Authentication failed. Stopping spider."
-            )
-            raise CloseSpider("authentication_failed")
+            yield from self.handle_401_response(response)
+            return
 
         data = json.loads(response.text)
         result = data["result"]
@@ -364,10 +360,8 @@ class SexyHubSpider(scrapy.Spider):
         """Parse the video download API response and add video files to metadata."""
         # Check for 401 response
         if response.status == 401:
-            self.logger.error(
-                "Received 401 Unauthorized response. Authentication failed. Stopping spider."
-            )
-            raise CloseSpider("authentication_failed")
+            yield from self.handle_401_response(response)
+            return
 
         self.logger.info("Parsing video download response")
         data = json.loads(response.text)
@@ -459,10 +453,8 @@ class SexyHubSpider(scrapy.Spider):
         """Parse the gallery details and yield the final release item with all files."""
         # Check for 401 response
         if response.status == 401:
-            self.logger.error(
-                "Received 401 Unauthorized response. Authentication failed. Stopping spider."
-            )
-            raise CloseSpider("authentication_failed")
+            yield from self.handle_401_response(response)
+            return
 
         data = json.loads(response.text)
         result = data["result"]
