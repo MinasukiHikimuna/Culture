@@ -1,6 +1,7 @@
 import psycopg
 import polars as pl
 import json
+import newnewid
 
 
 class ClientCultureExtractor:
@@ -440,3 +441,76 @@ class ClientCultureExtractor:
             }
 
             return pl.DataFrame(downloads, schema=schema)
+
+    def create_site(
+        self,
+        short_name: str,
+        name: str,
+        url: str,
+        username: str = None,
+        password: str = None,
+    ) -> str:
+        """Create a new site in the database.
+
+        Args:
+            short_name: A short identifier for the site
+            name: The full name of the site
+            url: The base URL of the site
+            username: Optional username for site authentication
+            password: Optional password for site authentication
+
+        Returns:
+            str: The UUID of the created site
+        """
+        with self.connection.cursor() as cursor:
+            site_uuid = str(newnewid.uuid7())
+            cursor.execute(
+                """
+                INSERT INTO sites (uuid, short_name, name, url, username, password)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                RETURNING uuid
+            """,
+                (site_uuid, short_name, name, url, username, password),
+            )
+            self.connection.commit()
+            return site_uuid
+
+    def create_sub_site(
+        self, site_uuid: str, short_name: str, name: str, json_document: dict = None
+    ) -> str:
+        """Create a new sub-site in the database.
+
+        Args:
+            site_uuid: The UUID of the parent site
+            short_name: A short identifier for the sub-site
+            name: The full name of the sub-site
+            json_document: Optional JSON metadata for the sub-site, defaults to empty dict if None
+
+        Returns:
+            str: The UUID of the created sub-site
+        """
+        with self.connection.cursor() as cursor:
+            # First verify the site exists
+            cursor.execute("SELECT uuid FROM sites WHERE uuid = %s", (site_uuid,))
+            if not cursor.fetchone():
+                raise ValueError(f"Site with UUID {site_uuid} does not exist")
+
+            sub_site_uuid = str(newnewid.uuid7())
+            # Ensure json_document is never None
+            json_doc = {} if json_document is None else json_document
+            cursor.execute(
+                """
+                INSERT INTO sub_sites (uuid, site_uuid, short_name, name, json_document)
+                VALUES (%s, %s, %s, %s, %s)
+                RETURNING uuid
+            """,
+                (
+                    sub_site_uuid,
+                    site_uuid,
+                    short_name,
+                    name,
+                    json.dumps(json_doc),  # Always serialize a dictionary
+                ),
+            )
+            self.connection.commit()
+            return sub_site_uuid
