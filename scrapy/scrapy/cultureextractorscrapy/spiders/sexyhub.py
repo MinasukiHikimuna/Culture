@@ -53,6 +53,41 @@ if not auth_token or not instance_token:
 
 base_url = os.getenv("SEXYHUB_BASE_URL")
 
+sites = {
+    "girlfriends": {
+        "id": 289,
+        "primary_collection": True,
+    },
+    "dane_jones": {
+        "id": 290,
+        "primary_collection": True,
+    },
+    "lesbea": {
+        "id": 291,
+        "primary_collection": True,
+    },
+    "massage_rooms": {
+        "id": 292,
+        "primary_collection": True,
+    },
+    "mom": {
+        "id": 293,
+        "primary_collection": True,
+    },
+    "fitness_rooms": {
+        "id": 294,
+        "primary_collection": True,
+    },
+    "why_not_bi": {
+        "id": 133,
+        "primary_collection": False,
+    },
+    "transangels": {
+        "id": 23,
+        "primary_collection": False,
+    },
+}
+
 girlfriends_id = 289
 dane_jones_id = 290
 lesbea_id = 291
@@ -60,7 +95,12 @@ massage_rooms_id = 292
 mom_id = 293
 fitness_rooms_id = 294
 
-remote_site_id = girlfriends_id
+remote_site = sites["mom"]
+if not remote_site:
+    raise ValueError("Remote site not found")
+
+remote_site_id = remote_site["id"]
+remote_primary_collection = remote_site["primary_collection"]
 
 
 class SexyHubSpider(scrapy.Spider):
@@ -94,6 +134,25 @@ class SexyHubSpider(scrapy.Spider):
         spider.existing_releases = get_existing_releases_with_status(site_item.id)
         return spider
 
+    def _construct_api_url(self, offset=0, per_page=20):
+        """Helper method to construct the API URL with consistent parameters."""
+        base_params = {
+            "adaptiveStreamingOnly": "false",
+            "orderBy": "dateReleased",
+            "type": "scene",
+            "limit": str(per_page),
+            "offset": str(offset),
+        }
+
+        if remote_primary_collection:
+            base_params["groupFilter"] = "primary"
+            base_params["collectionId"] = str(remote_site_id)
+        else:
+            base_params["groupId"] = str(remote_site_id)
+
+        query_string = "&".join(f"{k}={v}" for k, v in base_params.items())
+        return f"{base_url}/v2/releases?{query_string}"
+
     def start_requests(self):
         """Override start_requests to handle enter declaration."""
         headers = {
@@ -117,10 +176,8 @@ class SexyHubSpider(scrapy.Spider):
         }
 
         # Scrapy will automatically handle gzip decompression
-        per_page = 20
-        offset = 0
         yield scrapy.Request(
-            url=f"{base_url}/v2/releases?adaptiveStreamingOnly=false&dateReleased=%3C2025-03-13&orderBy=dateReleased&type=scene&groupFilter=primary&collectionId={remote_site_id}&limit={per_page}&offset={offset}",
+            url=self._construct_api_url(),
             callback=self.parse,
             headers=headers,
             dont_filter=True,
@@ -150,9 +207,23 @@ class SexyHubSpider(scrapy.Spider):
         # Continue with normal parsing if status is 200
         data = json.loads(response.text)
 
+        # Log pagination info
+        total = data["meta"]["total"]
+        current_offset = int(
+            parse_qs(urlparse(response.url).query).get("offset", [0])[0]
+        )
+        per_page = int(parse_qs(urlparse(response.url).query).get("limit", [20])[0])
+        current_page = (current_offset // per_page) + 1
+        total_pages = (total + per_page - 1) // per_page
+
+        self.logger.info(
+            f"Processing page {current_page}/{total_pages} (offset: {current_offset}, total: {total})"
+        )
+
         # Process each release in the listing
         for release in data["result"]:
             external_id = f"scene-{release['id']}"
+            self.logger.info(f"Processing release {external_id}")
 
             # Check if we have this release in database
             existing_release = self.existing_releases.get(external_id)
@@ -205,18 +276,10 @@ class SexyHubSpider(scrapy.Spider):
             )
 
         # Handle pagination
-        total = data["meta"]["total"]
-        current_offset = int(
-            parse_qs(urlparse(response.url).query).get("offset", [0])[0]
-        )
-        per_page = int(parse_qs(urlparse(response.url).query).get("limit", [4])[0])
-
         if current_offset + per_page < total:
             next_offset = current_offset + per_page
-            next_url = f"{base_url}/v2/releases?adaptiveStreamingOnly=false&dateReleased=%3C2025-03-13&orderBy=dateReleased&type=scene&groupFilter=primary&collectionId={remote_site_id}&limit={per_page}&offset={next_offset}"
-
             yield scrapy.Request(
-                url=next_url,
+                url=self._construct_api_url(offset=next_offset, per_page=per_page),
                 callback=self.parse,
                 headers=response.meta["headers"],
                 meta={
