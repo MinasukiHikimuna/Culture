@@ -116,6 +116,14 @@ class ClientCultureExtractor:
             return pl.DataFrame(sub_sites, schema=schema)
 
     def get_releases(self, site_uuid: str) -> pl.DataFrame:
+        """Get all releases for a given site UUID.
+
+        Args:
+            site_uuid: UUID of the site to get releases for
+
+        Returns:
+            DataFrame containing all releases for the site
+        """
         with self.connection.cursor() as cursor:
             # Get site info
             cursor.execute(
@@ -131,82 +139,137 @@ class ClientCultureExtractor:
                 return pl.DataFrame()
             site_name = site_row[0]
 
-            # Get all releases for the site
+            return self._get_releases_by_query(
+                cursor,
+                "WHERE site_uuid = %s",
+                (site_uuid,),
+                site_name=site_name,
+                site_uuid=site_uuid,
+            )
+
+    def get_release_by_uuid(self, release_uuid: str) -> pl.DataFrame:
+        """Get a specific release by its UUID.
+
+        Args:
+            release_uuid: UUID of the release to get
+
+        Returns:
+            DataFrame containing the release data
+        """
+        with self.connection.cursor() as cursor:
+            # First get the site info for this release
             cursor.execute(
                 """
-                SELECT 
-                    uuid,
-                    NULLIF(release_date, '-infinity') as release_date,
-                    short_name,
-                    name,
-                    url,
-                    description,
-                    NULLIF(created, '-infinity') as created,
-                    NULLIF(last_updated, '-infinity') as last_updated,
-                    available_files::text,
-                    json_document::text,
-                    site_uuid
-                FROM releases 
-                WHERE site_uuid = %s
-            """,
-                (site_uuid,),
+                SELECT s.name, s.uuid
+                FROM sites s
+                JOIN releases r ON r.site_uuid = s.uuid
+                WHERE r.uuid = %s
+                """,
+                (release_uuid,),
             )
-            releases_rows = cursor.fetchall()
+            site_row = cursor.fetchone()
+            if not site_row:
+                return pl.DataFrame()
+            site_name = site_row[0]
+            site_uuid = site_row[1]
 
-            # Combine all data
-            releases = []
-            for row in releases_rows:
-                release_uuid = row[0]
+            return self._get_releases_by_query(
+                cursor,
+                "WHERE uuid = %s",
+                (release_uuid,),
+                site_name=site_name,
+                site_uuid=site_uuid,
+            )
 
-                # Parse available_file JSON if it's a string
-                available_files = row[8]
-                if isinstance(available_files, str):
-                    try:
-                        available_files = json.loads(available_files)
-                    except json.JSONDecodeError:
-                        available_files = None
+    def _get_releases_by_query(
+        self, cursor, where_clause: str, params: tuple, site_name: str, site_uuid: str
+    ) -> pl.DataFrame:
+        """Internal method to get releases based on a WHERE clause.
 
-                # Parse file_metadata JSON if it's a string
-                file_metadata = row[9]
-                if isinstance(file_metadata, str):
-                    try:
-                        file_metadata = json.loads(file_metadata)
-                    except json.JSONDecodeError:
-                        file_metadata = {}
+        Args:
+            cursor: Database cursor
+            where_clause: SQL WHERE clause to filter releases
+            params: Parameters for the WHERE clause
+            site_name: Name of the site
+            site_uuid: UUID of the site
 
-                release_data = {
-                    "ce_site_uuid": str(row[10]),
-                    "ce_site_name": site_name,
-                    "ce_release_uuid": str(release_uuid),
-                    "ce_release_date": row[1],
-                    "ce_release_short_name": row[2],
-                    "ce_release_name": row[3],
-                    "ce_release_url": row[4],
-                    "ce_release_description": row[5],
-                    "ce_release_created": row[6],
-                    "ce_release_last_updated": row[7],
-                    "ce_release_available_files": row[8],
-                    "ce_release_json_document": row[9],
-                }
-                releases.append(release_data)
+        Returns:
+            DataFrame containing the matching releases
+        """
+        cursor.execute(
+            f"""
+            SELECT 
+                uuid,
+                NULLIF(release_date, '-infinity') as release_date,
+                short_name,
+                name,
+                url,
+                description,
+                NULLIF(created, '-infinity') as created,
+                NULLIF(last_updated, '-infinity') as last_updated,
+                available_files::text,
+                json_document::text,
+                site_uuid
+            FROM releases 
+            {where_clause}
+        """,
+            params,
+        )
+        releases_rows = cursor.fetchall()
 
-            # Schema remains the same as before
-            schema = {
-                "ce_site_uuid": pl.Utf8,
-                "ce_site_name": pl.Utf8,
-                "ce_release_uuid": pl.Utf8,
-                "ce_release_date": pl.Date,
-                "ce_release_short_name": pl.Utf8,
-                "ce_release_name": pl.Utf8,
-                "ce_release_url": pl.Utf8,
-                "ce_release_description": pl.Utf8,
-                "ce_release_created": pl.Datetime,
-                "ce_release_last_updated": pl.Datetime,
-                "ce_release_available_files": pl.Utf8,
-                "ce_release_json_document": pl.Utf8,
+        # Combine all data
+        releases = []
+        for row in releases_rows:
+            release_uuid = row[0]
+
+            # Parse available_file JSON if it's a string
+            available_files = row[8]
+            if isinstance(available_files, str):
+                try:
+                    available_files = json.loads(available_files)
+                except json.JSONDecodeError:
+                    available_files = None
+
+            # Parse file_metadata JSON if it's a string
+            file_metadata = row[9]
+            if isinstance(file_metadata, str):
+                try:
+                    file_metadata = json.loads(file_metadata)
+                except json.JSONDecodeError:
+                    file_metadata = {}
+
+            release_data = {
+                "ce_site_uuid": str(site_uuid),
+                "ce_site_name": site_name,
+                "ce_release_uuid": str(release_uuid),
+                "ce_release_date": row[1],
+                "ce_release_short_name": row[2],
+                "ce_release_name": row[3],
+                "ce_release_url": row[4],
+                "ce_release_description": row[5],
+                "ce_release_created": row[6],
+                "ce_release_last_updated": row[7],
+                "ce_release_available_files": row[8],
+                "ce_release_json_document": row[9],
             }
+            releases.append(release_data)
 
-            return pl.DataFrame(releases, schema=schema)
+        schema = {
+            "ce_site_uuid": pl.Utf8,
+            "ce_site_name": pl.Utf8,
+            "ce_release_uuid": pl.Utf8,
+            "ce_release_date": pl.Date,
+            "ce_release_short_name": pl.Utf8,
+            "ce_release_name": pl.Utf8,
+            "ce_release_url": pl.Utf8,
+            "ce_release_description": pl.Utf8,
+            "ce_release_created": pl.Datetime,
+            "ce_release_last_updated": pl.Datetime,
+            "ce_release_available_files": pl.Utf8,
+            "ce_release_json_document": pl.Utf8,
+        }
+
+        return pl.DataFrame(releases, schema=schema)
 
     def get_downloads(self, site_uuid: str) -> pl.DataFrame:
         with self.connection.cursor() as cursor:
