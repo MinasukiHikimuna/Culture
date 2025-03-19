@@ -135,7 +135,12 @@ scenes_schema = {
             "url": pl.Utf8,
             "tags": pl.List(pl.Struct({"id": pl.Int64, "name": pl.Utf8})),
             "parent_studio": pl.Struct(
-                {"id": pl.Int64, "name": pl.Utf8, "url": pl.Utf8, "tags": pl.List(pl.Struct({"id": pl.Int64, "name": pl.Utf8}))}
+                {
+                    "id": pl.Int64,
+                    "name": pl.Utf8,
+                    "url": pl.Utf8,
+                    "tags": pl.List(pl.Struct({"id": pl.Int64, "name": pl.Utf8})),
+                }
             ),
         }
     ),
@@ -302,7 +307,12 @@ galleries_schema = {
             "url": pl.Utf8,
             "tags": pl.List(pl.Struct({"id": pl.Int64, "name": pl.Utf8})),
             "parent_studio": pl.Struct(
-                {"id": pl.Int64, "name": pl.Utf8, "url": pl.Utf8, "tags": pl.List(pl.Struct({"id": pl.Int64, "name": pl.Utf8}))}
+                {
+                    "id": pl.Int64,
+                    "name": pl.Utf8,
+                    "url": pl.Utf8,
+                    "tags": pl.List(pl.Struct({"id": pl.Int64, "name": pl.Utf8})),
+                }
             ),
         }
     ),
@@ -345,6 +355,7 @@ galleries_schema = {
     "stashapp_scenes": pl.List(pl.Struct({"id": pl.Int64, "title": pl.Utf8})),
 }
 
+
 def get_stashapp_client(prefix=""):
     # Use the provided prefix to get environment variables
     scheme = os.getenv(f"{prefix}STASHAPP_SCHEME")
@@ -368,22 +379,29 @@ class StashAppClient:
     def __init__(self, prefix=""):
         self.stash = get_stashapp_client(prefix)
 
-    def create_stash_url(self, base_url, include_tags, exclude_tags, sort_by="random", sort_dir="desc"):
+    def create_stash_url(
+        self, base_url, include_tags, exclude_tags, sort_by="random", sort_dir="desc"
+    ):
         # Create random number for sort if needed
         import random
+
         random_num = random.randint(10000000, 99999999) if sort_by == "random" else ""
-        
+
         # Format tags into the required structure
-        included = ",".join([f'("id":"{tag["id"]}","label":"{tag["name"]}")' for tag in include_tags])
-        excluded = ",".join([f'("id":"{tag["id"]}","label":"{tag["name"]}")' for tag in exclude_tags])
+        included = ",".join(
+            [f'("id":"{tag["id"]}","label":"{tag["name"]}")' for tag in include_tags]
+        )
+        excluded = ",".join(
+            [f'("id":"{tag["id"]}","label":"{tag["name"]}")' for tag in exclude_tags]
+        )
 
         # Build the criteria string
         criteria = f'("type":"tags","value":("items":[{included}],"excluded":[{excluded}],"depth":0),"modifier":"INCLUDES_ALL")'
-        
+
         # Construct the full URL
         sort_by_with_random = f"{sort_by}_{random_num}" if random_num else sort_by
         url = f"{base_url}/scenes?c={criteria}&sortby={sort_by_with_random}&sortdir={sort_dir}"
-        
+
         return url
 
     def get_tags(self) -> pl.DataFrame:
@@ -392,27 +410,33 @@ class StashAppClient:
         name
         aliases
         """
-        
+
         schema = {
             "id": pl.Int64,
             "name": pl.Utf8,
             "stashdb_id": pl.Utf8,
         }
-        
+
         tags = self.stash.find_tags({}, fragment=fragment)
-        
+
         tags_data = []
         for tag in tags:
             tag_data = {
                 "id": tag.get("id"),
                 "name": tag.get("name"),
-                "stashdb_id": next((alias[len("StashDB ID: "):] for alias in tag.get("aliases", []) if alias.startswith("StashDB ID: ")), None),
+                "stashdb_id": next(
+                    (
+                        alias[len("StashDB ID: ") :]
+                        for alias in tag.get("aliases", [])
+                        if alias.startswith("StashDB ID: ")
+                    ),
+                    None,
+                ),
             }
             tags_data.append(tag_data)
-        
+
         df_tags = pl.DataFrame(tags_data, schema=schema)
         return df_tags
-
 
     def get_studios(self) -> pl.DataFrame:
         fragment = """
@@ -466,7 +490,9 @@ class StashAppClient:
                 studio_data["stash_studios_parent_studio_url"] = parent_studio.get(
                     "url"
                 )
-                studio_data["stash_studios_parent_studio_tags"] = parent_studio.get("tags", [])
+                studio_data["stash_studios_parent_studio_tags"] = parent_studio.get(
+                    "tags", []
+                )
                 parent_stash_ids = self._get_stash_ids(
                     parent_studio.get("stash_ids", [])
                 )
@@ -496,7 +522,9 @@ class StashAppClient:
             "stash_studios_parent_studio_id": pl.Int64,
             "stash_studios_parent_studio_name": pl.Utf8,
             "stash_studios_parent_studio_url": pl.Utf8,
-            "stash_studios_parent_studio_tags": pl.List(pl.Struct({"id": pl.Int64, "name": pl.Utf8})),
+            "stash_studios_parent_studio_tags": pl.List(
+                pl.Struct({"id": pl.Int64, "name": pl.Utf8})
+            ),
             "stash_studios_parent_studio_stashdb_id": pl.Utf8,
             "stash_studios_parent_studio_tpdb_id": pl.Utf8,
             "stash_studios_parent_studio_ce_id": pl.Utf8,
@@ -504,7 +532,7 @@ class StashAppClient:
 
         df_studios = pl.DataFrame(studios, schema=schema)
         df_studios = df_studios.sort(by=["stash_studios_name"])
-        
+
         return df_studios
 
     def _get_stash_ids(self, stash_ids):
@@ -523,7 +551,9 @@ class StashAppClient:
     def find_scenes_by_oshash(self, oshashes: List[str]) -> pl.DataFrame:
         scenes = []
         for oshash in oshashes:
-            stash_scene = self.stash.find_scene_by_hash({"oshash": oshash}, fragment=scenes_fragment)
+            stash_scene = self.stash.find_scene_by_hash(
+                {"oshash": oshash}, fragment=scenes_fragment
+            )
             if stash_scene:
                 scene_data = self._map_scene_data(stash_scene)
                 scenes.append(scene_data)
@@ -533,17 +563,29 @@ class StashAppClient:
         return df_scenes
 
     def find_scenes_by_studio(self, studio_ids: List[int]) -> pl.DataFrame:
-        scenes = self.stash.find_scenes({"studios": {"value": studio_ids, "excludes": [], "modifier": "INCLUDES"}}, fragment=scenes_fragment)
+        scenes = self.stash.find_scenes(
+            {"studios": {"value": studio_ids, "excludes": [], "modifier": "INCLUDES"}},
+            fragment=scenes_fragment,
+        )
         scenes_data = [self._map_scene_data(scene) for scene in scenes]
         df_scenes = pl.DataFrame(scenes_data, schema=scenes_schema)
-        
+
         return df_scenes
 
     def find_scenes_by_performers(self, performer_ids: List[int]) -> pl.DataFrame:
-        scenes = self.stash.find_scenes({"performers": {"value": performer_ids, "excludes": [], "modifier": "INCLUDES"}}, fragment=scenes_fragment)
+        scenes = self.stash.find_scenes(
+            {
+                "performers": {
+                    "value": performer_ids,
+                    "excludes": [],
+                    "modifier": "INCLUDES",
+                }
+            },
+            fragment=scenes_fragment,
+        )
         scenes_data = [self._map_scene_data(scene) for scene in scenes]
         df_scenes = pl.DataFrame(scenes_data, schema=scenes_schema)
-        
+
         return df_scenes
 
     def find_scenes(self, filter) -> pl.DataFrame:
@@ -559,9 +601,7 @@ class StashAppClient:
             "stashapp_title": stash_scene.get("title", ""),
             "stashapp_details": stash_scene.get("details", ""),
             "stashapp_date": (
-                datetime.strptime(
-                    stash_scene.get("date", ""), "%Y-%m-%d"
-                ).date()
+                datetime.strptime(stash_scene.get("date", ""), "%Y-%m-%d").date()
                 if stash_scene.get("date")
                 else None
             ),
@@ -584,9 +624,7 @@ class StashAppClient:
                 {
                     "stashapp_performers_id": int(p.get("id")),
                     "stashapp_performers_name": p.get("name"),
-                    "stashapp_performers_disambiguation": p.get(
-                        "disambiguation"
-                    ),
+                    "stashapp_performers_disambiguation": p.get("disambiguation"),
                     "stashapp_performers_alias_list": p.get("alias_list", []),
                     "stashapp_performers_gender": p.get("gender"),
                     "stashapp_performers_favorite": p.get("favorite", False),
@@ -599,12 +637,20 @@ class StashAppClient:
                         for x in p.get("stash_ids", [])
                     ],
                     "stashapp_performers_stashdb_id": next(
-                        (x["stash_id"] for x in p.get("stash_ids", []) if x["endpoint"] == "https://stashdb.org/graphql"),
-                        None
+                        (
+                            x["stash_id"]
+                            for x in p.get("stash_ids", [])
+                            if x["endpoint"] == "https://stashdb.org/graphql"
+                        ),
+                        None,
                     ),
                     "stashapp_performers_tpdb_id": next(
-                        (x["stash_id"] for x in p.get("stash_ids", []) if x["endpoint"] == "https://theporndb.net/graphql"),
-                        None
+                        (
+                            x["stash_id"]
+                            for x in p.get("stash_ids", [])
+                            if x["endpoint"] == "https://theporndb.net/graphql"
+                        ),
+                        None,
                     ),
                     "stashapp_performers_custom_fields": [
                         {"key": k, "value": v}
@@ -642,9 +688,7 @@ class StashAppClient:
             "stashapp_primary_file_oshash": next(
                 (
                     fp["value"]
-                    for fp in stash_scene.get("files", [])[0].get(
-                        "fingerprints", []
-                    )
+                    for fp in stash_scene.get("files", [])[0].get("fingerprints", [])
                     if fp["type"] == "oshash"
                 ),
                 None,
@@ -652,9 +696,7 @@ class StashAppClient:
             "stashapp_primary_file_phash": next(
                 (
                     fp["value"]
-                    for fp in stash_scene.get("files", [])[0].get(
-                        "fingerprints", []
-                    )
+                    for fp in stash_scene.get("files", [])[0].get("fingerprints", [])
                     if fp["type"] == "phash"
                 ),
                 None,
@@ -662,16 +704,14 @@ class StashAppClient:
             "stashapp_primary_file_xxhash": next(
                 (
                     fp["value"]
-                    for fp in stash_scene.get("files", [])[0].get(
-                        "fingerprints", []
-                    )
+                    for fp in stash_scene.get("files", [])[0].get("fingerprints", [])
                     if fp["type"] == "xxhash"
                 ),
                 None,
             ),
-            "stashapp_primary_file_duration": stash_scene.get("files", [])[
-                0
-            ].get("duration", 0)
+            "stashapp_primary_file_duration": stash_scene.get("files", [])[0].get(
+                "duration", 0
+            )
             * 1000,
             "stashapp_tags": stash_scene.get("tags", []),
             "stashapp_organized": stash_scene.get("organized", False),
@@ -713,11 +753,11 @@ class StashAppClient:
             ],
         }
         return scene_data
-        
+
     def find_galleries_by_sha256(self, sha256s: List[str]) -> pl.DataFrame:
         # Get all galleries in one request
         stash_galleries = self.stash.find_galleries(f={}, fragment=galleries_fragment)
-        
+
         # Create a lookup of sha256 -> gallery
         gallery_by_sha256 = {}
         for gallery in stash_galleries:
@@ -726,7 +766,7 @@ class StashAppClient:
             file_fingerprints = gallery["files"][0].get("fingerprints", [])
             gallery_sha256 = next(
                 (fp["value"] for fp in file_fingerprints if fp["type"] == "sha256"),
-                None
+                None,
             )
             if gallery_sha256:
                 gallery_by_sha256[gallery_sha256] = gallery
@@ -737,7 +777,7 @@ class StashAppClient:
             stash_gallery = gallery_by_sha256.get(sha256)
             if not stash_gallery:
                 continue
-            
+
             # Extract fields according to our schema
             gallery_data = self._map_gallery_data(stash_gallery)
             galleries.append(gallery_data)
@@ -747,7 +787,10 @@ class StashAppClient:
         return df_galleries
 
     def find_galleries_by_studio(self, studio_ids: List[int]) -> pl.DataFrame:
-        galleries = self.stash.find_galleries({"studios": {"value": studio_ids, "excludes": [], "modifier": "INCLUDES"}}, fragment=galleries_fragment)
+        galleries = self.stash.find_galleries(
+            {"studios": {"value": studio_ids, "excludes": [], "modifier": "INCLUDES"}},
+            fragment=galleries_fragment,
+        )
         galleries_data = [self._map_gallery_data(gallery) for gallery in galleries]
         df_galleries = pl.DataFrame(galleries_data, schema=galleries_schema)
         return df_galleries
@@ -758,9 +801,7 @@ class StashAppClient:
             "stashapp_title": stash_gallery.get("title", ""),
             "stashapp_details": stash_gallery.get("details", ""),
             "stashapp_date": (
-                datetime.strptime(
-                    stash_gallery.get("date", ""), "%Y-%m-%d"
-                ).date()
+                datetime.strptime(stash_gallery.get("date", ""), "%Y-%m-%d").date()
                 if stash_gallery.get("date")
                 else None
             ),
@@ -785,9 +826,7 @@ class StashAppClient:
                 {
                     "stashapp_performers_id": int(p.get("id")),
                     "stashapp_performers_name": p.get("name"),
-                    "stashapp_performers_disambiguation": p.get(
-                        "disambiguation"
-                    ),
+                    "stashapp_performers_disambiguation": p.get("disambiguation"),
                     "stashapp_performers_alias_list": p.get("alias_list", []),
                     "stashapp_performers_gender": p.get("gender"),
                     "stashapp_performers_stash_ids": [
@@ -831,9 +870,7 @@ class StashAppClient:
             "stashapp_primary_file_md5": next(
                 (
                     fp["value"]
-                    for fp in stash_gallery.get("files", [])[0].get(
-                        "fingerprints", []
-                    )
+                    for fp in stash_gallery.get("files", [])[0].get("fingerprints", [])
                     if fp["type"] == "md5"
                 ),
                 None,
@@ -841,9 +878,7 @@ class StashAppClient:
             "stashapp_primary_file_sha256": next(
                 (
                     fp["value"]
-                    for fp in stash_gallery.get("files", [])[0].get(
-                        "fingerprints", []
-                    )
+                    for fp in stash_gallery.get("files", [])[0].get("fingerprints", [])
                     if fp["type"] == "sha256"
                 ),
                 None,
@@ -851,9 +886,7 @@ class StashAppClient:
             "stashapp_primary_file_xxhash": next(
                 (
                     fp["value"]
-                    for fp in stash_gallery.get("files", [])[0].get(
-                        "fingerprints", []
-                    )
+                    for fp in stash_gallery.get("files", [])[0].get("fingerprints", [])
                     if fp["type"] == "xxhash"
                 ),
                 None,
@@ -1025,23 +1058,35 @@ class StashAppClient:
             {"id": performer_id, "custom_fields": {"partial": custom_fields}}
         )
 
-    def update_tags_for_scenes(self, scene_ids: List[int], add_tag_names: List[str], remove_tag_names: List[str]):
+    def update_performer_custom_fields_full(
+        self, performer_id: int, custom_fields: Dict[str, str]
+    ):
+        self.stash.update_performer(
+            {"id": performer_id, "custom_fields": {"full": custom_fields}}
+        )
+
+    def update_tags_for_scenes(
+        self,
+        scene_ids: List[int],
+        add_tag_names: List[str],
+        remove_tag_names: List[str],
+    ):
         """Update tags for multiple scenes by adding and removing specified tags by name.
-        
+
         Args:
             scene_ids: List of scene IDs to update
             add_tag_names: List of tag names to add
             remove_tag_names: List of tag names to remove
-        
+
         Returns:
             Dict[int, bool]: Dictionary mapping scene IDs to success status
         """
         # Get all tags at once
         all_tags = self.stash.find_tags(fragment="id name")
-        
+
         # Create lookup dict for faster tag searching
         tag_lookup = {tag["name"]: tag for tag in all_tags}
-        
+
         # Get all tags that need to be added
         add_tags = []
         for tag_name in add_tag_names:
@@ -1050,42 +1095,39 @@ class StashAppClient:
                 print(f"Warning: Tag '{tag_name}' not found")
                 return {scene_id: False for scene_id in scene_ids}
             add_tags.append(tag)
-            
+
         # Create set of tags to remove
         remove_tag_names_set = set(remove_tag_names)
-        
+
         results = {}
-        
+
         # Process each scene
         for scene_id in scene_ids:
             scene = self.stash.find_scene(scene_id, fragment="id tags { id name }")
-            
+
             try:
                 # Build new tag list:
                 # 1. Keep existing tags that aren't in remove list
                 # 2. Add new tags
                 new_tag_ids = []
-                
+
                 # Keep existing tags not marked for removal
                 for existing_tag in scene["tags"]:
                     if existing_tag["name"] not in remove_tag_names_set:
                         new_tag_ids.append(existing_tag["id"])
-                        
+
                 # Add new tags
                 for tag in add_tags:
                     if tag["id"] not in new_tag_ids:  # Avoid duplicates
                         new_tag_ids.append(tag["id"])
-                        
+
                 # Update the scene
-                self.stash.update_scene({
-                    "id": scene_id,
-                    "tag_ids": new_tag_ids
-                })
-                
+                self.stash.update_scene({"id": scene_id, "tag_ids": new_tag_ids})
+
                 results[scene_id] = True
-                
+
             except Exception as e:
                 print(f"Error updating scene {scene_id}: {str(e)}")
                 results[scene_id] = False
-        
+
         return results
