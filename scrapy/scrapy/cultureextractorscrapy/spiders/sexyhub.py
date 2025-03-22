@@ -95,7 +95,7 @@ massage_rooms_id = 292
 mom_id = 293
 fitness_rooms_id = 294
 
-remote_site = sites["mom"]
+remote_site = sites["transangels"]
 if not remote_site:
     raise ValueError("Remote site not found")
 
@@ -191,7 +191,15 @@ class SexyHubSpider(scrapy.Spider):
 
     def handle_error(self, failure):
         """Handle request errors."""
-        if failure.value.response.status == 401:
+        self.logger.error(f"Request failed: {failure.value}")
+        if hasattr(failure.value, "response") and failure.value.response:
+            self.logger.error(f"Response status: {failure.value.response.status}")
+            self.logger.error(f"Response headers: {failure.value.response.headers}")
+            try:
+                self.logger.error(f"Response body: {failure.value.response.text}")
+            except:
+                self.logger.error("Could not read response body")
+        if failure.value.status == 401:
             self.logger.error(
                 "Received 401 Unauthorized response. Authentication failed. Stopping spider."
             )
@@ -428,6 +436,13 @@ class SexyHubSpider(scrapy.Spider):
             errback=self.handle_error,
             dont_filter=True,
         )
+
+    def handle_401_response(self, response):
+        """Handle 401 response."""
+        self.logger.error(
+            f"Received 401 Unauthorized response. Authentication failed. Stopping spider."
+        )
+        raise CloseSpider("authentication_failed")
 
     def parse_video_download(self, response):
         """Parse the video download API response and add video files to metadata."""
