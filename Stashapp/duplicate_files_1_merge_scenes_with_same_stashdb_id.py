@@ -200,7 +200,8 @@ scenes_with_dupe_stashdb_ids_basic_info = all_scenes_basic_info_mapped_df.filter
         .agg(pl.len().alias("count"))
         .filter(pl.col("count") > 1)
         .get_column("stashapp_stashdb_id")
-    )
+    ),
+    pl.col("stashapp_studio_id").is_not_null(),
 ).sort("stashapp_stashdb_id")
 
 
@@ -325,3 +326,5 @@ for group in grouped_scenes.iter_rows(named=True):
         print(f"Error merging scenes: {e}")
 
     print("-" * 80)
+
+# %%
