@@ -64,7 +64,7 @@ public class EuphoriaRipper : IYieldingScraper
     {
         await page.GetByRole(AriaRole.Navigation).GetByRole(AriaRole.Link, new() { Name = "Content" }).ClickAsync();
         await page.GetByText("Movies").First.ClickAsync();
-        await SetSiteFilter(site, page);
+        // await SetSiteFilter(site, page);
 
         var totalPages = await GetTotalPagesAsync(page);
         for (var pageNumber = 1; pageNumber <= totalPages; pageNumber++)
@@ -165,7 +165,7 @@ public class EuphoriaRipper : IYieldingScraper
     {
         await page.GetByRole(AriaRole.Navigation).GetByRole(AriaRole.Link, new() { Name = "Content" }).ClickAsync();
         await page.GetByText("Photos").First.ClickAsync();
-        await SetSiteFilter(site, page);
+        // await SetSiteFilter(site, page);
 
         var totalPages = await GetTotalPagesAsync(page);
         for (var pageNumber = 1; pageNumber <= totalPages; pageNumber++)
@@ -288,12 +288,12 @@ public class EuphoriaRipper : IYieldingScraper
 
     private static async Task<List<SiteTag>> ScrapeTagsAsync(IPage releasePage)
     {
-        var tagElements = await releasePage.Locator("div.metadata div.tags > span").ElementHandlesAsync();
+        var tagElements = await releasePage.Locator("div.metadata div.tags > a").ElementHandlesAsync();
         var tags = new List<SiteTag>();
         foreach (var tagElement in tagElements)
         {
-            var tagUrl = await tagElement.GetAttributeAsync("data-href");
-            var tagId = await tagElement.GetAttributeAsync("data-value");
+            var tagUrl = await tagElement.GetAttributeAsync("href");
+            var tagId = tagUrl.Substring(tagUrl.LastIndexOf("?action=bytag_") + "?action=bytag_".Length);
             var tagName = await tagElement.TextContentAsync();
             tags.Add(new SiteTag(tagId, tagName, tagUrl));
         }
@@ -303,12 +303,12 @@ public class EuphoriaRipper : IYieldingScraper
 
     private static async Task<List<SitePerformer>> ScrapePerformersAsync(IPage releasePage)
     {
-        var performerElements = await releasePage.Locator("div.metadata div.models > span").ElementHandlesAsync();
+        var performerElements = await releasePage.Locator("div.metadata div.models > a").ElementHandlesAsync();
         var performers = new List<SitePerformer>();
         foreach (var performerElement in performerElements)
         {
-            var castUrl = await performerElement.GetAttributeAsync("data-href");
-            var castId = await performerElement.GetAttributeAsync("data-value");
+            var castUrl = await performerElement.GetAttributeAsync("href");
+            var castId = castUrl.Substring(castUrl.LastIndexOf("/") + 1);
             var castName = await performerElement.TextContentAsync();
             performers.Add(new SitePerformer(castId, castName, castUrl));
         }
