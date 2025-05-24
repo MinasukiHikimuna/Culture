@@ -52,7 +52,7 @@ stashbox_client = StashDbClient(
 
 # %%
 # Find by studio
-studio_id = stash.find_studio("Playboy Plus")["id"]
+studio_id = stash.find_studio("DarkX")["id"]
 
 target_scenes: pl.DataFrame = pl.DataFrame(
     stash.find_scenes(
@@ -112,14 +112,18 @@ def generate_search_queries(stashdb_target_scene, stashdb_primary_performers):
     date_str = format_iso_date_as_yy_mm_dd(stashdb_target_scene["date"])
     studio_name = format_studio_name(stashdb_target_scene["studio"]["name"])
 
-    # Most specific: studio + date
-    queries.append(f'{studio_name} "{date_str}"')
+    # Most specific: studio + performer + date
+    if performer_names:
+        queries.append(f'{studio_name} {performer_names[0]} "{date_str}"')
 
     # Next: first performer + date
     if performer_names:
         queries.append(f'{performer_names[0]} "{date_str}"')
 
-    # Finally: studio + first performer
+    # Next: studio + date (less specific, may return multiple scenes)
+    queries.append(f'{studio_name} "{date_str}"')
+
+    # Finally: studio + first performer (no date)
     if performer_names:
         queries.append(f"{studio_name} {performer_names[0]}")
 
