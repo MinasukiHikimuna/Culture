@@ -36,12 +36,10 @@
 - Store processed data in data/ directory
 - Use Parquet format for efficient data storage
 - Handle large datasets with streaming/chunking when necessary
-- Validate HAR file structure before processing
 
 ### File Organization
 
 - Main scripts go in scripts/ directory
-- Keep HAR files in captured/ directory
 - Store processed data in data/ directory
 - Downloaded media goes in media/ directory
 - Exclude data/, captured/, and media/ from version control
@@ -51,14 +49,12 @@
 - Implement proper rate limiting to respect server resources
 - Use session management for authenticated requests
 - Handle HTTP errors gracefully with retries
-- Extract headers from HAR files for authentication
 - Validate captured data before processing
 
 ### Error Handling & Logging
 
 - Use descriptive error messages
 - Log important operations and errors
-- Validate input files (HAR format, file existence)
 - Provide helpful error messages for common issues
 - Use try-except blocks for external API calls
 
@@ -96,7 +92,6 @@
 
 ## Testing & Development
 
-- Test HAR captures before running full scrapes
 - Use validate_capture.py to validate captured data
 - Write unit tests for core functionality
 - Use meaningful test data and assertions
@@ -105,7 +100,6 @@
 
 ## Security & Privacy
 
-- Keep HAR files secure (contain session data)
 - Don't commit sensitive data to version control
 - Validate and sanitize file paths
 - Use secure file permissions for sensitive data
