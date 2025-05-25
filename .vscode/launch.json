@@ -19,6 +19,20 @@
             "name": ".NET Core Attach",
             "type": "coreclr",
             "request": "attach"
+        },
+        {
+            "name": "Python: Launch Scrapy Spider",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "scrapy",
+            "args": [
+                "crawl",
+                "angelslove",
+                "--loglevel",
+                "DEBUG",
+            ],
+            "cwd": "${workspaceFolder}/scrapy/scrapy",
+            "console": "integratedTerminal"
         }
     ]
 }
