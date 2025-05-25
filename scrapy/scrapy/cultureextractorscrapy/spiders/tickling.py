@@ -4,51 +4,67 @@ import newnewid
 from datetime import datetime, timezone
 from dotenv import load_dotenv
 import scrapy
-from cultureextractorscrapy.spiders.database import get_site_item, get_existing_release_short_names, get_or_create_performer, get_or_create_tag
+from cultureextractorscrapy.spiders.database import (
+    get_site_item,
+    get_existing_release_short_names,
+    get_or_create_performer,
+    get_or_create_tag,
+)
 from cultureextractorscrapy.items import (
-    AvailableGalleryZipFile, AvailableImageFile, AvailableVideoFile, AvailableVttFile,
-    AvailableFileEncoder, available_file_decoder, ReleaseItem, SiteItem
+    AvailableGalleryZipFile,
+    AvailableImageFile,
+    AvailableVideoFile,
+    AvailableVttFile,
+    AvailableFileEncoder,
+    available_file_decoder,
+    ReleaseItem,
+    SiteItem,
 )
 from cultureextractorscrapy.utils import parse_resolution_height, parse_resolution_width
 
 load_dotenv()
 
-cookies = json.loads(os.getenv("COOKIES"))
-base_url = os.getenv("BASE_URL")
+cookies = json.loads(os.getenv("TICKLING_COOKIES"))
+base_url = os.getenv("TICKLING_BASE_URL")
+
 
 class TicklingSpider(scrapy.Spider):
     name = "tickling"
-    allowed_domains = os.getenv("ALLOWED_DOMAINS").split(",")
+    allowed_domains = os.getenv("TICKLING_ALLOWED_DOMAINS").split(",")
     start_urls = [f"{base_url}/updates/"]
     site_short_name = "ticklingsubmission"
-    
+
     @classmethod
     def from_crawler(cls, crawler, *args, **kwargs):
         spider = super(TicklingSpider, cls).from_crawler(crawler, *args, **kwargs)
         site_item = get_site_item(spider.site_short_name)
         if site_item is None:
-            raise ValueError(f"Site with short_name '{spider.site_short_name}' not found in the database.")
+            raise ValueError(
+                f"Site with short_name '{spider.site_short_name}' not found in the database."
+            )
         spider.site = site_item
         spider.existing_releases = get_existing_release_short_names(site_item.id)
         return spider
 
     def parse(self, response):
-        yield scrapy.Request(url=response.url, callback=self.parse_studios, cookies=cookies)
+        yield scrapy.Request(
+            url=response.url, callback=self.parse_studios, cookies=cookies
+        )
 
     def parse_studios(self, response):
         menu_items = response.css("div.studio-side-menu ul.menu li")
 
         for item in menu_items:
-            href = item.css('a::attr(href)').get()
+            href = item.css("a::attr(href)").get()
             yield scrapy.Request(
-                url=f"{base_url}{href}",
-                callback=self.parse_studio,
-                cookies=cookies
+                url=f"{base_url}{href}", callback=self.parse_studio, cookies=cookies
             )
 
     def parse_studio(self, response):
         # Get the last page number from the pager-last element
-        last_page = response.css('ul.pager li.pager-last a::attr(href)').re_first(r'page=(\d+)')
+        last_page = response.css("ul.pager li.pager-last a::attr(href)").re_first(
+            r"page=(\d+)"
+        )
         if last_page:
             last_page = int(last_page)
             # The page nuumbering is weird. First page is 0 but last page is the total number of pages.
@@ -57,82 +73,98 @@ class TicklingSpider(scrapy.Spider):
                 yield scrapy.Request(
                     url=f"{response.url}?page={page_number}",
                     callback=self.parse_updates,
-                    cookies=cookies
+                    cookies=cookies,
                 )
 
     def parse_updates(self, response):
-        updates = response.css('div.views-row div.node')
+        updates = response.css("div.views-row div.node")
         for update in updates:
-            url = update.css('h2 a::attr(href)').get()
+            url = update.css("h2 a::attr(href)").get()
             yield scrapy.Request(
-                url=f"{base_url}{url}",
-                callback=self.parse_update,
-                cookies=cookies
+                url=f"{base_url}{url}", callback=self.parse_update, cookies=cookies
             )
 
     def parse_update(self, response):
-        studio_slug = response.url.split('/')[-3]
-        movie_slug = response.url.split('/')[-2]
-        studio_name = response.css(f'div#main-content ul.menu li a.{studio_slug}::attr(title)').get()
-        movie_name = response.css('h1.title::text').get()
+        studio_slug = response.url.split("/")[-3]
+        movie_slug = response.url.split("/")[-2]
+        studio_name = response.css(
+            f"div#main-content ul.menu li a.{studio_slug}::attr(title)"
+        ).get()
+        movie_name = response.css("h1.title::text").get()
 
         # Check if this release already exists
         existing_release_id = self.existing_releases.get(movie_slug)
         release_id = existing_release_id if existing_release_id else newnewid.uuid7()
         if existing_release_id:
-            self.logger.info(f"Release ID={existing_release_id} short_name={movie_slug} already exists. Updating existing release.")
+            self.logger.info(
+                f"Release ID={existing_release_id} short_name={movie_slug} already exists. Updating existing release."
+            )
         else:
-            self.logger.info(f"Creating new release ID={release_id} short_name={movie_slug}.")
+            self.logger.info(
+                f"Creating new release ID={release_id} short_name={movie_slug}."
+            )
 
-        date_text = response.xpath('//p[@class="content"][span[@class="label" and contains(text(), "Datum:")]]/text()').get()
-        
+        date_text = response.xpath(
+            '//p[@class="content"][span[@class="label" and contains(text(), "Datum:")]]/text()'
+        ).get()
+
         if date_text:
             date_text = date_text.strip()
             try:
-                date = datetime.strptime(date_text, '%b %d %Y').date()
+                date = datetime.strptime(date_text, "%b %d %Y").date()
             except ValueError:
                 date = None
         else:
             date = None
 
         # Corrected XPath for duration
-        duration_raw = response.xpath('string(//div[contains(@class, "field-item")][div[contains(@class, "field-label-inline-first") and contains(text(), "Time:")]])').get().strip()
+        duration_raw = (
+            response.xpath(
+                'string(//div[contains(@class, "field-item")][div[contains(@class, "field-label-inline-first") and contains(text(), "Time:")]])'
+            )
+            .get()
+            .strip()
+        )
         if duration_raw:
-            duration_text = duration_raw.replace('Time:', '').strip()
+            duration_text = duration_raw.replace("Time:", "").strip()
         else:
             duration_text = None
 
         # Extract performers
         performers = []
-        performer_elements = response.css('div.field-field-tag-performers div.field-items div.field-item')
+        performer_elements = response.css(
+            "div.field-field-tag-performers div.field-items div.field-item"
+        )
         for element in performer_elements:
-            if 'Performers:' in element.get():
-                short_name = element.css('a::attr(href)').get().split('/')[-1]
-                name = element.css('a::text').get()
-                url = element.css('a::attr(href)').get()
+            if "Performers:" in element.get():
+                short_name = element.css("a::attr(href)").get().split("/")[-1]
+                name = element.css("a::text").get()
+                url = element.css("a::attr(href)").get()
                 if name and url:
                     performer = get_or_create_performer(
                         site_uuid=self.site.id,
                         short_name=short_name,
                         name=name.strip(),
-                        url=f"{base_url}{url.strip()}"
+                        url=f"{base_url}{url.strip()}",
                     )
                     performers.append(performer)
 
         # Extract tags (keywords)
         tags = []
-        keyword_elements = response.css('div.field-field-tag-keywords div.field-items div.field-item')
+        keyword_elements = response.css(
+            "div.field-field-tag-keywords div.field-items div.field-item"
+        )
         for element in keyword_elements:
-            if 'Keywords:' in element.get():
-                name = element.css('a::text').get()
-                url = element.css('a::attr(href)').get()
+            if "Keywords:" in element.get():
+                name = element.css("a::text").get()
+                url = element.css("a::attr(href)").get()
                 if name and url:
-                    short_name = url.split('/')[-1]
+                    short_name = url.split("/")[-1]
                     tag = get_or_create_tag(
                         site_uuid=self.site.id,
                         short_name=short_name,
                         name=name.strip(),
-                        url=f"{base_url}{url.strip()}"
+                        url=f"{base_url}{url.strip()}",
                     )
                     tags.append(tag)
 
@@ -141,57 +173,70 @@ class TicklingSpider(scrapy.Spider):
         # Extract downloadable files
         available_files = []
         file_elements = response.css(
-            'div.download-files-block span.views-field-field-mp4fullhd-url, div.download-files-block span.views-field-field-mp4hd-url, div.download-files-block span.views-field-field-mp4sd-url, div.download-files-block span.views-field-field-wmvhd-url, div.download-files-block span.views-field-field-wmv-url')
+            "div.download-files-block span.views-field-field-mp4fullhd-url, div.download-files-block span.views-field-field-mp4hd-url, div.download-files-block span.views-field-field-mp4sd-url, div.download-files-block span.views-field-field-wmvhd-url, div.download-files-block span.views-field-field-wmv-url"
+        )
         highest_resolution_video = None
         highest_resolution = 0
 
         for element in file_elements:
-            link = element.css('a::attr(href)').get()
-            title = element.css('a::attr(title)').get()
-            file_type = element.css('span.field-content::text').re_first(r'\((.*?)\)')
+            link = element.css("a::attr(href)").get()
+            title = element.css("a::attr(title)").get()
+            file_type = element.css("span.field-content::text").re_first(r"\((.*?)\)")
 
-            if 'mp4' in file_type.lower() or 'wmv' in file_type.lower():
+            if "mp4" in file_type.lower() or "wmv" in file_type.lower():
                 width = parse_resolution_width(title)
                 height = parse_resolution_height(title)
-                
-                if height > highest_resolution or (height == highest_resolution and 'mp4' in file_type.lower()):
+
+                if height > highest_resolution or (
+                    height == highest_resolution and "mp4" in file_type.lower()
+                ):
                     highest_resolution = height
                     highest_resolution_video = AvailableVideoFile(
-                        file_type='video',
-                        content_type='scene',
+                        file_type="video",
+                        content_type="scene",
                         variant=title,
                         url=link,
                         resolution_width=width,
                         resolution_height=height,
                     )
-            elif 'zip' in file_type.lower():
-                available_files.append(AvailableGalleryZipFile(
-                    file_type='gallery',
-                    content_type='application/zip',
-                    variant=file_type,
-                    url=link,
-                ))
+            elif "zip" in file_type.lower():
+                available_files.append(
+                    AvailableGalleryZipFile(
+                        file_type="gallery",
+                        content_type="application/zip",
+                        variant=file_type,
+                        url=link,
+                    )
+                )
 
         if highest_resolution_video:
             available_files.append(highest_resolution_video)
-        
-        preview_video_url = response.css("div#mediaspace span.field-content a::attr(href)").get()
-        if preview_video_url:
-            available_files.append(AvailableVideoFile(
-                file_type='video',
-                content_type='preview',
-                variant='',
-                url=preview_video_url,
-            ))
 
-        preview_image_url = response.css("div#mediaspace span.field-content img::attr(src)").get()
+        preview_video_url = response.css(
+            "div#mediaspace span.field-content a::attr(href)"
+        ).get()
+        if preview_video_url:
+            available_files.append(
+                AvailableVideoFile(
+                    file_type="video",
+                    content_type="preview",
+                    variant="",
+                    url=preview_video_url,
+                )
+            )
+
+        preview_image_url = response.css(
+            "div#mediaspace span.field-content img::attr(src)"
+        ).get()
         if preview_image_url:
-            available_files.append(AvailableImageFile(
-                file_type='image',
-                content_type='preview',
-                variant='',
-                url=preview_image_url,
-            ))
+            available_files.append(
+                AvailableImageFile(
+                    file_type="image",
+                    content_type="preview",
+                    variant="",
+                    url=preview_image_url,
+                )
+            )
 
         # Create or update ReleaseItem
         release_item = ReleaseItem(
@@ -202,17 +247,20 @@ class TicklingSpider(scrapy.Spider):
             url=response.url,
             description=description,
             duration=0,
-            created=datetime.now(tz=timezone.utc).astimezone() if not existing_release_id else None,
+            created=(
+                datetime.now(tz=timezone.utc).astimezone()
+                if not existing_release_id
+                else None
+            ),
             last_updated=datetime.now(tz=timezone.utc).astimezone(),
             performers=performers,
             tags=tags,
             available_files=json.dumps(available_files, cls=AvailableFileEncoder),
-            json_document=json.dumps({
-                "duration": duration_text,
-                "html": response.text
-            }),
+            json_document=json.dumps(
+                {"duration": duration_text, "html": response.text}
+            ),
             site_uuid=self.site.id,
-            site=self.site
+            site=self.site,
         )
 
         yield release_item
