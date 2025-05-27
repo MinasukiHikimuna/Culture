@@ -20,7 +20,6 @@ from libraries.client_stashapp import StashAppClient, get_stashapp_client
 stash_client = StashAppClient()
 stash_raw_client = get_stashapp_client()
 
-# %%
 # Define paths to scan
 PATHS = [
     r"F:\Culture\Staging",
@@ -31,7 +30,6 @@ PATHS = [
 ]
 
 
-# %%
 def is_valid_uuid(uuid_str: str) -> bool:
     """Check if a string is a valid UUID."""
     try:
@@ -83,7 +81,6 @@ scenes = stash_raw_client.find_scenes(
     """
 )
 
-# %%
 # Process scenes and files to extract UUIDs from filenames
 results = []
 
@@ -109,9 +106,6 @@ for scene in scenes:
                 "existing_stash_ids": existing_stash_ids,
             }
         )
-
-# Debug: print first few results to check for schema consistency
-print("First 5 results:", results[:5])
 
 # Ensure all dicts have the same keys
 all_keys = {k for d in results for k in d.keys()}
