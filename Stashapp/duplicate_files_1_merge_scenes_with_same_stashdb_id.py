@@ -45,6 +45,7 @@ def compare_and_merge_scenes(scenes):
         "gallery_ids",
         "play_duration",
         "play_count",
+        "stash_ids",
     ]
 
     print("=== Scene Comparison ===\n")
@@ -204,21 +205,38 @@ scenes_with_dupe_stashdb_ids_basic_info = all_scenes_basic_info_mapped_df.filter
     pl.col("stashapp_studio_id").is_not_null(),
 ).sort("stashapp_stashdb_id")
 
-
-# %%
 scenes_with_dupe_stashdb_ids_basic_info
-print(
-    f"Studios with duplicate scenes: {scenes_with_dupe_stashdb_ids_basic_info.select(pl.col('stashapp_studio_id')).unique().to_series().to_list()}"
+
+# Count duplicate scenes per studio and sort by most duplicates
+studios_with_duplicate_counts = (
+    scenes_with_dupe_stashdb_ids_basic_info.group_by("stashapp_studio_id")
+    .agg(
+        [
+            pl.len().alias("duplicate_scene_count"),
+            pl.col("stashapp_studio_name").first().alias("studio_name"),
+        ]
+    )
+    .sort("duplicate_scene_count", descending=True)
 )
 
-if len(scenes_with_dupe_stashdb_ids_basic_info) > 0:
-    studio_id = (
-        scenes_with_dupe_stashdb_ids_basic_info.select(pl.col("stashapp_studio_id"))
-        .unique()
-        .to_series()
-        .to_list()[0]
+print("Studios with duplicate scenes (ordered by most duplicates):")
+for row in studios_with_duplicate_counts.iter_rows(named=True):
+    print(
+        f"Studio ID: {row['stashapp_studio_id']} ({row['studio_name']}) - {row['duplicate_scene_count']} duplicate scenes"
     )
+
+if len(scenes_with_dupe_stashdb_ids_basic_info) > 0:
+    # Select the studio with the most duplicate scenes
+    studio_id = studios_with_duplicate_counts.row(0, named=True)["stashapp_studio_id"]
+    studio_name = studios_with_duplicate_counts.row(0, named=True)["studio_name"]
+    duplicate_count = studios_with_duplicate_counts.row(0, named=True)[
+        "duplicate_scene_count"
+    ]
+
+    print(f"\nProcessing studio with most duplicates:")
     print(f"Studio ID: {studio_id}")
+    print(f"Studio Name: {studio_name}")
+    print(f"Number of duplicate scenes: {duplicate_count}")
 
     all_scenes = stash_client.find_scenes_by_studio(studio_id)
     print(f"Number of scenes: {len(all_scenes)}")
@@ -235,8 +253,6 @@ if len(scenes_with_dupe_stashdb_ids_basic_info) > 0:
         f"Number of scenes with duplicate StashDB IDs: {len(scenes_with_dupe_stashdb_ids)}"
     )
 
-
-# %%
 grouped_scenes = scenes_with_dupe_stashdb_ids.group_by("stashapp_stashdb_id").agg(
     [pl.col("stashapp_id").alias("scene_ids"), pl.col("stashapp_title").alias("titles")]
 )
