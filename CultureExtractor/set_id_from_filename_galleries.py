@@ -20,7 +20,6 @@ from libraries.client_stashapp import StashAppClient, get_stashapp_client
 stash_client = StashAppClient()
 stash_raw_client = get_stashapp_client()
 
-# %%
 # Define paths to scan
 PATHS = [
     r"F:\Culture\Staging",
@@ -30,8 +29,10 @@ PATHS = [
     r"Z:\Culture\Videos",
 ]
 
+# Define Culture Extractor URL pattern
+CULTURE_EXTRACTOR_URL_PATTERN = "https://culture.extractor/galleries/"
 
-# %%
+
 def is_valid_uuid(uuid_str: str) -> bool:
     """Check if a string is a valid UUID."""
     try:
@@ -52,6 +53,12 @@ def extract_uuid_from_filename(filename: str) -> str | None:
     return None
 
 
+def get_existing_ce_url(existing_urls: List[str], ce_uuid: str) -> str | None:
+    """Get existing Culture Extractor URL if it exists for the given UUID."""
+    expected_url = f"{CULTURE_EXTRACTOR_URL_PATTERN}{ce_uuid}"
+    return expected_url if expected_url in existing_urls else None
+
+
 # %%
 # Get all galleries with their files and existing URLs
 galleries = stash_raw_client.find_galleries(
@@ -67,7 +74,6 @@ galleries = stash_raw_client.find_galleries(
     """
 )
 
-# %%
 # Process galleries and files to extract UUIDs from filenames
 results = []
 
@@ -87,15 +93,12 @@ for gallery in galleries:
             {
                 "gallery_id": gallery_id,
                 "gallery_title": gallery_title,
-                "existing_urls": existing_urls,
                 "file_basename": file_basename,
                 "file_path": file_path,
                 "ce_uuid": ce_uuid,
+                "existing_urls": existing_urls,
             }
         )
-
-# Debug: print first few results to check for schema consistency
-print("First 5 results:", results[:5])
 
 # Ensure all dicts have the same keys
 all_keys = {k for d in results for k in d.keys()}
@@ -118,13 +121,50 @@ files_df = pl.DataFrame(
 
 # Filter to only files with a found UUID
 files_with_uuid_df = files_df.filter(pl.col("ce_uuid").is_not_null())
-files_with_uuid_df
+
+# %%
+# Filter out galleries that already have the matching Culture Extractor URL
+galleries_to_update = []
+galleries_already_set = []
+
+for row in files_with_uuid_df.iter_rows(named=True):
+    existing_urls = row["existing_urls"] or []
+    existing_ce_url = get_existing_ce_url(existing_urls, row["ce_uuid"])
+
+    # Check if the Culture Extractor URL already exists
+    if existing_ce_url:
+        galleries_already_set.append(row)
+    else:
+        galleries_to_update.append(row)
+
+# Create DataFrames for verification
+galleries_to_update_df = (
+    pl.DataFrame(galleries_to_update) if galleries_to_update else pl.DataFrame()
+)
+galleries_already_set_df = (
+    pl.DataFrame(galleries_already_set) if galleries_already_set else pl.DataFrame()
+)
+
+print(f"Total galleries with UUIDs found: {len(files_with_uuid_df)}")
+print(f"Galleries that need updating: {len(galleries_to_update_df)}")
+print(f"Galleries already set (skipped): {len(galleries_already_set_df)}")
+
+if len(galleries_already_set_df) > 0:
+    print("\nGalleries already set with matching Culture Extractor URL:")
+    print(
+        galleries_already_set_df.select(
+            ["gallery_id", "gallery_title", "file_basename", "ce_uuid"]
+        )
+    )
+
+print("\nGalleries to be updated:")
+galleries_to_update_df
 
 # %%
 # Apply step: Update galleries with extracted UUIDs as URLs
 update_results = []
 
-for row in files_with_uuid_df.iter_rows(named=True):
+for row in galleries_to_update_df.iter_rows(named=True):
     gallery_id = row["gallery_id"]
     ce_uuid = row["ce_uuid"]
     gallery_title = row["gallery_title"]
@@ -132,22 +172,7 @@ for row in files_with_uuid_df.iter_rows(named=True):
     existing_urls = row["existing_urls"] or []
 
     # Create the Culture Extractor URL
-    ce_url = f"https://culture.extractor/galleries/{ce_uuid}"
-
-    # Check if the Culture Extractor URL already exists
-    if ce_url in existing_urls:
-        update_results.append(
-            {
-                "gallery_id": gallery_id,
-                "gallery_title": gallery_title,
-                "file_basename": file_basename,
-                "ce_uuid": ce_uuid,
-                "status": "skipped",
-                "error": "URL already exists",
-            }
-        )
-        print(f"- Skipped gallery {gallery_id} ({gallery_title}) - URL already exists")
-        continue
+    ce_url = f"{CULTURE_EXTRACTOR_URL_PATTERN}{ce_uuid}"
 
     try:
         # Add the new URL to existing URLs
@@ -190,22 +215,24 @@ for row in files_with_uuid_df.iter_rows(named=True):
 
 # %%
 # Verification of apply step results
-update_results_df = pl.DataFrame(update_results)
-print(f"Total galleries processed: {len(update_results_df)}")
-print(
-    f"Successful updates: {len(update_results_df.filter(pl.col('status') == 'success'))}"
-)
-print(
-    f"Skipped updates: {len(update_results_df.filter(pl.col('status') == 'skipped'))}"
-)
-print(f"Failed updates: {len(update_results_df.filter(pl.col('status') == 'error'))}")
+if update_results:
+    update_results_df = pl.DataFrame(update_results)
+    print(f"Total galleries processed: {len(update_results_df)}")
+    print(
+        f"Successful updates: {len(update_results_df.filter(pl.col('status') == 'success'))}"
+    )
+    print(
+        f"Failed updates: {len(update_results_df.filter(pl.col('status') == 'error'))}"
+    )
 
-# Show any errors
-errors_df = update_results_df.filter(pl.col("status") == "error")
-if len(errors_df) > 0:
-    print("\nErrors encountered:")
-    errors_df
+    # Show any errors
+    errors_df = update_results_df.filter(pl.col("status") == "error")
+    if len(errors_df) > 0:
+        print("\nErrors encountered:")
+        errors_df
 
-# Show successful updates
-success_df = update_results_df.filter(pl.col("status") == "success")
-success_df
+    # Show successful updates
+    success_df = update_results_df.filter(pl.col("status") == "success")
+    success_df
+else:
+    print("No galleries needed updating.")
