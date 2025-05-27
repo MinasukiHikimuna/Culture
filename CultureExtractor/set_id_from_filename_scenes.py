@@ -29,6 +29,9 @@ PATHS = [
     r"Z:\Culture\Videos",
 ]
 
+# Define Culture Extractor endpoint
+CULTURE_EXTRACTOR_ENDPOINT = "https://culture.extractor/graphql"
+
 
 def is_valid_uuid(uuid_str: str) -> bool:
     """Check if a string is a valid UUID."""
@@ -47,6 +50,14 @@ def extract_uuid_from_filename(filename: str) -> str | None:
     )
     if match and is_valid_uuid(match.group(1)):
         return match.group(1)
+    return None
+
+
+def get_existing_ce_stash_id(existing_stash_ids: List[Dict]) -> str | None:
+    """Get existing Culture Extractor stash_id if it exists."""
+    for sid in existing_stash_ids:
+        if sid.get("endpoint") == CULTURE_EXTRACTOR_ENDPOINT:
+            return sid.get("stash_id")
     return None
 
 
@@ -128,14 +139,50 @@ files_df = pl.DataFrame(
 
 # Filter to only files with a found UUID
 files_with_uuid_df = files_df.filter(pl.col("ce_uuid").is_not_null())
-files_with_uuid_df
+
+# %%
+# Filter out scenes that already have the matching Culture Extractor stash ID
+scenes_to_update = []
+scenes_already_set = []
+
+for row in files_with_uuid_df.iter_rows(named=True):
+    existing_stash_ids = row["existing_stash_ids"] or []
+    existing_ce_stash_id = get_existing_ce_stash_id(existing_stash_ids)
+
+    # Check if the same UUID is already set
+    if existing_ce_stash_id == row["ce_uuid"]:
+        scenes_already_set.append(row)
+    else:
+        scenes_to_update.append(row)
+
+# Create DataFrames for verification
+scenes_to_update_df = (
+    pl.DataFrame(scenes_to_update) if scenes_to_update else pl.DataFrame()
+)
+scenes_already_set_df = (
+    pl.DataFrame(scenes_already_set) if scenes_already_set else pl.DataFrame()
+)
+
+print(f"Total scenes with UUIDs found: {len(files_with_uuid_df)}")
+print(f"Scenes that need updating: {len(scenes_to_update_df)}")
+print(f"Scenes already set (skipped): {len(scenes_already_set_df)}")
+
+if len(scenes_already_set_df) > 0:
+    print("\nScenes already set with matching Culture Extractor stash ID:")
+    print(
+        scenes_already_set_df.select(
+            ["scene_id", "scene_title", "file_basename", "ce_uuid"]
+        )
+    )
+
+print("\nScenes to be updated:")
+scenes_to_update_df
 
 # %%
 # Apply step: Update scenes with extracted UUIDs as stash_ids (preserving existing stash_ids)
 update_results = []
-CULTURE_EXTRACTOR_ENDPOINT = "https://culture.extractor/graphql"
 
-for row in files_with_uuid_df.iter_rows(named=True):
+for row in scenes_to_update_df.iter_rows(named=True):
     scene_id = row["scene_id"]
     ce_uuid = row["ce_uuid"]
     scene_title = row["scene_title"]
@@ -143,30 +190,6 @@ for row in files_with_uuid_df.iter_rows(named=True):
     existing_stash_ids = row["existing_stash_ids"] or []
 
     try:
-        # Check if Culture Extractor stash_id already exists and matches
-        existing_ce_stash_id = None
-        for sid in existing_stash_ids:
-            if sid.get("endpoint") == CULTURE_EXTRACTOR_ENDPOINT:
-                existing_ce_stash_id = sid.get("stash_id")
-                break
-
-        # Skip if the same UUID is already set
-        if existing_ce_stash_id == ce_uuid:
-            update_results.append(
-                {
-                    "scene_id": scene_id,
-                    "scene_title": scene_title,
-                    "file_basename": file_basename,
-                    "ce_uuid": ce_uuid,
-                    "status": "skipped",
-                    "error": "UUID already set",
-                }
-            )
-            print(
-                f"→ Skipped scene {scene_id} ({scene_title}) - UUID {ce_uuid} already set"
-            )
-            continue
-
         # Merge stash_ids preserving existing ones
         merged_stash_ids = merge_stash_ids(
             existing_stash_ids, CULTURE_EXTRACTOR_ENDPOINT, ce_uuid
@@ -211,22 +234,24 @@ for row in files_with_uuid_df.iter_rows(named=True):
 
 # %%
 # Verification of apply step results
-update_results_df = pl.DataFrame(update_results)
-print(f"Total scenes processed: {len(update_results_df)}")
-print(
-    f"Successful updates: {len(update_results_df.filter(pl.col('status') == 'success'))}"
-)
-print(
-    f"Skipped (already set): {len(update_results_df.filter(pl.col('status') == 'skipped'))}"
-)
-print(f"Failed updates: {len(update_results_df.filter(pl.col('status') == 'error'))}")
+if update_results:
+    update_results_df = pl.DataFrame(update_results)
+    print(f"Total scenes processed: {len(update_results_df)}")
+    print(
+        f"Successful updates: {len(update_results_df.filter(pl.col('status') == 'success'))}"
+    )
+    print(
+        f"Failed updates: {len(update_results_df.filter(pl.col('status') == 'error'))}"
+    )
 
-# Show any errors
-errors_df = update_results_df.filter(pl.col("status") == "error")
-if len(errors_df) > 0:
-    print("\nErrors encountered:")
-    errors_df
+    # Show any errors
+    errors_df = update_results_df.filter(pl.col("status") == "error")
+    if len(errors_df) > 0:
+        print("\nErrors encountered:")
+        errors_df
 
-# Show successful updates
-success_df = update_results_df.filter(pl.col("status") == "success")
-success_df
+    # Show successful updates
+    success_df = update_results_df.filter(pl.col("status") == "success")
+    success_df
+else:
+    print("No scenes needed updating.")
