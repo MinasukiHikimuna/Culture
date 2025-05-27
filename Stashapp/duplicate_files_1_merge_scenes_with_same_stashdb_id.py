@@ -342,5 +342,3 @@ for group in grouped_scenes.iter_rows(named=True):
         print(f"Error merging scenes: {e}")
 
     print("-" * 80)
-
-# %%
