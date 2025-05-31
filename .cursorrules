@@ -1,3 +1,9 @@
 Before writing anything, let's create a .plan file at the root.
 
 We lay down the steps to some scoped goal. If there are some things that come up while focusing on the scoped goal, we can add those to BACKLOG.md to avoid losing focus.
+
+.plan should look something like this with multiple tasks and their descriptions. Once something is done, we can check it with [X].
+
+    [ ] Show sites
+
+    Sites should be available from REST API so that the web UI can show those.
