@@ -112,6 +112,21 @@ class AvailableVideoFile(IAvailableFile):
 
 
 @dataclass
+class AvailableAudioFile(IAvailableFile):
+    file_type: str
+    content_type: str
+    variant: str
+    url: str
+    file_size: Optional[float] = None
+    duration: Optional[float] = None  # Duration in seconds
+    bitrate: Optional[int] = None  # Bitrate in kbps
+    sample_rate: Optional[int] = None  # Sample rate in Hz
+    channels: Optional[int] = None  # Number of audio channels
+    codec: Optional[str] = None  # Audio codec (mp3, aac, ogg, etc.)
+    sha256_hash: Optional[str] = None  # SHA-256 hash for integrity checking
+
+
+@dataclass
 class AvailableVttFile(IAvailableFile):
     file_type: str
     content_type: str
@@ -123,7 +138,11 @@ import json
 from typing import Union
 
 AvailableFileType = Union[
-    AvailableGalleryZipFile, AvailableImageFile, AvailableVideoFile, AvailableVttFile
+    AvailableGalleryZipFile,
+    AvailableImageFile,
+    AvailableVideoFile,
+    AvailableAudioFile,
+    AvailableVttFile,
 ]
 
 

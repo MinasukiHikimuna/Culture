@@ -15,11 +15,11 @@ from cultureextractorscrapy.utils import parse_resolution_height, parse_resoluti
 load_dotenv()
 
 cookies = json.loads(os.getenv("FEMJOY_COOKIES"))
-base_url = os.getenv("FEMJOY_BASE_URL")
+base_url = "https://femjoy.com"
 
 class FemjoySpider(scrapy.Spider):
     name = "femjoy"
-    allowed_domains = os.getenv("FEMJOY_ALLOWED_DOMAINS").split(",")
+    allowed_domains = ["https://femjoy.com"]
     start_urls = [base_url]
     site_short_name = "femjoy"
     

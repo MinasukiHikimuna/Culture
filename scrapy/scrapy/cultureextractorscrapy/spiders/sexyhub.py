@@ -105,7 +105,7 @@ remote_primary_collection = remote_site["primary_collection"]
 
 class SexyHubSpider(scrapy.Spider):
     name = "sexyhub"
-    allowed_domains = os.getenv("SEXYHUB_ALLOWED_DOMAINS").split(",")
+    allowed_domains = ["http://site-ma.sexyhub.com"]
     start_urls = [base_url]
     site_short_name = "sexyhub"
 

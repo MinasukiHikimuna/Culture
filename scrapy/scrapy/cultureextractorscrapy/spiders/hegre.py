@@ -15,11 +15,11 @@ from itemadapter import ItemAdapter
 load_dotenv()
 
 cookies = json.loads(os.getenv("HEGRE_COOKIES"))
-base_url = os.getenv("HEGRE_BASE_URL")
+base_url = "https://hegre.com"
 
 class HegreSpider(scrapy.Spider):
     name = "hegre"
-    allowed_domains = os.getenv("HEGRE_ALLOWED_DOMAINS").split(",")
+    allowed_domains = ["https://hegre.com"]
     start_urls = [base_url]
     site_short_name = "hegre"
     

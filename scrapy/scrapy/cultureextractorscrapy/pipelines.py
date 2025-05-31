@@ -420,6 +420,8 @@ class AvailableFilesPipeline(FilesPipeline):
     def process_file_metadata(self, file_path, file_type):
         if file_type == "video":
             return self.process_video_metadata(file_path)
+        elif file_type == "audio":
+            return self.process_audio_metadata(file_path)
         else:
             return self.process_generic_metadata(file_path, file_type)
 
@@ -443,13 +445,87 @@ class AvailableFilesPipeline(FilesPipeline):
             logging.error(f"Failed to get video hashes: {result.stderr}")
             return {}
 
+    def process_audio_metadata(self, file_path):
+        """Process audio file metadata using ffprobe and calculate hashes."""
+        metadata = {"$type": "AudioFileMetadata"}
+
+        # Calculate file hashes
+        sha256_hash = hashlib.sha256()
+        md5_hash = hashlib.md5()
+        with open(file_path, "rb") as f:
+            for byte_block in iter(lambda: f.read(4096), b""):
+                sha256_hash.update(byte_block)
+                md5_hash.update(byte_block)
+
+        metadata["sha256Sum"] = sha256_hash.hexdigest()
+        metadata["md5Sum"] = md5_hash.hexdigest()
+
+        # Extract audio metadata using ffprobe
+        try:
+            result = subprocess.run(
+                [
+                    "ffprobe",
+                    "-v",
+                    "quiet",
+                    "-print_format",
+                    "json",
+                    "-show_streams",
+                    "-select_streams",
+                    "a:0",  # Select first audio stream
+                    file_path,
+                ],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+
+            if result.returncode == 0:
+                data = json.loads(result.stdout)
+                streams = data.get("streams", [])
+
+                if streams:
+                    audio_stream = streams[0]
+
+                    # Extract metadata
+                    metadata["duration"] = float(audio_stream.get("duration", 0))
+
+                    bit_rate = audio_stream.get("bit_rate")
+                    if bit_rate:
+                        metadata["bitrate"] = int(bit_rate) // 1000  # Convert to kbps
+
+                    sample_rate = audio_stream.get("sample_rate")
+                    if sample_rate:
+                        metadata["sampleRate"] = int(sample_rate)
+
+                    channels = audio_stream.get("channels")
+                    if channels:
+                        metadata["channels"] = int(channels)
+
+                    codec = audio_stream.get("codec_name")
+                    if codec:
+                        metadata["codec"] = codec
+
+        except (
+            subprocess.TimeoutExpired,
+            subprocess.CalledProcessError,
+            json.JSONDecodeError,
+            FileNotFoundError,
+        ) as e:
+            logging.warning(f"Could not extract audio metadata from {file_path}: {e}")
+
+        return metadata
+
     def process_generic_metadata(self, file_path, file_type):
         if file_type == "zip":
             type = "GalleryZipFileMetadata"
         elif file_type == "image":
             type = "ImageFileMetadata"
+        elif file_type == "audio":
+            type = "AudioFileMetadata"
         elif file_type == "vtt":
             type = "VttFileMetadata"
+        else:
+            type = "GenericFileMetadata"
 
         sha256_hash = hashlib.sha256()
         md5_hash = hashlib.md5()

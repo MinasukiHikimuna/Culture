@@ -36,12 +36,12 @@ if isinstance(raw_cookies, list):
         if isinstance(cookie, dict) and "name" in cookie and "value" in cookie:
             cookies[cookie["name"]] = cookie["value"]
 
-base_url = os.getenv("LEZKISS_BASE_URL")
+base_url = "http://lezkiss.com"
 
 
 class LezKissSpider(scrapy.Spider):
     name = "lezkiss"
-    allowed_domains = os.getenv("LEZKISS_ALLOWED_DOMAINS").split(",")
+    allowed_domains = ["http://lezkiss.com"]
     start_urls = [base_url]
     site_short_name = "lezkiss"
 

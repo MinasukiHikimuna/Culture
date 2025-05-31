@@ -25,12 +25,12 @@ from cultureextractorscrapy.utils import parse_resolution_height, parse_resoluti
 load_dotenv()
 
 cookies = json.loads(os.getenv("TICKLING_COOKIES"))
-base_url = os.getenv("TICKLING_BASE_URL")
+base_url = "http://tickling-submission.com"
 
 
 class TicklingSpider(scrapy.Spider):
     name = "tickling"
-    allowed_domains = os.getenv("TICKLING_ALLOWED_DOMAINS").split(",")
+    allowed_domains = ["http://tickling-submission.com"]
     start_urls = [f"{base_url}/updates/"]
     site_short_name = "ticklingsubmission"
 
