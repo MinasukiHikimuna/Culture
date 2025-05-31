@@ -1,9 +1,20 @@
 Before writing anything, let's create a .plan file at the root.
 
-We lay down the steps to some scoped goal. If there are some things that come up while focusing on the scoped goal, we can add those to BACKLOG.md to avoid losing focus.
+.plan should be minimal and focused ONLY on the current task/goal being worked on right now. It should contain:
 
-.plan should look something like this with multiple tasks and their descriptions. Once something is done, we can check it with [X].
+- Current specific task being worked on
+- Simple checklist of immediate steps to complete that task
+- No future phases or long-term planning
 
-    [ ] Show sites
+If there are ideas for future work or things that come up while focusing on the current goal, add those to BACKLOG.md to avoid losing focus.
 
-    Sites should be available from REST API so that the web UI can show those.
+.plan should look something like this:
+
+    # Current Task: Initialize NextJS Project
+
+    [ ] Create webapp directory with NextJS 15
+    [ ] Setup TypeScript configuration
+    [ ] Configure Tailwind CSS
+    [ ] Setup project structure
+
+Once something is done, check it with [X]. When all tasks in .plan are complete, move the next priority item from BACKLOG.md to .plan.
