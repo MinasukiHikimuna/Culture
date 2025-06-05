@@ -52,7 +52,7 @@ stashbox_client = StashDbClient(
 
 # %%
 # Find by studio
-studio_id = stash.find_studio("DarkX")["id"]
+studio_id = stash.find_studio("Parasited")["id"]
 
 target_scenes: pl.DataFrame = pl.DataFrame(
     stash.find_scenes(
@@ -108,23 +108,37 @@ def generate_search_queries(stashdb_target_scene, stashdb_primary_performers):
         for performer in stashdb_primary_performers
     ]
 
-    # Format date
-    date_str = format_iso_date_as_yy_mm_dd(stashdb_target_scene["date"])
+    # Format date in multiple formats for better matching
+    from datetime import datetime
+
+    date_obj = datetime.strptime(stashdb_target_scene["date"], "%Y-%m-%d")
+
+    # Different date formats that might appear in NZB titles
+    date_formats = [
+        date_obj.strftime("%y.%m.%d"),  # 25.02.22
+        date_obj.strftime("%Y.%m.%d"),  # 2025.02.22
+        date_obj.strftime("%y %m %d"),  # 25 02 22 (original format)
+        date_obj.strftime("%Y %m %d"),  # 2025 02 22
+    ]
+
     studio_name = format_studio_name(stashdb_target_scene["studio"]["name"])
 
-    # Most specific: studio + performer + date
+    # Most specific: studio + performer + date (try multiple date formats)
     if performer_names:
-        queries.append(f'{studio_name} {performer_names[0]} "{date_str}"')
+        for date_format in date_formats:
+            queries.append(f'{studio_name} {performer_names[0]} "{date_format}"')
 
-    # Next: first performer + date
+    # Next: studio + date (try multiple date formats)
+    for date_format in date_formats:
+        queries.append(f'{studio_name} "{date_format}"')
+
+    # Less specific fallbacks only if we haven't found anything
     if performer_names:
-        queries.append(f'{performer_names[0]} "{date_str}"')
+        # Performer + date without studio
+        for date_format in date_formats:
+            queries.append(f'{performer_names[0]} "{date_format}"')
 
-    # Next: studio + date (less specific, may return multiple scenes)
-    queries.append(f'{studio_name} "{date_str}"')
-
-    # Finally: studio + first performer (no date)
-    if performer_names:
+        # Finally: studio + first performer (no date)
         queries.append(f"{studio_name} {performer_names[0]}")
 
     return queries
@@ -192,8 +206,18 @@ for scene_dict in target_scenes.to_dicts():
 # Create DataFrame with scene info
 scenes_df = pl.DataFrame(scene_info_list)
 
-# Perform the search
-results = searcher.search(search_queries_list)
+# Prepare validation info for the search
+validation_info = [
+    {
+        "studio": scene_info["studio"],
+        "date": scene_info["date"],
+        "performers": scene_info["performers"],
+    }
+    for scene_info in scene_info_list
+]
+
+# Perform the search with validation
+results = searcher.search_multiple(search_queries_list, validation_info)
 
 # Join scene info with search results
 results_with_scenes = results.join(
@@ -217,6 +241,10 @@ best_results = results_with_scenes.filter(pl.col("is_best_match")).unique(
     ["link", "title"]
 )
 best_results
+
+# %%
+best_results.write_json()
+
 
 # %%
 sab = SABnzbdClient()
