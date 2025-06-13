@@ -65,15 +65,35 @@ def run_scene_detection(video_path):
 def rename_scene_csv(video_path):
     """Rename the scene CSV file to match the original filename pattern."""
     video_path = Path(video_path)
-    # Find the CSV file with .540p-Scenes.csv pattern
-    csv_pattern = f"{video_path.stem}.540p-Scenes.csv"
-    old_csv_path = video_path.parent / csv_pattern
 
-    if old_csv_path.exists():
+    # Find all CSV files in the directory that might be our scene file
+    csv_files = list(video_path.parent.glob(f"{video_path.stem}*-Scenes.csv"))
+
+    if not csv_files:
+        # If no exact match, try to find the most recent CSV file
+        # that was created after the video file
+        video_mtime = video_path.stat().st_mtime
+        csv_files = [
+            f
+            for f in video_path.parent.glob("*-Scenes.csv")
+            if f.stat().st_mtime > video_mtime
+        ]
+
+    if csv_files:
+        # Get the most recently modified CSV file
+        latest_csv = max(csv_files, key=lambda x: x.stat().st_mtime)
+
         # Create new filename by removing .540p from the name
-        new_csv_path = video_path.parent / f"{video_path.stem}-Scenes.csv"
-        old_csv_path.rename(new_csv_path)
+        # but preserve the original filename structure
+        new_name = str(video_path.stem).replace(".540p", "")
+        new_csv_path = video_path.parent / f"{new_name}-Scenes.csv"
+
+        print(f"Found CSV file: {latest_csv}")
+        print(f"Renaming to: {new_csv_path}")
+
+        latest_csv.rename(new_csv_path)
         return str(new_csv_path)
+
     return None
 
 
