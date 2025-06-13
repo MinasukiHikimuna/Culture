@@ -23,14 +23,24 @@ def downscale_video(input_path):
 
     ffmpeg_cmd = [
         "ffmpeg",
+        "-hwaccel",
+        "cuda",
+        "-hwaccel_output_format",
+        "cuda",
         "-i",
         str(input_path),
         "-vf",
-        "scale=960:540",
+        "scale_cuda=960:540",
         "-c:v",
         "h264_nvenc",
         "-preset",
-        "fast",
+        "p1",  # Fastest preset
+        "-tune",
+        "ll",  # Low latency
+        "-rc",
+        "cbr",  # Constant bitrate
+        "-b:v",
+        "1M",  # Low bitrate since quality doesn't matter
         "-an",
         str(output_path),
     ]
