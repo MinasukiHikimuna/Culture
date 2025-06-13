@@ -1,0 +1,108 @@
+import os
+import subprocess
+import re
+from pathlib import Path
+
+
+def get_sidecar_file(video_path):
+    """Check if a sidecar file exists for the given video file."""
+    video_path = Path(video_path)
+    # Look for a sidecar file with -Scenes.csv extension
+    sidecar_pattern = f"{video_path.stem}-Scenes.csv"
+    sidecar_path = video_path.parent / sidecar_pattern
+
+    if sidecar_path.exists():
+        return str(sidecar_path)
+    return None
+
+
+def downscale_video(input_path):
+    """Downscale video using ffmpeg with NVENC."""
+    input_path = Path(input_path)
+    output_path = input_path.parent / f"{input_path.stem}.540p{input_path.suffix}"
+
+    ffmpeg_cmd = [
+        "ffmpeg",
+        "-i",
+        str(input_path),
+        "-vf",
+        "scale=960:540",
+        "-c:v",
+        "h264_nvenc",
+        "-preset",
+        "fast",
+        "-an",
+        str(output_path),
+    ]
+
+    subprocess.run(ffmpeg_cmd, check=True)
+    return str(output_path)
+
+
+def run_scene_detection(video_path):
+    """Run scene detection on the video file."""
+    scenedetect_cmd = [
+        "scenedetect",
+        "--input",
+        video_path,
+        "detect-content",
+        "list-scenes",
+    ]
+
+    subprocess.run(scenedetect_cmd, check=True)
+
+
+def rename_scene_csv(video_path):
+    """Rename the scene CSV file to match the original filename pattern."""
+    video_path = Path(video_path)
+    # Find the CSV file with .540p-Scenes.csv pattern
+    csv_pattern = f"{video_path.stem}.540p-Scenes.csv"
+    old_csv_path = video_path.parent / csv_pattern
+
+    if old_csv_path.exists():
+        # Create new filename by removing .540p from the name
+        new_csv_path = video_path.parent / f"{video_path.stem}-Scenes.csv"
+        old_csv_path.rename(new_csv_path)
+        return str(new_csv_path)
+    return None
+
+
+def process_video(video_path):
+    """Main function to process a video file."""
+    video_path = Path(video_path)
+
+    # Check if sidecar file exists
+    sidecar_file = get_sidecar_file(video_path)
+    if sidecar_file:
+        print(f"Sidecar file already exists: {sidecar_file}")
+        return
+
+    # Downscale video
+    print(f"Downscaling video: {video_path}")
+    downscaled_path = downscale_video(video_path)
+
+    try:
+        # Run scene detection
+        print(f"Running scene detection on: {downscaled_path}")
+        run_scene_detection(downscaled_path)
+
+        # Rename CSV file
+        print("Renaming scene CSV file")
+        new_csv_path = rename_scene_csv(downscaled_path)
+        if new_csv_path:
+            print(f"Renamed CSV file to: {new_csv_path}")
+    finally:
+        # Clean up downscaled video file
+        print(f"Deleting downscaled video: {downscaled_path}")
+        Path(downscaled_path).unlink(missing_ok=True)
+
+
+if __name__ == "__main__":
+    import sys
+
+    if len(sys.argv) != 2:
+        print("Usage: python pyscenedetect-process.py <video_file>")
+        sys.exit(1)
+
+    video_file = sys.argv[1]
+    process_video(video_file)
