@@ -7,8 +7,8 @@ from pathlib import Path
 def get_sidecar_file(video_path):
     """Check if a sidecar file exists for the given video file."""
     video_path = Path(video_path)
-    # Look for a sidecar file with -Scenes.csv extension
-    sidecar_pattern = f"{video_path.stem}-Scenes.csv"
+    # Look for a sidecar file with .Scenes.csv extension
+    sidecar_pattern = f"{video_path.name}.Scenes.csv"
     sidecar_path = video_path.parent / sidecar_pattern
 
     if sidecar_path.exists():
@@ -84,9 +84,9 @@ def rename_scene_csv(video_path):
         latest_csv = max(csv_files, key=lambda x: x.stat().st_mtime)
 
         # Create new filename by removing .540p from the name
-        # but preserve the original filename structure
-        new_name = str(video_path.stem).replace(".540p", "")
-        new_csv_path = video_path.parent / f"{new_name}-Scenes.csv"
+        # but preserve the original filename structure including extension
+        original_name = str(video_path.name).replace(".540p", "")
+        new_csv_path = video_path.parent / f"{original_name}.Scenes.csv"
 
         print(f"Found CSV file: {latest_csv}")
         print(f"Renaming to: {new_csv_path}")
