@@ -3,6 +3,14 @@ import subprocess
 import re
 from pathlib import Path
 
+import polars as pl
+import sys
+import os
+
+sys.path.append(os.path.dirname(os.path.abspath("")))
+
+from libraries.client_stashapp import get_stashapp_client, StashAppClient
+
 
 def get_sidecar_file(video_path):
     """Check if a sidecar file exists for the given video file."""
@@ -133,9 +141,25 @@ def process_video(video_path):
 if __name__ == "__main__":
     import sys
 
-    if len(sys.argv) != 2:
-        print("Usage: python pyscenedetect-process.py <video_file>")
-        sys.exit(1)
+    if len(sys.argv) == 2:
+        video_file = sys.argv[1]
+        process_video(video_file)
+    else:
+        stash = get_stashapp_client()
+        stash_client = StashAppClient()
 
-    video_file = sys.argv[1]
-    process_video(video_file)
+        ai_tagged_tag = stash.find_tag("AI_Tagged")
+        pyscenedetect_processed_tag = stash.find_tag("Scenes: PySceneDetect: Processed")
+        scenes_with_ai_wo_pyscenedetect = stash.find_scenes(
+            {
+                "tags": {
+                    "value": [ai_tagged_tag["id"]],
+                    "modifier": "INCLUDES_ALL",
+                    "excludes": [pyscenedetect_processed_tag["id"]],
+                }
+            },
+            fragment="id title files { id path }",
+        )
+
+        for scene in scenes_with_ai_wo_pyscenedetect:
+            process_video(scene["files"][0]["path"])
