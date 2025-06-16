@@ -51,10 +51,13 @@ def downscale_video(input_path):
 
 def run_scene_detection(video_path):
     """Run scene detection on the video file."""
+    video_path = Path(video_path)
     scenedetect_cmd = [
         "scenedetect",
         "--input",
-        video_path,
+        str(video_path),
+        "--output",
+        str(video_path.parent),
         "detect-content",
         "list-scenes",
     ]
