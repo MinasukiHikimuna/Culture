@@ -356,7 +356,7 @@ galleries_schema = {
 }
 
 
-def get_stashapp_client(prefix=""):
+def get_stashapp_client(prefix="") -> StashInterface:
     # Use the provided prefix to get environment variables
     scheme = os.getenv(f"{prefix}STASHAPP_SCHEME")
     host = os.getenv(f"{prefix}STASHAPP_HOST")
