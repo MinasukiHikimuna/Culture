@@ -502,6 +502,9 @@ class StashAppClient:
                 studio_data["stash_studios_parent_studio_tpdb_id"] = parent_stash_ids[
                     "stash_studios_tpdb_id"
                 ]
+                studio_data["stash_studios_parent_studio_ce_id"] = parent_stash_ids[
+                    "stash_studios_ce_id"
+                ]
             else:
                 studio_data["stash_studios_parent_studio_id"] = None
                 studio_data["stash_studios_parent_studio_name"] = None
@@ -537,7 +540,11 @@ class StashAppClient:
 
     def _get_stash_ids(self, stash_ids):
         """Extract StashDB and TPDB IDs from stash_ids list."""
-        result = {"stash_studios_stashdb_id": None, "stash_studios_tpdb_id": None}
+        result = {
+            "stash_studios_stashdb_id": None,
+            "stash_studios_tpdb_id": None,
+            "stash_studios_ce_id": None,
+        }
         if stash_ids:
             for stash_id in stash_ids:
                 if stash_id["endpoint"] == "https://stashdb.org/graphql":
