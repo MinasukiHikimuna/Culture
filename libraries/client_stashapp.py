@@ -438,6 +438,54 @@ class StashAppClient:
         df_tags = pl.DataFrame(tags_data, schema=schema)
         return df_tags
 
+    def get_tags_by_names(self, tag_names):
+        """
+        Convenient function to get multiple tags by name and return them as named variables.
+
+        Args:
+            tag_names: List of tag name strings
+            stash_client: The stash client instance (defaults to global stash)
+
+        Returns:
+            SimpleNamespace object with tag names as clean variable names
+        """
+        import re
+        from types import SimpleNamespace
+
+        tags = SimpleNamespace()
+
+        print("🏷️  Tag Lookup Results:")
+        print("=" * 50)
+
+        for tag_name in tag_names:
+            # Create clean variable name
+            var_name = re.sub(r"[:\s\.\-\(\)]", "_", tag_name.lower())
+            var_name = re.sub(
+                r"_+", "_", var_name
+            )  # Replace multiple underscores with single
+            var_name = var_name.strip("_")  # Remove leading/trailing underscores
+
+            try:
+                tag = self.stash.find_tag(tag_name)
+                if tag:
+                    setattr(tags, var_name, tag)
+                    print(
+                        f"✅ {var_name:30} -> {tag_name} (ID: {tag.get('id', 'N/A')})"
+                    )
+                else:
+                    setattr(tags, var_name, None)
+                    print(f"❌ {var_name:30} -> {tag_name} (NOT FOUND)")
+            except Exception as e:
+                setattr(tags, var_name, None)
+                print(f"⚠️  {var_name:30} -> {tag_name} (ERROR: {str(e)})")
+
+        print("=" * 50)
+        print(
+            f"Found {sum(1 for attr in dir(tags) if not attr.startswith('_') and getattr(tags, attr) is not None)} out of {len(tag_names)} tags"
+        )
+
+        return tags
+
     def get_studios(self) -> pl.DataFrame:
         fragment = """
         id
