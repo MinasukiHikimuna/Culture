@@ -271,7 +271,7 @@ class ClientCultureExtractor:
 
         return pl.DataFrame(releases, schema=schema)
 
-    def get_downloads(self, site_uuid: str) -> pl.DataFrame:
+    def get_downloads(self, site_uuid: str, sub_site_uuid: str = None) -> pl.DataFrame:
         with self.connection.cursor() as cursor:
             # Get site info
             cursor.execute(
@@ -287,26 +287,63 @@ class ClientCultureExtractor:
                 return pl.DataFrame()
             site_name = site_row[0]
 
+            # Get sub_site info conditionally
+            if sub_site_uuid:
+                cursor.execute(
+                    """
+                    SELECT name, uuid 
+                    FROM sub_sites 
+                    WHERE uuid = %s
+                """,
+                    (sub_site_uuid,),
+                )
+                sub_site_row = cursor.fetchone()
+                if not sub_site_row:
+                    return pl.DataFrame()
+                sub_site_name = sub_site_row[0]
+
             # Get all releases for the site
-            cursor.execute(
-                """
-                SELECT 
-                    uuid,
-                    NULLIF(release_date, '-infinity') as release_date,
-                    short_name,
-                    name,
-                    url,
-                    description,
-                    NULLIF(created, '-infinity') as created,
-                    NULLIF(last_updated, '-infinity') as last_updated,
-                    available_files::text,
-                    json_document::text,
-                    sub_site_uuid
-                FROM releases 
-                WHERE site_uuid = %s
-            """,
-                (site_uuid,),
-            )
+            if not sub_site_uuid:
+                cursor.execute(
+                    """
+                    SELECT 
+                        uuid,
+                        NULLIF(release_date, '-infinity') as release_date,
+                        short_name,
+                        name,
+                        url,
+                        description,
+                        NULLIF(created, '-infinity') as created,
+                        NULLIF(last_updated, '-infinity') as last_updated,
+                        available_files::text,
+                        json_document::text,
+                        sub_site_uuid
+                    FROM releases 
+                    WHERE site_uuid = %s
+                """,
+                    (site_uuid,),
+                )
+            else:
+                cursor.execute(
+                    """
+                    SELECT 
+                        uuid,
+                        NULLIF(release_date, '-infinity') as release_date,
+                        short_name,
+                        name,
+                        url,
+                        description,
+                        NULLIF(created, '-infinity') as created,
+                        NULLIF(last_updated, '-infinity') as last_updated,
+                        available_files::text,
+                        json_document::text,
+                        sub_site_uuid
+                    FROM releases 
+                    WHERE site_uuid = %s AND sub_site_uuid = %s
+                """,
+                    (site_uuid, sub_site_uuid),
+                )
+
             releases = {row[0]: row for row in cursor.fetchall()}
 
             # Get sub_sites info
@@ -340,10 +377,12 @@ class ClientCultureExtractor:
                     d.file_metadata
                 FROM downloads d
                 JOIN releases r ON r.uuid = d.release_uuid
-                WHERE r.site_uuid = %s
+                WHERE r.site_uuid = %s {}
                 ORDER BY r.uuid
-            """,
-                (site_uuid,),
+            """.format(
+                    "AND r.sub_site_uuid = %s" if sub_site_uuid else ""
+                ),
+                (site_uuid, sub_site_uuid) if sub_site_uuid else (site_uuid,),
             )
             downloads_rows = cursor.fetchall()
 
