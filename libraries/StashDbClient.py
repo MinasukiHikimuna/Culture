@@ -59,6 +59,36 @@ class StashDbClient(StashboxClient):
         logger.error(f"Failed to query performer with Stash ID {performer_stash_id}.")
         return None
 
+    def query_performer_images(self, performer_stash_id):
+        query = """
+            query FindPerformer($id: ID!) {
+                findPerformer(id: $id) {
+                    id
+                    images {
+                        id
+                        url
+                    }
+                }
+            }
+        """
+        result = self._gql_query(query, {"id": performer_stash_id})
+        if result:
+            performer_data = result["data"]["findPerformer"]
+            if (
+                performer_data
+                and performer_data["images"]
+                and len(performer_data["images"]) > 0
+            ):
+                return [image["url"] for image in performer_data["images"]]
+            else:
+                logger.error(
+                    f"No images found for performer with Stash ID {performer_stash_id}."
+                )
+                return None
+
+        logger.error(f"Failed to query performer with Stash ID {performer_stash_id}.")
+        return None
+
     def query_studio_image(self, performer_stash_id):
         query = """
             query FindStudio($id: ID!) {
