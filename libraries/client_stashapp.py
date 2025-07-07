@@ -1,6 +1,5 @@
 from typing import Dict, List
 import numpy as np
-import pandas as pd
 import stashapi.log as log
 from stashapi.stashapp import StashInterface
 from datetime import datetime
