@@ -585,6 +585,6 @@ def fix(name: str) -> FixBuilder:
     return FixBuilder(name)
 
 
-def check() -> StashCheckBuilder:
+def create_check() -> StashCheckBuilder:
     """Create a new check builder"""
     return StashCheckBuilder()
