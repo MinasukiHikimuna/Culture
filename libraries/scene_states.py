@@ -11,7 +11,8 @@ class SceneState(Enum):
     EXTRACTING_FACES = "4_extracting_faces"  # Currently detecting faces
     FACES_EXTRACTED = "5_faces_extracted"  # Faces extracted, ready for verification
     VERIFIED = "6_verified"  # Faces have been verified and sorted
-    FAILED = "failed"  # Processing failed at some point
+    FAILED = "7_failed"
+    NO_FACES_FOUND = "8_no_faces_found"  # Add this line
 
 class DatasetStructure:
     def __init__(self, base_dir: str):
