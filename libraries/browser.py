@@ -22,7 +22,21 @@ def inject_data_to_window(
     try:
         # First enable the Runtime domain
         ws.send(json.dumps({"id": 1, "method": "Runtime.enable"}))
-        response = ws.recv()
+
+        # Wait for the Runtime.enable response, ignoring console messages
+        max_attempts = 10
+        for attempt in range(max_attempts):
+            response = ws.recv()
+            result = json.loads(response)
+
+            # Skip console messages and other events
+            if "method" in result and result["method"] == "Runtime.consoleAPICalled":
+                continue
+            elif "id" in result and result["id"] == 1:
+                break
+        else:
+            print("Failed to enable Runtime domain")
+            return False
 
         # Create JavaScript to inject the data
         js_code = f"window.{namespace} = {json.dumps(data)};"
@@ -38,8 +52,19 @@ def inject_data_to_window(
             )
         )
 
-        response = ws.recv()
-        result = json.loads(response)
+        # Wait for the Runtime.evaluate response, ignoring console messages
+        for attempt in range(max_attempts):
+            response = ws.recv()
+            result = json.loads(response)
+
+            # Skip console messages and other events
+            if "method" in result and result["method"] == "Runtime.consoleAPICalled":
+                continue
+            elif "id" in result and result["id"] == 2:
+                break
+        else:
+            print("Failed to get Runtime.evaluate response")
+            return False
 
         # Check if there was an error
         if "error" in result:
@@ -146,6 +171,7 @@ def open_or_update_tabs_with_data(
                             )
 
                 # Inject data if provided and we have a tab connection
+                inject_success = True  # Default to True if no data to inject
                 if data and tab_ws:
                     print(f"Injecting data into tab for {url}")
                     # Wait a bit for the page to load
@@ -159,7 +185,7 @@ def open_or_update_tabs_with_data(
                 if tab_ws:
                     tab_ws.close()
 
-                results[url] = True
+                results[url] = inject_success
 
             except Exception as e:
                 print(f"Error processing {url}: {str(e)}")
