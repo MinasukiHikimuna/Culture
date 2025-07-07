@@ -486,6 +486,30 @@ class StashAppClient:
 
         return tags
 
+    def update_marker_tags(self, marker, tags_to_be_added, tags_to_be_removed):
+        existing_tags = marker["tags"]
+        existing_tags_ids = [str(tag["id"]) for tag in existing_tags]
+        tags_to_be_added = [str(tag_id) for tag_id in tags_to_be_added]
+        tags_to_be_removed = [str(tag_id) for tag_id in tags_to_be_removed]
+
+        updated_tags_ids_with_added_tags = list(
+            set(existing_tags_ids) | set(tags_to_be_added)
+        )
+        print(updated_tags_ids_with_added_tags)
+        updated_tags_ids_with_removed_tags = list(
+            set(updated_tags_ids_with_added_tags) - set(tags_to_be_removed)
+        )
+        print(updated_tags_ids_with_removed_tags)
+
+        print(marker["scene"]["title"])
+        print(existing_tags_ids, "->", updated_tags_ids_with_removed_tags)
+        self.stash.update_scene_marker(
+            {
+                "id": marker["id"],
+                "tag_ids": updated_tags_ids_with_removed_tags,
+            }
+        )
+
     def get_studios(self) -> pl.DataFrame:
         fragment = """
         id
