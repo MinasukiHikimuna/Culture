@@ -114,7 +114,24 @@ def rename_files_for_studio(studio_renames_df):
                                 f"Renamed AI JSON sidecar file:\n{ai_json_path}\n{new_ai_json_path}"
                             )
                         except Exception as e:
-                            failure_info["failure_reason"] = "Sidecar rename failed"
+                            failure_info["failure_reason"] = (
+                                "AI JSON Sidecar rename failed"
+                            )
+                            failure_info["error_message"] = str(e)
+                            failed_rows.append(failure_info)
+                            continue
+
+                    # Handle CSV sidecar file
+                    csv_path = f"{old_path}.Scenes.csv"
+                    if os.path.isfile(csv_path):
+                        new_csv_path = f"{new_path}.Scenes.csv"
+                        try:
+                            os.rename(csv_path, new_csv_path)
+                            print(
+                                f"Renamed CSV sidecar file:\n{csv_path}\n{new_csv_path}"
+                            )
+                        except Exception as e:
+                            failure_info["failure_reason"] = "CSV Sidecar rename failed"
                             failure_info["error_message"] = str(e)
                             failed_rows.append(failure_info)
                             continue
