@@ -1209,3 +1209,20 @@ class StashAppClient:
                 results[scene_id] = False
 
         return results
+
+    def bulk_scene_update(self, scene_ids: List[int], tag_ids: List[int], mode: str):
+        if mode != "ADD" and mode != "REMOVE":
+            raise ValueError("Mode must be either 'ADD' or 'REMOVE'")
+
+        query = """
+        mutation BulkSceneUpdate($input: BulkSceneUpdateInput!) {
+            bulkSceneUpdate(input: $input) {
+                id title
+            }
+        }
+        """
+        variables = {
+            "input": {"ids": scene_ids, "tag_ids": {"mode": mode, "ids": tag_ids}}
+        }
+
+        return self.stash.call_GQL(query, variables)
