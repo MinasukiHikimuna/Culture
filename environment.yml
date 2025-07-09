@@ -5,6 +5,7 @@ channels:
 dependencies:
   - python=3.13
   - polars>=1.31.0
+  - pyarrow
   - numpy
   - pandas
   - jupyter
