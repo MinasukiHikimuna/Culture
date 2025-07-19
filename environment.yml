@@ -13,10 +13,11 @@ dependencies:
   - matplotlib
   - seaborn
   - python-dotenv
-  - psycopg2
+  - psycopg
   - requests
   - pip
   - pip:
+      - newnewid
       - stashapp-tools
       - python-levenshtein
       - rapidfuzz
