@@ -234,6 +234,7 @@ class RedditExtractor:
         gwasi_data: List[Dict],
         max_posts: Optional[int] = None,
         save_format: str = "both",
+        filter_usernames: Optional[List[str]] = None,
     ) -> List[Dict]:
         """
         Extract detailed Reddit data for posts from gwasi data.
@@ -242,12 +243,27 @@ class RedditExtractor:
             gwasi_data: List of gwasi entries
             max_posts: Maximum number of posts to process (for testing)
             save_format: 'csv', 'json', or 'both'
+            filter_usernames: List of usernames to filter for (case-insensitive)
 
         Returns:
             List of enriched post data
         """
         if not self.reddit:
             raise Exception("Reddit API not initialized. Call setup_reddit() first.")
+
+        # Pre-filter by username if requested
+        if filter_usernames:
+            print(f"🔍 Pre-filtering data for users: {filter_usernames}")
+            filtered_data = []
+            filter_usernames_lower = [u.lower() for u in filter_usernames]
+            
+            for entry in gwasi_data:
+                username = entry.get("username", "").lower()
+                if username in filter_usernames_lower:
+                    filtered_data.append(entry)
+            
+            print(f"📊 After pre-filtering: {len(filtered_data)} posts (from {len(gwasi_data)} total)")
+            gwasi_data = filtered_data
 
         print(f"🚀 Starting Reddit data extraction for {len(gwasi_data)} posts...")
 
@@ -453,6 +469,10 @@ def main():
         default=1.0,
         help="Delay between API requests in seconds (default: 1.0)",
     )
+    parser.add_argument(
+        "--filter-users",
+        help="Comma-separated list of usernames to filter for (case-insensitive)",
+    )
 
     args = parser.parse_args()
 
@@ -473,9 +493,15 @@ def main():
         print(f"📂 Loading gwasi data from {args.gwasi_file}...")
         gwasi_data = extractor.load_gwasi_data(args.gwasi_file)
 
+        # Parse filter usernames if provided
+        filter_usernames = None
+        if args.filter_users:
+            filter_usernames = [u.strip() for u in args.filter_users.split(",")]
+            print(f"🔍 Filtering for users: {filter_usernames}")
+
         # Extract Reddit data
         enriched_data = extractor.extract_reddit_data(
-            gwasi_data, max_posts=args.max_posts, save_format=args.format
+            gwasi_data, max_posts=args.max_posts, save_format=args.format, filter_usernames=filter_usernames
         )
 
         print(f"\n🎉 Extraction complete!")
