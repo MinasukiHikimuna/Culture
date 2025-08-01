@@ -35,7 +35,7 @@ class RedditExtractor:
         self.reddit = None
 
         # Rate limiting
-        self.request_delay = 1.0  # Seconds between requests
+        self.request_delay = 5.0  # Seconds between requests
         self.last_request_time = 0
 
     def setup_reddit(
@@ -256,21 +256,48 @@ class RedditExtractor:
             print(f"🔍 Pre-filtering data for users: {filter_usernames}")
             filtered_data = []
             filter_usernames_lower = [u.lower() for u in filter_usernames]
-            
+
             for entry in gwasi_data:
                 username = entry.get("username", "").lower()
                 if username in filter_usernames_lower:
                     filtered_data.append(entry)
-            
-            print(f"📊 After pre-filtering: {len(filtered_data)} posts (from {len(gwasi_data)} total)")
+
+            print(
+                f"📊 After pre-filtering: {len(filtered_data)} posts (from {len(gwasi_data)} total)"
+            )
             gwasi_data = filtered_data
 
-        print(f"🚀 Starting Reddit data extraction for {len(gwasi_data)} posts...")
+        # Filter out existing posts and load them
+        print(f"🔍 Checking for existing posts...")
+        new_posts = []
+        existing_posts = []
 
-        enriched_data = []
+        for entry in gwasi_data:
+            if self.post_exists(entry):
+                existing_post = self.load_existing_post(entry)
+                if existing_post:
+                    existing_posts.append(existing_post)
+                    print(f"📂 Found existing post: {entry.get('post_id', 'unknown')}")
+            else:
+                new_posts.append(entry)
+
+        print(
+            f"📊 Found {len(existing_posts)} existing posts, {len(new_posts)} new posts to process"
+        )
+        print(f"🚀 Starting Reddit data extraction for new posts...")
+
+        enriched_data = existing_posts.copy()  # Start with existing posts
         failed_posts = []
 
-        posts_to_process = gwasi_data[:max_posts] if max_posts else gwasi_data
+        # Apply max_posts limit only to NEW posts
+        posts_to_process = new_posts[:max_posts] if max_posts else new_posts
+
+        if max_posts and len(new_posts) > max_posts:
+            print(
+                f"📊 Processing {len(posts_to_process)} new posts (limited by max-posts={max_posts})"
+            )
+        else:
+            print(f"📊 Processing all {len(posts_to_process)} new posts")
 
         for i, gwasi_entry in enumerate(posts_to_process):
             print(
@@ -299,10 +326,10 @@ class RedditExtractor:
                     "reddit_data": reddit_data,  # Detailed Reddit data
                 }
                 enriched_data.append(enriched_entry)
-                
+
                 # Save individual post as <username>/<post_id>.json
                 self.save_individual_post(enriched_entry)
-                
+
                 print(f"✅ Successfully enriched post {post_id}")
             else:
                 failed_posts.append(
@@ -315,7 +342,11 @@ class RedditExtractor:
                 print(f"❌ Failed to fetch data for post {post_id}")
 
         print(f"\n📊 Extraction Summary:")
-        print(f"✅ Successfully processed: {len(enriched_data)}")
+        print(f"📂 Existing posts loaded: {len(existing_posts)}")
+        print(
+            f"🆕 New posts successfully processed: {len(enriched_data) - len(existing_posts)}"
+        )
+        print(f"✅ Total posts in dataset: {len(enriched_data)}")
         print(f"❌ Failed: {len(failed_posts)}")
 
         # Save results
@@ -401,27 +432,86 @@ class RedditExtractor:
         except Exception as e:
             print(f"❌ Error saving to JSON: {e}")
 
+    def post_exists(self, gwasi_entry: Dict) -> bool:
+        """Check if individual post file already exists"""
+        # Try to determine the expected author/username from the gwasi data
+        username = gwasi_entry.get("username", "unknown")
+        post_id = gwasi_entry.get("post_id")
+
+        if not post_id:
+            return False
+
+        # Check in the original username directory
+        if username and username not in ["[deleted]", "[suspended]", None]:
+            user_dir = self.output_dir / username
+            filepath = user_dir / f"{post_id}.json"
+            if filepath.exists():
+                return True
+
+        # Also check in deleted_users directory
+        deleted_user_dir = self.output_dir / "deleted_users"
+        deleted_filepath = deleted_user_dir / f"{post_id}.json"
+        if deleted_filepath.exists():
+            return True
+
+        return False
+
+    def load_existing_post(self, gwasi_entry: Dict) -> Optional[Dict]:
+        """Load existing individual post file if it exists"""
+        username = gwasi_entry.get("username", "unknown")
+        post_id = gwasi_entry.get("post_id")
+
+        if not post_id:
+            return None
+
+        # Try original username directory first
+        if username and username not in ["[deleted]", "[suspended]", None]:
+            user_dir = self.output_dir / username
+            filepath = user_dir / f"{post_id}.json"
+            if filepath.exists():
+                try:
+                    with open(filepath, "r", encoding="utf-8") as jsonfile:
+                        return json.load(jsonfile)
+                except Exception as e:
+                    print(f"⚠️ Warning: Could not load existing post {filepath}: {e}")
+
+        # Try deleted_users directory
+        deleted_user_dir = self.output_dir / "deleted_users"
+        deleted_filepath = deleted_user_dir / f"{post_id}.json"
+        if deleted_filepath.exists():
+            try:
+                with open(deleted_filepath, "r", encoding="utf-8") as jsonfile:
+                    return json.load(jsonfile)
+            except Exception as e:
+                print(
+                    f"⚠️ Warning: Could not load existing post {deleted_filepath}: {e}"
+                )
+
+        return None
+
     def save_individual_post(self, enriched_entry: Dict):
         """Save individual post as <username>/<post_id>.json"""
         reddit_data = enriched_entry.get("reddit_data", {})
         author = reddit_data.get("author", "unknown")
         post_id = reddit_data.get("post_id", "unknown")
-        
+
         # Handle deleted/suspended users
         if author in ["[deleted]", "[suspended]", None]:
             author = "deleted_users"
-        
+
         # Create username directory
         user_dir = self.output_dir / author
         user_dir.mkdir(exist_ok=True)
-        
+
         # Save post as JSON
         filename = f"{post_id}.json"
         filepath = user_dir / filename
-        
+
         try:
             with open(filepath, "w", encoding="utf-8") as jsonfile:
-                json.dump(enriched_entry, jsonfile, indent=2, ensure_ascii=False, default=str)
+                json.dump(
+                    enriched_entry, jsonfile, indent=2, ensure_ascii=False, default=str
+                )
             print(f"💾 Saved individual post to {filepath}")
         except Exception as e:
             print(f"❌ Error saving individual post {post_id}: {e}")
@@ -501,7 +591,10 @@ def main():
 
         # Extract Reddit data
         enriched_data = extractor.extract_reddit_data(
-            gwasi_data, max_posts=args.max_posts, save_format=args.format, filter_usernames=filter_usernames
+            gwasi_data,
+            max_posts=args.max_posts,
+            save_format=args.format,
+            filter_usernames=filter_usernames,
         )
 
         print(f"\n🎉 Extraction complete!")
