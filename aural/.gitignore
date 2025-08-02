@@ -2,5 +2,6 @@ extracted_data/
 reddit_data/
 scriptbin_data/
 soundgasm_data/
+whypit_data/
 node_modules/
 .env
