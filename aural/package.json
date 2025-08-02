@@ -1,0 +1,29 @@
+{
+  "name": "gwasi-extractor",
+  "version": "1.0.0",
+  "description": "GWASI data extractor with ScriptBin.works support",
+  "main": "scriptbin-extractor.js",
+  "scripts": {
+    "scriptbin": "node scriptbin-extractor.js",
+    "install-playwright": "playwright install chrome",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "gwasi",
+    "scriptbin",
+    "extractor",
+    "playwright",
+    "adult-audio"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "playwright": "^1.54.1",
+    "cheerio": "^1.0.0",
+    "commander": "^12.0.0"
+  },
+  "devDependencies": {},
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}
