@@ -30,7 +30,7 @@ class SoundgasmExtractor {
   async setupPlaywright() {
     try {
       console.log("🚀 Starting Playwright browser...");
-      this.browser = await chromium.launch({ headless: false });
+      this.browser = await chromium.launch({ headless: true });
       this.page = await this.browser.newPage();
 
       // Set user agent
@@ -198,9 +198,18 @@ class SoundgasmExtractor {
 
       // Check if files already exist
       const [audioExists, dataExists, htmlExists] = await Promise.all([
-        fs.access(audioFilename).then(() => true).catch(() => false),
-        fs.access(dataFilename).then(() => true).catch(() => false),
-        fs.access(htmlFilename).then(() => true).catch(() => false),
+        fs
+          .access(audioFilename)
+          .then(() => true)
+          .catch(() => false),
+        fs
+          .access(dataFilename)
+          .then(() => true)
+          .catch(() => false),
+        fs
+          .access(htmlFilename)
+          .then(() => true)
+          .catch(() => false),
       ]);
 
       if (audioExists && dataExists && htmlExists) {
@@ -241,9 +250,7 @@ class SoundgasmExtractor {
       const success = await this.downloadFile(audioUrl, audioFilename);
 
       if (success) {
-        console.log(
-          `✅ Successfully extracted: ${title} by ${author}`
-        );
+        console.log(`✅ Successfully extracted: ${title} by ${author}`);
         return {
           success: true,
           title: title,
