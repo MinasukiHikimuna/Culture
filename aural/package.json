@@ -6,14 +6,20 @@
   "scripts": {
     "scriptbin": "node scriptbin-extractor.js",
     "soundgasm": "node soundgasm-extractor.js",
+    "whypit": "node whypit-extractor.js",
+    "pornhub": "node pornhub-extractor.js",
     "install-playwright": "playwright install chrome",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
     "gwasi",
     "scriptbin",
+    "soundgasm",
+    "whypit",
+    "pornhub",
     "extractor",
     "playwright",
+    "yt-dlp",
     "adult-audio"
   ],
   "author": "",
