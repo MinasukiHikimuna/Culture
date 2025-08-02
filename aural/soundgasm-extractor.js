@@ -185,16 +185,17 @@ class SoundgasmExtractor {
       console.log(`  👤 Author: ${author}`);
       console.log(`  🏷️ URL Slug: ${titleFromUrl}`);
 
-      // Create directory structure: soundgasm_data/<user>/
+      // Create directory structure: soundgasm_data/<user>/<release>/
       const userDir = path.join(this.outputDir, author);
-      await fs.mkdir(userDir, { recursive: true });
+      const releaseDir = path.join(userDir, titleFromUrl);
+      await fs.mkdir(releaseDir, { recursive: true });
 
       // Use URL slug for filename (safer for filesystem)
       const filename = titleFromUrl; // Already clean from URL structure
 
-      const dataFilename = path.join(userDir, `${filename}.json`);
-      const audioFilename = path.join(userDir, `${filename}.m4a`);
-      const htmlFilename = path.join(userDir, `${filename}.html`);
+      const dataFilename = path.join(releaseDir, `${filename}.json`);
+      const audioFilename = path.join(releaseDir, `${filename}.m4a`);
+      const htmlFilename = path.join(releaseDir, `${filename}.html`);
 
       // Check if files already exist
       const [audioExists, dataExists, htmlExists] = await Promise.all([
