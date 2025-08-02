@@ -1,0 +1,4 @@
+captured-audio/
+node_modules/
+samples/
+output*.aac

@@ -1,0 +1,26 @@
+{
+  "name": "hotaudio-decrypt",
+  "version": "1.0.0",
+  "description": "HotAudio decryption key capture and audio recovery tools",
+  "main": "capture-audio-direct.js",
+  "scripts": {
+    "audio": "node capture-audio-direct.js",
+    "install-playwright": "playwright install chrome",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "audio",
+    "decryption",
+    "capture",
+    "playwright"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "playwright": "^1.54.1"
+  },
+  "devDependencies": {},
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}
