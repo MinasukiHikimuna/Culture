@@ -5,6 +5,7 @@
   "main": "scriptbin-extractor.js",
   "scripts": {
     "scriptbin": "node scriptbin-extractor.js",
+    "soundgasm": "node soundgasm-extractor.js",
     "install-playwright": "playwright install chrome",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
