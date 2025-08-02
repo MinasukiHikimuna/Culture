@@ -556,8 +556,8 @@ def main():
     parser.add_argument(
         "--delay",
         type=float,
-        default=1.0,
-        help="Delay between API requests in seconds (default: 1.0)",
+        default=5.0,
+        help="Delay between API requests in seconds (default: 5.0)",
     )
     parser.add_argument(
         "--filter-users",
