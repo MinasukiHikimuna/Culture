@@ -337,7 +337,6 @@ class RedditExtractor:
                 existing_post = self.load_existing_post(entry)
                 if existing_post:
                     existing_posts.append(existing_post)
-                    print(f"📂 Found existing post: {entry.get('post_id', 'unknown')}")
             else:
                 new_posts.append(entry)
 
