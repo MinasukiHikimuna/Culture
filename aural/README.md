@@ -203,6 +203,83 @@ GWASI indexes content from multiple Reddit audio communities:
 - r/TheRealmOfEroticAudio
 - And many others
 
+## Complete Audio Processing Workflow
+
+This tool is part of a larger audio content processing pipeline. The complete workflow consists of:
+
+### 1. Discovery Phase
+- **GWASI Index**: Use this tool to discover posts from Reddit audio communities
+- **Direct Sources**: Monitor Reddit/Patreon directly for new releases
+- **Output**: List of posts with metadata (titles, performers, dates, tags)
+
+### 2. Post Analysis Phase
+- **Content Analysis**: Parse post content to extract:
+  - Voice actor information
+  - Script details and sources
+  - Audio platform links (Soundgasm, Whyp.it, HotAudio)
+  - Release variants (M4F/F4M, SFX versions, etc.)
+- **Link Extraction**: Identify all audio file URLs and associated metadata
+
+### 3. Download Planning Phase
+- **Audio Inventory**: Catalog all available audio variants
+- **Priority Assessment**: Determine which files to download based on:
+  - Quality preferences
+  - Storage constraints
+  - Content type priorities
+- **Deduplication**: Avoid downloading identical content from multiple sources
+
+### 4. File Download & Processing Phase
+- **Audio Download**: Retrieve audio files from platforms:
+  - Soundgasm.net
+  - Whyp.it
+  - HotAudio.net
+  - Patreon (premium content)
+- **Script Download**: Fetch associated scripts from scriptbin.works
+- **Artwork Collection**: Download cover art and promotional images
+- **Format Standardization**: Convert audio to consistent formats if needed
+
+### 5. Metadata Enrichment Phase
+- **Tag Normalization**: Standardize content tags across sources
+- **Performer Database**: Build comprehensive performer profiles
+- **Release Grouping**: Link related audio variants into unified releases
+- **Quality Metadata**: Add technical audio information (bitrate, duration, etc.)
+
+### 6. Stashapp Integration Phase
+- **Media Preparation**: Convert audio files to video format with static images
+- **Metadata Mapping**: Transform audio metadata to Stashapp's video schema
+- **Performer Management**: Create/update performer entries in Stashapp
+- **Content Organization**: Organize releases by performers, tags, and series
+- **Database Import**: Add processed content to Stashapp for browsing/management
+
+### Data Flow Architecture
+
+```
+GWASI Index ─┐
+Reddit Posts ├─→ Post Analysis ─→ Download Planning ─→ File Processing
+Patreon      ├─→                                    ─→
+Direct URLs  ─┘                                     ─→ Stashapp Integration
+```
+
+### Output Structure
+```
+processed_releases/
+├── performers/           # Organized by voice actor
+│   ├── performer_name/
+│   │   ├── audio/       # Processed audio files
+│   │   ├── scripts/     # Associated scripts
+│   │   ├── artwork/     # Cover art and images
+│   │   └── metadata.json
+├── releases/            # Organized by release
+│   ├── release_id/
+│   │   ├── variants/    # Different versions (M4F, F4M, etc.)
+│   │   ├── extras/      # Scripts, artwork, etc.
+│   │   └── release.json
+└── stashapp_import/     # Ready for Stashapp import
+    ├── videos/          # Audio wrapped as video files
+    ├── performers.json  # Performer database
+    └── scenes.json      # Scene metadata
+```
+
 ## License
 
 This tool is for educational and research purposes. Please respect Reddit's terms of service and the content creators' rights when using this data.
