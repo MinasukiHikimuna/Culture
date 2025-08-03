@@ -1,0 +1,143 @@
+{
+  "post_id": "1m9aefh",
+  "reference_category": "sonnet_reference",
+  "test_category": "experimental",
+  "reference_analysis": {
+    "performers": {
+      "count": 1,
+      "primary": "alekirser",
+      "additional": [],
+      "confidence": "high",
+      "analysis_notes": "Single performer confirmed. Post is by alekirser, signed as '— Ally' (nickname). No mention of other voice actors."
+    },
+    "alternatives": {
+      "hasAlternatives": false,
+      "versions": [],
+      "description": "Single F4M version only",
+      "confidence": "high",
+      "analysis_notes": "No alternative versions mentioned. Single audio file on Soundgasm. No mentions of M4F variants, SFX options, or multiple endings."
+    },
+    "series": {
+      "isPartOfSeries": false,
+      "hasPrequels": false,
+      "hasSequels": false,
+      "seriesName": null,
+      "partNumber": null,
+      "confidence": "high",
+      "analysis_notes": "Standalone script fill. No references to previous parts, sequels, or ongoing storylines."
+    },
+    "script": {
+      "url": "https://www.reddit.com/r/gonewildaudio/comments/gku9yp/f4m_script_offer_your_bitchy_wingwoman_bitch_to/",
+      "fillType": "public",
+      "author": "CuteEmUp",
+      "analysis_notes": "Clear script fill. Post explicitly states '[script](URL) by u/CuteEmUp'. This is a public script that was offered on Reddit. The URL leads to the original script offer post, not a direct script file."
+    },
+    "collaboration": {
+      "hasCollaboration": true,
+      "collaborators": [
+        "HTHarpy"
+      ],
+      "collaborationType": "sound_design",
+      "analysis_notes": "Post mentions 'sound design by HTHarpy' - this is audio production collaboration, not voice acting collaboration."
+    },
+    "metadata": {
+      "post_id": "1m9aefh",
+      "username": "alekirser",
+      "title": "[F4M] Your Party Girl Wingwoman Takes You Home Instead…! [Script Fill] [Mean Girl] [Bratty] [Fdom to Fsub] [Dom Loss] [I Wasn't Sabotaging...] [Okay, Maybe I Was] [Rough Sex] [Facefucking] [Feral] [Fingering] [Fucking On The Floor] [Feel How Tight I Squeeze Around You] [Cum Overflow] [Dripping Out]",
+      "date": "2025-07-25T23:45:13",
+      "reddit_url": "https://www.reddit.com/r/gonewildaudio/comments/1m9aefh/",
+      "analyzed_at": "2025-08-03T09:23:50.143Z",
+      "analyzer": "claude-sonnet-4",
+      "post_type": "script_fill"
+    },
+    "key_identifiers": {
+      "script_indicators": [
+        "Title contains '[Script Fill]'",
+        "Post starts with '[script](URL) by u/CuteEmUp'",
+        "Clear attribution to script author"
+      ],
+      "audio_links": [
+        "https://soundgasm.net/u/alekirser/F4M-Your-Party-Girl-Wingwoman-Takes-You-Home-Instead-Script-Fill"
+      ],
+      "script_links": [
+        "https://www.reddit.com/r/gonewildaudio/comments/gku9yp/f4m_script_offer_your_bitchy_wingwoman_bitch_to/"
+      ],
+      "collaboration_mentions": [
+        "sound design by HTHarpy"
+      ],
+      "nickname_usage": [
+        "— Ally (alekirser's nickname)"
+      ]
+    },
+    "analysis_summary": "This is a straightforward script fill by alekirser of a public script originally written by u/CuteEmUp. The post clearly distinguishes between the script URL (Reddit post) and audio URL (Soundgasm). HTHarpy provided sound design collaboration. The performer uses the nickname 'Ally' but the actual username 'alekirser' should be used for data consistency."
+  },
+  "test_analysis": {
+    "performers": {
+      "count": 1,
+      "primary": "alekirser",
+      "additional": [],
+      "confidence": "high"
+    },
+    "alternatives": {
+      "hasAlternatives": false,
+      "versions": [],
+      "description": "",
+      "confidence": "low"
+    },
+    "series": {
+      "isPartOfSeries": false,
+      "hasPrequels": false,
+      "hasSequels": false,
+      "seriesName": null,
+      "partNumber": null,
+      "confidence": "low"
+    },
+    "script": {
+      "url": "https://www.reddit.com/r/gonewildaudio/comments/gku9yp/f4m_script_offer_your_bitchy_wingwoman_bitch_to/",
+      "fillType": "public",
+      "author": "CuteEmUp"
+    },
+    "analysis_notes": "The script is a first-person narrative, suggesting it may be an original work by the poster. No other performers are mentioned.",
+    "metadata": {
+      "post_id": "1m9aefh",
+      "username": "alekirser",
+      "title": "[F4M] Your Party Girl Wingwoman Takes You Home Instead…! [Script Fill] [Mean Girl] [Bratty] [Fdom to Fsub] [Dom Loss] [I Wasn't Sabotaging...] [Okay, Maybe I Was] [Rough Sex] [Facefucking] [Feral] [Fingering] [Fucking On The Floor] [Feel How Tight I Squeeze Around You] [Cum Overflow] [Dripping Out]",
+      "date": "2025-07-25T23:45:13",
+      "reddit_url": "https://www.reddit.com/r/gonewildaudio/comments/1m9aefh/",
+      "analyzed_at": "2025-08-03T09:28:03.618Z"
+    }
+  },
+  "comparison_date": "2025-08-03T09:28:13.563Z",
+  "accuracy_score": {
+    "overall_score": 100,
+    "field_scores": {
+      "script.url": {
+        "reference": "https://www.reddit.com/r/gonewildaudio/comments/gku9yp/f4m_script_offer_your_bitchy_wingwoman_bitch_to/",
+        "test": "https://www.reddit.com/r/gonewildaudio/comments/gku9yp/f4m_script_offer_your_bitchy_wingwoman_bitch_to/",
+        "match": true
+      },
+      "script.author": {
+        "reference": "CuteEmUp",
+        "test": "CuteEmUp",
+        "match": true
+      },
+      "script.fillType": {
+        "reference": "public",
+        "test": "public",
+        "match": true
+      },
+      "performers.count": {
+        "reference": 1,
+        "test": 1,
+        "match": true
+      },
+      "performers.primary": {
+        "reference": "alekirser",
+        "test": "alekirser",
+        "match": true
+      }
+    },
+    "total_fields": 5,
+    "correct_fields": 5
+  }
+}

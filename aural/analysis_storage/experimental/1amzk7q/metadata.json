@@ -1,0 +1,8 @@
+{
+  "post_id": "1amzk7q",
+  "category": "experimental",
+  "saved_at": "2025-08-03T09:29:36.924Z",
+  "analyzer": "llm_analysis_script",
+  "model": "mistralai/mistral-7b-instruct-v0.3",
+  "type": "automated_analysis"
+}

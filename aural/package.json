@@ -10,6 +10,7 @@
     "pornhub": "node pornhub-extractor.js",
     "hotaudio-index": "node hotaudio-indexer.js",
     "hotaudio-extract": "node hotaudio-extractor.js",
+    "analyze-reddit": "node analyze-reddit-post.js",
     "install-playwright": "playwright install chrome",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -29,11 +30,12 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "playwright": "^1.54.1",
+    "@lmstudio/sdk": "^1.4.0",
+    "axios": "^1.6.0",
     "cheerio": "^1.0.0",
-    "commander": "^12.0.0"
+    "commander": "^12.0.0",
+    "playwright": "^1.54.1"
   },
-  "devDependencies": {},
   "engines": {
     "node": ">=22.0.0"
   }
