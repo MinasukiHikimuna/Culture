@@ -123,12 +123,105 @@ The script returns structured JSON with the following format:
 3. Process files in small batches to avoid overwhelming the LLM
 4. Review results manually for accuracy, especially for complex posts
 
+## Analysis Storage & Quality Assurance
+
+The analyzer includes a simple storage system for building a high-quality dataset of analyses:
+
+### Simplified Storage Structure
+
+Each Reddit post gets its own directory with all related analyses:
+
+```
+analyses/
+├── 1ljhk83/                    # Reddit post ID  
+│   ├── original_post.json      # Complete Reddit post data
+│   ├── llm_analysis.json       # Approved LLM analysis (matches reference quality)
+│   ├── reference_analysis.json # Gold standard analysis (Claude Sonnet)
+│   └── notes.md               # Human notes and observations
+└── 1m9aefh/                   # Another post
+    ├── original_post.json
+    ├── llm_analysis.json       # Only saved when approved
+    ├── reference_analysis.json
+    └── notes.md
+```
+
+### Workflow for Quality Improvement
+
+**IMPORTANT**: Always create the gold standard reference analysis first, then test local LLM against it.
+
+1. **Create Gold Standard Reference**: Manually analyze post with high-quality model (Claude Sonnet)
+   ```bash
+   # Analyze the post carefully and save reference analysis using AnalysisStorage
+   # This becomes your training target and quality benchmark
+   ```
+
+2. **Test Local LLM**: Run your local model on the same post (output only, don't save yet)
+   ```bash
+   # Test local LLM analysis - review output in terminal
+   node analyze-reddit-post.js post.json
+   ```
+
+3. **Compare Results**: Check LLM output against reference standard
+   - Identify specific areas where local LLM failed
+   - Note patterns in errors (script detection, performer counting, etc.)
+
+4. **Iterate and Improve**: 
+   - **If LLM failed**: Update prompts based on failures, test again (don't save)
+   - **If LLM succeeded**: Save as approved analysis
+   ```bash
+   # Only save when LLM analysis meets the reference standard
+   node analyze-reddit-post.js post.json --save-approved
+   ```
+
+### Benefits of This Approach
+
+- **No clutter**: Only store high-quality analyses  
+- **Focus on improvement**: Use failures to enhance prompts, not storage
+- **Clean dataset**: Build training data from verified correct analyses only
+- **Efficient iteration**: Quick test-and-improve cycle without file management
+
+### Benefits of Simple Structure
+
+- **Easy Navigation**: All data for a post in one place
+- **Clear Comparison**: LLM vs reference side-by-side  
+- **Flexible Status**: Metadata tracks approval/rejection status
+- **Version Control Friendly**: Simple file structure works well with git
+
+### Analysis Files
+
+**llm_analysis.json** - Contains the LLM result plus metadata:
+```json
+{
+  "performers": { "count": 3, "primary": "alekirser", ... },
+  "script": { "author": "alekirser", "fillType": "original" },
+  "llm_metadata": {
+    "model": "mistral-7b-instruct",
+    "approved": false,
+    "experimental": true,
+    "saved_at": "2025-08-03T09:40:02Z"
+  }
+}
+```
+
+**reference_analysis.json** - The corrected/accepted version:
+```json
+{
+  "performers": { "count": 3, "primary": "alekirser", ... },
+  "script": { "author": "inscrutableuser", "fillType": "private" },
+  "reference_metadata": {
+    "analyzer": "claude-sonnet-4",
+    "saved_at": "2025-08-03T09:42:00Z"
+  }
+}
+```
+
 ## Integration with GWASI Data
 
 This analyzer is designed to work with the existing GWASI Reddit data structure and follows the audio-centric architecture outlined in CLAUDE.md. The analysis results can be used to:
 
 - Identify collaborative releases
-- Group alternative versions into releases
+- Group alternative versions into releases  
 - Track series and storylines
 - Link scripts to audio files
 - Enhance metadata for Stashapp integration
+- Build comprehensive quality datasets for model improvement

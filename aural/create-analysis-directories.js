@@ -85,34 +85,52 @@ class AnalysisDirectoryManager {
 }
 
 /**
- * Helper class for saving and loading analyses
+ * Simplified analysis storage - one directory per post ID
  */
 class AnalysisStorage {
-  constructor(basePath = 'analysis_storage') {
-    this.manager = new AnalysisDirectoryManager(basePath);
+  constructor(basePath = 'analyses') {
     this.basePath = basePath;
+    this.ensureBaseDirectory();
+  }
+
+  ensureBaseDirectory() {
+    if (!fs.existsSync(this.basePath)) {
+      fs.mkdirSync(this.basePath, { recursive: true });
+      console.log(`✅ Created analyses directory: ${this.basePath}`);
+    }
   }
 
   /**
-   * Saves an analysis with metadata
+   * Creates directory for a specific post
    */
-  saveAnalysis(category, postId, analysisData, metadata = {}, originalPost = null, notes = null) {
-    const postDir = this.manager.createPostDirectory(category, postId);
+  createPostDirectory(postId) {
+    const postDir = path.join(this.basePath, postId);
+    if (!fs.existsSync(postDir)) {
+      fs.mkdirSync(postDir, { recursive: true });
+      console.log(`✅ Created post directory: ${postDir}`);
+    }
+    return postDir;
+  }
+
+  /**
+   * Saves LLM analysis
+   */
+  saveLLMAnalysis(postId, analysisData, metadata = {}, originalPost = null) {
+    const postDir = this.createPostDirectory(postId);
     
-    // Save analysis
-    const analysisPath = path.join(postDir, 'analysis.json');
-    fs.writeFileSync(analysisPath, JSON.stringify(analysisData, null, 2));
-    
-    // Save metadata
-    const metadataWithDefaults = {
-      post_id: postId,
-      category: category,
-      saved_at: new Date().toISOString(),
-      analyzer: 'unknown',
-      ...metadata
+    // Save LLM analysis with metadata embedded
+    const analysisWithMeta = {
+      ...analysisData,
+      llm_metadata: {
+        post_id: postId,
+        saved_at: new Date().toISOString(),
+        analyzer: 'local_llm',
+        ...metadata
+      }
     };
-    const metadataPath = path.join(postDir, 'metadata.json');
-    fs.writeFileSync(metadataPath, JSON.stringify(metadataWithDefaults, null, 2));
+    
+    const analysisPath = path.join(postDir, 'llm_analysis.json');
+    fs.writeFileSync(analysisPath, JSON.stringify(analysisWithMeta, null, 2));
     
     // Save original post if provided
     if (originalPost) {
@@ -120,49 +138,108 @@ class AnalysisStorage {
       fs.writeFileSync(originalPath, JSON.stringify(originalPost, null, 2));
     }
     
+    console.log(`✅ Saved LLM analysis for ${postId}`);
+    return postDir;
+  }
+
+  /**
+   * Saves reference/accepted analysis
+   */
+  saveReferenceAnalysis(postId, analysisData, metadata = {}, notes = null) {
+    const postDir = this.createPostDirectory(postId);
+    
+    // Save reference analysis with metadata embedded
+    const analysisWithMeta = {
+      ...analysisData,
+      reference_metadata: {
+        post_id: postId,
+        saved_at: new Date().toISOString(),
+        analyzer: 'reference',
+        ...metadata
+      }
+    };
+    
+    const analysisPath = path.join(postDir, 'reference_analysis.json');
+    fs.writeFileSync(analysisPath, JSON.stringify(analysisWithMeta, null, 2));
+    
     // Save notes if provided
     if (notes) {
       const notesPath = path.join(postDir, 'notes.md');
       fs.writeFileSync(notesPath, notes);
     }
     
-    console.log(`✅ Saved analysis for ${postId} in category: ${category}`);
+    console.log(`✅ Saved reference analysis for ${postId}`);
     return postDir;
   }
 
   /**
-   * Loads an analysis
+   * Legacy method for backwards compatibility
    */
-  loadAnalysis(category, postId) {
-    const postDir = path.join(this.basePath, category, postId);
+  saveAnalysis(category, postId, analysisData, metadata = {}, originalPost = null, notes = null) {
+    if (category === 'reference' || category === 'sonnet_reference') {
+      return this.saveReferenceAnalysis(postId, analysisData, metadata, notes);
+    } else {
+      return this.saveLLMAnalysis(postId, analysisData, metadata, originalPost);
+    }
+  }
+
+  /**
+   * Loads analysis data for a post
+   */
+  loadPostData(postId) {
+    const postDir = path.join(this.basePath, postId);
     if (!fs.existsSync(postDir)) {
-      throw new Error(`Analysis not found: ${category}/${postId}`);
+      throw new Error(`Post analysis not found: ${postId}`);
     }
 
-    const analysisPath = path.join(postDir, 'analysis.json');
-    const metadataPath = path.join(postDir, 'metadata.json');
+    const result = { post_id: postId };
+    
+    // Load original post
     const originalPath = path.join(postDir, 'original_post.json');
-    const notesPath = path.join(postDir, 'notes.md');
-
-    const result = {};
-    
-    if (fs.existsSync(analysisPath)) {
-      result.analysis = JSON.parse(fs.readFileSync(analysisPath, 'utf8'));
-    }
-    
-    if (fs.existsSync(metadataPath)) {
-      result.metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
-    }
-    
     if (fs.existsSync(originalPath)) {
       result.originalPost = JSON.parse(fs.readFileSync(originalPath, 'utf8'));
     }
     
+    // Load LLM analysis
+    const llmPath = path.join(postDir, 'llm_analysis.json');
+    if (fs.existsSync(llmPath)) {
+      result.llmAnalysis = JSON.parse(fs.readFileSync(llmPath, 'utf8'));
+    }
+    
+    // Load reference analysis
+    const refPath = path.join(postDir, 'reference_analysis.json');
+    if (fs.existsSync(refPath)) {
+      result.referenceAnalysis = JSON.parse(fs.readFileSync(refPath, 'utf8'));
+    }
+    
+    // Load notes
+    const notesPath = path.join(postDir, 'notes.md');
     if (fs.existsSync(notesPath)) {
       result.notes = fs.readFileSync(notesPath, 'utf8');
     }
 
     return result;
+  }
+
+  /**
+   * Legacy method for backwards compatibility
+   */
+  loadAnalysis(category, postId) {
+    const postData = this.loadPostData(postId);
+    
+    if (category === 'reference' || category === 'sonnet_reference') {
+      return {
+        analysis: postData.referenceAnalysis,
+        originalPost: postData.originalPost,
+        notes: postData.notes
+      };
+    } else {
+      return {
+        analysis: postData.llmAnalysis,
+        originalPost: postData.originalPost,
+        notes: postData.notes
+      };
+    }
   }
 
   /**

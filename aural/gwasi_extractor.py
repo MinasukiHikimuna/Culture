@@ -172,7 +172,34 @@ class GwasiExtractor:
         self.current_base_dir.mkdir(exist_ok=True)
         print(f"📁 Using base directory: {self.current_base_dir}")
 
-    def needs_full_base_download(self, current_base_dir: str) -> bool:
+    def prompt_user_for_base_download(self, old_version: str, new_version: str) -> bool:
+        """
+        Prompt user whether to download the new base data when version has changed.
+        Returns True if user wants to download, False otherwise.
+        """
+        print(f"\n🔄 BASE VERSION CHANGE DETECTED")
+        print(f"{'='*50}")
+        print(f"Previous base version: {old_version}")
+        print(f"New base version: {new_version}")
+        print(f"\nThis means the entire base dataset has been updated.")
+        print(f"You can either:")
+        print(f"  1. Download the new base data (recommended for complete dataset)")
+        print(f"  2. Continue with delta-only updates (faster, but may miss some data)")
+        
+        while True:
+            try:
+                response = input(f"\nDownload new base data? [y/N]: ").strip().lower()
+                if response in ['', 'n', 'no']:
+                    return False
+                elif response in ['y', 'yes']:
+                    return True
+                else:
+                    print("Please enter 'y' for yes or 'n' for no.")
+            except (KeyboardInterrupt, EOFError):
+                print("\n⏹️  Interrupted by user, defaulting to no base download")
+                return False
+
+    def needs_full_base_download(self, current_base_dir: str, interactive: bool = True) -> bool:
         """
         Determine if we need to download all base files or just delta.
         Note: setup_base_directory should be called before this method.
@@ -187,9 +214,13 @@ class GwasiExtractor:
             return True
 
         if cached_version != current_base_dir:
-            print(f"🔄 Base version changed: {cached_version} → {current_base_dir}")
-            print(f"📊 Will download all base files for new version")
-            return True
+            if interactive:
+                # Prompt user for decision
+                return self.prompt_user_for_base_download(cached_version, current_base_dir)
+            else:
+                print(f"🔄 Base version changed: {cached_version} → {current_base_dir}")
+                print(f"📊 Will download all base files for new version")
+                return True
 
         # Check if base files exist for this version
         existing_files = list(self.current_base_dir.glob("*.json"))
@@ -517,6 +548,8 @@ class GwasiExtractor:
         max_files: Optional[int] = None,
         use_cache: bool = True,
         force_full_download: bool = False,
+        delta_only: bool = False,
+        interactive: bool = True,
     ) -> List[Dict]:
         """
         Main extraction method. Fetches and processes all available data.
@@ -562,7 +595,12 @@ class GwasiExtractor:
         # Always setup the base directory first
         self.setup_base_directory(base_dir_name)
 
-        needs_full_download = self.needs_full_base_download(base_dir_name)
+        # Check if we should skip base files entirely (delta-only mode)
+        if delta_only:
+            print(f"📊 Delta-only mode: skipping base files")
+            needs_full_download = False
+        else:
+            needs_full_download = self.needs_full_base_download(base_dir_name, interactive)
 
         # Step 3: Handle base files
         if needs_full_download or max_files or force_full_download:
@@ -578,8 +616,9 @@ class GwasiExtractor:
             all_entries.extend(base_entries)
             print(f"✅ Added {len(base_entries)} base entries to dataset")
 
-            # Save the base version after successful download
+            # Save the base version and mark download as complete after successful download
             self.save_base_version(base_dir_name)
+            self.mark_base_download_complete()
 
         else:
             # Load base data from cache since version hasn't changed
@@ -739,6 +778,16 @@ def main():
         default=15,
         help="Number of consecutive 404s before stopping file discovery (default: 5)",
     )
+    parser.add_argument(
+        "--delta-only",
+        action="store_true",
+        help="Only fetch delta.json updates, skip base files entirely",
+    )
+    parser.add_argument(
+        "--non-interactive",
+        action="store_true",
+        help="Run in non-interactive mode (auto-download new base when version changes)",
+    )
 
     args = parser.parse_args()
 
@@ -758,8 +807,10 @@ def main():
         else:
             # Normal extraction with optional caching
             use_cache = not args.no_cache
+            delta_only = getattr(args, 'delta_only', False)
+            interactive = not getattr(args, 'non_interactive', False)
             data = extractor.extract_all_data(
-                args.format, args.max_files, use_cache, args.force_full
+                args.format, args.max_files, use_cache, args.force_full, delta_only, interactive
             )
 
         print(f"\n🎉 Extraction complete! Found {len(data)} entries.")

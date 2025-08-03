@@ -1,8 +1,0 @@
-{
-  "post_id": "1amzk7q",
-  "category": "llm_approved",
-  "saved_at": "2025-08-03T09:29:08.428Z",
-  "analyzer": "llm_analysis_script",
-  "model": "mistralai/mistral-7b-instruct-v0.3",
-  "type": "automated_analysis"
-}

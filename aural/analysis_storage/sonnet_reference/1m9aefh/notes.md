@@ -1,1 +1,0 @@
-Reference analysis for wingwoman post. Used as gold standard for comparison with LLM analyses.

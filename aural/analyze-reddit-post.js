@@ -19,7 +19,12 @@ class RedditPostAnalyzer {
    * Creates a structured prompt for the LLM to analyze the Reddit post
    */
   createAnalysisPrompt(postData) {
-    const { title, selftext, author } = postData.reddit_data;
+    const { title, selftext, author, comments } = postData.reddit_data;
+    
+    // Get first few comments for collaboration detection
+    const topComments = comments ? comments.slice(0, 5).map(c => 
+      `${c.author}: ${c.body.substring(0, 200)}${c.body.length > 200 ? '...' : ''}`
+    ).join('\n\n') : 'No comments available';
 
     return `Analyze this Reddit post from r/gonewildaudio and extract specific information. 
 
@@ -30,6 +35,9 @@ TITLE: ${title}
 
 POST CONTENT:
 ${selftext}
+
+TOP COMMENTS (for collaboration detection):
+${topComments}
 
 Please analyze and return JSON with this exact structure:
 {
@@ -61,29 +69,51 @@ Please analyze and return JSON with this exact structure:
   "analysis_notes": "<any additional relevant observations>"
 }
 
-CRITICAL SCRIPT ANALYSIS RULES:
-1. URL IDENTIFICATION - Look for these patterns:
-   - [script](URL) or "script:" followed by a URL = script URL (extract this URL)
-   - [AUDIO HERE](URL) or "audio:" followed by URL = audio URL (NOT script URL)
+CRITICAL SCRIPT ANALYSIS RULES - READ CAREFULLY:
+1. URL IDENTIFICATION - Look for these EXACT patterns:
+   - **"[script](URL)"** = script URL (extract this URL immediately!)
+   - **"script:" followed by URL** = script URL 
+   - **"[AUDIO HERE](URL)"** = audio URL (NOT script URL - ignore for script analysis)
+   - **"audio:" followed by URL** = audio URL (NOT script URL - ignore for script analysis)
    - Script URLs are typically Reddit links (/r/gonewildaudio/comments/)
    - Audio URLs are typically soundgasm.net, whyp.it, hotaudio.net (DO NOT use these as script URLs)
    - For original content: script URL should be null (no separate script exists)
 
-2. AUTHOR IDENTIFICATION - Search for these exact patterns:
-   - "by u/[username]" anywhere in post = script author is [username]
-   - "[script](URL) by u/[username]" = script author is [username]  
-   - "script by u/[username]" = script author is [username]
-   - "written by u/[username]" = script author is [username]
-   - If NO "by u/[username]" found AND poster says "my script"/"I wrote"/"my own stuff" = script author is poster
+2. AUTHOR IDENTIFICATION - Search for these EXACT patterns in order:
+   - **"[script](URL) by u/[username]"** = script author is [username] (most common!)
+   - **"by u/[username]"** anywhere in post = script author is [username]
+   - **"script by u/[username]"** = script author is [username]
+   - **"written by u/[username]"** = script author is [username]
+   - **"written privately by u/[username]"** = script author is [username], fillType "private", url null
+   - **"script was written privately by u/[username]"** = script author is [username], fillType "private", url null
+   - If NO "by u/[username]" found AND poster says "my script"/"I wrote"/"my own stuff"/"trying to write more" = script author is poster
    - If NO clear attribution = fillType "unknown", author: poster username
 
-3. FILL TYPE CLASSIFICATION:
-   - Script URL present + "by u/[username]" = "public"
-   - "[Script Fill]" in title + script attribution = "public"
-   - "private fill" mentioned = "private"
-   - Poster says "my script"/"I wrote"/"something I came up with"/"my own stuff"/"trying to write more" = "original"
-   - No script reference AND no attribution = "original" (likely original content)
-   - Cannot determine = "unknown"
+3. FILL TYPE CLASSIFICATION - CHECK IN ORDER:
+   - **"written privately" OR "script was written privately"** = "private" (NO URL, script shared privately)
+   - **"private fill"** = "private" (NO URL)
+   - **Poster says "my script"/"I wrote"/"something I came up with"/"my own stuff"/"trying to write more"** = "original"
+   - **Script URL present + "by u/[username]"** = "public" (public script with URL)
+   - **"[Script Fill]" in title + script attribution** = "public" 
+   - **No script reference AND no attribution** = "original" (likely original content)
+   - **Cannot determine** = "unknown"
+
+IMPORTANT: If "written privately" is mentioned, it's ALWAYS "private" fillType with url: null
+
+4. ALTERNATIVE VERSION DETECTION:
+   - Look for multiple audio links in post content
+   - **"[AUDIO HERE](URL)"** = main audio
+   - **"[bloopers](URL)" OR "(bloopers URL)"** = alternative version
+   - **"bonus" audio links** = alternative version
+   - **"with SFX" and "without SFX"** = alternative versions
+   - Count distinct audio URLs for alternatives
+
+STEP-BY-STEP ANALYSIS:
+1. FIRST: Check for "written privately" - if found, set fillType "private" and url null immediately
+2. IF NOT private: scan post for "[script](URL)" pattern - if found, extract URL 
+3. Then, scan post for "by u/username" pattern - if found, that's the script author
+4. Count only VOICE ACTORS (poster + collaborators), NOT script writers
+5. Count alternatives by finding multiple audio links
 
 EXAMPLE WALKTHROUGH:
 1. Script Fill: "[script](https://reddit.com/r/gwa/comments/abc/) by u/CuteEmUp || [AUDIO HERE](https://soundgasm.net/u/alekirser/audio)"
@@ -104,10 +134,90 @@ DOUBLE-CHECK YOUR WORK:
 
 Focus on:
 - Performers: Look for mentions of other voice actors, collaborations, or "with [username]"
+  * Check title for collaboration indicators: "collab w/", "with u/", "& u/", "featuring"
+  * Look for thanks/credits in post text: "thank you u/", "thanks to u/", "working with u/"
+  * Check comments for collaborator responses (first comment often from collaborators)
+  * Parse title tags like [FFF4M] = 3 female performers, [M4F] = 1 male performer
 - Alternatives: Different versions (M4F/F4M, with/without SFX, different endings, etc.)
+  * Look for multiple audio links with different descriptions
+  * Check for "versions available", "also posted", "alternative", "bonus"
 - Series: References to previous parts, sequels, ongoing storylines, numbered episodes
+  * Look for "Part 1", "Episode 2", "continued from", "sequel to"
+  * Check for mentions of previous posts or upcoming content
+
+CONFIDENCE LEVELS - VERY IMPORTANT:
+- **high**: When you have clear evidence FOR or AGAINST something
+- **medium**: When evidence is unclear or ambiguous  
+- **low**: Only when you cannot determine at all
+
+EXAMPLES:
+- No collaboration mentioned = "count": 1, "confidence": "high" (high confidence it's solo)
+- No series references = "isPartOfSeries": false, "confidence": "high" (high confidence it's standalone)
+- No alternative versions = "hasAlternatives": false, "confidence": "high" (high confidence single version)
+- Unclear script attribution = "confidence": "medium" or "low"
+
+PERFORMER DETECTION RULES:
+1. Title Analysis: Extract performers from title patterns:
+   - "collab w/ u/username" = collaboration with username
+   - "collab w/ u/user1 & u/user2" = collaboration with user1 AND user2
+   - "[FFF4M]" = 3 female performers total (count FFF = 3)
+   - "& u/username" = additional performer
+2. Post Content: Look for collaboration acknowledgments:
+   - "thank you u/username" = likely collaborator
+   - "working with u/username" = confirmed collaborator
+3. Comments: Check first few comments for collaborator responses
+
+PERFORMER COUNTING - CRITICAL:
+- **ONLY count VOICE ACTORS, not script writers**
+- Primary performer = poster (always 1) 
+- Additional performers = voice actor collaborators ONLY (from "collab w/" patterns)
+- Script authors are NOT performers (they write, don't perform audio)
+- Title tags like [FFF4F] are just format indicators, count actual collaborators
+- Total count = 1 + number of people mentioned in "collab w/" 
+- Example: "collab w/ u/user1 & u/user2" = 1 poster + 2 collaborators = 3 total
+- Example: "script by u/writer" = writer is NOT a performer, exclude from count
 
 IMPORTANT: The poster's username is ${author}. When they refer to themselves with nicknames or signatures, always use their actual username for consistency.`;
+  }
+
+  /**
+   * Creates a simplified prompt using preprocessed data
+   */
+  createSimplifiedPrompt(postData, preprocessedData) {
+    const { title, selftext, author } = postData.reddit_data;
+    
+    return `Analyze this Reddit post from r/gonewildaudio. 
+
+CRITICAL: Your response must be ONLY valid JSON. Do not include reasoning or explanations.
+
+POSTER USERNAME: ${author}
+TITLE: ${title}
+
+POST CONTENT:
+${selftext}
+
+PREPROCESSED DATA (use this as guidance):
+- Performers detected: ${preprocessedData.performers.count} (${preprocessedData.performers.primary} + ${preprocessedData.performers.additional.join(', ')})
+- Script info: ${preprocessedData.script.fillType} by ${preprocessedData.script.author}
+- Alternatives: ${preprocessedData.alternatives.hasAlternatives ? 'Yes' : 'No'}
+
+Focus only on:
+1. Series information (part of series, sequels, prequels)
+2. Analysis notes about the content and context
+3. Confidence assessment for series detection
+
+Return JSON with this structure:
+{
+  "series": {
+    "isPartOfSeries": <boolean>,
+    "hasPrequels": <boolean>, 
+    "hasSequels": <boolean>,
+    "seriesName": "<name if mentioned>",
+    "partNumber": <number or null>,
+    "confidence": "<high|medium|low>"
+  },
+  "analysis_notes": "<brief observations about the post content>"
+}`;
   }
 
   /**
@@ -174,12 +284,9 @@ IMPORTANT: The poster's username is ${author}. When they refer to themselves wit
 
       const parsed = JSON.parse(jsonText);
 
-      // Validate required structure
-      const required = ["performers", "alternatives", "series", "script"];
-      for (const field of required) {
-        if (!parsed[field]) {
-          throw new Error(`Missing required field: ${field}`);
-        }
+      // For simplified parsing, just validate series and analysis_notes
+      if (parsed.series === undefined) {
+        throw new Error(`Missing required field: series`);
       }
 
       return parsed;
@@ -190,7 +297,7 @@ IMPORTANT: The poster's username is ${author}. When they refer to themselves wit
   }
 
   /**
-   * Analyzes a single Reddit post file
+   * Analyzes a single Reddit post file with preprocessing
    */
   async analyzePost(filePath) {
     try {
@@ -204,9 +311,42 @@ IMPORTANT: The poster's username is ${author}. When they refer to themselves wit
 
       console.log(`Analyzing post: ${postData.reddit_data.title}`);
 
-      const prompt = this.createAnalysisPrompt(postData);
+      // Preprocess to extract structured data
+      const RedditPostPreprocessor = require('./preprocess-reddit-post.js');
+      const preprocessor = new RedditPostPreprocessor();
+      const preprocessedData = preprocessor.preprocess(postData);
+
+      // Create simplified prompt with preprocessed data
+      const prompt = this.createSimplifiedPrompt(postData, preprocessedData);
       const llmResponse = await this.callLLM(prompt);
       const analysis = this.parseResponse(llmResponse);
+
+      // Override with preprocessed data for accuracy
+      analysis.performers = {
+        ...preprocessedData.performers,
+        confidence: "high"
+      };
+      
+      analysis.alternatives = {
+        hasAlternatives: preprocessedData.alternatives.hasAlternatives,
+        versions: preprocessedData.alternatives.versions,
+        description: preprocessedData.alternatives.hasAlternatives ? 
+          preprocessedData.alternatives.versions.join(" and ") : "Single version audio",
+        confidence: "high"
+      };
+
+      analysis.script = preprocessedData.script;
+
+      // Use series info from LLM or default from preprocessing
+      if (analysis.series) {
+        // LLM provided series analysis, keep it
+      } else {
+        // Fallback to preprocessed series data
+        analysis.series = {
+          ...preprocessedData.series,
+          confidence: "high"
+        };
+      }
 
       // Add metadata
       analysis.metadata = {
@@ -216,6 +356,7 @@ IMPORTANT: The poster's username is ${author}. When they refer to themselves wit
         date: postData.date,
         reddit_url: postData.reddit_url,
         analyzed_at: new Date().toISOString(),
+        preprocessing_used: true
       };
 
       return analysis;
@@ -321,21 +462,20 @@ Examples:
         const { AnalysisStorage } = require('./create-analysis-directories.js');
         const storage = new AnalysisStorage();
         
-        let category;
-        if (saveApproved) category = 'llm_approved';
-        else if (saveRejected) category = 'llm_rejected';
-        else if (saveExperimental) category = 'experimental';
-        
         const originalPost = JSON.parse(fs.readFileSync(inputPath, 'utf8'));
         const metadata = {
           analyzer: 'llm_analysis_script',
           model: options.model || 'local-model',
           lm_studio_url: options.lmStudioUrl,
-          type: 'automated_analysis'
+          type: 'automated_analysis',
+          approved: saveApproved,
+          rejected: saveRejected,
+          experimental: saveExperimental
         };
         
-        storage.saveAnalysis(category, results.metadata.post_id, results, metadata, originalPost);
-        console.log(`✅ Saved analysis to ${category} category`);
+        storage.saveLLMAnalysis(results.metadata.post_id, results, metadata, originalPost);
+        const status = saveApproved ? 'approved' : saveRejected ? 'rejected' : 'experimental';
+        console.log(`✅ Saved LLM analysis (${status})`);
       }
       
       if (outputPath) {

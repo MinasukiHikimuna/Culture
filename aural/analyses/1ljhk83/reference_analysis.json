@@ -1,0 +1,48 @@
+{
+  "performers": {
+    "count": 3,
+    "primary": "alekirser",
+    "additional": [
+      "RoteDisaster",
+      "beegeewanders"
+    ],
+    "confidence": "high"
+  },
+  "alternatives": {
+    "hasAlternatives": true,
+    "versions": [
+      "main audio",
+      "bloopers"
+    ],
+    "description": "Main audio plus bloopers version available",
+    "confidence": "high"
+  },
+  "series": {
+    "isPartOfSeries": false,
+    "hasPrequels": false,
+    "hasSequels": false,
+    "seriesName": null,
+    "partNumber": null,
+    "confidence": "high"
+  },
+  "script": {
+    "url": null,
+    "fillType": "private",
+    "author": "inscrutableuser"
+  },
+  "analysis_notes": "Collaborative audio with three female performers (alekirser, RoteDisaster, beegeewanders). Script was written privately by u/inscrutableuser. Contains main audio and bloopers. Clear collaboration indicated in title and acknowledged in comments.",
+  "metadata": {
+    "post_id": "1ljhk83",
+    "username": "alekirser",
+    "title": "[FFF4F] Prepping for the Pride Parade Turns Into Your First WLW Experience [Script Fill][Pride Month][Coming Out][Friends To Lovers][Foursome][Gentle Fdom][Teasing][Praise][Shy Listener][Kissing][Clit Rubbing][Cunnilingus][Speaker Orgasms][Listener Orgasm] collab w/ u/RoteDisaster & u/beegeewanders",
+    "date": "2025-06-24T20:37:35",
+    "reddit_url": "https://www.reddit.com/r/GWASapphic/comments/1ljhk83/",
+    "analyzed_at": "2025-08-03T09:52:22.813Z"
+  },
+  "reference_metadata": {
+    "post_id": "1ljhk83",
+    "saved_at": "2025-08-03T09:52:22.817Z",
+    "analyzer": "claude-sonnet-4",
+    "type": "gold_standard"
+  }
+}

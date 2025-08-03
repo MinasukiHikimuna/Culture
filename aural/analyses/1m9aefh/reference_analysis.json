@@ -8,8 +8,8 @@
   "alternatives": {
     "hasAlternatives": false,
     "versions": [],
-    "description": "",
-    "confidence": "low"
+    "description": "Single version audio",
+    "confidence": "high"
   },
   "series": {
     "isPartOfSeries": false,
@@ -17,20 +17,26 @@
     "hasSequels": false,
     "seriesName": null,
     "partNumber": null,
-    "confidence": "low"
+    "confidence": "high"
   },
   "script": {
     "url": "https://www.reddit.com/r/gonewildaudio/comments/gku9yp/f4m_script_offer_your_bitchy_wingwoman_bitch_to/",
     "fillType": "public",
     "author": "CuteEmUp"
   },
-  "analysis_notes": "The script is a first-person narrative with no mention of other performers or collaborations. There are no references to alternatives, series, or prequels/sequels.",
+  "analysis_notes": "Public script fill by alekirser. Script written by u/CuteEmUp with clear URL provided. Sound design by HTHarpy.",
   "metadata": {
     "post_id": "1m9aefh",
     "username": "alekirser",
     "title": "[F4M] Your Party Girl Wingwoman Takes You Home Instead…! [Script Fill] [Mean Girl] [Bratty] [Fdom to Fsub] [Dom Loss] [I Wasn't Sabotaging...] [Okay, Maybe I Was] [Rough Sex] [Facefucking] [Feral] [Fingering] [Fucking On The Floor] [Feel How Tight I Squeeze Around You] [Cum Overflow] [Dripping Out]",
     "date": "2025-07-25T23:45:13",
     "reddit_url": "https://www.reddit.com/r/gonewildaudio/comments/1m9aefh/",
-    "analyzed_at": "2025-08-03T09:28:24.934Z"
+    "analyzed_at": "2025-08-03T09:52:01.827Z"
+  },
+  "reference_metadata": {
+    "post_id": "1m9aefh",
+    "saved_at": "2025-08-03T09:52:01.837Z",
+    "analyzer": "claude-sonnet-4",
+    "type": "gold_standard"
   }
 }

@@ -21,7 +21,10 @@
       "Bash(xxd:*)",
       "Bash(ls:*)",
       "Bash(node:*)",
-      "Bash(ffprobe:*)"
+      "Bash(ffprobe:*)",
+      "Bash(copy:*)",
+      "Bash(cp:*)",
+      "Bash(rm:*)"
     ],
     "deny": []
   }
