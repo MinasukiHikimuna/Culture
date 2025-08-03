@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 import argparse
 import os
+import re
 from urllib.parse import urlparse
 from dotenv import load_dotenv
 
@@ -137,6 +138,32 @@ class RedditExtractor:
             # This is necessary because PRAW uses lazy loading
             _ = submission.title
 
+            # Extract comments
+            comments_data = []
+            try:
+                submission.comments.replace_more(limit=None)  # Load all comments
+                for comment in submission.comments.list():
+                    if hasattr(comment, 'body'):  # Skip deleted comments
+                        comment_data = {
+                            "comment_id": comment.id,
+                            "author": str(comment.author) if comment.author else "[deleted]",
+                            "body": comment.body,
+                            "score": comment.score,
+                            "created_utc": comment.created_utc,
+                            "created_date": datetime.fromtimestamp(
+                                comment.created_utc
+                            ).isoformat(),
+                            "is_submitter": comment.is_submitter,
+                            "distinguished": comment.distinguished,
+                            "edited": comment.edited,
+                            "parent_id": comment.parent_id,
+                            "permalink": f"https://www.reddit.com{comment.permalink}",
+                        }
+                        comments_data.append(comment_data)
+            except Exception as e:
+                print(f"⚠️ Warning: Could not load comments for post {post_id}: {e}")
+                comments_data = []
+
             post_data = {
                 "post_id": submission.id,
                 "title": submission.title,
@@ -184,6 +211,7 @@ class RedditExtractor:
                 "secure_media": (
                     str(submission.secure_media) if submission.secure_media else None
                 ),
+                "comments": comments_data,
             }
 
             return post_data
@@ -191,6 +219,38 @@ class RedditExtractor:
         except Exception as e:
             print(f"❌ Error fetching post {post_id}: {e}")
             return None
+
+    def create_slug(self, title: str, max_length: int = 50) -> str:
+        """
+        Create a URL-friendly slug from a title.
+        
+        Args:
+            title: The title to convert
+            max_length: Maximum length of the slug
+            
+        Returns:
+            A URL-friendly slug
+        """
+        if not title:
+            return "untitled"
+            
+        # Convert to lowercase and replace spaces with hyphens
+        slug = title.lower()
+        
+        # Remove special characters except hyphens and alphanumeric
+        slug = re.sub(r'[^a-z0-9\s-]', '', slug)
+        
+        # Replace multiple spaces/hyphens with single hyphen
+        slug = re.sub(r'[\s-]+', '-', slug)
+        
+        # Remove leading/trailing hyphens
+        slug = slug.strip('-')
+        
+        # Truncate to max length
+        if len(slug) > max_length:
+            slug = slug[:max_length].rstrip('-')
+            
+        return slug or "untitled"
 
     def load_gwasi_data(self, gwasi_file: str) -> List[Dict]:
         """Load gwasi extractor output data."""
@@ -433,7 +493,7 @@ class RedditExtractor:
             print(f"❌ Error saving to JSON: {e}")
 
     def post_exists(self, gwasi_entry: Dict) -> bool:
-        """Check if individual post file already exists"""
+        """Check if individual post file already exists (checks both old and new filename formats)"""
         # Try to determine the expected author/username from the gwasi data
         username = gwasi_entry.get("username", "unknown")
         post_id = gwasi_entry.get("post_id")
@@ -444,20 +504,34 @@ class RedditExtractor:
         # Check in the original username directory
         if username and username not in ["[deleted]", "[suspended]", None]:
             user_dir = self.output_dir / username
-            filepath = user_dir / f"{post_id}.json"
-            if filepath.exists():
+            
+            # Check for old format first
+            old_filepath = user_dir / f"{post_id}.json"
+            if old_filepath.exists():
                 return True
+                
+            # Check for new format (any file starting with post_id_)
+            if user_dir.exists():
+                for file in user_dir.glob(f"{post_id}_*.json"):
+                    return True
 
         # Also check in deleted_users directory
         deleted_user_dir = self.output_dir / "deleted_users"
-        deleted_filepath = deleted_user_dir / f"{post_id}.json"
-        if deleted_filepath.exists():
+        
+        # Check old format
+        old_deleted_filepath = deleted_user_dir / f"{post_id}.json"
+        if old_deleted_filepath.exists():
             return True
+            
+        # Check new format
+        if deleted_user_dir.exists():
+            for file in deleted_user_dir.glob(f"{post_id}_*.json"):
+                return True
 
         return False
 
     def load_existing_post(self, gwasi_entry: Dict) -> Optional[Dict]:
-        """Load existing individual post file if it exists"""
+        """Load existing individual post file if it exists (checks both old and new filename formats)"""
         username = gwasi_entry.get("username", "unknown")
         post_id = gwasi_entry.get("post_id")
 
@@ -467,33 +541,58 @@ class RedditExtractor:
         # Try original username directory first
         if username and username not in ["[deleted]", "[suspended]", None]:
             user_dir = self.output_dir / username
-            filepath = user_dir / f"{post_id}.json"
-            if filepath.exists():
+            
+            # Try old format first
+            old_filepath = user_dir / f"{post_id}.json"
+            if old_filepath.exists():
+                try:
+                    with open(old_filepath, "r", encoding="utf-8") as jsonfile:
+                        return json.load(jsonfile)
+                except Exception as e:
+                    print(f"⚠️ Warning: Could not load existing post {old_filepath}: {e}")
+            
+            # Try new format (find any file starting with post_id_)
+            if user_dir.exists():
+                for filepath in user_dir.glob(f"{post_id}_*.json"):
+                    try:
+                        with open(filepath, "r", encoding="utf-8") as jsonfile:
+                            return json.load(jsonfile)
+                    except Exception as e:
+                        print(f"⚠️ Warning: Could not load existing post {filepath}: {e}")
+
+        # Try deleted_users directory
+        deleted_user_dir = self.output_dir / "deleted_users"
+        
+        # Try old format
+        old_deleted_filepath = deleted_user_dir / f"{post_id}.json"
+        if old_deleted_filepath.exists():
+            try:
+                with open(old_deleted_filepath, "r", encoding="utf-8") as jsonfile:
+                    return json.load(jsonfile)
+            except Exception as e:
+                print(
+                    f"⚠️ Warning: Could not load existing post {old_deleted_filepath}: {e}"
+                )
+        
+        # Try new format in deleted_users
+        if deleted_user_dir.exists():
+            for filepath in deleted_user_dir.glob(f"{post_id}_*.json"):
                 try:
                     with open(filepath, "r", encoding="utf-8") as jsonfile:
                         return json.load(jsonfile)
                 except Exception as e:
-                    print(f"⚠️ Warning: Could not load existing post {filepath}: {e}")
-
-        # Try deleted_users directory
-        deleted_user_dir = self.output_dir / "deleted_users"
-        deleted_filepath = deleted_user_dir / f"{post_id}.json"
-        if deleted_filepath.exists():
-            try:
-                with open(deleted_filepath, "r", encoding="utf-8") as jsonfile:
-                    return json.load(jsonfile)
-            except Exception as e:
-                print(
-                    f"⚠️ Warning: Could not load existing post {deleted_filepath}: {e}"
-                )
+                    print(
+                        f"⚠️ Warning: Could not load existing post {filepath}: {e}"
+                    )
 
         return None
 
     def save_individual_post(self, enriched_entry: Dict):
-        """Save individual post as <username>/<post_id>.json"""
+        """Save individual post as <username>/<post_id>_<slug>.json"""
         reddit_data = enriched_entry.get("reddit_data", {})
         author = reddit_data.get("author", "unknown")
         post_id = reddit_data.get("post_id", "unknown")
+        title = reddit_data.get("title", "")
 
         # Handle deleted/suspended users
         if author in ["[deleted]", "[suspended]", None]:
@@ -503,8 +602,11 @@ class RedditExtractor:
         user_dir = self.output_dir / author
         user_dir.mkdir(exist_ok=True)
 
-        # Save post as JSON
-        filename = f"{post_id}.json"
+        # Create slug from title
+        slug = self.create_slug(title)
+        
+        # Save post as JSON with new filename format
+        filename = f"{post_id}_{slug}.json"
         filepath = user_dir / filename
 
         try:
