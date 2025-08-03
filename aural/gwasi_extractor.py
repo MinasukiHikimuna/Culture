@@ -13,7 +13,6 @@ Data sources:
 
 import requests
 import json
-import csv
 import re
 import time
 from datetime import datetime
@@ -424,46 +423,6 @@ class GwasiExtractor:
 
         return None
 
-    def save_to_csv(self, data: List[Dict], filename: str):
-        """Save extracted data to CSV file."""
-        if not data:
-            print("⚠️  No data to save")
-            return
-
-        filepath = self.output_dir / filename
-
-        # Define CSV columns
-        columns = [
-            "post_id",
-            "subreddit",
-            "username",
-            "post_type",
-            "full_title",
-            "date",
-            "timestamp",
-            "comments",
-            "score",
-            "content_type",
-            "duration",
-            "reddit_url",
-            "tag_string",
-            "additional_info",
-        ]
-
-        try:
-            with open(filepath, "w", newline="", encoding="utf-8") as csvfile:
-                writer = csv.DictWriter(csvfile, fieldnames=columns)
-                writer.writeheader()
-
-                for item in data:
-                    # Only write columns that exist in our column list
-                    row = {col: item.get(col, "") for col in columns}
-                    writer.writerow(row)
-
-            print(f"💾 Saved {len(data)} entries to {filepath}")
-
-        except IOError as e:
-            print(f"❌ Error saving to CSV: {e}")
 
     def save_to_json(self, data: List[Dict], filename: str):
         """Save extracted data to JSON file."""
@@ -544,7 +503,6 @@ class GwasiExtractor:
 
     def extract_all_data(
         self,
-        save_format: str = "both",
         max_files: Optional[int] = None,
         use_cache: bool = True,
         force_full_download: bool = False,
@@ -553,9 +511,6 @@ class GwasiExtractor:
     ) -> List[Dict]:
         """
         Main extraction method. Fetches and processes all available data.
-
-        Args:
-            save_format: 'csv', 'json', or 'both'
 
         Returns:
             List of parsed entries
@@ -567,7 +522,9 @@ class GwasiExtractor:
         # Step 1: Fetch delta data to get base version and recent updates
         print("\n📊 Fetching delta data...")
         delta_url = f"{self.base_url}/delta.json"
-        delta_data = self.fetch_json_data(delta_url, use_cache)
+        # In delta-only mode, always fetch fresh delta.json to get latest updates
+        delta_use_cache = use_cache and not delta_only
+        delta_data = self.fetch_json_data(delta_url, delta_use_cache)
 
         if not delta_data:
             print("❌ Failed to fetch delta.json - cannot proceed")
@@ -657,12 +614,7 @@ class GwasiExtractor:
 
         # Step 5: Save data
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-
-        if save_format in ["csv", "both"]:
-            self.save_to_csv(unique_entries, f"gwasi_data_{timestamp}.csv")
-
-        if save_format in ["json", "both"]:
-            self.save_to_json(unique_entries, f"gwasi_data_{timestamp}.json")
+        self.save_to_json(unique_entries, f"gwasi_data_{timestamp}.json")
 
         # Generate summary report
         self.generate_summary(unique_entries, timestamp)
@@ -744,13 +696,6 @@ def main():
         help="Output directory (default: extracted_data)",
     )
     parser.add_argument(
-        "--format",
-        "-f",
-        choices=["csv", "json", "both"],
-        default="both",
-        help="Output format (default: both)",
-    )
-    parser.add_argument(
         "--max-files",
         "-m",
         type=int,
@@ -799,10 +744,7 @@ def main():
 
             # Save processed data
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            if args.format in ["csv", "both"]:
-                extractor.save_to_csv(data, f"gwasi_data_{timestamp}.csv")
-            if args.format in ["json", "both"]:
-                extractor.save_to_json(data, f"gwasi_data_{timestamp}.json")
+            extractor.save_to_json(data, f"gwasi_data_{timestamp}.json")
             extractor.generate_summary(data, timestamp)
         else:
             # Normal extraction with optional caching
@@ -810,7 +752,7 @@ def main():
             delta_only = getattr(args, 'delta_only', False)
             interactive = not getattr(args, 'non_interactive', False)
             data = extractor.extract_all_data(
-                args.format, args.max_files, use_cache, args.force_full, delta_only, interactive
+                args.max_files, use_cache, args.force_full, delta_only, interactive
             )
 
         print(f"\n🎉 Extraction complete! Found {len(data)} entries.")
