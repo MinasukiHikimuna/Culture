@@ -219,7 +219,10 @@ class ReleaseOrchestrator {
     try {
       const metadata = JSON.parse(await fs.readFile(metadataFile, 'utf8'));
       console.log(`📦 Loaded cached extraction for: ${url}`);
-      return metadata;
+      // Find the platform from the cached data
+      const platform = metadata.metadata?.platform?.name || metadata.platform || 'unknown';
+      // Normalize the cached result
+      return this.normalizeExtractorResult(metadata, platform);
     } catch (error) {
       throw new Error(`Failed to load cache for ${url}: ${error.message}`);
     }
@@ -246,9 +249,10 @@ class ReleaseOrchestrator {
     try {
       // Dynamic import of extractor module
       const ExtractorClass = require(config.module);
-      const extractor = new ExtractorClass({
-        outputDir: path.join(this.config.dataDir, 'audio', platform)
-      });
+      const extractor = new ExtractorClass(
+        path.join(this.config.dataDir, 'audio', platform),
+        { requestDelay: 2000 }
+      );
       
       // Setup if needed (e.g., Playwright)
       if (extractor.setupPlaywright) {
@@ -262,9 +266,9 @@ class ReleaseOrchestrator {
         // Transform to AudioSource if needed
         const audioSource = this.normalizeExtractorResult(result, platform);
         
-        // Cache the result
+        // Cache the original result, not the AudioSource
         if (this.config.cacheEnabled) {
-          await this.cacheExtraction(url, audioSource);
+          await this.cacheExtraction(url, result);
         }
         
         return audioSource;
@@ -291,28 +295,28 @@ class ReleaseOrchestrator {
       return result;
     }
     
-    // Transform legacy format to new schema
+    // Transform from new extractor format to AudioSource schema
     const audioSource = new AudioSource({
-      sourceUrl: result.sourceUrl || result.url,
-      downloadUrl: result.audioUrl || result.audio?.url,
-      filePath: result.filePath || result.originalMediaFile?.filePath,
-      format: result.format || result.originalMediaFile?.format || 'm4a',
-      fileSize: result.fileSize || result.originalMediaFile?.fileSize,
-      checksum: result.checksum || result.originalMediaFile?.checksum,
+      sourceUrl: result.audio?.sourceUrl || result.sourceUrl || result.url,
+      downloadUrl: result.audio?.downloadUrl || result.audioUrl,
+      filePath: result.audio?.filePath || result.filePath,
+      format: result.audio?.format || result.format || 'm4a',
+      fileSize: result.audio?.fileSize || result.fileSize,
+      checksum: result.audio?.checksum || result.checksum || {},
       
-      title: result.title,
-      author: result.author || result.user,
-      description: result.description,
-      tags: result.tags || [],
-      duration: result.duration || result.metadata?.expectedDuration,
-      uploadDate: result.uploadDate,
+      title: result.metadata?.title || result.title,
+      author: result.metadata?.author || result.author || result.user,
+      description: result.metadata?.description || result.description,
+      tags: result.metadata?.tags || result.tags || [],
+      duration: result.metadata?.duration || result.duration,
+      uploadDate: result.metadata?.uploadDate || result.uploadDate,
       
       platformName: platform,
-      extractorVersion: result.extractorVersion || '1.0',
-      platformData: result.platformData || result.metadata || {},
+      extractorVersion: result.metadata?.platform?.extractorVersion || '1.0',
+      platformData: result.platformData || {},
       
-      htmlBackup: result.htmlBackup || result.backupFiles?.html,
-      metadataFile: result.metadataFile || result.backupFiles?.metadata
+      htmlBackup: result.backupFiles?.html || result.htmlBackup,
+      metadataFile: result.backupFiles?.metadata || result.metadataFile
     });
     
     return audioSource;

@@ -25,7 +25,9 @@
       "Bash(copy:*)",
       "Bash(cp:*)",
       "Bash(rm:*)",
-      "Bash(mv:*)"
+      "Bash(mv:*)",
+      "Bash(ls:*)",
+      "Bash(grep:*)"
     ],
     "deny": []
   }
