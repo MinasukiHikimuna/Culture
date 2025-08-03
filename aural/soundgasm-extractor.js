@@ -53,7 +53,7 @@ class SoundgasmExtractor extends BaseExtractor {
   /**
    * Extract content from Soundgasm URL using new data structures
    */
-  async extract(url) {
+  async extract(url, analysisMetadata = null) {
     await this.ensureRateLimit();
     
     try {
@@ -76,7 +76,11 @@ class SoundgasmExtractor extends BaseExtractor {
         tags: metadata.tags,
         metadata: {
           soundgasmMetadata: metadata,
-          audioUrl: audioUrl
+          audioUrl: audioUrl,
+          analysisMetadata: analysisMetadata // Include LLM analysis data
+        },
+        enrichmentData: {
+          llmAnalysis: analysisMetadata // Also add to enrichmentData for clarity
         }
       });
 
@@ -297,6 +301,7 @@ if (require.main === module) {
     .option("-o, --output <dir>", "Output directory", "soundgasm_data")
     .option("--no-transform", "Disable transformations")
     .option("--pipeline <name>", "Transformation pipeline", "AUDIO_TO_VIDEO")
+    .option("--analysis-metadata <file>", "Path to analysis metadata JSON file")
     .action(async (url, options) => {
       const extractor = new SoundgasmExtractor(options.output, {
         enableTransformations: options.transform,
@@ -305,7 +310,21 @@ if (require.main === module) {
 
       try {
         await extractor.setupPlaywright();
-        const content = await extractor.extract(url);
+        
+        // Load analysis metadata if provided
+        let analysisMetadata = null;
+        if (options.analysisMetadata) {
+          try {
+            const fs = require('fs');
+            const analysisData = fs.readFileSync(options.analysisMetadata, 'utf8');
+            analysisMetadata = JSON.parse(analysisData);
+            console.log('📋 Loaded analysis metadata');
+          } catch (error) {
+            console.warn(`⚠️ Warning: Could not load analysis metadata: ${error.message}`);
+          }
+        }
+        
+        const content = await extractor.extract(url, analysisMetadata);
         
         console.log("\n📊 Extraction Summary:");
         console.log(`Title: ${content.title}`);

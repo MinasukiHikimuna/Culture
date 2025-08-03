@@ -11,6 +11,8 @@
     "hotaudio-index": "node hotaudio-indexer.js",
     "hotaudio-extract": "node hotaudio-extractor.js",
     "analyze-reddit": "node analyze-reddit-post.js",
+    "download-orchestrator": "node download-orchestrator.js",
+    "analyze-and-download": "node analyze-and-download.js",
     "install-playwright": "playwright install chrome",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

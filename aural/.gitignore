@@ -1,4 +1,5 @@
 .env
+downloads/
 extracted_data/
 hotaudio_data/
 node_modules/

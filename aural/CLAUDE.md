@@ -294,3 +294,16 @@ class StashappAdapter:
 - [ ] Implement data validation pipelines
 - [ ] Create monitoring and alerting system
 - [ ] Build manual review and correction tools
+
+## Metadata Collection Guidelines
+
+When implementing extractors and download workflows:
+
+1. **Gather ALL metadata along the way** - Each step should preserve and enrich metadata
+2. **Include LLM analysis in final JSON** - Reddit post analysis should be included in the final extracted content JSON files
+3. **Preserve original data** - Keep original Reddit post data, Soundgasm metadata, checksums, etc.
+4. **Structure for traceability** - Final JSON should contain:
+   - `metadata.analysisMetadata` - LLM analysis results
+   - `enrichmentData.llmAnalysis` - Duplicate for clarity 
+   - `metadata.platformMetadata` - Platform-specific metadata (Soundgasm, etc.)
+   - Complete audit trail of transformations and processing
