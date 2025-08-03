@@ -8,6 +8,8 @@
     "soundgasm": "node soundgasm-extractor.js",
     "whypit": "node whypit-extractor.js",
     "pornhub": "node pornhub-extractor.js",
+    "hotaudio-index": "node hotaudio-indexer.js",
+    "hotaudio-extract": "node hotaudio-extractor.js",
     "install-playwright": "playwright install chrome",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -17,7 +19,9 @@
     "soundgasm",
     "whypit",
     "pornhub",
+    "hotaudio",
     "extractor",
+    "indexer",
     "playwright",
     "yt-dlp",
     "adult-audio"
