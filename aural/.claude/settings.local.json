@@ -24,7 +24,8 @@
       "Bash(ffprobe:*)",
       "Bash(copy:*)",
       "Bash(cp:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(mv:*)"
     ],
     "deny": []
   }

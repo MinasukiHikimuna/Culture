@@ -1,25 +1,22 @@
 #!/usr/bin/env node
 
 /**
- * Soundgasm Extractor - Refactored with Common Data Structures
+ * Soundgasm Extractor - Refactored for Clean Architecture
  * 
- * Example of how to refactor an existing extractor to use the new common
- * data structures and transformation system.
+ * Pure audio extractor without LLM awareness
+ * Returns platform-agnostic schema
  */
 
-const { BaseExtractor, ExtractedContent } = require('./common-extractor-types');
 const { chromium } = require("playwright");
 const fs = require("fs").promises;
 const path = require("path");
+const crypto = require('crypto');
 
-class SoundgasmExtractor extends BaseExtractor {
+class SoundgasmExtractor {
   constructor(outputDir = "soundgasm_data", config = {}) {
-    super('soundgasm', outputDir, {
-      defaultPipeline: 'AUDIO_TO_VIDEO', // Convert all audio to video by default
-      ...config
-    });
-    
-    this.requestDelay = 2000;
+    this.outputDir = outputDir;
+    this.platform = 'soundgasm';
+    this.requestDelay = config.requestDelay || 2000;
     this.lastRequestTime = 0;
     this.browser = null;
     this.page = null;
@@ -51,13 +48,21 @@ class SoundgasmExtractor extends BaseExtractor {
   }
 
   /**
-   * Extract content from Soundgasm URL using new data structures
+   * Extract content from Soundgasm URL
+   * Pure extraction without any LLM dependencies
    */
-  async extract(url, analysisMetadata = null) {
+  async extract(url) {
     await this.ensureRateLimit();
     
     try {
       console.log(`📥 Processing: ${url}`);
+      
+      // Check cache first
+      const cached = await this.checkCache(url);
+      if (cached) {
+        console.log(`✅ Using cached extraction for: ${url}`);
+        return cached;
+      }
       
       // Navigate to page and extract metadata
       await this.page.goto(url, { waitUntil: "networkidle" });
@@ -65,46 +70,66 @@ class SoundgasmExtractor extends BaseExtractor {
       const metadata = await this.extractMetadata(url);
       const audioUrl = await this.extractAudioUrl();
       
-      // Create ExtractedContent instance
-      const content = new ExtractedContent({
-        id: this.generateContentId(url),
-        sourceUrl: url,
-        platform: this.platform,
-        title: metadata.title,
-        author: metadata.author,
-        description: metadata.description,
-        tags: metadata.tags,
-        metadata: {
-          soundgasmMetadata: metadata,
-          audioUrl: audioUrl,
-          analysisMetadata: analysisMetadata // Include LLM analysis data
-        },
-        enrichmentData: {
-          llmAnalysis: analysisMetadata // Also add to enrichmentData for clarity
-        }
-      });
-
-      // Download the original audio file
-      const audioFilePath = await this.downloadAudio(audioUrl, metadata);
+      // Create output directory structure
+      const authorDir = path.join(this.outputDir, this.sanitizeFilename(metadata.author));
+      const releaseDir = path.join(authorDir, this.sanitizeFilename(metadata.titleFromUrl));
+      await fs.mkdir(releaseDir, { recursive: true });
       
-      // Create MediaFile for the original audio
-      content.originalMediaFile = await this.createMediaFile(
-        audioFilePath, 
-        audioUrl, 
-        { 
-          platform: 'soundgasm',
-          originalFormat: 'm4a'
+      // Download audio file
+      const audioFilePath = await this.downloadAudio(audioUrl, metadata, releaseDir);
+      
+      // Calculate checksum
+      const checksum = await this.calculateChecksum(audioFilePath);
+      
+      // Get file stats
+      const stats = await fs.stat(audioFilePath);
+      
+      // Save HTML backup
+      const htmlPath = await this.saveHtmlBackup(releaseDir, metadata.titleFromUrl);
+      
+      // Build result in platform-agnostic schema
+      const result = {
+        audio: {
+          sourceUrl: url,
+          downloadUrl: audioUrl,
+          filePath: audioFilePath,
+          format: 'm4a',
+          fileSize: stats.size,
+          checksum: {
+            sha256: checksum
+          }
+        },
+        metadata: {
+          title: metadata.title,
+          author: metadata.author,
+          description: metadata.description || '',
+          tags: metadata.tags || [],
+          duration: metadata.expectedDuration,
+          platform: {
+            name: 'soundgasm',
+            url: 'https://soundgasm.net'
+          }
+        },
+        platformData: {
+          titleFromUrl: metadata.titleFromUrl,
+          pageTitle: metadata.pageTitle,
+          extractedAt: new Date().toISOString()
+        },
+        backupFiles: {
+          html: htmlPath
         }
-      );
-
-      // Execute transformations (audio -> video with gwa.png)
-      await this.executeTransformations(content);
-
+      };
+      
       // Save metadata
-      await this.saveMetadata(content);
-
+      const metadataPath = path.join(releaseDir, `${metadata.titleFromUrl}.json`);
+      await fs.writeFile(metadataPath, JSON.stringify(result, null, 2));
+      result.backupFiles.metadata = metadataPath;
+      
+      // Create completion marker
+      await this.createCompletionMarker(releaseDir, result);
+      
       console.log(`✅ Successfully extracted: ${metadata.title}`);
-      return content;
+      return result;
 
     } catch (error) {
       console.error(`❌ Failed to extract ${url}:`, error.message);
@@ -112,9 +137,46 @@ class SoundgasmExtractor extends BaseExtractor {
     }
   }
 
+  async checkCache(url) {
+    try {
+      // Derive cache location from URL
+      const urlMatch = url.match(/soundgasm\.net\/u\/([^\/]+)\/([^\/]+)/);
+      if (!urlMatch) return null;
+      
+      const [, author, titleSlug] = urlMatch;
+      const cacheDir = path.join(this.outputDir, this.sanitizeFilename(author), this.sanitizeFilename(titleSlug));
+      const markerFile = path.join(cacheDir, '.extracted');
+      
+      // Check if marker file exists
+      await fs.access(markerFile);
+      
+      // Load and return cached result
+      const metadataFiles = await fs.readdir(cacheDir);
+      const jsonFile = metadataFiles.find(f => f.endsWith('.json') && f !== '.extracted');
+      
+      if (jsonFile) {
+        const cached = JSON.parse(await fs.readFile(path.join(cacheDir, jsonFile), 'utf8'));
+        return cached;
+      }
+    } catch (e) {
+      // Not cached
+    }
+    return null;
+  }
+
+  async createCompletionMarker(outputDir, result) {
+    const markerFile = path.join(outputDir, '.extracted');
+    const markerData = {
+      url: result.audio.sourceUrl,
+      extractedAt: result.platformData.extractedAt,
+      checksum: result.audio.checksum.sha256
+    };
+    await fs.writeFile(markerFile, JSON.stringify(markerData, null, 2));
+  }
+
   async extractMetadata(url) {
     try {
-      // Extract author and title from URL like the original
+      // Extract author and title from URL
       const urlMatch = url.match(
         /https?:\/\/(?:www\.)?soundgasm\.net\/u\/([A-Za-z0-9\-_]+)\/([A-Za-z0-9\-_]+)/
       );
@@ -130,13 +192,12 @@ class SoundgasmExtractor extends BaseExtractor {
         const titleElement = document.querySelector(".jp-title");
         const descriptionElement = document.querySelector(".jp-description");
         
-        // Try to get duration from the page - look for time display elements
+        // Try to get duration from the page
         let duration = null;
         const timeElements = document.querySelectorAll('[class*="time"], .jp-duration, .duration');
         for (const el of timeElements) {
           const text = el.textContent.trim();
-          if (text.includes(':') && text.includes('-')) {
-            // Extract duration from format like "-49:15"
+          if (text.includes(':')) {
             const match = text.match(/-?(\d+):(\d+)/);
             if (match) {
               const minutes = parseInt(match[1]);
@@ -155,7 +216,7 @@ class SoundgasmExtractor extends BaseExtractor {
         };
       });
 
-      // Use detailed title for metadata, but URL slug for filename (like original)
+      // Get page title as fallback
       const pageTitle = await this.page.title();
       const title = detailedTitle || pageTitle || titleFromUrl;
 
@@ -166,9 +227,10 @@ class SoundgasmExtractor extends BaseExtractor {
         title: title.trim(),
         author: author.trim(),
         titleFromUrl: titleFromUrl, // For filename
+        pageTitle: pageTitle,
         description: (description || "").trim(),
         tags: tags,
-        expectedDuration: duration // Duration from page in seconds
+        expectedDuration: duration // Duration in seconds
       };
     } catch (error) {
       console.error("Failed to extract metadata:", error);
@@ -178,7 +240,6 @@ class SoundgasmExtractor extends BaseExtractor {
 
   async extractAudioUrl() {
     try {
-      // Use the same approach as the original extractor
       const audioUrl = await this.page.evaluate(() => {
         // First try to find the audio element
         const audioElement = document.querySelector("audio");
@@ -205,14 +266,9 @@ class SoundgasmExtractor extends BaseExtractor {
     }
   }
 
-  async downloadAudio(audioUrl, metadata) {
-    // Use titleFromUrl for filename and create release directory structure
-    const filename = metadata.titleFromUrl;
-    const authorDir = path.join(this.outputDir, metadata.author);
-    const releaseDir = path.join(authorDir, filename);
-    await fs.mkdir(releaseDir, { recursive: true });
-
-    const audioFilePath = path.join(releaseDir, `${filename}.m4a`);
+  async downloadAudio(audioUrl, metadata, releaseDir) {
+    const filename = `${metadata.titleFromUrl}.m4a`;
+    const audioFilePath = path.join(releaseDir, filename);
 
     try {
       console.log(`⬇️  Downloading audio: ${audioUrl}`);
@@ -233,18 +289,18 @@ class SoundgasmExtractor extends BaseExtractor {
     }
   }
 
-  async saveMetadata(content) {
-    const releaseDir = path.dirname(content.originalMediaFile.filePath);
-    const baseName = path.basename(content.originalMediaFile.filePath, path.extname(content.originalMediaFile.filePath));
-    
-    // Save comprehensive metadata including transformations
-    const metadataPath = path.join(releaseDir, `${baseName}.json`);
-    await fs.writeFile(metadataPath, JSON.stringify(content, null, 2));
-
-    // Save HTML backup
+  async saveHtmlBackup(releaseDir, titleFromUrl) {
     const htmlContent = await this.page.content();
-    const htmlPath = path.join(releaseDir, `${baseName}.html`);
+    const htmlPath = path.join(releaseDir, `${titleFromUrl}.html`);
     await fs.writeFile(htmlPath, htmlContent);
+    return htmlPath;
+  }
+
+  async calculateChecksum(filePath) {
+    const fileBuffer = await fs.readFile(filePath);
+    const hashSum = crypto.createHash('sha256');
+    hashSum.update(fileBuffer);
+    return hashSum.digest('hex');
   }
 
   parseTags(description) {
@@ -257,11 +313,6 @@ class SoundgasmExtractor extends BaseExtractor {
     }
     
     return tags;
-  }
-
-  generateContentId(url) {
-    const crypto = require('crypto');
-    return crypto.createHash('md5').update(url).digest('hex');
   }
 
   sanitizeFilename(filename) {
@@ -284,60 +335,83 @@ class SoundgasmExtractor extends BaseExtractor {
 
 module.exports = SoundgasmExtractor;
 
-// Example usage
+// CLI Interface
 if (require.main === module) {
   const { Command } = require("commander");
   
   const program = new Command();
   program
     .name("soundgasm-extractor")
-    .description("Extract audio content from Soundgasm with transformations")
-    .version("2.0.0");
+    .description("Extract audio content from Soundgasm - pure extraction without LLM dependencies")
+    .version("3.0.0");
 
   program
     .command("extract")
     .description("Extract content from a Soundgasm URL")
     .argument("<url>", "Soundgasm URL to extract")
     .option("-o, --output <dir>", "Output directory", "soundgasm_data")
-    .option("--no-transform", "Disable transformations")
-    .option("--pipeline <name>", "Transformation pipeline", "AUDIO_TO_VIDEO")
-    .option("--analysis-metadata <file>", "Path to analysis metadata JSON file")
     .action(async (url, options) => {
-      const extractor = new SoundgasmExtractor(options.output, {
-        enableTransformations: options.transform,
-        defaultPipeline: options.pipeline
-      });
+      const extractor = new SoundgasmExtractor(options.output);
 
       try {
         await extractor.setupPlaywright();
         
-        // Load analysis metadata if provided
-        let analysisMetadata = null;
-        if (options.analysisMetadata) {
-          try {
-            const fs = require('fs');
-            const analysisData = fs.readFileSync(options.analysisMetadata, 'utf8');
-            analysisMetadata = JSON.parse(analysisData);
-            console.log('📋 Loaded analysis metadata');
-          } catch (error) {
-            console.warn(`⚠️ Warning: Could not load analysis metadata: ${error.message}`);
-          }
-        }
-        
-        const content = await extractor.extract(url, analysisMetadata);
+        const content = await extractor.extract(url);
         
         console.log("\n📊 Extraction Summary:");
-        console.log(`Title: ${content.title}`);
-        console.log(`Author: ${content.author}`);
-        console.log(`Original file: ${content.originalMediaFile.filePath}`);
-        console.log(`Transformations: ${content.transformations.length}`);
-        
-        if (content.transformedMediaFiles.length > 0) {
-          console.log(`Final output: ${content.getFinalMediaFile().filePath}`);
-        }
+        console.log(`Title: ${content.metadata.title}`);
+        console.log(`Author: ${content.metadata.author}`);
+        console.log(`Audio file: ${content.audio.filePath}`);
+        console.log(`File size: ${(content.audio.fileSize / 1024 / 1024).toFixed(2)} MB`);
+        console.log(`Checksum: ${content.audio.checksum.sha256.substring(0, 16)}...`);
         
       } catch (error) {
         console.error("❌ Extraction failed:", error.message);
+        process.exit(1);
+      } finally {
+        await extractor.closeBrowser();
+      }
+    });
+
+  program
+    .command("batch")
+    .description("Extract multiple URLs from a file")
+    .argument("<file>", "File containing URLs (one per line)")
+    .option("-o, --output <dir>", "Output directory", "soundgasm_data")
+    .action(async (file, options) => {
+      const extractor = new SoundgasmExtractor(options.output);
+      
+      try {
+        const content = await fs.readFile(file, 'utf8');
+        const urls = content.split('\n').filter(line => line.trim() && !line.startsWith('#'));
+        
+        console.log(`📋 Found ${urls.length} URLs to process`);
+        
+        await extractor.setupPlaywright();
+        
+        const results = [];
+        for (let i = 0; i < urls.length; i++) {
+          const url = urls[i].trim();
+          console.log(`\n[${i + 1}/${urls.length}] Processing: ${url}`);
+          
+          try {
+            const content = await extractor.extract(url);
+            results.push({ success: true, url, title: content.metadata.title });
+          } catch (error) {
+            console.error(`❌ Failed: ${error.message}`);
+            results.push({ success: false, url, error: error.message });
+          }
+        }
+        
+        const successful = results.filter(r => r.success).length;
+        const failed = results.filter(r => !r.success).length;
+        
+        console.log(`\n📊 Batch Summary:`);
+        console.log(`✅ Successful: ${successful}`);
+        console.log(`❌ Failed: ${failed}`);
+        
+      } catch (error) {
+        console.error("❌ Batch processing failed:", error.message);
         process.exit(1);
       } finally {
         await extractor.closeBrowser();
