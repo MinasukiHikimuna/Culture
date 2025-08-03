@@ -1,0 +1,105 @@
+{
+  "transformationPipelines": {
+    "AUDIO_TO_VIDEO": {
+      "name": "audio_to_video",
+      "description": "Convert audio file to video with static GWA image",
+      "enabled": true,
+      "steps": [
+        {
+          "type": "audio_to_video",
+          "command": "ffmpeg -i {input} -i gwa.png -c:v libx264 -c:a copy -shortest {output}",
+          "outputFormat": "mkv",
+          "preserveOriginal": true,
+          "requirements": ["gwa.png"]
+        }
+      ]
+    },
+    "PATREON_PIPELINE": {
+      "name": "patreon_wav_pipeline", 
+      "description": "Convert WAV to FLAC, then to video for Patreon content",
+      "enabled": true,
+      "steps": [
+        {
+          "type": "format_conversion",
+          "command": "ffmpeg -i {input} -c:a flac -compression_level 8 {output}",
+          "outputFormat": "flac",
+          "preserveOriginal": true,
+          "description": "Convert WAV to FLAC for better compression"
+        },
+        {
+          "type": "audio_to_video", 
+          "command": "ffmpeg -i {input} -i gwa.png -c:v libx264 -c:a copy -shortest {output}",
+          "outputFormat": "mkv",
+          "preserveOriginal": true,
+          "requirements": ["gwa.png"]
+        }
+      ]
+    },
+    "HIGH_QUALITY_ENCODE": {
+      "name": "high_quality_encode",
+      "description": "High quality re-encoding for archival purposes",
+      "enabled": false,
+      "steps": [
+        {
+          "type": "audio_reencoding",
+          "command": "ffmpeg -i {input} -c:a flac -compression_level 12 {output}",
+          "outputFormat": "flac",
+          "preserveOriginal": true
+        },
+        {
+          "type": "audio_to_video",
+          "command": "ffmpeg -i {input} -i gwa.png -c:v libx264 -preset veryslow -crf 18 -c:a copy -shortest {output}",
+          "outputFormat": "mkv", 
+          "preserveOriginal": true,
+          "requirements": ["gwa.png"]
+        }
+      ]
+    },
+    "MOBILE_OPTIMIZED": {
+      "name": "mobile_optimized",
+      "description": "Create mobile-optimized versions", 
+      "enabled": false,
+      "steps": [
+        {
+          "type": "audio_optimization",
+          "command": "ffmpeg -i {input} -c:a aac -b:a 128k {output}",
+          "outputFormat": "m4a",
+          "preserveOriginal": true
+        },
+        {
+          "type": "audio_to_video",
+          "command": "ffmpeg -i {input} -i gwa.png -c:v libx264 -preset fast -crf 25 -vf scale=720:720 -c:a copy -shortest {output}",
+          "outputFormat": "mkv",
+          "preserveOriginal": true,
+          "requirements": ["gwa.png"]
+        }
+      ]
+    }
+  },
+  "platformDefaults": {
+    "soundgasm": "AUDIO_TO_VIDEO",
+    "whypit": "AUDIO_TO_VIDEO", 
+    "hotaudio": "AUDIO_TO_VIDEO",
+    "patreon": "PATREON_PIPELINE"
+  },
+  "globalSettings": {
+    "enableTransformations": true,
+    "preserveOriginals": true,
+    "calculateChecksums": true,
+    "parallelTransformations": false,
+    "maxRetries": 2,
+    "tempDirectory": "temp_transformations"
+  },
+  "requirements": {
+    "gwa.png": {
+      "description": "Static image for audio-to-video conversion",
+      "path": "./gwa.png",
+      "required": true
+    },
+    "ffmpeg": {
+      "description": "FFmpeg binary for media transformations",
+      "command": "ffmpeg -version",
+      "required": true
+    }
+  }
+}

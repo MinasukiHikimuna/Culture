@@ -1,28 +1,26 @@
 #!/usr/bin/env node
 
 /**
- * Soundgasm Data Extractor - Node.js Version
- *
- * This script extracts audio files and metadata from Soundgasm using Playwright.
- * It downloads audio files, extracts metadata, and saves HTML backups.
- *
- * Requirements:
- * 1. Install dependencies: npm install
- * 2. Install browser: npm run install-playwright
+ * Soundgasm Extractor - Refactored with Common Data Structures
+ * 
+ * Example of how to refactor an existing extractor to use the new common
+ * data structures and transformation system.
  */
 
+const { BaseExtractor, ExtractedContent } = require('./common-extractor-types');
 const { chromium } = require("playwright");
 const fs = require("fs").promises;
 const path = require("path");
-const { Command } = require("commander");
 
-class SoundgasmExtractor {
-  constructor(outputDir = "soundgasm_data") {
-    this.outputDir = path.resolve(outputDir);
-    this.requestDelay = 2000; // Milliseconds between requests
+class SoundgasmExtractor extends BaseExtractor {
+  constructor(outputDir = "soundgasm_data", config = {}) {
+    super('soundgasm', outputDir, {
+      defaultPipeline: 'AUDIO_TO_VIDEO', // Convert all audio to video by default
+      ...config
+    });
+    
+    this.requestDelay = 2000;
     this.lastRequestTime = 0;
-
-    // Playwright setup
     this.browser = null;
     this.page = null;
   }
@@ -33,16 +31,13 @@ class SoundgasmExtractor {
       this.browser = await chromium.launch({ headless: true });
       this.page = await this.browser.newPage();
 
-      // Set user agent
       await this.page.setExtraHTTPHeaders({
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/76.0.3809.100 Safari/537.36",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/76.0.3809.100 Safari/537.36",
       });
 
       console.log("✅ Playwright browser initialized successfully");
     } catch (error) {
       console.error("❌ Failed to initialize Playwright:", error.message);
-      console.log('💡 Run "npm run install-playwright" to install browser');
       throw error;
     }
   }
@@ -50,87 +45,136 @@ class SoundgasmExtractor {
   async closeBrowser() {
     if (this.browser) {
       await this.browser.close();
-      console.log("🔧 Playwright browser closed");
+      this.browser = null;
+      this.page = null;
     }
   }
 
-  async rateLimit() {
-    const currentTime = Date.now();
-    const timeSinceLastRequest = currentTime - this.lastRequestTime;
-
-    if (timeSinceLastRequest < this.requestDelay) {
-      const sleepTime = this.requestDelay - timeSinceLastRequest;
-      console.log(`⏱️ Rate limiting: waiting ${sleepTime}ms...`);
-      await new Promise((resolve) => setTimeout(resolve, sleepTime));
-    }
-
-    this.lastRequestTime = Date.now();
-  }
-
-  cleanFilename(name) {
-    return name.replace(/[^A-Za-z0-9 \-_]/g, "");
-  }
-
-  async downloadFile(url, filename, maxRetries = 5) {
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        console.log(`📥 Download attempt ${attempt}/${maxRetries}...`);
-        const response = await fetch(url, {
-          headers: {
-            "User-Agent":
-              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/76.0.3809.100 Safari/537.36",
-          },
-        });
-
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
-        const buffer = await response.arrayBuffer();
-        await fs.writeFile(filename, Buffer.from(buffer));
-        console.log("✅ Audio download completed successfully");
-        return true;
-      } catch (error) {
-        console.log(
-          `❌ Download attempt ${attempt}/${maxRetries} failed: ${error.message}`
-        );
-        if (attempt < maxRetries) {
-          const waitTime = 5000 * attempt;
-          console.log(`⏱️ Waiting ${waitTime / 1000} seconds before retry...`);
-          await new Promise((resolve) => setTimeout(resolve, waitTime));
-        }
-      }
-    }
-    return false;
-  }
-
-  extractMetadata(soundgasmUrl, detailedTitle, description, author) {
-    // Extract tags from description if available
-    let tags = [];
-    if (description) {
-      const tagMatches = description.match(/\[([^\]]+)\]/g);
-      if (tagMatches) {
-        tags = tagMatches.map((tag) => tag.replace(/[\[\]]/g, "").trim());
-      }
-    }
-
-    return {
-      title: detailedTitle,
-      author: author,
-      description: description || null,
-      tags: tags,
-      url: soundgasmUrl,
-      extracted_at: new Date().toISOString(),
-    };
-  }
-
-  async extractSoundgasm(soundgasmUrl) {
+  /**
+   * Extract content from Soundgasm URL using new data structures
+   */
+  async extract(url) {
+    await this.ensureRateLimit();
+    
     try {
-      console.log(`🌐 Navigating to: ${soundgasmUrl}`);
-      await this.rateLimit();
-      await this.page.goto(soundgasmUrl, { waitUntil: "networkidle" });
+      console.log(`📥 Processing: ${url}`);
+      
+      // Navigate to page and extract metadata
+      await this.page.goto(url, { waitUntil: "networkidle" });
+      
+      const metadata = await this.extractMetadata(url);
+      const audioUrl = await this.extractAudioUrl();
+      
+      // Create ExtractedContent instance
+      const content = new ExtractedContent({
+        id: this.generateContentId(url),
+        sourceUrl: url,
+        platform: this.platform,
+        title: metadata.title,
+        author: metadata.author,
+        description: metadata.description,
+        tags: metadata.tags,
+        metadata: {
+          soundgasmMetadata: metadata,
+          audioUrl: audioUrl
+        }
+      });
 
-      // Extract audio URL from the page
+      // Download the original audio file
+      const audioFilePath = await this.downloadAudio(audioUrl, metadata);
+      
+      // Create MediaFile for the original audio
+      content.originalMediaFile = await this.createMediaFile(
+        audioFilePath, 
+        audioUrl, 
+        { 
+          platform: 'soundgasm',
+          originalFormat: 'm4a'
+        }
+      );
+
+      // Execute transformations (audio -> video with gwa.png)
+      await this.executeTransformations(content);
+
+      // Save metadata
+      await this.saveMetadata(content);
+
+      console.log(`✅ Successfully extracted: ${metadata.title}`);
+      return content;
+
+    } catch (error) {
+      console.error(`❌ Failed to extract ${url}:`, error.message);
+      throw error;
+    }
+  }
+
+  async extractMetadata(url) {
+    try {
+      // Extract author and title from URL like the original
+      const urlMatch = url.match(
+        /https?:\/\/(?:www\.)?soundgasm\.net\/u\/([A-Za-z0-9\-_]+)\/([A-Za-z0-9\-_]+)/
+      );
+      if (!urlMatch) {
+        throw new Error("Invalid Soundgasm URL format");
+      }
+
+      const author = urlMatch[1];
+      const titleFromUrl = urlMatch[2];
+
+      // Extract detailed title, description, and duration from page
+      const { detailedTitle, description, duration } = await this.page.evaluate(() => {
+        const titleElement = document.querySelector(".jp-title");
+        const descriptionElement = document.querySelector(".jp-description");
+        
+        // Try to get duration from the page - look for time display elements
+        let duration = null;
+        const timeElements = document.querySelectorAll('[class*="time"], .jp-duration, .duration');
+        for (const el of timeElements) {
+          const text = el.textContent.trim();
+          if (text.includes(':') && text.includes('-')) {
+            // Extract duration from format like "-49:15"
+            const match = text.match(/-?(\d+):(\d+)/);
+            if (match) {
+              const minutes = parseInt(match[1]);
+              const seconds = parseInt(match[2]);
+              duration = minutes * 60 + seconds;
+            }
+          }
+        }
+
+        return {
+          detailedTitle: titleElement ? titleElement.textContent.trim() : null,
+          description: descriptionElement
+            ? descriptionElement.textContent.trim()
+            : null,
+          duration: duration
+        };
+      });
+
+      // Use detailed title for metadata, but URL slug for filename (like original)
+      const pageTitle = await this.page.title();
+      const title = detailedTitle || pageTitle || titleFromUrl;
+
+      // Extract tags from description
+      const tags = this.parseTags(description || "");
+
+      return {
+        title: title.trim(),
+        author: author.trim(),
+        titleFromUrl: titleFromUrl, // For filename
+        description: (description || "").trim(),
+        tags: tags,
+        expectedDuration: duration // Duration from page in seconds
+      };
+    } catch (error) {
+      console.error("Failed to extract metadata:", error);
+      throw error;
+    }
+  }
+
+  async extractAudioUrl() {
+    try {
+      // Use the same approach as the original extractor
       const audioUrl = await this.page.evaluate(() => {
         // First try to find the audio element
         const audioElement = document.querySelector("audio");
@@ -145,291 +189,141 @@ class SoundgasmExtractor {
         );
         return match ? match[1] : null;
       });
-
+      
       if (!audioUrl) {
         throw new Error("Could not find audio URL in Soundgasm page");
       }
 
-      console.log(`🎵 Found audio URL: ${audioUrl}`);
-
-      // Extract metadata from URL
-      const urlMatch = soundgasmUrl.match(
-        /https?:\/\/(?:www\.)?soundgasm\.net\/u\/([A-Za-z0-9\-_]+)\/([A-Za-z0-9\-_]+)/
-      );
-      if (!urlMatch) {
-        throw new Error("Invalid Soundgasm URL format");
-      }
-
-      const author = urlMatch[1];
-      const titleFromUrl = urlMatch[2];
-
-      // Extract detailed title and description from page
-      const { detailedTitle, description } = await this.page.evaluate(() => {
-        const titleElement = document.querySelector(".jp-title");
-        const descriptionElement = document.querySelector(".jp-description");
-
-        return {
-          detailedTitle: titleElement ? titleElement.textContent.trim() : null,
-          description: descriptionElement
-            ? descriptionElement.textContent.trim()
-            : null,
-        };
-      });
-
-      // Use detailed title for metadata, but URL slug for filename
-      const pageTitle = await this.page.title();
-      const title = detailedTitle || pageTitle || titleFromUrl;
-
-      console.log(`📊 Extracting from Soundgasm:`);
-      console.log(`  🎭 Title: ${title}`);
-      console.log(`  👤 Author: ${author}`);
-      console.log(`  🏷️ URL Slug: ${titleFromUrl}`);
-
-      // Create directory structure: soundgasm_data/<user>/<release>/
-      const userDir = path.join(this.outputDir, author);
-      const releaseDir = path.join(userDir, titleFromUrl);
-      await fs.mkdir(releaseDir, { recursive: true });
-
-      // Use URL slug for filename (safer for filesystem)
-      const filename = titleFromUrl; // Already clean from URL structure
-
-      const dataFilename = path.join(releaseDir, `${filename}.json`);
-      const audioFilename = path.join(releaseDir, `${filename}.m4a`);
-      const htmlFilename = path.join(releaseDir, `${filename}.html`);
-
-      // Check if files already exist
-      const [audioExists, dataExists, htmlExists] = await Promise.all([
-        fs
-          .access(audioFilename)
-          .then(() => true)
-          .catch(() => false),
-        fs
-          .access(dataFilename)
-          .then(() => true)
-          .catch(() => false),
-        fs
-          .access(htmlFilename)
-          .then(() => true)
-          .catch(() => false),
-      ]);
-
-      if (audioExists && dataExists && htmlExists) {
-        console.log(
-          `⏭️ ${filename}.m4a, ${filename}.json, and ${filename}.html already exist! Skipping...`
-        );
-        return {
-          skipped: true,
-          title: title,
-          author: author,
-        };
-      }
-
-      // Extract metadata
-      const metadata = this.extractMetadata(
-        soundgasmUrl,
-        title,
-        description,
-        author
-      );
-      metadata.audio_url = audioUrl;
-
-      // Save metadata
-      await fs.writeFile(
-        dataFilename,
-        JSON.stringify(metadata, null, 2),
-        "utf8"
-      );
-      console.log(`💾 Metadata saved to: ${filename}.json`);
-
-      // Save HTML backup
-      const pageSource = await this.page.content();
-      await fs.writeFile(htmlFilename, pageSource, "utf8");
-      console.log(`💾 HTML backup saved to: ${filename}.html`);
-
-      // Download audio file
-      console.log(`📥 Downloading audio to: ${filename}.m4a`);
-      const success = await this.downloadFile(audioUrl, audioFilename);
-
-      if (success) {
-        console.log(`✅ Successfully extracted: ${title} by ${author}`);
-        return {
-          success: true,
-          title: title,
-          author: author,
-          metadata: metadata,
-        };
-      } else {
-        console.error("❌ Failed to download audio file after maximum retries");
-        // Clean up metadata and HTML files if audio download failed
-        await Promise.allSettled([
-          fs.unlink(dataFilename),
-          fs.unlink(htmlFilename),
-        ]);
-        return {
-          success: false,
-          title: title,
-          author: author,
-          error: "Audio download failed",
-        };
-      }
+      return audioUrl;
     } catch (error) {
-      console.error(`❌ Error processing Soundgasm URL: ${error.message}`);
-      return {
-        success: false,
-        error: error.message,
-      };
+      console.error("Failed to extract audio URL:", error);
+      throw error;
     }
   }
 
-  async ensureOutputDir() {
+  async downloadAudio(audioUrl, metadata) {
+    // Use titleFromUrl for filename and create release directory structure
+    const filename = metadata.titleFromUrl;
+    const authorDir = path.join(this.outputDir, metadata.author);
+    const releaseDir = path.join(authorDir, filename);
+    await fs.mkdir(releaseDir, { recursive: true });
+
+    const audioFilePath = path.join(releaseDir, `${filename}.m4a`);
+
     try {
-      await fs.mkdir(this.outputDir, { recursive: true });
+      console.log(`⬇️  Downloading audio: ${audioUrl}`);
+      
+      const response = await this.page.context().request.get(audioUrl);
+      if (!response.ok()) {
+        throw new Error(`HTTP ${response.status()}: ${response.statusText()}`);
+      }
+
+      const buffer = await response.body();
+      await fs.writeFile(audioFilePath, buffer);
+      
+      console.log(`💾 Audio saved: ${audioFilePath}`);
+      return audioFilePath;
     } catch (error) {
-      // Directory might already exist, ignore error
+      console.error(`Failed to download audio from ${audioUrl}:`, error);
+      throw error;
     }
   }
 
-  async extractFromUrls(urls) {
-    console.log(`🚀 Starting Soundgasm extraction for ${urls.length} URLs...`);
+  async saveMetadata(content) {
+    const releaseDir = path.dirname(content.originalMediaFile.filePath);
+    const baseName = path.basename(content.originalMediaFile.filePath, path.extname(content.originalMediaFile.filePath));
+    
+    // Save comprehensive metadata including transformations
+    const metadataPath = path.join(releaseDir, `${baseName}.json`);
+    await fs.writeFile(metadataPath, JSON.stringify(content, null, 2));
 
-    const results = [];
-    const failedUrls = [];
+    // Save HTML backup
+    const htmlContent = await this.page.content();
+    const htmlPath = path.join(releaseDir, `${baseName}.html`);
+    await fs.writeFile(htmlPath, htmlContent);
+  }
 
-    for (let i = 0; i < urls.length; i++) {
-      const url = urls[i];
-      console.log(`\n📥 Processing audio ${i + 1}/${urls.length}: ${url}`);
-
-      const result = await this.extractSoundgasm(url);
-      results.push(result);
-
-      if (!result.success && !result.skipped) {
-        failedUrls.push({ url, error: result.error });
-      }
+  parseTags(description) {
+    const tagRegex = /\[([^\]]+)\]/g;
+    const tags = [];
+    let match;
+    
+    while ((match = tagRegex.exec(description)) !== null) {
+      tags.push(match[1]);
     }
+    
+    return tags;
+  }
 
-    const successful = results.filter((r) => r.success).length;
-    const skipped = results.filter((r) => r.skipped).length;
-    const failed = results.filter((r) => !r.success && !r.skipped).length;
+  generateContentId(url) {
+    const crypto = require('crypto');
+    return crypto.createHash('md5').update(url).digest('hex');
+  }
 
-    console.log(`\n📊 Extraction Summary:`);
-    console.log(`✅ Successfully processed: ${successful}`);
-    console.log(`⏭️ Skipped (already exist): ${skipped}`);
-    console.log(`❌ Failed: ${failed}`);
+  sanitizeFilename(filename) {
+    return filename.replace(/[<>:"/\\|?*]/g, '-').replace(/\s+/g, '-');
+  }
 
-    // Save failed URLs if any
-    if (failedUrls.length > 0) {
-      const timestamp = new Date()
-        .toISOString()
-        .replace(/[:.]/g, "-")
-        .split("T")[0];
-      const failedFilename = `failed_soundgasm_urls_${timestamp}.json`;
-      const failedFilepath = path.join(this.outputDir, failedFilename);
-      await fs.writeFile(
-        failedFilepath,
-        JSON.stringify(failedUrls, null, 2),
-        "utf8"
-      );
-      console.log(`📝 Failed URLs saved to: ${failedFilename}`);
+  async ensureRateLimit() {
+    const now = Date.now();
+    const timeSinceLastRequest = now - this.lastRequestTime;
+    
+    if (timeSinceLastRequest < this.requestDelay) {
+      const delay = this.requestDelay - timeSinceLastRequest;
+      console.log(`⏳ Rate limiting: waiting ${delay}ms`);
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
-
-    return results;
+    
+    this.lastRequestTime = Date.now();
   }
 }
 
-async function main() {
-  const program = new Command();
+module.exports = SoundgasmExtractor;
 
+// Example usage
+if (require.main === module) {
+  const { Command } = require("commander");
+  
+  const program = new Command();
   program
     .name("soundgasm-extractor")
-    .description("Extract audio files and metadata from Soundgasm")
-    .version("1.0.0")
-    .argument("[urls...]", "Soundgasm URLs to extract")
+    .description("Extract audio content from Soundgasm with transformations")
+    .version("2.0.0");
+
+  program
+    .command("extract")
+    .description("Extract content from a Soundgasm URL")
+    .argument("<url>", "Soundgasm URL to extract")
     .option("-o, --output <dir>", "Output directory", "soundgasm_data")
-    .option(
-      "-d, --delay <number>",
-      "Delay between requests in milliseconds",
-      parseInt,
-      2000
-    )
-    .option("-f, --url-file <file>", "File containing URLs (one per line)")
-    .parse();
+    .option("--no-transform", "Disable transformations")
+    .option("--pipeline <name>", "Transformation pipeline", "AUDIO_TO_VIDEO")
+    .action(async (url, options) => {
+      const extractor = new SoundgasmExtractor(options.output, {
+        enableTransformations: options.transform,
+        defaultPipeline: options.pipeline
+      });
 
-  const options = program.opts();
-  let urls = program.args;
-
-  try {
-    // Get URLs from file if specified
-    if (options.urlFile) {
-      const urlFile = path.resolve(options.urlFile);
       try {
-        const fileContent = await fs.readFile(urlFile, "utf8");
-        urls = fileContent
-          .split("\n")
-          .map((line) => line.trim())
-          .filter((line) => line && !line.startsWith("#"));
-        console.log(`📂 Loaded ${urls.length} URLs from ${options.urlFile}`);
+        await extractor.setupPlaywright();
+        const content = await extractor.extract(url);
+        
+        console.log("\n📊 Extraction Summary:");
+        console.log(`Title: ${content.title}`);
+        console.log(`Author: ${content.author}`);
+        console.log(`Original file: ${content.originalMediaFile.filePath}`);
+        console.log(`Transformations: ${content.transformations.length}`);
+        
+        if (content.transformedMediaFiles.length > 0) {
+          console.log(`Final output: ${content.getFinalMediaFile().filePath}`);
+        }
+        
       } catch (error) {
-        console.error(`❌ URL file not found: ${options.urlFile}`);
+        console.error("❌ Extraction failed:", error.message);
         process.exit(1);
+      } finally {
+        await extractor.closeBrowser();
       }
-    }
+    });
 
-    if (!urls || urls.length === 0) {
-      console.error("❌ No URLs provided");
-      console.log("Usage: node soundgasm-extractor.js <soundgasm-url>");
-      console.log(
-        "Example: node soundgasm-extractor.js https://soundgasm.net/u/username/audioname"
-      );
-      process.exit(1);
-    }
-
-    // Validate URLs
-    const invalidUrls = urls.filter((url) => !url.includes("soundgasm.net"));
-    if (invalidUrls.length > 0) {
-      console.error("❌ Invalid Soundgasm URLs found:");
-      invalidUrls.forEach((url) => console.error(`  ${url}`));
-      process.exit(1);
-    }
-
-    // Initialize extractor
-    const extractor = new SoundgasmExtractor(options.output);
-    extractor.requestDelay = options.delay;
-
-    await extractor.ensureOutputDir();
-    await extractor.setupPlaywright();
-
-    // Extract audio files
-    const results = await extractor.extractFromUrls(urls);
-
-    const successful = results.filter((r) => r.success).length;
-    console.log(`\n🎉 Extraction complete!`);
-    console.log(`📁 Results saved to: ${extractor.outputDir}`);
-    console.log(`📊 Successfully processed ${successful} audio files`);
-
-    // Close browser
-    await extractor.closeBrowser();
-  } catch (error) {
-    if (error.name === "CommanderError") {
-      // Commander error, already handled
-      process.exit(1);
-    }
-
-    console.error(`\n❌ Error: ${error.message}`);
-    process.exit(1);
-  }
+  program.parse();
 }
-
-// Handle graceful shutdown
-process.on("SIGINT", () => {
-  console.log("\n⏹️ Extraction interrupted by user");
-  process.exit(0);
-});
-
-if (require.main === module) {
-  main().catch((error) => {
-    console.error("❌ Unhandled error:", error);
-    process.exit(1);
-  });
-}
-
-module.exports = { SoundgasmExtractor };
