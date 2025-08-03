@@ -199,7 +199,7 @@ ${selftext}
 PREPROCESSED DATA (use this as guidance):
 - Performers detected: ${preprocessedData.performers.count} (${preprocessedData.performers.primary} + ${preprocessedData.performers.additional.join(', ')})
 - Script info: ${preprocessedData.script.fillType} by ${preprocessedData.script.author}
-- Alternatives: ${preprocessedData.alternatives.hasAlternatives ? 'Yes' : 'No'}
+- Audio versions: ${preprocessedData.audio_versions.length} version(s) detected
 
 Focus only on:
 1. Series information (part of series, sequels, prequels)
@@ -327,13 +327,7 @@ Return JSON with this structure:
         confidence: "high"
       };
       
-      analysis.alternatives = {
-        hasAlternatives: preprocessedData.alternatives.hasAlternatives,
-        versions: preprocessedData.alternatives.versions,
-        description: preprocessedData.alternatives.hasAlternatives ? 
-          preprocessedData.alternatives.versions.join(" and ") : "Single version audio",
-        confidence: "high"
-      };
+      analysis.audio_versions = preprocessedData.audio_versions;
 
       analysis.script = preprocessedData.script;
 

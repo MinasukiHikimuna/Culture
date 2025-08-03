@@ -62,12 +62,22 @@ The script returns structured JSON with the following format:
     "additional": [],
     "confidence": "high"
   },
-  "alternatives": {
-    "hasAlternatives": false,
-    "versions": [],
-    "description": "Single version audio",
-    "confidence": "high"
-  },
+  "audio_versions": [
+    {
+      "version_name": "Main Audio",
+      "description": "Primary audio version",
+      "urls": [
+        {
+          "platform": "Soundgasm",
+          "url": "https://soundgasm.net/u/alekirser/audio-title"
+        },
+        {
+          "platform": "Whypit",
+          "url": "https://whyp.it/tracks/12345/audio-title"
+        }
+      ]
+    }
+  ],
   "series": {
     "isPartOfSeries": false,
     "hasPrequels": false,
@@ -91,6 +101,72 @@ The script returns structured JSON with the following format:
     "analyzed_at": "2024-01-15T10:30:00.000Z"
   }
 }
+```
+
+## Audio Versions Structure
+
+The `audio_versions` field contains an array of different audio versions, each with:
+
+- **version_name**: Descriptive name (e.g., "Main Audio", "F4M Version", "Bloopers")
+- **description**: Detailed description of this version
+- **urls**: Array of URLs where this version is available, each containing:
+  - **platform**: Platform name (e.g., "Soundgasm", "Whypit", "Hotaudio")
+  - **url**: Direct URL to the audio file
+
+### Example Audio Version Patterns
+
+**Single version with multiple platforms:**
+```json
+"audio_versions": [
+  {
+    "version_name": "Main Audio",
+    "description": "Primary audio version",
+    "urls": [
+      { "platform": "Soundgasm", "url": "https://soundgasm.net/u/performer/audio" },
+      { "platform": "Whypit", "url": "https://whyp.it/tracks/12345/audio" }
+    ]
+  }
+]
+```
+
+**Multiple versions (F4M/F4F):**
+```json
+"audio_versions": [
+  {
+    "version_name": "F4M Version",
+    "description": "Version for male listeners",
+    "urls": [
+      { "platform": "Soundgasm", "url": "https://soundgasm.net/u/performer/f4m-audio" }
+    ]
+  },
+  {
+    "version_name": "F4F Version", 
+    "description": "Version for female listeners",
+    "urls": [
+      { "platform": "Soundgasm", "url": "https://soundgasm.net/u/performer/f4f-audio" }
+    ]
+  }
+]
+```
+
+**Main audio plus bloopers:**
+```json
+"audio_versions": [
+  {
+    "version_name": "Main Audio",
+    "description": "Primary audio version",
+    "urls": [
+      { "platform": "Soundgasm", "url": "https://soundgasm.net/u/performer/main" }
+    ]
+  },
+  {
+    "version_name": "Bloopers",
+    "description": "Outtakes and mistakes from recording",
+    "urls": [
+      { "platform": "Soundgasm", "url": "https://soundgasm.net/u/performer/bloopers" }
+    ]
+  }
+]
 ```
 
 ## Script Analysis Fields
