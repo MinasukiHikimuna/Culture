@@ -221,6 +221,73 @@ Return JSON with this structure:
   }
 
   /**
+   * Creates version naming prompt for generating file/directory slugs
+   */
+  createVersionNamingPrompt(postData, audioVersions) {
+    const { title, selftext, post_id } = postData.reddit_data;
+    
+    return `You are a file naming expert. Analyze this Reddit post and its audio versions to create optimal flat file naming within a single directory.
+
+CRITICAL: Your response must be ONLY valid JSON. No reasoning or explanations.
+
+POST: ${title}
+CONTENT: ${selftext}
+POST_ID: ${post_id}
+
+AUDIO VERSIONS DETECTED:
+${audioVersions.map((v, i) => `${i+1}. ${v.version_name || 'Version ' + (i+1)}: ${v.description || ''} | URLs: ${v.urls.map(u => u.url).join(', ')}`).join('\n')}
+
+NAMING PATTERN: {post_id}_{release_slug}_-_{version_slug}.{ext}
+
+RELEASE SLUG RULES:
+- Extract core title, remove brackets and gender tags
+- Convert to lowercase snake_case
+- Maximum 40 characters
+- Examples: "sweet_southern_hospitality", "anniversary_date", "let_me_cater_to_you"
+
+VERSION SLUG RULES:
+1. **Multi-scenario projects** (8+ audios, different stories):
+   - Use scenario names: "intro", "learning_to_ride_horse", "southern_cookin"
+   
+2. **Gender variants** (F4M/F4F/M4F/M4M):
+   - Use gender tags: "f4m", "f4f", "m4f", "m4m"
+   
+3. **Audio quality variants**:
+   - "sfx + music" → "sfx_music"
+   - "sfx + no music" → "sfx_no_music" 
+   - "just vocals" → "vocals_only"
+   - "with wet sounds" → "wet_sounds"
+   
+4. **Combined variants**: Combine with underscore
+   - "f4m_sfx_music", "f4f_vocals_only"
+
+5. **Single version**: Use primary gender tag or "default"
+
+SANITIZATION:
+- Lowercase only
+- Replace spaces/punctuation with underscores
+- Remove brackets, quotes, emojis
+- Maximum 30 characters per version slug
+
+Return JSON:
+{
+  "release_directory": "{post_id}_{release_slug}",
+  "release_slug": "{sanitized_release_title}",
+  "audio_files": [
+    {
+      "filename": "{post_id}_{release_slug}_-_{version_slug}.{ext}",
+      "version_slug": "{sanitized_version_name}",
+      "display_name": "{human_readable_version_name}",
+      "detected_tags": ["{tag1}", "{tag2}"],
+      "audio_urls": ["{url1}", "{url2}"],
+      "metadata_file": "{post_id}_{release_slug}_-_{version_slug}.json"
+    }
+  ],
+  "structure_type": "{multi_scenario|gender_variants|quality_variants|combined_variants|single_version}"
+}`;
+  }
+
+  /**
    * Calls the local LLM API to analyze the post
    */
   async callLLM(prompt) {
@@ -297,6 +364,61 @@ Return JSON with this structure:
   }
 
   /**
+   * Generates version naming information using LLM
+   */
+  async generateVersionNaming(postData, audioVersions) {
+    try {
+      const prompt = this.createVersionNamingPrompt(postData, audioVersions);
+      const llmResponse = await this.callLLM(prompt);
+      const namingData = this.parseResponse(llmResponse);
+      return namingData;
+    } catch (error) {
+      console.error(`Version naming generation failed: ${error.message}`);
+      // Fallback to simple naming
+      return this.generateFallbackNaming(postData, audioVersions);
+    }
+  }
+
+  /**
+   * Generates fallback naming when LLM fails
+   */
+  generateFallbackNaming(postData, audioVersions) {
+    const postId = postData.reddit_data.post_id || postData.post_id;
+    const title = postData.reddit_data.title || '';
+    
+    // Simple slug generation
+    const releaseSlug = title
+      .replace(/\[.*?\]/g, '') // Remove brackets
+      .replace(/[^\w\s]/g, '') // Remove special chars
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, '_')
+      .substring(0, 40);
+
+    const audioFiles = audioVersions.map((version, index) => {
+      const versionSlug = version.version_name 
+        ? version.version_name.toLowerCase().replace(/\s+/g, '_').replace(/[^\w_]/g, '')
+        : `version_${index + 1}`;
+      
+      return {
+        filename: `${postId}_${releaseSlug}_-_${versionSlug}.m4a`,
+        version_slug: versionSlug,
+        display_name: version.version_name || `Version ${index + 1}`,
+        detected_tags: [],
+        audio_urls: version.urls.map(u => u.url),
+        metadata_file: `${postId}_${releaseSlug}_-_${versionSlug}.json`
+      };
+    });
+
+    return {
+      release_directory: `${postId}_${releaseSlug}`,
+      release_slug: releaseSlug,
+      audio_files: audioFiles,
+      structure_type: audioVersions.length > 1 ? 'multiple_versions' : 'single_version'
+    };
+  }
+
+  /**
    * Analyzes a single Reddit post file with preprocessing
    */
   async analyzePost(filePath) {
@@ -341,6 +463,26 @@ Return JSON with this structure:
           confidence: "high"
         };
       }
+
+      // Generate version naming information
+      console.log(`Generating version naming for ${analysis.audio_versions.length} audio version(s)...`);
+      const versionNaming = await this.generateVersionNaming(postData, analysis.audio_versions);
+      
+      // Enhance audio_versions with slug information
+      if (versionNaming && versionNaming.audio_files) {
+        analysis.audio_versions = analysis.audio_versions.map((version, index) => {
+          const namingInfo = versionNaming.audio_files[index] || versionNaming.audio_files[0];
+          return {
+            ...version,
+            slug: namingInfo ? namingInfo.version_slug : `version_${index + 1}`,
+            filename: namingInfo ? namingInfo.filename : `${postData.post_id}_audio_${index + 1}.m4a`,
+            metadata_file: namingInfo ? namingInfo.metadata_file : `${postData.post_id}_audio_${index + 1}.json`
+          };
+        });
+      }
+
+      // Add version naming metadata
+      analysis.version_naming = versionNaming;
 
       // Add metadata
       analysis.metadata = {

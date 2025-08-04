@@ -369,20 +369,98 @@ class ReleaseOrchestrator {
       llmAnalysis: llmAnalysis
     });
     
+    // Determine target directory structure
+    let releaseDir;
+    if (llmAnalysis?.version_naming?.release_directory) {
+      releaseDir = path.join(
+        this.config.dataDir,
+        'releases',
+        post.author,
+        llmAnalysis.version_naming.release_directory
+      );
+    } else {
+      releaseDir = path.join(
+        this.config.dataDir,
+        'releases',
+        post.author,
+        release.id
+      );
+    }
+    
+    await fs.mkdir(releaseDir, { recursive: true });
+    
     // Extract audio URLs from post and analysis
     const audioUrls = this.extractAudioUrls(post, llmAnalysis);
     console.log(`🔗 Found ${audioUrls.length} audio URLs`);
     
-    // Extract each audio source
-    for (const url of audioUrls) {
-      try {
-        console.log(`📥 Extracting: ${url}`);
-        const audioSource = await this.extractAudio(url);
-        release.addAudioSource(audioSource);
-        console.log(`✅ Added audio source from ${audioSource.metadata.platform.name}`);
-      } catch (error) {
-        console.error(`❌ Failed to extract ${url}: ${error.message}`);
-        // Continue with other URLs
+    // Process each audio version with proper naming
+    if (llmAnalysis?.audio_versions && llmAnalysis.audio_versions.length > 0) {
+      for (let i = 0; i < llmAnalysis.audio_versions.length; i++) {
+        const audioVersion = llmAnalysis.audio_versions[i];
+        
+        if (audioVersion.urls && audioVersion.urls.length > 0) {
+          for (const urlInfo of audioVersion.urls) {
+            try {
+              console.log(`📥 Extracting: ${urlInfo.url} (${audioVersion.version_name || `Version ${i+1}`})`);
+              const audioSource = await this.extractAudio(urlInfo.url);
+              
+              // Update file path to use new naming if available
+              if (audioVersion.filename) {
+                const newFilePath = path.join(releaseDir, audioVersion.filename);
+                if (audioSource.audio.filePath && audioSource.audio.filePath !== newFilePath) {
+                  // Move/rename the downloaded file to match new naming
+                  try {
+                    await fs.rename(audioSource.audio.filePath, newFilePath);
+                    audioSource.audio.filePath = newFilePath;
+                    console.log(`📝 Renamed file to: ${audioVersion.filename}`);
+                  } catch (renameError) {
+                    console.warn(`⚠️ Could not rename file: ${renameError.message}`);
+                  }
+                }
+              }
+              
+              // Add version-specific metadata
+              audioSource.versionInfo = {
+                slug: audioVersion.slug,
+                version_name: audioVersion.version_name,
+                description: audioVersion.description
+              };
+              
+              release.addAudioSource(audioSource);
+              console.log(`✅ Added audio source: ${audioVersion.version_name || 'Version'} from ${audioSource.metadata.platform.name}`);
+              
+              // Save individual version metadata if specified
+              if (audioVersion.metadata_file) {
+                const metadataPath = path.join(releaseDir, audioVersion.metadata_file);
+                const versionMetadata = {
+                  version_info: audioSource.versionInfo,
+                  audio_metadata: audioSource.metadata,
+                  platform_data: audioSource.platformData,
+                  extracted_at: new Date().toISOString()
+                };
+                await fs.writeFile(metadataPath, JSON.stringify(versionMetadata, null, 2));
+                console.log(`📄 Saved version metadata: ${audioVersion.metadata_file}`);
+              }
+              
+            } catch (error) {
+              console.error(`❌ Failed to extract ${urlInfo.url}: ${error.message}`);
+              // Continue with other URLs
+            }
+          }
+        }
+      }
+    } else {
+      // Fallback: process URLs directly (old method)
+      for (const url of audioUrls) {
+        try {
+          console.log(`📥 Extracting: ${url}`);
+          const audioSource = await this.extractAudio(url);
+          release.addAudioSource(audioSource);
+          console.log(`✅ Added audio source from ${audioSource.metadata.platform.name}`);
+        } catch (error) {
+          console.error(`❌ Failed to extract ${url}: ${error.message}`);
+          // Continue with other URLs
+        }
       }
     }
     
@@ -434,19 +512,33 @@ class ReleaseOrchestrator {
   }
   
   /**
-   * Save release to storage
+   * Save release to storage using new naming structure
    */
   async saveRelease(release) {
-    const releaseDir = path.join(
-      this.config.dataDir,
-      'releases',
-      release.primaryPerformer,
-      release.id
-    );
+    // Use version naming if available, otherwise fallback to old structure
+    let releaseDir;
+    
+    if (release.enrichmentData?.llmAnalysis?.version_naming?.release_directory) {
+      // Use new naming structure: data/releases/performer/release_directory/
+      releaseDir = path.join(
+        this.config.dataDir,
+        'releases',
+        release.primaryPerformer,
+        release.enrichmentData.llmAnalysis.version_naming.release_directory
+      );
+    } else {
+      // Fallback to old structure
+      releaseDir = path.join(
+        this.config.dataDir,
+        'releases',
+        release.primaryPerformer,
+        release.id
+      );
+    }
     
     await fs.mkdir(releaseDir, { recursive: true });
     
-    // Save release metadata
+    // Save release metadata in the same directory as audio files
     const releasePath = path.join(releaseDir, 'release.json');
     await fs.writeFile(releasePath, JSON.stringify(release, null, 2));
     
@@ -531,26 +623,9 @@ module.exports = {
   AudioSource
 };
 
-// CLI interface
+// CLI interface - no direct execution
 if (require.main === module) {
-  async function main() {
-    const orchestrator = new ReleaseOrchestrator({
-      dataDir: 'data',
-      cacheEnabled: true,
-      validateExtractions: true
-    });
-    
-    // Example usage
-    const testPost = {
-      title: "[F4M] Test Audio Release",
-      author: "TestPerformer",
-      created_utc: new Date().toISOString(),
-      selftext: "Check out my new audio: https://soundgasm.net/u/TestPerformer/Test-Audio"
-    };
-    
-    const release = await orchestrator.processPost(testPost);
-    console.log('📊 Release created:', release);
-  }
-  
-  main().catch(console.error);
+  console.log('ReleaseOrchestrator is a library module.');
+  console.log('Use download-orchestrator.js to process analysis files.');
+  console.log('Example: node download-orchestrator.js analysis_results/your_file.json');
 }
