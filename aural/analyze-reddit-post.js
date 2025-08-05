@@ -376,13 +376,47 @@ Return JSON:
   }
 
   /**
+   * Parses and validates the version naming LLM response
+   */
+  parseVersionNamingResponse(responseText) {
+    try {
+      // Remove any reasoning tokens and other unwanted text
+      let cleanText = responseText
+        .replace(/<think>[\s\S]*?<\/think>/gi, '')
+        .replace(/^[^{]*/, '') // Remove everything before first {
+        .replace(/[^}]*$/, '') // Remove everything after last }
+        .trim();
+      
+      // If we still don't have clean JSON, try to extract it
+      if (!cleanText.startsWith('{')) {
+        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+        cleanText = jsonMatch ? jsonMatch[0] : responseText;
+      }
+      
+      const jsonText = cleanText;
+
+      const parsed = JSON.parse(jsonText);
+
+      // Validate version naming response structure
+      if (!parsed.release_directory || !parsed.release_slug || !parsed.audio_files) {
+        throw new Error(`Missing required fields for version naming`);
+      }
+
+      return parsed;
+    } catch (error) {
+      console.error("Failed to parse version naming LLM response:", responseText);
+      throw new Error("Invalid JSON response from LLM: " + error.message);
+    }
+  }
+
+  /**
    * Generates version naming information using LLM
    */
   async generateVersionNaming(postData, audioVersions) {
     try {
       const prompt = this.createVersionNamingPrompt(postData, audioVersions);
       const llmResponse = await this.callLLM(prompt);
-      const namingData = this.parseResponse(llmResponse);
+      const namingData = this.parseVersionNamingResponse(llmResponse);
       return namingData;
     } catch (error) {
       console.error(`Version naming generation failed: ${error.message}`);
