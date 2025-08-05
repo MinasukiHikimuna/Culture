@@ -79,14 +79,29 @@ class RedditPostPreprocessor {
   /**
    * Extract script information
    */
-  extractScriptInfo(content) {
+  extractScriptInfo(content, link_flair_text = null) {
     const result = {
       url: null,
       author: null,
       fillType: 'unknown'
     };
 
-    // Check for private fill first (highest priority)
+    // Check flair first (highest priority)
+    if (link_flair_text) {
+      if (link_flair_text === 'OC') {
+        result.fillType = 'original';
+        result.url = null;
+        // For OC, the author is the poster (will be set later)
+        return result;
+      } else if (link_flair_text === 'Script Fill') {
+        result.fillType = 'public';
+      } else if (link_flair_text === 'Private Script Fill') {
+        result.fillType = 'private';
+        result.url = null;
+      }
+    }
+
+    // Check for private fill patterns (overrides flair if explicit)
     const privateMatch = content.match(this.scriptPatterns.privatePattern) || 
                          content.match(this.scriptPatterns.scriptWrittenPattern);
     if (privateMatch) {
@@ -338,11 +353,11 @@ class RedditPostPreprocessor {
    * Main preprocessing function
    */
   preprocess(postData) {
-    const { title, selftext, author } = postData.reddit_data;
+    const { title, selftext, author, link_flair_text } = postData.reddit_data;
     
     // Extract structured information
     const collaborators = this.extractCollaborators(title, selftext);
-    const scriptInfo = this.extractScriptInfo(selftext);
+    const scriptInfo = this.extractScriptInfo(selftext, link_flair_text);
     const audioVersions = this.extractAudioVersions(selftext);
     const seriesInfo = this.extractSeriesInfo(title, selftext);
 

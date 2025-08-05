@@ -19,7 +19,7 @@ class RedditPostAnalyzer {
    * Creates a structured prompt for the LLM to analyze the Reddit post
    */
   createAnalysisPrompt(postData) {
-    const { title, selftext, author, comments } = postData.reddit_data;
+    const { title, selftext, author, comments, link_flair_text } = postData.reddit_data;
     
     // Get first few comments for collaboration detection
     const topComments = comments ? comments.slice(0, 5).map(c => 
@@ -32,6 +32,7 @@ CRITICAL: Your response must be ONLY valid JSON. Do not include <think> tags, re
 
 POSTER USERNAME: ${author}
 TITLE: ${title}
+FLAIR: ${link_flair_text || 'No flair'}
 
 POST CONTENT:
 ${selftext}
@@ -70,6 +71,13 @@ Please analyze and return JSON with this exact structure:
 }
 
 CRITICAL SCRIPT ANALYSIS RULES - READ CAREFULLY:
+
+FLAIR-BASED FILL TYPE (USE THIS FIRST):
+- **FLAIR: "OC"** = fillType: "original" (Original Content - no script)
+- **FLAIR: "Script Fill"** = fillType: "public" (Public script fill)
+- **FLAIR: "Private Script Fill"** = fillType: "private" (Private script fill)
+- **FLAIR: "Audio" or No flair** = Analyze post content to determine
+
 1. URL IDENTIFICATION - Look for these EXACT patterns:
    - **"[script](URL)"** = script URL (extract this URL immediately!)
    - **"script:" followed by URL** = script URL 
@@ -90,6 +98,8 @@ CRITICAL SCRIPT ANALYSIS RULES - READ CAREFULLY:
    - If NO clear attribution = fillType "unknown", author: poster username
 
 3. FILL TYPE CLASSIFICATION - CHECK IN ORDER:
+   - **FIRST CHECK FLAIR** (see FLAIR-BASED FILL TYPE above)
+   - **If flair is "Audio" or missing, then check:**
    - **"written privately" OR "script was written privately"** = "private" (NO URL, script shared privately)
    - **"private fill"** = "private" (NO URL)
    - **Poster says "my script"/"I wrote"/"something I came up with"/"my own stuff"/"trying to write more"** = "original"
@@ -109,11 +119,12 @@ IMPORTANT: If "written privately" is mentioned, it's ALWAYS "private" fillType w
    - Count distinct audio URLs for alternatives
 
 STEP-BY-STEP ANALYSIS:
-1. FIRST: Check for "written privately" - if found, set fillType "private" and url null immediately
-2. IF NOT private: scan post for "[script](URL)" pattern - if found, extract URL 
-3. Then, scan post for "by u/username" pattern - if found, that's the script author
-4. Count only VOICE ACTORS (poster + collaborators), NOT script writers
-5. Count alternatives by finding multiple audio links
+1. FIRST: Check the FLAIR - if "OC", "Script Fill", or "Private Script Fill", use that for fillType
+2. IF flair is "Audio" or missing: Check for "written privately" - if found, set fillType "private" and url null
+3. IF NOT private: scan post for "[script](URL)" pattern - if found, extract URL 
+4. Then, scan post for "by u/username" pattern - if found, that's the script author
+5. Count only VOICE ACTORS (poster + collaborators), NOT script writers
+6. Count alternatives by finding multiple audio links
 
 EXAMPLE WALKTHROUGH:
 1. Script Fill: "[script](https://reddit.com/r/gwa/comments/abc/) by u/CuteEmUp || [AUDIO HERE](https://soundgasm.net/u/alekirser/audio)"
@@ -184,7 +195,7 @@ IMPORTANT: The poster's username is ${author}. When they refer to themselves wit
    * Creates a simplified prompt using preprocessed data
    */
   createSimplifiedPrompt(postData, preprocessedData) {
-    const { title, selftext, author } = postData.reddit_data;
+    const { title, selftext, author, link_flair_text } = postData.reddit_data;
     
     return `Analyze this Reddit post from r/gonewildaudio. 
 
@@ -192,6 +203,7 @@ CRITICAL: Your response must be ONLY valid JSON. Do not include reasoning or exp
 
 POSTER USERNAME: ${author}
 TITLE: ${title}
+FLAIR: ${link_flair_text || 'No flair'}
 
 POST CONTENT:
 ${selftext}
