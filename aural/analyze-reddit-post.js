@@ -5,197 +5,33 @@ const path = require("path");
 const axios = require("axios");
 
 /**
- * Analyzes Reddit post data using local LLM via LM Studio
- * to extract structured information about audio releases
+ * Enhanced Reddit Post Analyzer with Script URL Resolution
+ * 
+ * Extends the original analyzer to use the enhanced preprocessor
+ * that can resolve indirect script references.
  */
-class RedditPostAnalyzer {
+class EnhancedRedditPostAnalyzer {
   constructor(options = {}) {
     this.lmStudioUrl =
       options.lmStudioUrl || "http://localhost:1234/v1/chat/completions";
     this.model = options.model || "local-model";
+    this.enableScriptResolution = options.enableScriptResolution !== false;
   }
 
   /**
-   * Creates a structured prompt for the LLM to analyze the Reddit post
+   * Creates a simplified prompt using enhanced preprocessed data
    */
-  createAnalysisPrompt(postData) {
-    const { title, selftext, author, comments, link_flair_text } = postData.reddit_data;
-    
-    // Get first few comments for collaboration detection
-    const topComments = comments ? comments.slice(0, 5).map(c => 
-      `${c.author}: ${c.body.substring(0, 200)}${c.body.length > 200 ? '...' : ''}`
-    ).join('\n\n') : 'No comments available';
-
-    return `Analyze this Reddit post from r/gonewildaudio and extract specific information. 
-
-CRITICAL: Your response must be ONLY valid JSON. Do not include <think> tags, reasoning, explanations, or any other text. Start directly with { and end with }.
-
-POSTER USERNAME: ${author}
-TITLE: ${title}
-FLAIR: ${link_flair_text || 'No flair'}
-
-POST CONTENT:
-${selftext}
-
-TOP COMMENTS (for collaboration detection):
-${topComments}
-
-Please analyze and return JSON with this exact structure:
-{
-  "performers": {
-    "count": <number>,
-    "primary": "<poster username>",
-    "additional": ["<username1>", "<username2>"],
-    "confidence": "<high|medium|low>"
-  },
-  "alternatives": {
-    "hasAlternatives": <boolean>,
-    "versions": ["<version1>", "<version2>"],
-    "description": "<brief description of alternatives>",
-    "confidence": "<high|medium|low>"
-  },
-  "series": {
-    "isPartOfSeries": <boolean>,
-    "hasPrequels": <boolean>,
-    "hasSequels": <boolean>,
-    "seriesName": "<name if mentioned>",
-    "partNumber": <number or null>,
-    "confidence": "<high|medium|low>"
-  },
-  "script": {
-    "url": "<direct URL to script if available, null if none>",
-    "fillType": "<'original', 'public', 'private', or 'unknown'>",
-    "author": "<username of script author>"
-  },
-  "analysis_notes": "<any additional relevant observations>"
-}
-
-CRITICAL SCRIPT ANALYSIS RULES - READ CAREFULLY:
-
-FLAIR-BASED FILL TYPE (USE THIS FIRST):
-- **FLAIR: "OC"** = fillType: "original" (Original Content - no script)
-- **FLAIR: "Script Fill"** = fillType: "public" (Public script fill)
-- **FLAIR: "Private Script Fill"** = fillType: "private" (Private script fill)
-- **FLAIR: "Audio" or No flair** = Analyze post content to determine
-
-1. URL IDENTIFICATION - Look for these EXACT patterns:
-   - **"[script](URL)"** = script URL (extract this URL immediately!)
-   - **"script:" followed by URL** = script URL 
-   - **"[AUDIO HERE](URL)"** = audio URL (NOT script URL - ignore for script analysis)
-   - **"audio:" followed by URL** = audio URL (NOT script URL - ignore for script analysis)
-   - Script URLs are typically Reddit links (/r/gonewildaudio/comments/)
-   - Audio URLs are typically soundgasm.net, whyp.it, hotaudio.net (DO NOT use these as script URLs)
-   - For original content: script URL should be null (no separate script exists)
-
-2. AUTHOR IDENTIFICATION - Search for these EXACT patterns in order:
-   - **"[script](URL) by u/[username]"** = script author is [username] (most common!)
-   - **"by u/[username]"** anywhere in post = script author is [username]
-   - **"script by u/[username]"** = script author is [username]
-   - **"written by u/[username]"** = script author is [username]
-   - **"written privately by u/[username]"** = script author is [username], fillType "private", url null
-   - **"script was written privately by u/[username]"** = script author is [username], fillType "private", url null
-   - If NO "by u/[username]" found AND poster says "my script"/"I wrote"/"my own stuff"/"trying to write more" = script author is poster
-   - If NO clear attribution = fillType "unknown", author: poster username
-
-3. FILL TYPE CLASSIFICATION - CHECK IN ORDER:
-   - **FIRST CHECK FLAIR** (see FLAIR-BASED FILL TYPE above)
-   - **If flair is "Audio" or missing, then check:**
-   - **"written privately" OR "script was written privately"** = "private" (NO URL, script shared privately)
-   - **"private fill"** = "private" (NO URL)
-   - **Poster says "my script"/"I wrote"/"something I came up with"/"my own stuff"/"trying to write more"** = "original"
-   - **Script URL present + "by u/[username]"** = "public" (public script with URL)
-   - **"[Script Fill]" in title + script attribution** = "public" 
-   - **No script reference AND no attribution** = "original" (likely original content)
-   - **Cannot determine** = "unknown"
-
-IMPORTANT: If "written privately" is mentioned, it's ALWAYS "private" fillType with url: null
-
-4. ALTERNATIVE VERSION DETECTION:
-   - Look for multiple audio links in post content
-   - **"[AUDIO HERE](URL)"** = main audio
-   - **"[bloopers](URL)" OR "(bloopers URL)"** = alternative version
-   - **"bonus" audio links** = alternative version
-   - **"with SFX" and "without SFX"** = alternative versions
-   - Count distinct audio URLs for alternatives
-
-STEP-BY-STEP ANALYSIS:
-1. FIRST: Check the FLAIR - if "OC", "Script Fill", or "Private Script Fill", use that for fillType
-2. IF flair is "Audio" or missing: Check for "written privately" - if found, set fillType "private" and url null
-3. IF NOT private: scan post for "[script](URL)" pattern - if found, extract URL 
-4. Then, scan post for "by u/username" pattern - if found, that's the script author
-5. Count only VOICE ACTORS (poster + collaborators), NOT script writers
-6. Count alternatives by finding multiple audio links
-
-EXAMPLE WALKTHROUGH:
-1. Script Fill: "[script](https://reddit.com/r/gwa/comments/abc/) by u/CuteEmUp || [AUDIO HERE](https://soundgasm.net/u/alekirser/audio)"
-   - Script URL: https://reddit.com/r/gwa/comments/abc/ (extract from [script](URL))
-   - Script Author: CuteEmUp (from "by u/CuteEmUp")
-   - Fill Type: public (has script URL + attribution)
-   - DO NOT use the soundgasm URL as script URL
-
-2. Original Content: "i'm trying to write more of my own stuff || [AUDIO HERE](https://soundgasm.net/audio)"
-   - Script URL: null (no separate script exists)
-   - Script Author: alekirser (poster wrote it)
-   - Fill Type: original (poster created the content)
-
-DOUBLE-CHECK YOUR WORK:
-- Is the URL you extracted from [script](URL) or similar pattern?
-- Does the author come from "by u/[username]" pattern?
-- Are you distinguishing script links from audio links?
-
-Focus on:
-- Performers: Look for mentions of other voice actors, collaborations, or "with [username]"
-  * Check title for collaboration indicators: "collab w/", "with u/", "& u/", "featuring"
-  * Look for thanks/credits in post text: "thank you u/", "thanks to u/", "working with u/"
-  * Check comments for collaborator responses (first comment often from collaborators)
-  * Parse title tags like [FFF4M] = 3 female performers, [M4F] = 1 male performer
-- Alternatives: Different versions (M4F/F4M, with/without SFX, different endings, etc.)
-  * Look for multiple audio links with different descriptions
-  * Check for "versions available", "also posted", "alternative", "bonus"
-- Series: References to previous parts, sequels, ongoing storylines, numbered episodes
-  * Look for "Part 1", "Episode 2", "continued from", "sequel to"
-  * Check for mentions of previous posts or upcoming content
-
-CONFIDENCE LEVELS - VERY IMPORTANT:
-- **high**: When you have clear evidence FOR or AGAINST something
-- **medium**: When evidence is unclear or ambiguous  
-- **low**: Only when you cannot determine at all
-
-EXAMPLES:
-- No collaboration mentioned = "count": 1, "confidence": "high" (high confidence it's solo)
-- No series references = "isPartOfSeries": false, "confidence": "high" (high confidence it's standalone)
-- No alternative versions = "hasAlternatives": false, "confidence": "high" (high confidence single version)
-- Unclear script attribution = "confidence": "medium" or "low"
-
-PERFORMER DETECTION RULES:
-1. Title Analysis: Extract performers from title patterns:
-   - "collab w/ u/username" = collaboration with username
-   - "collab w/ u/user1 & u/user2" = collaboration with user1 AND user2
-   - "[FFF4M]" = 3 female performers total (count FFF = 3)
-   - "& u/username" = additional performer
-2. Post Content: Look for collaboration acknowledgments:
-   - "thank you u/username" = likely collaborator
-   - "working with u/username" = confirmed collaborator
-3. Comments: Check first few comments for collaborator responses
-
-PERFORMER COUNTING - CRITICAL:
-- **ONLY count VOICE ACTORS, not script writers**
-- Primary performer = poster (always 1) 
-- Additional performers = voice actor collaborators ONLY (from "collab w/" patterns)
-- Script authors are NOT performers (they write, don't perform audio)
-- Title tags like [FFF4F] are just format indicators, count actual collaborators
-- Total count = 1 + number of people mentioned in "collab w/" 
-- Example: "collab w/ u/user1 & u/user2" = 1 poster + 2 collaborators = 3 total
-- Example: "script by u/writer" = writer is NOT a performer, exclude from count
-
-IMPORTANT: The poster's username is ${author}. When they refer to themselves with nicknames or signatures, always use their actual username for consistency.`;
-  }
-
-  /**
-   * Creates a simplified prompt using preprocessed data
-   */
-  createSimplifiedPrompt(postData, preprocessedData) {
+  createSimplifiedPrompt(postData, enhancedPreprocessedData) {
     const { title, selftext, author, link_flair_text } = postData.reddit_data;
+    
+    // Build script info summary including resolution details
+    let scriptSummary = `${enhancedPreprocessedData.script.fillType} by ${enhancedPreprocessedData.script.author}`;
+    if (enhancedPreprocessedData.script.url) {
+      scriptSummary += ` (URL: ${enhancedPreprocessedData.script.url})`;
+    }
+    if (enhancedPreprocessedData.script.resolution_info) {
+      scriptSummary += ` [Resolved via ${enhancedPreprocessedData.script.resolution_info.resolved_via}]`;
+    }
     
     return `Analyze this Reddit post from r/gonewildaudio. 
 
@@ -208,10 +44,11 @@ FLAIR: ${link_flair_text || 'No flair'}
 POST CONTENT:
 ${selftext}
 
-PREPROCESSED DATA (use this as guidance):
-- Performers detected: ${preprocessedData.performers.count} (${preprocessedData.performers.primary} + ${preprocessedData.performers.additional.join(', ')})
-- Script info: ${preprocessedData.script.fillType} by ${preprocessedData.script.author}
-- Audio versions: ${preprocessedData.audio_versions.length} version(s) detected
+ENHANCED PREPROCESSED DATA (use this as guidance):
+- Performers detected: ${enhancedPreprocessedData.performers.count} (${enhancedPreprocessedData.performers.primary} + ${enhancedPreprocessedData.performers.additional.join(', ')})
+- Script info: ${scriptSummary}
+- Audio versions: ${enhancedPreprocessedData.audio_versions.length} version(s) detected
+- Script resolution: ${enhancedPreprocessedData.enhancement_metadata.script_resolution_successful ? 'Successful' : 'Not needed/failed'}
 
 Focus only on:
 1. Series information (part of series, sequels, prequels)
@@ -465,7 +302,7 @@ Return JSON:
   }
 
   /**
-   * Analyzes a single Reddit post file with preprocessing
+   * Analyzes a single Reddit post file with enhanced preprocessing
    */
   async analyzePost(filePath) {
     try {
@@ -479,25 +316,27 @@ Return JSON:
 
       console.log(`Analyzing post: ${postData.reddit_data.title}`);
 
-      // Preprocess to extract structured data
-      const RedditPostPreprocessor = require('./preprocess-reddit-post.js');
-      const preprocessor = new RedditPostPreprocessor();
-      const preprocessedData = preprocessor.preprocess(postData);
+      // Enhanced preprocessing with script resolution
+      const EnhancedRedditPreprocessor = require('./enhanced-reddit-preprocessor.js');
+      const preprocessor = new EnhancedRedditPreprocessor({
+        enableScriptResolution: this.enableScriptResolution
+      });
+      const enhancedPreprocessedData = await preprocessor.preprocessEnhanced(postData);
 
-      // Create simplified prompt with preprocessed data
-      const prompt = this.createSimplifiedPrompt(postData, preprocessedData);
+      // Create simplified prompt with enhanced preprocessed data
+      const prompt = this.createSimplifiedPrompt(postData, enhancedPreprocessedData);
       const llmResponse = await this.callLLM(prompt);
       const analysis = this.parseResponse(llmResponse);
 
-      // Override with preprocessed data for accuracy
+      // Override with enhanced preprocessed data for accuracy
       analysis.performers = {
-        ...preprocessedData.performers,
+        ...enhancedPreprocessedData.performers,
         confidence: "high"
       };
       
-      analysis.audio_versions = preprocessedData.audio_versions;
+      analysis.audio_versions = enhancedPreprocessedData.audio_versions;
 
-      analysis.script = preprocessedData.script;
+      analysis.script = enhancedPreprocessedData.script;
 
       // Use series info from LLM or default from preprocessing
       if (analysis.series) {
@@ -505,7 +344,7 @@ Return JSON:
       } else {
         // Fallback to preprocessed series data
         analysis.series = {
-          ...preprocessedData.series,
+          ...enhancedPreprocessedData.series,
           confidence: "high"
         };
       }
@@ -530,7 +369,7 @@ Return JSON:
       // Add version naming metadata
       analysis.version_naming = versionNaming;
 
-      // Add metadata
+      // Add metadata including enhancement info
       analysis.metadata = {
         post_id: postData.post_id,
         username: postData.username,
@@ -538,8 +377,14 @@ Return JSON:
         date: postData.date,
         reddit_url: postData.reddit_url,
         analyzed_at: new Date().toISOString(),
-        preprocessing_used: true
+        preprocessing_used: true,
+        enhanced_preprocessing: true,
+        script_resolution_enabled: this.enableScriptResolution,
+        script_resolution_successful: enhancedPreprocessedData.enhancement_metadata.script_resolution_successful
       };
+
+      // Add enhancement metadata
+      analysis.enhancement_metadata = enhancedPreprocessedData.enhancement_metadata;
 
       return analysis;
     } catch (error) {
@@ -564,8 +409,8 @@ Return JSON:
         const analysis = await this.analyzePost(file);
         results.push(analysis);
 
-        // Small delay to avoid overwhelming the LLM
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        // Small delay to avoid overwhelming the LLM and Reddit API
+        await new Promise((resolve) => setTimeout(resolve, 2000));
       } catch (error) {
         console.error(`Error processing ${file}: ${error.message}`);
         results.push({
@@ -594,17 +439,19 @@ async function main() {
 Usage: node analyze-reddit-post.js <file_or_directory> [options]
 
 Options:
-  --output <path>        Output file for results (JSON)
-  --url <url>           LM Studio API URL (default: http://localhost:1234/v1/chat/completions)
-  --model <name>        Model name (default: local-model)
-  --save-approved       Save result to llm_approved category in analysis storage
-  --save-rejected       Save result to llm_rejected category in analysis storage
-  --save-experimental   Save result to experimental category in analysis storage
+  --output <path>          Output file for results (JSON)
+  --url <url>             LM Studio API URL (default: http://localhost:1234/v1/chat/completions)
+  --model <name>          Model name (default: local-model)
+  --no-script-resolution  Disable script URL resolution
+  --save-approved         Save result to llm_approved category in analysis storage
+  --save-rejected         Save result to llm_rejected category in analysis storage
+  --save-experimental     Save result to experimental category in analysis storage
 
 Examples:
   node analyze-reddit-post.js reddit_data/alekirser/1amzk7q.json
-  node analyze-reddit-post.js reddit_data/alekirser/ --output analysis_results.json
+  node analyze-reddit-post.js reddit_data/alekirser/ --output enhanced_analysis_results.json
   node analyze-reddit-post.js reddit_data/alekirser/1m9aefh*.json --save-approved --model mistralai/mistral-7b-instruct-v0.3
+  node analyze-reddit-post.js reddit_data/BotanicalSpringVA/1mhsvf0*.json --no-script-resolution
 `);
     process.exit(1);
   }
@@ -616,8 +463,11 @@ Examples:
   const saveApproved = args.includes("--save-approved");
   const saveRejected = args.includes("--save-rejected");
   const saveExperimental = args.includes("--save-experimental");
+  const noScriptResolution = args.includes("--no-script-resolution");
 
-  const options = {};
+  const options = {
+    enableScriptResolution: !noScriptResolution
+  };
   if (urlIndex !== -1 && args[urlIndex + 1]) {
     options.lmStudioUrl = args[urlIndex + 1];
   }
@@ -628,7 +478,7 @@ Examples:
   const outputPath =
     outputIndex !== -1 && args[outputIndex + 1] ? args[outputIndex + 1] : null;
 
-  const analyzer = new RedditPostAnalyzer(options);
+  const analyzer = new EnhancedRedditPostAnalyzer(options);
 
   try {
     const stats = fs.statSync(inputPath);
@@ -646,18 +496,20 @@ Examples:
         
         const originalPost = JSON.parse(fs.readFileSync(inputPath, 'utf8'));
         const metadata = {
-          analyzer: 'llm_analysis_script',
+          analyzer: 'enhanced_llm_analysis_script',
           model: options.model || 'local-model',
           lm_studio_url: options.lmStudioUrl,
-          type: 'automated_analysis',
+          type: 'automated_analysis_with_script_resolution',
           approved: saveApproved,
           rejected: saveRejected,
-          experimental: saveExperimental
+          experimental: saveExperimental,
+          script_resolution_enabled: options.enableScriptResolution,
+          script_resolution_successful: results.enhancement_metadata?.script_resolution_successful || false
         };
         
         storage.saveLLMAnalysis(results.metadata.post_id, results, metadata, originalPost);
         const status = saveApproved ? 'approved' : saveRejected ? 'rejected' : 'experimental';
-        console.log(`✅ Saved LLM analysis (${status})`);
+        console.log(`✅ Saved enhanced LLM analysis (${status})`);
       }
       
       if (outputPath) {
@@ -668,7 +520,7 @@ Examples:
       }
     }
 
-    console.log("Analysis complete!");
+    console.log("Enhanced analysis complete!");
   } catch (error) {
     console.error("Error:", error.message);
     process.exit(1);
@@ -679,4 +531,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = RedditPostAnalyzer;
+module.exports = EnhancedRedditPostAnalyzer;
