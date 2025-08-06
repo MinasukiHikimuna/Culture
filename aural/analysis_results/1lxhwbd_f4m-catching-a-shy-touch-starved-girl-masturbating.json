@@ -7,7 +7,7 @@
     "partNumber": null,
     "confidence": "low"
   },
-  "analysis_notes": "The post does not appear to be part of a series. It is a standalone script offer for an adult roleplay audio.",
+  "analysis_notes": "The post does not appear to be part of a series. It is a standalone script offer for an audio roleplay.",
   "performers": {
     "count": 1,
     "primary": "alekirser",
@@ -23,7 +23,10 @@
           "platform": "Soundgasm",
           "url": "https://soundgasm.net/u/alekirser/F4M-Catching-A-Shy-Touch-Starved-Girl-Masturbating-In-Your-Bed-Script-Fill"
         }
-      ]
+      ],
+      "slug": "main_audio",
+      "filename": "1lxhwbd_catching_a_shy_touchstarved_girl_masturb_-_main_audio.m4a",
+      "metadata_file": "1lxhwbd_catching_a_shy_touchstarved_girl_masturb_-_main_audio.json"
     }
   ],
   "script": {
@@ -31,13 +34,30 @@
     "author": "DestinyEvolved",
     "fillType": "public"
   },
+  "version_naming": {
+    "release_directory": "1lxhwbd_catching_a_shy_touchstarved_girl_masturb",
+    "release_slug": "catching_a_shy_touchstarved_girl_masturb",
+    "audio_files": [
+      {
+        "filename": "1lxhwbd_catching_a_shy_touchstarved_girl_masturb_-_main_audio.m4a",
+        "version_slug": "main_audio",
+        "display_name": "Main Audio",
+        "detected_tags": [],
+        "audio_urls": [
+          "https://soundgasm.net/u/alekirser/F4M-Catching-A-Shy-Touch-Starved-Girl-Masturbating-In-Your-Bed-Script-Fill"
+        ],
+        "metadata_file": "1lxhwbd_catching_a_shy_touchstarved_girl_masturb_-_main_audio.json"
+      }
+    ],
+    "structure_type": "single_version"
+  },
   "metadata": {
     "post_id": "1lxhwbd",
     "username": "alekirser",
     "title": "[F4M] Catching A Shy, Touch-Starved Girl Masturbating In Your Bed...! [Script Fill] [Fdom] [Yandere] [Loser Girl] [ASMR] [Whimpery] to [Confident] [Obsessed] [Scent Worship] [Drooling] [Cleaning You Up] [Licking] [Tasting You] [Blowjob] [Throatpie] [MULTIPLE LOADS] [Cowgirl] [Creampie] [Aftercare]",
     "date": "2025-07-11T23:45:31",
     "reddit_url": "https://www.reddit.com/r/gonewildaudio/comments/1lxhwbd/",
-    "analyzed_at": "2025-08-03T12:14:54.445Z",
+    "analyzed_at": "2025-08-04T04:28:56.354Z",
     "preprocessing_used": true
   }
 }
