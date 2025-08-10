@@ -234,7 +234,6 @@ class StashDbClient(StashboxClient):
                         name
                         description
                         aliases
-                        deleted
                         created
                         updated
                         category {
