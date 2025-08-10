@@ -205,6 +205,92 @@ class StashDbClient(StashboxClient):
 
         return scenes
 
+    def query_scenes_by_studio(self, studio_stash_id):
+        query = """
+            query QueryScenes($studio_ids: [ID!]!, $page: Int!) {
+                queryScenes(
+                    input: {
+                        studios: {
+                            value: $studio_ids,
+                            modifier: INCLUDES
+                        },
+                        per_page: 25,
+                        page: $page
+                    }
+                ) {
+                    scenes {
+                        id
+                        title
+                        details
+                        release_date
+                        urls {
+                            url
+                            site {
+                                name
+                                url
+                            }
+                        }
+                        studio {
+                            id
+                            name
+                            parent {
+                                id
+                                name
+                            }
+                        }
+                        images {
+                            id
+                            url
+                        }
+                        performers {
+                            performer {
+                                id
+                                name
+                                gender
+                                aliases
+                                birth_date
+                                breast_type
+                                cup_size
+                                ethnicity
+                                country
+                                hair_color
+                                eye_color
+                                images {
+                                    id
+                                    url
+                                }
+                            }
+                        }
+                        duration
+                        code
+                        tags {
+                            id
+                            name
+                        }
+                    }
+                    count
+                }
+            }
+        """
+        scenes = []
+        page = 1
+        total_scenes = None
+        while True:
+            result = self._gql_query(
+                query, {"studio_ids": studio_stash_id, "page": page}
+            )
+            if result:
+                scenes_data = result["data"]["queryScenes"]
+                scenes.extend(scenes_data["scenes"])
+                total_scenes = total_scenes or scenes_data["count"]
+                if len(scenes) >= total_scenes or len(scenes_data["scenes"]) < 25:
+                    break
+                page += 1
+            else:
+                break
+
+        return scenes
+
     def query_scenes_by_phash(self, scenes: List[Dict]) -> pl.DataFrame:
         """Legacy method for querying scenes by phash"""
         phashes = [scene["phash"] for scene in scenes]
