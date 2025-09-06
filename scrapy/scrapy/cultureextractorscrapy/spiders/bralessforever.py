@@ -85,33 +85,14 @@ class BralessForeverSpider(scrapy.Spider):
         return spider
 
     def parse(self, response):
-        """Initial parse method - start with the main page."""
-        # Save the main page DOM to a file for analysis
-        self.save_dom_to_file(response, "main.html")
+        """Initial parse method - start with categories page."""
+        self.logger.info("🚀 Starting Braless Forever scraper")
         
-        # Fetch categories page (our primary starting point)
+        # Go directly to categories page (our primary starting point)
         yield scrapy.Request(
             url=f"{base_url}/browse/categories",
             callback=self.parse_categories_page,
             cookies=cookies,
-            dont_filter=True,
-        )
-        
-        # Also try the browse page for reference
-        yield scrapy.Request(
-            url=f"{base_url}/browse",
-            callback=self.parse_browse_page,
-            cookies=cookies,
-            meta={"page": 1},
-            dont_filter=True,
-        )
-        
-        # Try the specific videos page with all channels visible for reference
-        yield scrapy.Request(
-            url=f"{base_url}/browse/videos?channel_visibility=%22ALL%22",
-            callback=self.parse_videos_page,
-            cookies=cookies,
-            meta={"page": 1},
             dont_filter=True,
         )
 
@@ -231,28 +212,6 @@ class BralessForeverSpider(scrapy.Spider):
         self.logger.info(f"   📈 Videos processed: {videos_processed}")
         self.logger.info(f"   ⏩ Videos skipped (Premiere): {videos_skipped}")
         self.logger.info(f"   📊 Total videos found: {len(video_cards)}")
-        
-        return []
-    
-    def parse_browse_page(self, response):
-        """Parse the browse page and save DOM."""
-        # Save the browse page DOM to a file for analysis
-        self.save_dom_to_file(response, "browse.html")
-        
-        # Log some basic info
-        self.logger.info(f"🏠 Processing browse page: {response.url}")
-        self.logger.info(f"📊 Response status: {response.status}")
-        
-        return []
-    
-    def parse_videos_page(self, response):
-        """Parse the videos page and save DOM."""
-        # Save the videos page DOM to a file for analysis
-        self.save_dom_to_file(response, "videos.html")
-        
-        # Log some basic info  
-        self.logger.info(f"🎬 Processing videos page: {response.url}")
-        self.logger.info(f"📊 Response status: {response.status}")
         
         return []
     
