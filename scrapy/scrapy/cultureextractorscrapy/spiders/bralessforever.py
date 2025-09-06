@@ -56,7 +56,7 @@ base_url = "https://app.bralessforever.com"
 
 class BralessForeverSpider(scrapy.Spider):
     name = "bralessforever"
-    allowed_domains = ["app.bralessforever.com"]
+    allowed_domains = ["app.bralessforever.com", "private-blvideo.b-cdn.net", "cdn.realms.tv"]
     start_urls = [base_url]
     site_short_name = "bralessforever"
 
@@ -391,6 +391,8 @@ class BralessForeverSpider(scrapy.Spider):
                 content_type="cover",
                 variant="cover",
                 url=cover_image,
+                resolution_width=640,  # Standard thumbnail width from realms.tv
+                resolution_height=360,  # Standard thumbnail height from realms.tv
             )
             available_files.append(image_file)
         
@@ -445,6 +447,14 @@ class BralessForeverSpider(scrapy.Spider):
         self.logger.info(f"   🏷️ Tags: {len(tags)}")
         
         yield release_item
+        
+        # Now yield DirectDownloadItems for each available file
+        for file_info in available_files:
+            yield DirectDownloadItem(
+                release_id=str(release_id),
+                file_info=ItemAdapter(file_info).asdict(),
+                url=file_info.url,
+            )
     
     def save_dom_to_file(self, response, filename):
         """Save the response HTML to a file for analysis."""

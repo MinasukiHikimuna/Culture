@@ -268,6 +268,26 @@ class AvailableFilesPipeline(FilesPipeline):
                     "[AvailableFilesPipeline] File does not exist, requesting download: %s",
                     full_path,
                 )
+                
+                # Check if this is an HLS m3u8 file that needs ffmpeg
+                if item["url"].endswith('.m3u8') or '.m3u8' in item["url"]:
+                    spider.logger.info(
+                        "[AvailableFilesPipeline] Detected HLS stream, using ffmpeg for download"
+                    )
+                    # Handle ffmpeg download directly here
+                    success = self.download_hls_with_ffmpeg(item["url"], full_path, spider)
+                    if success:
+                        spider.logger.info(
+                            "[AvailableFilesPipeline] HLS download completed successfully: %s",
+                            full_path,
+                        )
+                    else:
+                        spider.logger.error(
+                            "[AvailableFilesPipeline] HLS download failed: %s",
+                            full_path,
+                        )
+                    return []  # Don't use standard downloader
+                
                 return [
                     Request(
                         item["url"],
@@ -324,11 +344,21 @@ class AvailableFilesPipeline(FilesPipeline):
             url_path = urlparse(file_info["url"]).path
             file_extension = os.path.splitext(url_path)[1]
             if not file_extension:
-                file_extension = ".mp4"  # Default to .mp4 for video files
+                if file_info["file_type"] == "video":
+                    file_extension = ".mp4"  # Default to .mp4 for video files
+                elif file_info["file_type"] == "image":
+                    file_extension = ".jpg"  # Default to .jpg for image files
+                else:
+                    file_extension = ""  # No extension for other types
 
             # Create filename in the specified format
             if file_info["file_type"] == "video":
-                filename = f"{formatted_site_name} - {release_date} - {release_name} - {file_info['resolution_width']}x{file_info['resolution_height']} - {release_id}{file_extension}"
+                # Only include resolution if both width and height are present and not None
+                if file_info.get('resolution_width') and file_info.get('resolution_height'):
+                    resolution_part = f" - {file_info['resolution_width']}x{file_info['resolution_height']}"
+                else:
+                    resolution_part = ""
+                filename = f"{formatted_site_name} - {release_date} - {release_name}{resolution_part} - {release_id}{file_extension}"
             else:
                 filename = f"{formatted_site_name} - {release_date} - {release_name} - {file_info['variant']} - {release_id}{file_extension}"
 
@@ -537,3 +567,94 @@ class AvailableFilesPipeline(FilesPipeline):
         md5_sum = md5_hash.hexdigest()
 
         return {"$type": type, "sha256Sum": sha256_sum, "md5Sum": md5_sum}
+    
+    def download_hls_with_ffmpeg(self, url, output_path, spider):
+        """Download HLS stream using ffmpeg"""
+        import subprocess
+        import os
+        
+        try:
+            # Ensure output path has .mp4 extension for HLS downloads
+            if not output_path.endswith('.mp4'):
+                output_path = os.path.splitext(output_path)[0] + '.mp4'
+            
+            # Ensure the directory exists
+            os.makedirs(os.path.dirname(output_path), exist_ok=True)
+            
+            # Run ffmpeg command to download HLS stream
+            cmd = [
+                'ffmpeg',
+                '-i', url,
+                '-c', 'copy',  # Copy streams without re-encoding
+                '-progress', 'pipe:2',  # Send progress to stderr
+                '-y',  # Overwrite output file if it exists
+                output_path
+            ]
+            
+            spider.logger.info(
+                "[AvailableFilesPipeline] Starting ffmpeg download: %s", 
+                ' '.join(cmd)
+            )
+            
+            # Use Popen to capture output in real-time
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                universal_newlines=True
+            )
+            
+            # Monitor progress
+            last_progress_log = 0
+            while True:
+                output = process.stderr.readline()
+                if output == '' and process.poll() is not None:
+                    break
+                if output:
+                    # Log progress every 30 seconds or on important messages
+                    import time
+                    current_time = time.time()
+                    if ('time=' in output or 'speed=' in output or 
+                        current_time - last_progress_log > 30):
+                        spider.logger.info(
+                            "[AvailableFilesPipeline] ffmpeg progress: %s", 
+                            output.strip()
+                        )
+                        if current_time - last_progress_log > 30:
+                            last_progress_log = current_time
+            
+            return_code = process.poll()
+            
+            if return_code == 0:
+                spider.logger.info(
+                    "[AvailableFilesPipeline] ffmpeg download successful: %s", 
+                    output_path
+                )
+                return True
+            else:
+                # Get any remaining stderr output
+                remaining_stderr = process.stderr.read()
+                spider.logger.error(
+                    "[AvailableFilesPipeline] ffmpeg failed with return code %s: %s", 
+                    return_code, remaining_stderr
+                )
+                return False
+                
+        except subprocess.TimeoutExpired:
+            spider.logger.error(
+                "[AvailableFilesPipeline] ffmpeg download timed out for: %s", 
+                url
+            )
+            return False
+        except FileNotFoundError:
+            spider.logger.error(
+                "[AvailableFilesPipeline] ffmpeg not found in PATH. Please install ffmpeg."
+            )
+            return False
+        except Exception as e:
+            spider.logger.error(
+                "[AvailableFilesPipeline] ffmpeg download error: %s", 
+                str(e)
+            )
+            return False
