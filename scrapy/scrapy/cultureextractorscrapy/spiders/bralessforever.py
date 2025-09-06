@@ -87,9 +87,17 @@ class BralessForeverSpider(scrapy.Spider):
     def parse(self, response):
         """Initial parse method - start with the main page."""
         # Save the main page DOM to a file for analysis
-        self.save_dom_to_file(response, "braless_forever_main.html")
+        self.save_dom_to_file(response, "main.html")
         
-        # Also try the browse page
+        # Fetch categories page (our primary starting point)
+        yield scrapy.Request(
+            url=f"{base_url}/browse/categories",
+            callback=self.parse_categories_page,
+            cookies=cookies,
+            dont_filter=True,
+        )
+        
+        # Also try the browse page for reference
         yield scrapy.Request(
             url=f"{base_url}/browse",
             callback=self.parse_browse_page,
@@ -98,7 +106,7 @@ class BralessForeverSpider(scrapy.Spider):
             dont_filter=True,
         )
         
-        # Try the specific videos page with all channels visible
+        # Try the specific videos page with all channels visible for reference
         yield scrapy.Request(
             url=f"{base_url}/browse/videos?channel_visibility=%22ALL%22",
             callback=self.parse_videos_page,
@@ -107,25 +115,144 @@ class BralessForeverSpider(scrapy.Spider):
             dont_filter=True,
         )
 
+    def parse_categories_page(self, response):
+        """Parse the categories page and extract all available categories."""
+        # Save the categories page DOM to a file for analysis
+        self.save_dom_to_file(response, "categories.html")
+        
+        # Log some basic info
+        self.logger.info(f"📋 Processing categories page: {response.url}")
+        self.logger.info(f"📊 Response status: {response.status}")
+        
+        # Extract category links using CSS selectors
+        category_links = response.css('a[href*="/categories/"]::attr(href)').getall()
+        
+        self.logger.info(f"🔍 Found {len(category_links)} category links")
+        
+        categories_found = []
+        for link in category_links:
+            # Extract category slug from URL
+            if '/categories/' in link:
+                category_slug = link.split('/categories/')[-1]
+                # Get the category display name from the associated text
+                category_element = response.css(f'a[href="{link}"]')
+                if category_element:
+                    category_name = category_element.css('h3::text').get()
+                    if category_name:
+                        categories_found.append({
+                            'slug': category_slug,
+                            'name': category_name.strip(),
+                            'url': link
+                        })
+                        self.logger.info(f"📂 Found category: '{category_name}' -> {category_slug}")
+        
+        self.logger.info(f"✅ Successfully parsed {len(categories_found)} categories")
+        
+        # For now, let's scrape just one category for testing
+        if categories_found:
+            test_category = categories_found[0]  # Take first category for testing
+            self.logger.info(f"🧪 Testing with category: '{test_category['name']}'")
+            
+            full_url = response.urljoin(test_category['url'])
+            yield scrapy.Request(
+                url=full_url,
+                callback=self.parse_category_videos,
+                cookies=cookies,
+                meta={'category': test_category},
+                dont_filter=True,
+            )
+        else:
+            self.logger.warning("⚠️ No categories found on the page")
+        
+        return []
+    
+    def parse_category_videos(self, response):
+        """Parse videos from a specific category page."""
+        category = response.meta.get('category', {})
+        category_name = category.get('name', 'Unknown')
+        category_slug = category.get('slug', 'unknown')
+        
+        # Save the category page DOM for analysis
+        self.save_dom_to_file(response, f"category_{category_slug}.html")
+        
+        self.logger.info(f"🎬 Processing videos for category: '{category_name}'")
+        self.logger.info(f"📊 Response status: {response.status} for {response.url}")
+        
+        # Extract video cards - same structure as main videos page
+        video_cards = response.css('div.collection-card')
+        self.logger.info(f"🔍 Found {len(video_cards)} video cards in '{category_name}'")
+        
+        videos_processed = 0
+        videos_skipped = 0
+        
+        for card in video_cards:
+            # Extract basic video information
+            title_element = card.css('h3::text')
+            video_link = card.css('a[href*="/videos/"]::attr(href)')
+            duration_element = card.css('span:contains(":")::text, span:contains("Premiere")::text')
+            
+            if not title_element or not video_link:
+                self.logger.debug("⏭️ Skipping card with missing title or link")
+                continue
+                
+            title = title_element.get().strip()
+            video_url = video_link.get()
+            video_id = video_url.split('/')[-1] if video_url else None
+            duration = duration_element.get() if duration_element else None
+            
+            # Skip "Premiere" videos (upcoming content)
+            if duration and "Premiere" in duration:
+                self.logger.info(f"⏩ Skipping upcoming video: '{title}' (Premiere)")
+                videos_skipped += 1
+                continue
+            
+            # Extract cast information
+            cast_links = card.css('a[href*="/users/"]')
+            cast_members = []
+            for cast_link in cast_links:
+                cast_name = cast_link.css('::text').get()
+                if cast_name:
+                    cast_members.append(cast_name.strip())
+            
+            # Extract cover image
+            cover_img = card.css('img::attr(src)').get()
+            
+            # Log the video details
+            self.logger.info(f"🎥 Found video: '{title}' ({duration or 'No duration'}) in '{category_name}'")
+            if cast_members:
+                self.logger.info(f"👥 Cast: {', '.join(cast_members)}")
+            
+            videos_processed += 1
+            
+            # TODO: Create video item and yield it
+            # For now, just log the details
+        
+        self.logger.info(f"✅ Category '{category_name}' processing complete:")
+        self.logger.info(f"   📈 Videos processed: {videos_processed}")
+        self.logger.info(f"   ⏩ Videos skipped (Premiere): {videos_skipped}")
+        self.logger.info(f"   📊 Total videos found: {len(video_cards)}")
+        
+        return []
+    
     def parse_browse_page(self, response):
         """Parse the browse page and save DOM."""
         # Save the browse page DOM to a file for analysis
-        self.save_dom_to_file(response, "braless_forever_browse.html")
+        self.save_dom_to_file(response, "browse.html")
         
         # Log some basic info
-        self.logger.info(f"Browse page URL: {response.url}")
-        self.logger.info(f"Response status: {response.status}")
+        self.logger.info(f"🏠 Processing browse page: {response.url}")
+        self.logger.info(f"📊 Response status: {response.status}")
         
         return []
     
     def parse_videos_page(self, response):
         """Parse the videos page and save DOM."""
         # Save the videos page DOM to a file for analysis
-        self.save_dom_to_file(response, "braless_forever_videos.html")
+        self.save_dom_to_file(response, "videos.html")
         
-        # Log some basic info
-        self.logger.info(f"Videos page URL: {response.url}")
-        self.logger.info(f"Response status: {response.status}")
+        # Log some basic info  
+        self.logger.info(f"🎬 Processing videos page: {response.url}")
+        self.logger.info(f"📊 Response status: {response.status}")
         
         return []
     
@@ -133,8 +260,8 @@ class BralessForeverSpider(scrapy.Spider):
         """Save the response HTML to a file for analysis."""
         import os
         
-        # Create output directory if it doesn't exist
-        output_dir = "/Users/thardas/Private/Code/CultureExtractor/scrapy/dom_analysis"
+        # Create bralessforever-specific directory under dom_analysis
+        output_dir = "/Users/thardas/Private/Code/CultureExtractor/scrapy/dom_analysis/bralessforever"
         os.makedirs(output_dir, exist_ok=True)
         
         file_path = os.path.join(output_dir, filename)
