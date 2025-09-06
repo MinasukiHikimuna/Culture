@@ -204,13 +204,86 @@ class BralessForeverSpider(scrapy.Spider):
             
             videos_processed += 1
             
-            # TODO: Create video item and yield it
-            # For now, just log the details
+            # For testing, only scrape the first video
+            if videos_processed == 1:
+                yield scrapy.Request(
+                    url=response.urljoin(video_url),
+                    callback=self.parse_video,
+                    cookies=cookies,
+                    meta={
+                        'category': category,
+                        'video_data': {
+                            'title': title,
+                            'video_id': video_id,
+                            'duration': duration,
+                            'cast_members': cast_members,
+                            'cover_img': cover_img
+                        }
+                    },
+                    dont_filter=True,
+                )
+                # Stop processing after first video for testing
+                break
         
         self.logger.info(f"✅ Category '{category_name}' processing complete:")
         self.logger.info(f"   📈 Videos processed: {videos_processed}")
         self.logger.info(f"   ⏩ Videos skipped (Premiere): {videos_skipped}")
         self.logger.info(f"   📊 Total videos found: {len(video_cards)}")
+    
+    def parse_video(self, response):
+        """Parse individual video page to extract scene details."""
+        category = response.meta.get('category', {})
+        video_data = response.meta.get('video_data', {})
+        category_name = category.get('name', 'Unknown')
+        
+        # Save the video page DOM for analysis
+        video_id = video_data.get('video_id', 'unknown')
+        self.save_dom_to_file(response, f"video_{video_id}.html")
+        
+        self.logger.info(f"🎬 Processing individual video: '{video_data.get('title', 'Unknown')}'")
+        self.logger.info(f"📊 Response status: {response.status} for {response.url}")
+        
+        # Extract video download links/streams
+        video_elements = response.css('video source, video::attr(src), a[href*=".mp4"], a[href*=".m4v"]')
+        self.logger.info(f"🎞️ Found {len(video_elements)} potential video elements")
+        
+        # Log video sources
+        for i, element in enumerate(video_elements):
+            src = element.css('::attr(src)').get() or element.css('::attr(href)').get()
+            if src:
+                self.logger.info(f"   📹 Video source {i+1}: {src}")
+        
+        # Extract high-resolution images
+        image_elements = response.css('img')
+        scene_images = []
+        for img in image_elements:
+            src = img.css('::attr(src)').get()
+            if src and ('thumb' not in src.lower() and 'avatar' not in src.lower()):
+                scene_images.append(src)
+        
+        self.logger.info(f"🖼️ Found {len(scene_images)} scene images:")
+        for i, img_src in enumerate(scene_images[:5]):  # Log first 5 images
+            self.logger.info(f"   🖼️ Scene image {i+1}: {img_src}")
+        
+        # Extract any additional metadata available on the video page
+        description_element = response.css('div.description, p.description, div.video-description')
+        description = description_element.css('::text').get() if description_element else ''
+        
+        # Extract view count, likes, etc.
+        stats_elements = response.css('span:contains("views"), span:contains("likes"), div.stats')
+        stats = []
+        for stat in stats_elements:
+            stat_text = stat.css('::text').get()
+            if stat_text:
+                stats.append(stat_text.strip())
+        
+        self.logger.info(f"📊 Video stats: {', '.join(stats) if stats else 'None found'}")
+        self.logger.info(f"📝 Description: {description[:100] if description else 'None found'}")
+        
+        # Log summary
+        self.logger.info(f"✅ Video parsing complete for '{video_data.get('title')}'")
+        self.logger.info(f"   🎞️ Video sources found: {len(video_elements)}")
+        self.logger.info(f"   🖼️ Scene images found: {len(scene_images)}")
         
         return []
     
