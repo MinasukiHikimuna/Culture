@@ -187,19 +187,38 @@ class BralessForeverSpider(scrapy.Spider):
                 videos_skipped += 1
                 continue
             
-            # Extract cast information
+            # Extract cast information with URLs  
             cast_links = card.css('a[href*="/users/"]')
             cast_members = []
             for cast_link in cast_links:
-                cast_name = cast_link.css('::text').get()
-                if cast_name:
-                    cast_members.append(cast_name.strip())
+                cast_name = cast_link.css('::text').get()  # Text is directly inside the <a> tag
+                cast_url = cast_link.css('::attr(href)').get()
+                if cast_name and cast_url:
+                    cast_members.append({
+                        'name': cast_name.strip(),
+                        'url': cast_url
+                    })
             
             # Extract cover image
             cover_img = card.css('img::attr(src)').get()
             
+            # Extract release date from time element
+            release_date_element = card.css('time::attr(datetime)')
+            release_date = None
+            if release_date_element:
+                release_date_str = release_date_element.get()
+                if release_date_str:
+                    try:
+                        # Parse ISO datetime and convert to date
+                        from datetime import datetime
+                        release_dt = datetime.fromisoformat(release_date_str.replace('Z', '+00:00'))
+                        release_date = release_dt.date().isoformat()
+                    except (ValueError, AttributeError) as e:
+                        self.logger.warning(f"Could not parse release date: {release_date_str} - {e}")
+            
             # Log the video details in a single comprehensive line
-            cast_info = f" | Cast: {', '.join(cast_members)}" if cast_members else ""
+            cast_names = [member['name'] for member in cast_members] if cast_members else []
+            cast_info = f" | Cast: {', '.join(cast_names)}" if cast_names else ""
             self.logger.info(f"🎥 {category_name} → '{title}' ({duration or 'No duration'}){cast_info}")
             
             videos_processed += 1
@@ -217,7 +236,8 @@ class BralessForeverSpider(scrapy.Spider):
                             'video_id': video_id,
                             'duration': duration,
                             'cast_members': cast_members,
-                            'cover_img': cover_img
+                            'cover_img': cover_img,
+                            'release_date': release_date
                         }
                     },
                     dont_filter=True,
@@ -235,6 +255,7 @@ class BralessForeverSpider(scrapy.Spider):
         category = response.meta.get('category', {})
         video_data = response.meta.get('video_data', {})
         category_name = category.get('name', 'Unknown')
+        category_slug = category.get('slug', 'unknown')
         
         # Save the video page DOM for analysis
         video_id = video_data.get('video_id', 'unknown')
@@ -247,45 +268,183 @@ class BralessForeverSpider(scrapy.Spider):
         video_elements = response.css('video source, video::attr(src), a[href*=".mp4"], a[href*=".m4v"]')
         self.logger.info(f"🎞️ Found {len(video_elements)} potential video elements")
         
-        # Log video sources
-        for i, element in enumerate(video_elements):
+        # Get the HLS stream URL
+        hls_url = None
+        for element in video_elements:
             src = element.css('::attr(src)').get() or element.css('::attr(href)').get()
-            if src:
-                self.logger.info(f"   📹 Video source {i+1}: {src}")
+            if src and '.m3u8' in src:
+                hls_url = src
+                self.logger.info(f"   📹 HLS stream: {src}")
+                break
         
         # Extract high-resolution images
         image_elements = response.css('img')
         scene_images = []
         for img in image_elements:
             src = img.css('::attr(src)').get()
-            if src and ('thumb' not in src.lower() and 'avatar' not in src.lower()):
+            if src and ('thumb' not in src.lower() and 'avatar' not in src.lower() and 'logo' not in src.lower()):
                 scene_images.append(src)
         
-        self.logger.info(f"🖼️ Found {len(scene_images)} scene images:")
-        for i, img_src in enumerate(scene_images[:5]):  # Log first 5 images
-            self.logger.info(f"   🖼️ Scene image {i+1}: {img_src}")
+        # Use the cover image from listing if available, otherwise first scene image
+        cover_image = video_data.get('cover_img') or (scene_images[0] if scene_images else None)
         
-        # Extract any additional metadata available on the video page
-        description_element = response.css('div.description, p.description, div.video-description')
-        description = description_element.css('::text').get() if description_element else ''
+        # Extract release date from video page (more reliable than category listing)
+        video_release_date = None
+        time_element = response.css('time::attr(datetime)').get()
+        if time_element:
+            try:
+                # Parse ISO datetime and convert to date
+                release_dt = datetime.fromisoformat(time_element.replace('Z', '+00:00'))
+                video_release_date = release_dt.date().isoformat()
+                self.logger.info(f"📅 Extracted release date: {video_release_date} from video page")
+            except (ValueError, AttributeError) as e:
+                self.logger.warning(f"Could not parse video page release date: {time_element} - {e}")
         
-        # Extract view count, likes, etc.
-        stats_elements = response.css('span:contains("views"), span:contains("likes"), div.stats')
-        stats = []
-        for stat in stats_elements:
-            stat_text = stat.css('::text').get()
-            if stat_text:
-                stats.append(stat_text.strip())
+        # Use video page date if available, otherwise fall back to category listing date
+        final_release_date = video_release_date or video_data.get('release_date') or '1900-01-01'
         
-        self.logger.info(f"📊 Video stats: {', '.join(stats) if stats else 'None found'}")
-        self.logger.info(f"📝 Description: {description[:100] if description else 'None found'}")
+        # Extract description from JSON-LD structured data
+        description = ''
+        json_ld_data = None
+        json_ld_script = response.css('script[type="application/ld+json"]::text').get()
+        if json_ld_script:
+            try:
+                json_ld_data = json.loads(json_ld_script)
+                if isinstance(json_ld_data, dict) and json_ld_data.get('@type') == 'VideoObject':
+                    description = json_ld_data.get('description', '')
+                    if description:
+                        self.logger.info(f"📝 Extracted description: {description[:100]}{'...' if len(description) > 100 else ''}")
+            except (json.JSONDecodeError, AttributeError) as e:
+                self.logger.warning(f"Could not parse JSON-LD data: {e}")
+                json_ld_data = None
         
-        # Log summary
-        self.logger.info(f"✅ Video parsing complete for '{video_data.get('title')}'")
-        self.logger.info(f"   🎞️ Video sources found: {len(video_elements)}")
-        self.logger.info(f"   🖼️ Scene images found: {len(scene_images)}")
+        # Convert duration from MM:SS to seconds
+        duration_seconds = 0
+        duration_str = video_data.get('duration', '')
+        if duration_str and ':' in duration_str:
+            try:
+                parts = duration_str.split(':')
+                if len(parts) == 2:
+                    minutes, seconds = map(int, parts)
+                    duration_seconds = minutes * 60 + seconds
+                elif len(parts) == 3:
+                    hours, minutes, seconds = map(int, parts)
+                    duration_seconds = hours * 3600 + minutes * 60 + seconds
+            except ValueError:
+                self.logger.warning(f"Could not parse duration: {duration_str}")
         
-        return []
+        # Create performers from cast members
+        performers = []
+        cast_members = video_data.get('cast_members', [])
+        for cast_member in cast_members:
+            if cast_member and isinstance(cast_member, dict):
+                cast_name = cast_member.get('name')
+                cast_url = cast_member.get('url')
+                if cast_name and cast_url:
+                    # Extract UUID from URL (e.g., /users/35bd8c49-d9ea-4489-8e37-4c363f3df293/preview)
+                    url_parts = cast_url.split('/')
+                    performer_uuid = None
+                    for part in url_parts:
+                        if len(part) == 36 and part.count('-') == 4:  # UUID format check
+                            performer_uuid = part
+                            break
+                    
+                    if performer_uuid:
+                        performer = get_or_create_performer(
+                            self.site.id,
+                            performer_uuid,  # Use UUID as short_name
+                            cast_name,
+                            response.urljoin(cast_url),  # Use actual URL
+                        )
+                        performers.append(performer)
+                    else:
+                        self.logger.warning(f"Could not extract UUID from performer URL: {cast_url}")
+        
+        # Create tag from category
+        tags = []
+        if category_name and category_name != 'Unknown':
+            tag = get_or_create_tag(
+                self.site.id,
+                category_slug,
+                category_name,
+                f"{base_url}/categories/{category_slug}",
+            )
+            tags.append(tag)
+        
+        # Create available files list
+        available_files = []
+        
+        # Add HLS video stream
+        if hls_url:
+            video_file = AvailableVideoFile(
+                file_type="video",
+                content_type="scene",
+                variant="hls_stream",
+                url=hls_url,
+            )
+            available_files.append(video_file)
+        
+        # Add cover image
+        if cover_image:
+            image_file = AvailableImageFile(
+                file_type="image",
+                content_type="cover",
+                variant="cover",
+                url=cover_image,
+            )
+            available_files.append(image_file)
+        
+        # Check if this release already exists
+        existing_release = self.existing_releases.get(video_id)
+        release_id = existing_release.get('uuid') if existing_release else newnewid.uuid7()
+        
+        if existing_release:
+            self.logger.info(f"Release ID={release_id} short_name={video_id} already exists. Updating existing release.")
+        else:
+            self.logger.info(f"Creating new release ID={release_id} short_name={video_id}.")
+        
+        # Create the release item
+        release_item = ReleaseItem(
+            id=release_id,
+            release_date=final_release_date,
+            short_name=video_id,
+            name=video_data.get('title', ''),
+            url=response.url,
+            description=description,
+            duration=duration_seconds,
+            created=datetime.now(tz=timezone.utc).astimezone(),
+            last_updated=datetime.now(tz=timezone.utc).astimezone(),
+            performers=performers,
+            tags=tags,
+            available_files=json.dumps(available_files, cls=AvailableFileEncoder),
+            json_document=json.dumps({
+                'video_id': video_id,
+                'title': video_data.get('title'),
+                'duration': duration_str,
+                'cast_members': cast_members,  # Now includes name and url
+                'category': {
+                    'name': category_name,
+                    'slug': category_slug
+                },
+                'hls_url': hls_url,
+                'cover_image': cover_image,
+                'scene_images': scene_images,
+                'release_date': final_release_date,
+                'original_datetime': time_element,  # Store original datetime for reference
+                'description': description,
+                'json_ld_data': json_ld_data if json_ld_script else None,  # Full structured data
+            }),
+            site_uuid=self.site.id,
+            site=self.site,
+        )
+        
+        self.logger.info(f"✅ Created ReleaseItem for '{video_data.get('title')}'")
+        self.logger.info(f"   🎞️ Video files: {len([f for f in available_files if f.file_type == 'video'])}")
+        self.logger.info(f"   🖼️ Image files: {len([f for f in available_files if f.file_type == 'image'])}")
+        self.logger.info(f"   👥 Performers: {len(performers)}")
+        self.logger.info(f"   🏷️ Tags: {len(tags)}")
+        
+        yield release_item
     
     def save_dom_to_file(self, response, filename):
         """Save the response HTML to a file for analysis."""
