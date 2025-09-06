@@ -198,10 +198,9 @@ class BralessForeverSpider(scrapy.Spider):
             # Extract cover image
             cover_img = card.css('img::attr(src)').get()
             
-            # Log the video details
-            self.logger.info(f"🎥 Found video: '{title}' ({duration or 'No duration'}) in '{category_name}'")
-            if cast_members:
-                self.logger.info(f"👥 Cast: {', '.join(cast_members)}")
+            # Log the video details in a single comprehensive line
+            cast_info = f" | Cast: {', '.join(cast_members)}" if cast_members else ""
+            self.logger.info(f"🎥 {category_name} → '{title}' ({duration or 'No duration'}){cast_info}")
             
             videos_processed += 1
             
