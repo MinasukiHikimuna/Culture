@@ -281,6 +281,8 @@ class AvailableFilesPipeline(FilesPipeline):
                             "[AvailableFilesPipeline] HLS download completed successfully: %s",
                             full_path,
                         )
+                        # Create DownloadedFileItem directly since we bypassed standard pipeline
+                        self.create_downloaded_item_for_hls(item, full_path, spider)
                     else:
                         spider.logger.error(
                             "[AvailableFilesPipeline] HLS download failed: %s",
@@ -658,3 +660,55 @@ class AvailableFilesPipeline(FilesPipeline):
                 str(e)
             )
             return False
+    
+    def create_downloaded_item_for_hls(self, item, full_path, spider):
+        """Create DownloadedFileItem for HLS downloads that bypass standard pipeline"""
+        from datetime import datetime
+        import newnewid
+        import os
+        
+        file_info = item["file_info"]
+        
+        # Process file metadata
+        file_metadata = self.process_file_metadata(full_path, file_info["file_type"])
+        
+        # Create DownloadedFileItem
+        downloaded_item = DownloadedFileItem(
+            uuid=newnewid.uuid7(),
+            downloaded_at=datetime.now(),
+            file_type=file_info["file_type"],
+            content_type=file_info.get("content_type"),
+            variant=file_info.get("variant"),
+            available_file=file_info,
+            original_filename=os.path.basename(item["url"].split("?")[0]),
+            saved_filename=os.path.basename(full_path),
+            release_uuid=item["release_id"],
+            file_metadata=file_metadata,
+        )
+        
+        spider.logger.info(
+            "[AvailableFilesPipeline] Created DownloadedFileItem for HLS download: %s",
+            downloaded_item["saved_filename"],
+        )
+        
+        # Send the item to PostgresPipeline manually
+        try:
+            # Find the PostgresPipeline instance
+            postgres_pipeline = None
+            for pipeline in spider.crawler.engine.scraper.itemproc.pipelines:
+                if hasattr(pipeline, '__class__') and 'PostgresPipeline' in pipeline.__class__.__name__:
+                    postgres_pipeline = pipeline
+                    break
+            
+            if postgres_pipeline:
+                spider.logger.info("[AvailableFilesPipeline] Found PostgresPipeline, processing DownloadedFileItem")
+                postgres_pipeline.process_item(downloaded_item, spider)
+            else:
+                spider.logger.warning("[AvailableFilesPipeline] PostgresPipeline not found, DownloadedFileItem not persisted")
+        except Exception as e:
+            spider.logger.error(
+                "[AvailableFilesPipeline] Error sending DownloadedFileItem to PostgresPipeline: %s",
+                str(e)
+            )
+        
+        return downloaded_item
