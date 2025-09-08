@@ -275,14 +275,14 @@ class AvailableFilesPipeline(FilesPipeline):
                         "[AvailableFilesPipeline] Detected HLS stream, using ffmpeg for download"
                     )
                     # Handle ffmpeg download directly here
-                    success = self.download_hls_with_ffmpeg(item["url"], full_path, spider)
-                    if success:
+                    actual_path = self.download_hls_with_ffmpeg(item["url"], full_path, spider)
+                    if actual_path:
                         spider.logger.info(
                             "[AvailableFilesPipeline] HLS download completed successfully: %s",
-                            full_path,
+                            actual_path,
                         )
-                        # Create DownloadedFileItem directly since we bypassed standard pipeline
-                        self.create_downloaded_item_for_hls(item, full_path, spider)
+                        # Mark that we handled this with ffmpeg (we'll create DownloadedFileItem in item_completed)
+                        item["_m3u8_downloaded_path"] = actual_path
                     else:
                         spider.logger.error(
                             "[AvailableFilesPipeline] HLS download failed: %s",
@@ -409,6 +409,14 @@ class AvailableFilesPipeline(FilesPipeline):
             )
             spider.logger.info("[AvailableFilesPipeline] Download results: %s", results)
 
+            # Check if this was downloaded with ffmpeg
+            if "_m3u8_downloaded_path" in item:
+                spider.logger.info(
+                    "[AvailableFilesPipeline] Processing m3u8-downloaded file: %s", 
+                    item["_m3u8_downloaded_path"]
+                )
+                return self.create_downloaded_item_from_path(item, item["_m3u8_downloaded_path"], spider)
+
             file_paths = [x["path"] for ok, x in results if ok]
             spider.logger.info(
                 "[AvailableFilesPipeline] File paths from results: %s", file_paths
@@ -459,7 +467,7 @@ class AvailableFilesPipeline(FilesPipeline):
 
     def process_video_metadata(self, file_path):
         result = subprocess.run(
-            ["C:\\Tools\\videohashes-windows-amd64.exe", "-json", "-md5", file_path],
+            ["/Users/thardas/Code/videohashes/dist/videohashes-arm64-macos", "-json", "-md5", file_path],
             capture_output=True,
             text=True,
         )
@@ -633,7 +641,7 @@ class AvailableFilesPipeline(FilesPipeline):
                     "[AvailableFilesPipeline] ffmpeg download successful: %s", 
                     output_path
                 )
-                return True
+                return output_path
             else:
                 # Get any remaining stderr output
                 remaining_stderr = process.stderr.read()
@@ -661,7 +669,7 @@ class AvailableFilesPipeline(FilesPipeline):
             )
             return False
     
-    def create_downloaded_item_for_hls(self, item, full_path, spider):
+    def create_downloaded_item_from_path(self, item, full_path, spider):
         """Create DownloadedFileItem for HLS downloads that bypass standard pipeline"""
         from datetime import datetime
         import newnewid
@@ -687,28 +695,8 @@ class AvailableFilesPipeline(FilesPipeline):
         )
         
         spider.logger.info(
-            "[AvailableFilesPipeline] Created DownloadedFileItem for HLS download: %s",
+            "[AvailableFilesPipeline] Created DownloadedFileItem: %s",
             downloaded_item["saved_filename"],
         )
-        
-        # Send the item to PostgresPipeline manually
-        try:
-            # Find the PostgresPipeline instance
-            postgres_pipeline = None
-            for pipeline in spider.crawler.engine.scraper.itemproc.pipelines:
-                if hasattr(pipeline, '__class__') and 'PostgresPipeline' in pipeline.__class__.__name__:
-                    postgres_pipeline = pipeline
-                    break
-            
-            if postgres_pipeline:
-                spider.logger.info("[AvailableFilesPipeline] Found PostgresPipeline, processing DownloadedFileItem")
-                postgres_pipeline.process_item(downloaded_item, spider)
-            else:
-                spider.logger.warning("[AvailableFilesPipeline] PostgresPipeline not found, DownloadedFileItem not persisted")
-        except Exception as e:
-            spider.logger.error(
-                "[AvailableFilesPipeline] Error sending DownloadedFileItem to PostgresPipeline: %s",
-                str(e)
-            )
         
         return downloaded_item
