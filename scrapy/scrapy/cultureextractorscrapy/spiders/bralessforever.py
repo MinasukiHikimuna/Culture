@@ -443,7 +443,10 @@ class BralessForeverSpider(scrapy.Spider):
             site=self.site,
         )
         
-        self.logger.info(f"✅ Created ReleaseItem for '{video_data.get('title')}'")
+        if existing_release:
+            self.logger.info(f"✅ Updated ReleaseItem for '{video_data.get('title')}'")
+        else:
+            self.logger.info(f"✅ Created ReleaseItem for '{video_data.get('title')}'")
         self.logger.info(f"   🎞️ Video files: {len([f for f in available_files if f.file_type == 'video'])}")
         self.logger.info(f"   🖼️ Image files: {len([f for f in available_files if f.file_type == 'image'])}")
         self.logger.info(f"   👥 Performers: {len(performers)}")
