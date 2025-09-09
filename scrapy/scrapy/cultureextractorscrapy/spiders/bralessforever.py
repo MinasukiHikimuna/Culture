@@ -131,7 +131,7 @@ class BralessForeverSpider(scrapy.Spider):
         
         self.logger.info(f"✅ Successfully parsed {len(categories_found)} categories")
         
-        # For now, let's scrape just one category for testing
+        # TODO: For now, let's scrape just one category for testing
         if categories_found:
             test_category = categories_found[0]  # Take first category for testing
             self.logger.info(f"🧪 Testing with category: '{test_category['name']}'")
@@ -219,27 +219,23 @@ class BralessForeverSpider(scrapy.Spider):
             
             videos_processed += 1
             
-            # For testing, only scrape the first video
-            if videos_processed == 1:
-                yield scrapy.Request(
-                    url=response.urljoin(video_url),
-                    callback=self.parse_video,
-                    cookies=cookies,
-                    meta={
-                        'category': category,
-                        'video_data': {
-                            'title': title,
-                            'video_id': video_id,
-                            'duration': duration,
-                            'cast_members': cast_members,
-                            'cover_img': cover_img,
-                            'release_date': release_date
-                        }
-                    },
-                    dont_filter=True,
-                )
-                # Stop processing after first video for testing
-                break
+            yield scrapy.Request(
+                url=response.urljoin(video_url),
+                callback=self.parse_video,
+                cookies=cookies,
+                meta={
+                    'category': category,
+                    'video_data': {
+                        'title': title,
+                        'video_id': video_id,
+                        'duration': duration,
+                        'cast_members': cast_members,
+                        'cover_img': cover_img,
+                        'release_date': release_date
+                    }
+                },
+                dont_filter=True,
+            )
         
         self.logger.info(f"✅ Category '{category_name}' processing complete:")
         self.logger.info(f"   📈 Videos processed: {videos_processed}")
