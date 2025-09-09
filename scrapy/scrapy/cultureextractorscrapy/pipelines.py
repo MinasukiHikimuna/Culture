@@ -246,6 +246,7 @@ class BaseDownloadPipeline:
                 raise ValueError(f"Site with ID {release.site_uuid} not found")
             release_date = release.release_date.isoformat()
             release_name = release.name  # Original name from database
+            release_short_name = release.short_name  # Site's video ID
             site_name = site.name
             # Format site name with subsite if available
             formatted_site_name = site_name
@@ -272,9 +273,9 @@ class BaseDownloadPipeline:
                     resolution_part = f" - {file_info['resolution_width']}x{file_info['resolution_height']}"
                 else:
                     resolution_part = ""
-                filename = f"{formatted_site_name} - {release_date} - {release_name}{resolution_part} - {release_id}{file_extension}"
+                filename = f"{formatted_site_name} - {release_date} - {release_short_name} - {release_name}{resolution_part} - {release_id}{file_extension}"
             else:
-                filename = f"{formatted_site_name} - {release_date} - {release_name} - {file_info['variant']} - {release_id}{file_extension}"
+                filename = f"{formatted_site_name} - {release_date} - {release_short_name} - {release_name} - {file_info['variant']} - {release_id}{file_extension}"
             # Create a folder structure based on site and release ID
             folder = f"{formatted_site_name}/Metadata/{release_id}"
             # Sanitize each component separately to maintain structure
