@@ -454,8 +454,8 @@ class AvailableFilesPipeline(BaseDownloadPipeline, FilesPipeline):
         FilesPipeline.__init__(self, store_uri, download_func, settings)
 
     @classmethod
-    def from_settings(cls, settings):
-        return cls(settings["FILES_STORE"], settings=settings)
+    def from_crawler(cls, crawler):
+        return cls(crawler.settings["FILES_STORE"], settings=crawler.settings)
 
     def get_media_requests(self, item, info):
         if isinstance(item, DirectDownloadItem):
@@ -528,8 +528,8 @@ class FfmpegDownloadPipeline(BaseDownloadPipeline):
         super().__init__(store_uri, settings)
     
     @classmethod
-    def from_settings(cls, settings):
-        return cls(settings["FILES_STORE"], settings)
+    def from_crawler(cls, crawler):
+        return cls(crawler.settings["FILES_STORE"], settings=crawler.settings)
 
     def process_item(self, item, spider):
         if isinstance(item, FfmpegDownloadItem):
