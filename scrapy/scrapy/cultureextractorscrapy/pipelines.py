@@ -449,13 +449,13 @@ class BaseDownloadPipeline:
 
 
 class AvailableFilesPipeline(BaseDownloadPipeline, FilesPipeline):
-    def __init__(self, store_uri, download_func=None, settings=None):
+    def __init__(self, store_uri, download_func=None, settings=None, crawler=None):
         BaseDownloadPipeline.__init__(self, store_uri, settings)
-        FilesPipeline.__init__(self, store_uri, download_func, settings)
+        FilesPipeline.__init__(self, store_uri, download_func, crawler=crawler)
 
     @classmethod
     def from_crawler(cls, crawler):
-        return cls(crawler.settings["FILES_STORE"], settings=crawler.settings)
+        return cls(crawler.settings["FILES_STORE"], settings=crawler.settings, crawler=crawler)
 
     def get_media_requests(self, item, info):
         if isinstance(item, DirectDownloadItem):
