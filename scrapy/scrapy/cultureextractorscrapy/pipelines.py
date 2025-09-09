@@ -219,7 +219,21 @@ class BaseDownloadPipeline:
             "LPT9",
         }
 
-    def file_path(self, release_id, file_info):
+    def file_path(self, request, response=None, info=None, *, item=None):
+        """Standard Scrapy FilesPipeline file_path method - extracts data from request"""
+        if request is not None and hasattr(request, 'meta'):
+            release_id = request.meta.get('release_id')
+            file_info = request.meta.get('file_info')
+            if release_id and file_info:
+                return self._generate_file_path(release_id, file_info)
+        
+        raise ValueError("Request must contain release_id and file_info in meta")
+    
+    def get_file_path(self, release_id, file_info):
+        """Custom method for direct file path generation without request objects"""
+        return self._generate_file_path(release_id, file_info)
+    
+    def _generate_file_path(self, release_id, file_info):
         """Generate file path from release_id and file_info without needing Request objects"""
         # Get release info from database
         session = get_session()
@@ -451,7 +465,7 @@ class AvailableFilesPipeline(BaseDownloadPipeline, FilesPipeline):
                 item["url"],
             )
 
-            file_path = self.file_path(item["release_id"], item["file_info"])
+            file_path = self.get_file_path(item["release_id"], item["file_info"])
 
             full_path = os.path.join(self.store.basedir, file_path)
             # Use %s formatting to avoid encoding issues in logging
@@ -531,7 +545,7 @@ class FfmpegDownloadPipeline(BaseDownloadPipeline):
             )
             
             # Generate file path using base class method
-            file_path = self.file_path(item["release_id"], item["file_info"])
+            file_path = self.get_file_path(item["release_id"], item["file_info"])
             
             # Check if file already exists
             spider.logger.info(
