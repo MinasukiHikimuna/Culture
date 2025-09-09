@@ -264,6 +264,14 @@ class BaseDownloadPipeline:
             sanitized_filename = self.sanitize_component(filename)
             # Combine into final path
             file_path = f"{sanitized_site}/Metadata/{release_id}/{sanitized_filename}"
+            
+            # Debug logging
+            print(f"[DEBUG file_path] Generated path: {file_path}")
+            print(f"[DEBUG file_path] URL: {file_info['url']}")
+            print(f"[DEBUG file_path] File extension extracted: {file_extension}")
+            print(f"[DEBUG file_path] File type: {file_info['file_type']}")
+            print(f"[DEBUG file_path] Release ID: {release_id}")
+            
             return file_path
         finally:
             session.close()
@@ -511,11 +519,28 @@ class FfmpegDownloadPipeline(BaseDownloadPipeline):
                 "[FfmpegDownloadPipeline] Processing FfmpegDownloadItem for URL: %s",
                 item["url"],
             )
+            spider.logger.info(
+                "[FfmpegDownloadPipeline] DEBUG: Release ID: %s", item["release_id"]
+            )
+            spider.logger.info(
+                "[FfmpegDownloadPipeline] DEBUG: File info: %s", item["file_info"]
+            )
             
             # Generate file path using base class method
             file_path = self.file_path(item["release_id"], item["file_info"])
             
             # Check if file already exists
+            spider.logger.info(
+                "[FfmpegDownloadPipeline] DEBUG: Checking file existence for path: %s", file_path
+            )
+            full_path_check = os.path.join(self.store_uri, file_path)
+            spider.logger.info(
+                "[FfmpegDownloadPipeline] DEBUG: Full path for existence check: %s", full_path_check
+            )
+            spider.logger.info(
+                "[FfmpegDownloadPipeline] DEBUG: File exists result: %s", os.path.exists(full_path_check)
+            )
+            
             if self.file_exists_check(file_path):
                 spider.logger.info(
                     "[FfmpegDownloadPipeline] File already exists: %s", file_path
