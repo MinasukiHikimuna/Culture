@@ -240,7 +240,11 @@ class BaseDownloadPipeline:
             # Extract file extension from the URL or use original filename from json_document
             url_path = urlparse(file_info["url"]).path
             file_extension = os.path.splitext(url_path)[1]
-            if not file_extension:
+            
+            # Convert .m3u8 to .mp4 since ffmpeg downloads HLS streams as MP4
+            if file_extension == ".m3u8":
+                file_extension = ".mp4"
+            elif not file_extension:
                 if file_info["file_type"] == "video":
                     file_extension = ".mp4"  # Default to .mp4 for video files
                 elif file_info["file_type"] == "image":
@@ -577,10 +581,6 @@ class FfmpegDownloadPipeline(BaseDownloadPipeline):
         import os
         
         try:
-            # Ensure output path has .mp4 extension for HLS downloads
-            if not output_path.endswith('.mp4'):
-                output_path = os.path.splitext(output_path)[0] + '.mp4'
-            
             # Ensure the directory exists
             os.makedirs(os.path.dirname(output_path), exist_ok=True)
             
