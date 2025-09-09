@@ -324,7 +324,7 @@ class BaseDownloadPipeline:
             else:
                 return self.process_generic_metadata(file_path, file_type)
         except Exception as e:
-            return json.dumps({"error": f"Failed to process metadata: {str(e)}"})
+            return {"error": f"Failed to process metadata: {str(e)}"}
 
     def process_video_metadata(self, file_path):
         """Process video file metadata with both video hashes and ffprobe data"""
@@ -383,7 +383,7 @@ class BaseDownloadPipeline:
             logging.error(f"ffprobe failed: {str(e)}")
             metadata["ffprobe_error"] = str(e)
         
-        return json.dumps(metadata)
+        return metadata
 
     def process_audio_metadata(self, file_path):
         """Process audio file metadata"""
@@ -393,7 +393,7 @@ class BaseDownloadPipeline:
             "$type": "AudioFileMetadata",
             "file_size": file_size
         }
-        return json.dumps(metadata)
+        return metadata
 
     def process_generic_metadata(self, file_path, file_type):
         """Process generic file metadata"""
@@ -403,7 +403,7 @@ class BaseDownloadPipeline:
             "file_type": file_type,
             "file_size": file_size
         }
-        return json.dumps(metadata)
+        return metadata
 
 
 class AvailableFilesPipeline(BaseDownloadPipeline, FilesPipeline):
