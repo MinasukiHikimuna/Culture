@@ -149,8 +149,6 @@ class BralessForeverSpider(scrapy.Spider):
             )
         else:
             self.logger.warning("⚠️ No categories found on the page")
-        
-        return []
     
     def parse_category_videos(self, response):
         """Parse videos from a specific category page."""
