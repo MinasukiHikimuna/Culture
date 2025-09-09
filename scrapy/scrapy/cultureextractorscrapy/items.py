@@ -186,3 +186,10 @@ class DirectDownloadItem(scrapy.Item):
     release_id = scrapy.Field()
     file_info = scrapy.Field()
     url = scrapy.Field()
+
+
+class FfmpegDownloadItem(scrapy.Item):
+    release_id = scrapy.Field()
+    file_info = scrapy.Field()
+    url = scrapy.Field()
+    output_path = scrapy.Field()

@@ -22,6 +22,7 @@ from .items import (
     AvailableGalleryZipFile,
     DownloadedFileItem,
     DirectDownloadItem,
+    FfmpegDownloadItem,
 )
 from datetime import datetime
 import json
@@ -185,12 +186,147 @@ class PostgresPipeline:
         self.session.close()
 
 
-class AvailableFilesPipeline(FilesPipeline):
-    def __init__(self, store_uri, download_func=None, settings=None):
-        super().__init__(store_uri, download_func, settings)
-        self.store_uri = store_uri  # This is the FILES_STORE setting
+class BaseDownloadPipeline:
+    """Base class for download pipelines with shared file path and existence logic"""
+    
+    def __init__(self, store_uri, settings=None):
+        self.store_uri = store_uri
+        self.settings = settings
         # Add Windows invalid characters list
         self.INVALID_CHARS = r'<>:"/\|?*'
+
+    def file_path(self, release_id, file_info):
+        """Generate file path from release_id and file_info without needing Request objects"""
+        # Get release info from database
+        session = get_session()
+        try:
+            release = session.query(Release).filter_by(uuid=release_id).first()
+            if not release:
+                raise ValueError(f"Release with ID {release_id} not found")
+            site = session.query(Site).filter_by(uuid=release.site_uuid).first()
+            if not site:
+                raise ValueError(f"Site with ID {release.site_uuid} not found")
+            release_date = release.release_date.isoformat()
+            release_name = release.name  # Original name from database
+            site_name = site.name
+            # Format site name with subsite if available
+            formatted_site_name = site_name
+            if release.sub_site_uuid is not None:
+                formatted_site_name = f"{site_name}꞉ {release.sub_site.name}"
+            # Extract file extension from the URL or use original filename from json_document
+            url_path = urlparse(file_info["url"]).path
+            file_extension = os.path.splitext(url_path)[1]
+            if not file_extension:
+                if file_info["file_type"] == "video":
+                    file_extension = ".mp4"  # Default to .mp4 for video files
+                elif file_info["file_type"] == "image":
+                    file_extension = ".jpg"  # Default to .jpg for image files
+                else:
+                    file_extension = ""  # No extension for other types
+            # Create filename in the specified format
+            if file_info["file_type"] == "video":
+                # Only include resolution if both width and height are present and not None
+                if file_info.get('resolution_width') and file_info.get('resolution_height'):
+                    resolution_part = f" - {file_info['resolution_width']}x{file_info['resolution_height']}"
+                else:
+                    resolution_part = ""
+                filename = f"{formatted_site_name} - {release_date} - {release_name}{resolution_part} - {release_id}{file_extension}"
+            else:
+                filename = f"{formatted_site_name} - {release_date} - {release_name} - {file_info['variant']} - {release_id}{file_extension}"
+            # Create a folder structure based on site and release ID
+            folder = f"{formatted_site_name}/Metadata/{release_id}"
+            # Sanitize each component separately to maintain structure
+            sanitized_site = self.sanitize_component(formatted_site_name)
+            sanitized_filename = self.sanitize_component(filename)
+            # Combine into final path
+            file_path = f"{sanitized_site}/Metadata/{release_id}/{sanitized_filename}"
+            return file_path
+        finally:
+            session.close()
+
+    def sanitize_component(self, text):
+        """Sanitize a single component of a path to be Windows-compatible."""
+        # Replace invalid characters with underscore
+        for char in self.INVALID_CHARS:
+            text = text.replace(char, "_")
+        # Remove any leading/trailing spaces or dots
+        text = text.strip(" .")
+        return text
+
+    def file_exists_check(self, file_path):
+        """Check if file already exists at the given path"""
+        full_path = os.path.join(self.store_uri, file_path)
+        return os.path.exists(full_path)
+
+    def create_downloaded_item_from_path(self, item, file_path, spider):
+        """Create DownloadedFileItem from a file path"""
+        from datetime import datetime
+        import newnewid
+        import os
+        
+        file_info = item["file_info"]
+        
+        # Process file metadata
+        full_path = os.path.join(self.store_uri, file_path)
+        file_metadata = self.process_file_metadata(full_path, file_info["file_type"])
+        
+        # Create DownloadedFileItem
+        downloaded_item = DownloadedFileItem(
+            uuid=newnewid.uuid7(),
+            downloaded_at=datetime.now(),
+            file_type=file_info["file_type"],
+            content_type=file_info["content_type"],
+            variant=file_info["variant"],
+            available_file=file_info,
+            original_filename=os.path.basename(file_info["url"]),
+            saved_filename=os.path.basename(file_path),
+            release_uuid=item["release_id"],
+            file_metadata=file_metadata,
+        )
+        
+        spider.logger.info(
+            "[BaseDownloadPipeline] Created DownloadedFileItem: %s", 
+            downloaded_item["saved_filename"]
+        )
+        return downloaded_item
+
+    def process_file_metadata(self, file_path, file_type):
+        """Process file metadata - extracted from existing pipeline logic"""
+        try:
+            if file_type == "video":
+                import subprocess
+                import json as json_lib
+                
+                ffprobe_command = [
+                    "ffprobe",
+                    "-v", "quiet",
+                    "-print_format", "json",
+                    "-show_format",
+                    "-show_streams",
+                    file_path,
+                ]
+                
+                result = subprocess.run(
+                    ffprobe_command, capture_output=True, text=True, timeout=60
+                )
+                
+                if result.returncode == 0:
+                    metadata = json_lib.loads(result.stdout)
+                    return json.dumps(metadata)
+                else:
+                    return json.dumps({"error": f"ffprobe failed: {result.stderr}"})
+            else:
+                # For non-video files, just return basic file info
+                file_size = os.path.getsize(file_path) if os.path.exists(file_path) else 0
+                return json.dumps({"file_size": file_size})
+        except Exception as e:
+            return json.dumps({"error": f"Failed to process metadata: {str(e)}"})
+
+
+class AvailableFilesPipeline(BaseDownloadPipeline, FilesPipeline):
+    def __init__(self, store_uri, download_func=None, settings=None):
+        BaseDownloadPipeline.__init__(self, store_uri, settings)
+        FilesPipeline.__init__(self, store_uri, download_func, settings)
         self.INVALID_NAMES = {
             "CON",
             "PRN",
@@ -248,13 +384,7 @@ class AvailableFilesPipeline(FilesPipeline):
                 item["url"],
             )
 
-            file_path = self.file_path(
-                None,
-                None,
-                info,
-                release_id=item["release_id"],
-                file_info=item["file_info"],
-            )
+            file_path = self.file_path(item["release_id"], item["file_info"])
 
             full_path = os.path.join(self.store.basedir, file_path)
             # Use %s formatting to avoid encoding issues in logging
@@ -263,32 +393,12 @@ class AvailableFilesPipeline(FilesPipeline):
                 "[AvailableFilesPipeline] File info: %s", item["file_info"]
             )
 
-            if not os.path.exists(full_path):
+            if not self.file_exists_check(file_path):
                 spider.logger.info(
                     "[AvailableFilesPipeline] File does not exist, requesting download: %s",
                     full_path,
                 )
                 
-                # Check if this is an HLS m3u8 file that needs ffmpeg
-                if item["url"].endswith('.m3u8') or '.m3u8' in item["url"]:
-                    spider.logger.info(
-                        "[AvailableFilesPipeline] Detected HLS stream, using ffmpeg for download"
-                    )
-                    # Handle ffmpeg download directly here
-                    actual_path = self.download_hls_with_ffmpeg(item["url"], full_path, spider)
-                    if actual_path:
-                        spider.logger.info(
-                            "[AvailableFilesPipeline] HLS download completed successfully: %s",
-                            actual_path,
-                        )
-                        # Mark that we handled this with ffmpeg (we'll create DownloadedFileItem in item_completed)
-                        item["_m3u8_downloaded_path"] = actual_path
-                    else:
-                        spider.logger.error(
-                            "[AvailableFilesPipeline] HLS download failed: %s",
-                            full_path,
-                        )
-                    return []  # Don't use standard downloader
                 
                 return [
                     Request(
@@ -408,15 +518,6 @@ class AvailableFilesPipeline(FilesPipeline):
                 "[AvailableFilesPipeline] Item completed for URL: %s", item["url"]
             )
             spider.logger.info("[AvailableFilesPipeline] Download results: %s", results)
-
-            # Check if this was downloaded with ffmpeg
-            if "_m3u8_downloaded_path" in item:
-                spider.logger.info(
-                    "[AvailableFilesPipeline] Processing m3u8-downloaded file: %s", 
-                    item["_m3u8_downloaded_path"]
-                )
-                return self.create_downloaded_item_from_path(item, item["_m3u8_downloaded_path"], spider)
-
             file_paths = [x["path"] for ok, x in results if ok]
             spider.logger.info(
                 "[AvailableFilesPipeline] File paths from results: %s", file_paths
@@ -669,34 +770,144 @@ class AvailableFilesPipeline(FilesPipeline):
             )
             return False
     
-    def create_downloaded_item_from_path(self, item, full_path, spider):
-        """Create DownloadedFileItem for HLS downloads that bypass standard pipeline"""
-        from datetime import datetime
-        import newnewid
+
+class FfmpegDownloadPipeline(BaseDownloadPipeline):
+    """Pipeline for downloading M3U8/HLS streams using ffmpeg"""
+    
+    def __init__(self, store_uri, settings=None):
+        super().__init__(store_uri, settings)
+    
+    @classmethod
+    def from_settings(cls, settings):
+        return cls(settings["FILES_STORE"], settings)
+
+    def process_item(self, item, spider):
+        if isinstance(item, FfmpegDownloadItem):
+            spider.logger.info(
+                "[FfmpegDownloadPipeline] Processing FfmpegDownloadItem for URL: %s",
+                item["url"],
+            )
+            
+            # Generate file path using base class method
+            file_path = self.file_path(item["release_id"], item["file_info"])
+            
+            # Check if file already exists
+            if self.file_exists_check(file_path):
+                spider.logger.info(
+                    "[FfmpegDownloadPipeline] File already exists: %s", file_path
+                )
+                return self.create_downloaded_item_from_path(item, file_path, spider)
+            
+            # File doesn't exist, download with ffmpeg
+            full_path = os.path.join(self.store_uri, file_path)
+            spider.logger.info(
+                "[FfmpegDownloadPipeline] Downloading with ffmpeg to: %s", full_path
+            )
+            
+            actual_path = self.download_hls_with_ffmpeg(item["url"], full_path, spider)
+            if actual_path:
+                spider.logger.info(
+                    "[FfmpegDownloadPipeline] Download completed successfully: %s",
+                    actual_path,
+                )
+                # Convert full path back to relative path for create_downloaded_item_from_path
+                relative_path = os.path.relpath(actual_path, self.store_uri)
+                return self.create_downloaded_item_from_path(item, relative_path, spider)
+            else:
+                spider.logger.error(
+                    "[FfmpegDownloadPipeline] Download failed: %s", item["url"]
+                )
+                raise DropItem(f"FFmpeg download failed: {item['url']}")
+        
+        return item
+
+    def download_hls_with_ffmpeg(self, url, output_path, spider):
+        """Download HLS stream using ffmpeg"""
+        import subprocess
         import os
         
-        file_info = item["file_info"]
-        
-        # Process file metadata
-        file_metadata = self.process_file_metadata(full_path, file_info["file_type"])
-        
-        # Create DownloadedFileItem
-        downloaded_item = DownloadedFileItem(
-            uuid=newnewid.uuid7(),
-            downloaded_at=datetime.now(),
-            file_type=file_info["file_type"],
-            content_type=file_info.get("content_type"),
-            variant=file_info.get("variant"),
-            available_file=file_info,
-            original_filename=os.path.basename(item["url"].split("?")[0]),
-            saved_filename=os.path.basename(full_path),
-            release_uuid=item["release_id"],
-            file_metadata=file_metadata,
-        )
-        
-        spider.logger.info(
-            "[AvailableFilesPipeline] Created DownloadedFileItem: %s",
-            downloaded_item["saved_filename"],
-        )
-        
-        return downloaded_item
+        try:
+            # Ensure output path has .mp4 extension for HLS downloads
+            if not output_path.endswith('.mp4'):
+                output_path = os.path.splitext(output_path)[0] + '.mp4'
+            
+            # Ensure the directory exists
+            os.makedirs(os.path.dirname(output_path), exist_ok=True)
+            
+            # Run ffmpeg command to download HLS stream
+            cmd = [
+                'ffmpeg',
+                '-i', url,
+                '-c', 'copy',  # Copy streams without re-encoding
+                '-progress', 'pipe:2',  # Send progress to stderr
+                '-y',  # Overwrite output file if it exists
+                output_path
+            ]
+            
+            spider.logger.info(
+                "[FfmpegDownloadPipeline] Starting ffmpeg download: %s", 
+                ' '.join(cmd)
+            )
+            
+            # Use Popen to capture output in real-time
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                universal_newlines=True
+            )
+            
+            # Monitor progress
+            last_progress_log = 0
+            while True:
+                output = process.stderr.readline()
+                if output == '' and process.poll() is not None:
+                    break
+                if output:
+                    # Log progress every 30 seconds or on important messages
+                    import time
+                    current_time = time.time()
+                    if ('time=' in output or 'speed=' in output or 
+                        current_time - last_progress_log > 30):
+                        spider.logger.info(
+                            "[FfmpegDownloadPipeline] ffmpeg progress: %s",
+                            output.strip()
+                        )
+                        last_progress_log = current_time
+            
+            # Wait for process to complete
+            return_code = process.wait()
+            
+            if return_code == 0:
+                spider.logger.info(
+                    "[FfmpegDownloadPipeline] ffmpeg download successful: %s", 
+                    output_path
+                )
+                return output_path
+            else:
+                # Get any remaining stderr output
+                remaining_stderr = process.stderr.read()
+                spider.logger.error(
+                    "[FfmpegDownloadPipeline] ffmpeg failed with return code %s: %s", 
+                    return_code, remaining_stderr
+                )
+                return False
+                
+        except subprocess.TimeoutExpired:
+            spider.logger.error(
+                "[FfmpegDownloadPipeline] ffmpeg download timed out for: %s", 
+                url
+            )
+            return False
+        except FileNotFoundError:
+            spider.logger.error(
+                "[FfmpegDownloadPipeline] ffmpeg not found in PATH. Please install ffmpeg."
+            )
+            return False
+        except Exception as e:
+            spider.logger.error(
+                "[FfmpegDownloadPipeline] ffmpeg download error: %s", 
+                str(e)
+            )
+            return False

@@ -59,6 +59,10 @@ class BralessForeverSpider(scrapy.Spider):
     allowed_domains = ["app.bralessforever.com", "private-blvideo.b-cdn.net", "cdn.realms.tv"]
     start_urls = [base_url]
     site_short_name = "bralessforever"
+    
+    # Add desired performer short names for filtering
+    # Set to empty list to scrape all performers, or add specific performer short names
+    desired_performers = []
 
     def __init__(self, *args, **kwargs):
         super(BralessForeverSpider, self).__init__(*args, **kwargs)
