@@ -453,8 +453,30 @@ class BralessForeverSpider(scrapy.Spider):
         
         yield release_item
         
+        # Check for duplicate downloads before yielding download items
+        files_to_download = available_files
+        if existing_release and not self.force_update:
+            # Compare available files with downloaded files
+            existing_available_files = existing_release['available_files']
+            downloaded_files = existing_release['downloaded_files']
+            
+            needed_files = set(
+                (f.file_type, f.content_type, f.variant) 
+                for f in available_files
+            )
+            
+            if not needed_files.issubset(downloaded_files):
+                # We have missing files - filter to only missing ones
+                missing_files = [f for f in available_files if 
+                    (f.file_type, f.content_type, f.variant) not in downloaded_files]
+                files_to_download = missing_files
+                self.logger.info(f"Release {video_id} exists but missing {len(missing_files)} files. Downloading them.")
+            else:
+                self.logger.info(f"Release {video_id} already exists with all files downloaded. Skipping downloads.")
+                files_to_download = []  # Skip all downloads
+        
         # Now yield appropriate download items based on file type
-        for file_info in available_files:
+        for file_info in files_to_download:
             # Check if this is an m3u8/HLS URL that needs ffmpeg processing
             if file_info.url.endswith('.m3u8') or '.m3u8' in file_info.url:
                 self.logger.info(f"🎬 Yielding FfmpegDownloadItem for m3u8 URL: {file_info.url}")
