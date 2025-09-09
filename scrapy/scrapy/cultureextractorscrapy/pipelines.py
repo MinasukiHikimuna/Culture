@@ -315,36 +315,95 @@ class BaseDownloadPipeline:
         return downloaded_item
 
     def process_file_metadata(self, file_path, file_type):
-        """Process file metadata - extracted from existing pipeline logic"""
+        """Process file metadata with proper video hashes and ffprobe data"""
         try:
             if file_type == "video":
-                import subprocess
-                import json as json_lib
-                
-                ffprobe_command = [
-                    "ffprobe",
-                    "-v", "quiet",
-                    "-print_format", "json",
-                    "-show_format",
-                    "-show_streams",
-                    file_path,
-                ]
-                
-                result = subprocess.run(
-                    ffprobe_command, capture_output=True, text=True, timeout=60
-                )
-                
-                if result.returncode == 0:
-                    metadata = json_lib.loads(result.stdout)
-                    return json.dumps(metadata)
-                else:
-                    return json.dumps({"error": f"ffprobe failed: {result.stderr}"})
+                return self.process_video_metadata(file_path)
+            elif file_type == "audio":
+                return self.process_audio_metadata(file_path)
             else:
-                # For non-video files, just return basic file info
-                file_size = os.path.getsize(file_path) if os.path.exists(file_path) else 0
-                return json.dumps({"file_size": file_size})
+                return self.process_generic_metadata(file_path, file_type)
         except Exception as e:
             return json.dumps({"error": f"Failed to process metadata: {str(e)}"})
+
+    def process_video_metadata(self, file_path):
+        """Process video file metadata with both video hashes and ffprobe data"""
+        import subprocess
+        import json as json_lib
+        import logging
+        
+        metadata = {
+            "$type": "VideoFileMetadata"
+        }
+        
+        # Get video hashes (phash, oshash, md5, duration)
+        try:
+            result = subprocess.run(
+                ["/Users/thardas/Code/videohashes/dist/videohashes-arm64-macos", "-json", "-md5", file_path],
+                capture_output=True,
+                text=True,
+                timeout=300  # 5 minutes for video hash calculation
+            )
+            if result.returncode == 0:
+                video_hashes = json_lib.loads(result.stdout)
+                # Add video hashes at root level for compatibility
+                metadata["duration"] = video_hashes.get("duration")
+                metadata["phash"] = video_hashes.get("phash") 
+                metadata["oshash"] = video_hashes.get("oshash")
+                metadata["md5"] = video_hashes.get("md5")
+            else:
+                logging.error(f"Failed to get video hashes: {result.stderr}")
+                metadata["video_hashes_error"] = result.stderr
+        except Exception as e:
+            logging.error(f"Video hashes calculation failed: {str(e)}")
+            metadata["video_hashes_error"] = str(e)
+        
+        # Get ffprobe metadata for additional technical details
+        try:
+            ffprobe_command = [
+                "ffprobe",
+                "-v", "quiet", 
+                "-print_format", "json",
+                "-show_format",
+                "-show_streams",
+                file_path,
+            ]
+            
+            result = subprocess.run(
+                ffprobe_command, capture_output=True, text=True, timeout=60
+            )
+            
+            if result.returncode == 0:
+                ffprobe_data = json_lib.loads(result.stdout)
+                metadata["ffprobe"] = ffprobe_data
+            else:
+                logging.error(f"ffprobe failed: {result.stderr}")
+                metadata["ffprobe_error"] = result.stderr
+        except Exception as e:
+            logging.error(f"ffprobe failed: {str(e)}")
+            metadata["ffprobe_error"] = str(e)
+        
+        return json.dumps(metadata)
+
+    def process_audio_metadata(self, file_path):
+        """Process audio file metadata"""
+        # For now, just return basic file info - can be enhanced later
+        file_size = os.path.getsize(file_path) if os.path.exists(file_path) else 0
+        metadata = {
+            "$type": "AudioFileMetadata",
+            "file_size": file_size
+        }
+        return json.dumps(metadata)
+
+    def process_generic_metadata(self, file_path, file_type):
+        """Process generic file metadata"""
+        file_size = os.path.getsize(file_path) if os.path.exists(file_path) else 0
+        metadata = {
+            "$type": "GenericFileMetadata", 
+            "file_type": file_type,
+            "file_size": file_size
+        }
+        return json.dumps(metadata)
 
 
 class AvailableFilesPipeline(BaseDownloadPipeline, FilesPipeline):
@@ -352,29 +411,9 @@ class AvailableFilesPipeline(BaseDownloadPipeline, FilesPipeline):
         BaseDownloadPipeline.__init__(self, store_uri, settings)
         FilesPipeline.__init__(self, store_uri, download_func, settings)
 
-    def sanitize_path(self, path):
-        """Sanitize the path to be Windows-compatible."""
-        # Split path into parts
-        parts = path.split(os.sep)
-
-        # Sanitize each part
-        sanitized_parts = []
-        for part in parts:
-            # Replace invalid characters with underscore
-            for char in self.INVALID_CHARS:
-                part = part.replace(char, "_")
-
-            # Remove any leading/trailing spaces or dots
-            part = part.strip(" .")
-
-            # Check if this part is a reserved name
-            if part.upper() in self.INVALID_NAMES:
-                part = f"_{part}"
-
-            sanitized_parts.append(part)
-
-        # Rejoin path
-        return os.sep.join(sanitized_parts)
+    @classmethod
+    def from_settings(cls, settings):
+        return cls(settings["FILES_STORE"], settings=settings)
 
     def get_media_requests(self, item, info):
         if isinstance(item, DirectDownloadItem):
@@ -407,13 +446,12 @@ class AvailableFilesPipeline(BaseDownloadPipeline, FilesPipeline):
                             "release_id": item["release_id"],
                             "file_info": item["file_info"],
                             "dont_redirect": True,
-                            "handle_httpstatus_list": [302, 401],
                         },
                     )
                 ]
             else:
                 spider.logger.info(
-                    "[AvailableFilesPipeline] File already exists, skipping: %s",
+                    "[AvailableFilesPipeline] File already exists, skipping download: %s",
                     full_path,
                 )
         return []
@@ -430,254 +468,16 @@ class AvailableFilesPipeline(BaseDownloadPipeline, FilesPipeline):
             spider.logger.info(
                 "[AvailableFilesPipeline] File paths from results: %s", file_paths
             )
-
             if file_paths:
                 file_info = item["file_info"]
                 # Get full path by combining store_uri with relative path
                 full_path = os.path.join(self.store_uri, file_paths[0])
                 spider.logger.info(
-                    "[AvailableFilesPipeline] Processing completed file: %s", full_path
+                    "[AvailableFilesPipeline] Processing file: %s", full_path
                 )
-
-                file_metadata = self.process_file_metadata(
-                    full_path, file_info["file_type"]
-                )
-
-                downloaded_item = DownloadedFileItem(
-                    uuid=newnewid.uuid7(),
-                    downloaded_at=datetime.now(),
-                    file_type=file_info["file_type"],
-                    content_type=file_info.get("content_type"),
-                    variant=file_info.get("variant"),
-                    available_file=file_info,
-                    original_filename=os.path.basename(item["url"].split("?")[0]),
-                    saved_filename=os.path.basename(file_paths[0]),
-                    release_uuid=item["release_id"],
-                    file_metadata=file_metadata,
-                )
-                spider.logger.info(
-                    "[AvailableFilesPipeline] Created DownloadedFileItem for: %s",
-                    downloaded_item["saved_filename"],
-                )
-                return downloaded_item
-            else:
-                spider.logger.info(
-                    "[AvailableFilesPipeline] No file paths in results, skipping DownloadedFileItem creation"
-                )
+                return self.create_downloaded_item_from_path(item, file_paths[0], spider)
         return item
 
-    def process_file_metadata(self, file_path, file_type):
-        if file_type == "video":
-            return self.process_video_metadata(file_path)
-        elif file_type == "audio":
-            return self.process_audio_metadata(file_path)
-        else:
-            return self.process_generic_metadata(file_path, file_type)
-
-    def process_video_metadata(self, file_path):
-        result = subprocess.run(
-            ["/Users/thardas/Code/videohashes/dist/videohashes-arm64-macos", "-json", "-md5", file_path],
-            capture_output=True,
-            text=True,
-        )
-
-        if result.returncode == 0:
-            video_hashes = json.loads(result.stdout)
-            return {
-                "$type": "VideoHashes",
-                "duration": video_hashes.get("duration"),
-                "phash": video_hashes.get("phash"),
-                "oshash": video_hashes.get("oshash"),
-                "md5": video_hashes.get("md5"),
-            }
-        else:
-            logging.error(f"Failed to get video hashes: {result.stderr}")
-            return {}
-
-    def process_audio_metadata(self, file_path):
-        """Process audio file metadata using ffprobe and calculate hashes."""
-        metadata = {"$type": "AudioFileMetadata"}
-
-        # Calculate file hashes
-        sha256_hash = hashlib.sha256()
-        md5_hash = hashlib.md5()
-        with open(file_path, "rb") as f:
-            for byte_block in iter(lambda: f.read(4096), b""):
-                sha256_hash.update(byte_block)
-                md5_hash.update(byte_block)
-
-        metadata["sha256Sum"] = sha256_hash.hexdigest()
-        metadata["md5Sum"] = md5_hash.hexdigest()
-
-        # Extract audio metadata using ffprobe
-        try:
-            result = subprocess.run(
-                [
-                    "ffprobe",
-                    "-v",
-                    "quiet",
-                    "-print_format",
-                    "json",
-                    "-show_streams",
-                    "-select_streams",
-                    "a:0",  # Select first audio stream
-                    file_path,
-                ],
-                capture_output=True,
-                text=True,
-                timeout=30,
-            )
-
-            if result.returncode == 0:
-                data = json.loads(result.stdout)
-                streams = data.get("streams", [])
-
-                if streams:
-                    audio_stream = streams[0]
-
-                    # Extract metadata
-                    metadata["duration"] = float(audio_stream.get("duration", 0))
-
-                    bit_rate = audio_stream.get("bit_rate")
-                    if bit_rate:
-                        metadata["bitrate"] = int(bit_rate) // 1000  # Convert to kbps
-
-                    sample_rate = audio_stream.get("sample_rate")
-                    if sample_rate:
-                        metadata["sampleRate"] = int(sample_rate)
-
-                    channels = audio_stream.get("channels")
-                    if channels:
-                        metadata["channels"] = int(channels)
-
-                    codec = audio_stream.get("codec_name")
-                    if codec:
-                        metadata["codec"] = codec
-
-        except (
-            subprocess.TimeoutExpired,
-            subprocess.CalledProcessError,
-            json.JSONDecodeError,
-            FileNotFoundError,
-        ) as e:
-            logging.warning(f"Could not extract audio metadata from {file_path}: {e}")
-
-        return metadata
-
-    def process_generic_metadata(self, file_path, file_type):
-        if file_type == "zip":
-            type = "GalleryZipFileMetadata"
-        elif file_type == "image":
-            type = "ImageFileMetadata"
-        elif file_type == "audio":
-            type = "AudioFileMetadata"
-        elif file_type == "vtt":
-            type = "VttFileMetadata"
-        else:
-            type = "GenericFileMetadata"
-
-        sha256_hash = hashlib.sha256()
-        md5_hash = hashlib.md5()
-        with open(file_path, "rb") as f:
-            for byte_block in iter(lambda: f.read(4096), b""):
-                sha256_hash.update(byte_block)
-                md5_hash.update(byte_block)
-        sha256_sum = sha256_hash.hexdigest()
-        md5_sum = md5_hash.hexdigest()
-
-        return {"$type": type, "sha256Sum": sha256_sum, "md5Sum": md5_sum}
-    
-    def download_hls_with_ffmpeg(self, url, output_path, spider):
-        """Download HLS stream using ffmpeg"""
-        import subprocess
-        import os
-        
-        try:
-            # Ensure output path has .mp4 extension for HLS downloads
-            if not output_path.endswith('.mp4'):
-                output_path = os.path.splitext(output_path)[0] + '.mp4'
-            
-            # Ensure the directory exists
-            os.makedirs(os.path.dirname(output_path), exist_ok=True)
-            
-            # Run ffmpeg command to download HLS stream
-            cmd = [
-                'ffmpeg',
-                '-i', url,
-                '-c', 'copy',  # Copy streams without re-encoding
-                '-progress', 'pipe:2',  # Send progress to stderr
-                '-y',  # Overwrite output file if it exists
-                output_path
-            ]
-            
-            spider.logger.info(
-                "[AvailableFilesPipeline] Starting ffmpeg download: %s", 
-                ' '.join(cmd)
-            )
-            
-            # Use Popen to capture output in real-time
-            process = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                universal_newlines=True
-            )
-            
-            # Monitor progress
-            last_progress_log = 0
-            while True:
-                output = process.stderr.readline()
-                if output == '' and process.poll() is not None:
-                    break
-                if output:
-                    # Log progress every 30 seconds or on important messages
-                    import time
-                    current_time = time.time()
-                    if ('time=' in output or 'speed=' in output or 
-                        current_time - last_progress_log > 30):
-                        spider.logger.info(
-                            "[AvailableFilesPipeline] ffmpeg progress: %s", 
-                            output.strip()
-                        )
-                        if current_time - last_progress_log > 30:
-                            last_progress_log = current_time
-            
-            return_code = process.poll()
-            
-            if return_code == 0:
-                spider.logger.info(
-                    "[AvailableFilesPipeline] ffmpeg download successful: %s", 
-                    output_path
-                )
-                return output_path
-            else:
-                # Get any remaining stderr output
-                remaining_stderr = process.stderr.read()
-                spider.logger.error(
-                    "[AvailableFilesPipeline] ffmpeg failed with return code %s: %s", 
-                    return_code, remaining_stderr
-                )
-                return False
-                
-        except subprocess.TimeoutExpired:
-            spider.logger.error(
-                "[AvailableFilesPipeline] ffmpeg download timed out for: %s", 
-                url
-            )
-            return False
-        except FileNotFoundError:
-            spider.logger.error(
-                "[AvailableFilesPipeline] ffmpeg not found in PATH. Please install ffmpeg."
-            )
-            return False
-        except Exception as e:
-            spider.logger.error(
-                "[AvailableFilesPipeline] ffmpeg download error: %s", 
-                str(e)
-            )
-            return False
-    
 
 class FfmpegDownloadPipeline(BaseDownloadPipeline):
     """Pipeline for downloading M3U8/HLS streams using ffmpeg"""
@@ -725,6 +525,7 @@ class FfmpegDownloadPipeline(BaseDownloadPipeline):
                 spider.logger.error(
                     "[FfmpegDownloadPipeline] Download failed: %s", item["url"]
                 )
+                from scrapy.exceptions import DropItem
                 raise DropItem(f"FFmpeg download failed: {item['url']}")
         
         return item
