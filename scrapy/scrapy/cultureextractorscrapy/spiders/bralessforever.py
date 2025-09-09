@@ -103,9 +103,6 @@ class BralessForeverSpider(scrapy.Spider):
 
     def parse_categories_page(self, response):
         """Parse the categories page and extract all available categories."""
-        # Save the categories page DOM to a file for analysis
-        self.save_dom_to_file(response, "categories.html")
-        
         # Log some basic info
         self.logger.info(f"📋 Processing categories page: {response.url}")
         self.logger.info(f"📊 Response status: {response.status}")
@@ -154,10 +151,6 @@ class BralessForeverSpider(scrapy.Spider):
         """Parse videos from a specific category page."""
         category = response.meta.get('category', {})
         category_name = category.get('name', 'Unknown')
-        category_slug = category.get('slug', 'unknown')
-        
-        # Save the category page DOM for analysis
-        self.save_dom_to_file(response, f"category_{category_slug}.html")
         
         self.logger.info(f"🎬 Processing videos for category: '{category_name}'")
         self.logger.info(f"📊 Response status: {response.status} for {response.url}")
@@ -262,7 +255,6 @@ class BralessForeverSpider(scrapy.Spider):
         
         # Save the video page DOM for analysis
         video_id = video_data.get('video_id', 'unknown')
-        self.save_dom_to_file(response, f"video_{video_id}.html")
         
         self.logger.info(f"🎬 Processing individual video: '{video_data.get('title', 'Unknown')}'")
         self.logger.info(f"📊 Response status: {response.status} for {response.url}")
@@ -493,19 +485,3 @@ class BralessForeverSpider(scrapy.Spider):
                     file_info=ItemAdapter(file_info).asdict(),
                     url=file_info.url,
                 )
-    
-    def save_dom_to_file(self, response, filename):
-        """Save the response HTML to a file for analysis."""
-        import os
-        
-        # Create bralessforever-specific directory under dom_analysis
-        output_dir = "/Users/thardas/Private/Code/CultureExtractor/scrapy/dom_analysis/bralessforever"
-        os.makedirs(output_dir, exist_ok=True)
-        
-        file_path = os.path.join(output_dir, filename)
-        
-        with open(file_path, 'w', encoding='utf-8') as f:
-            f.write(response.text)
-        
-        self.logger.info(f"Saved DOM to: {file_path}")
-        print(f"DOM saved to: {file_path}")
