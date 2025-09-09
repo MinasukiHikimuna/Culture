@@ -331,6 +331,7 @@ class BaseDownloadPipeline:
         import subprocess
         import json as json_lib
         import logging
+        import os
         
         metadata = {
             "$type": "VideoFileMetadata"
@@ -338,19 +339,34 @@ class BaseDownloadPipeline:
         
         # Get video hashes (phash, oshash, md5, duration)
         try:
+            videohashes_cmd = ["/Users/thardas/Code/videohashes/dist/videohashes-arm64-macos", "-json", "-md5", file_path]
+            logging.info(f"[process_video_metadata] Running videohashes command: {' '.join(videohashes_cmd)}")
+            logging.info(f"[process_video_metadata] File path: {file_path}")
+            logging.info(f"[process_video_metadata] File exists: {os.path.exists(file_path)}")
+            if os.path.exists(file_path):
+                file_size = os.path.getsize(file_path)
+                logging.info(f"[process_video_metadata] File size: {file_size} bytes")
+            
             result = subprocess.run(
-                ["/Users/thardas/Code/videohashes/dist/videohashes-arm64-macos", "-json", "-md5", file_path],
+                videohashes_cmd,
                 capture_output=True,
                 text=True,
                 timeout=300  # 5 minutes for video hash calculation
             )
+            
+            logging.info(f"[process_video_metadata] videohashes return code: {result.returncode}")
+            logging.info(f"[process_video_metadata] videohashes stdout: {result.stdout}")
+            logging.info(f"[process_video_metadata] videohashes stderr: {result.stderr}")
+            
             if result.returncode == 0:
                 video_hashes = json_lib.loads(result.stdout)
+                logging.info(f"[process_video_metadata] Parsed video hashes: {video_hashes}")
                 # Add video hashes at root level for compatibility
                 metadata["duration"] = video_hashes.get("duration")
                 metadata["phash"] = video_hashes.get("phash") 
                 metadata["oshash"] = video_hashes.get("oshash")
                 metadata["md5"] = video_hashes.get("md5")
+                logging.info(f"[process_video_metadata] Added hashes to metadata: duration={metadata['duration']}, phash={metadata['phash']}")
             else:
                 logging.error(f"Failed to get video hashes: {result.stderr}")
                 metadata["video_hashes_error"] = result.stderr
