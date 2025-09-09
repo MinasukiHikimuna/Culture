@@ -1,6 +1,8 @@
 import re
 import logging
 import sys
+import shutil
+import os
 
 
 class WindowsSafeFormatter(logging.Formatter):
@@ -136,3 +138,32 @@ def get_log_filename(spider_name):
     logger.addHandler(ch)
 
     return log_file
+
+
+def check_available_disk_space(target_path, min_free_gb=50):
+    """
+    Check if there's at least min_free_gb of free space available on the target drive.
+    
+    Args:
+        target_path (str): Path to check disk space for
+        min_free_gb (int): Minimum required free space in gigabytes (default: 50GB)
+        
+    Returns:
+        tuple: (bool, float) - (has_enough_space, available_gb)
+    """
+    try:
+        # Ensure the directory exists to get accurate disk space
+        os.makedirs(target_path, exist_ok=True)
+        
+        # Get disk usage statistics
+        total, used, free = shutil.disk_usage(target_path)
+        
+        # Convert bytes to gigabytes
+        free_gb = free / (1024 ** 3)
+        
+        return free_gb >= min_free_gb, free_gb
+        
+    except Exception as e:
+        logging.error(f"Error checking disk space for {target_path}: {e}")
+        # Return False to be safe if we can't check disk space
+        return False, 0.0

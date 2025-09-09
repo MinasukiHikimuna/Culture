@@ -14,6 +14,7 @@ import logging
 from scrapy.utils.project import get_project_settings
 
 from .spiders.database import get_session, Site, Release, DownloadedFile, Performer, Tag
+from .utils import check_available_disk_space
 from .items import (
     ReleaseAndDownloadsItem,
     ReleaseItem,
@@ -476,11 +477,20 @@ class AvailableFilesPipeline(BaseDownloadPipeline, FilesPipeline):
             )
 
             if not self.file_exists_check(file_path):
-                spider.logger.info(
-                    "[AvailableFilesPipeline] File does not exist, requesting download: %s",
-                    full_path,
-                )
+                # Check disk space before downloading
+                has_space, available_gb = check_available_disk_space(self.store_uri)
+                if not has_space:
+                    spider.logger.error(
+                        "[AvailableFilesPipeline] Insufficient disk space (%.2fGB available, 50GB required). Skipping download: %s",
+                        available_gb, full_path
+                    )
+                    from scrapy.exceptions import DropItem
+                    raise DropItem(f"Insufficient disk space: {available_gb:.2f}GB available, 50GB required")
                 
+                spider.logger.info(
+                    "[AvailableFilesPipeline] File does not exist, requesting download (%.2fGB available): %s",
+                    available_gb, full_path,
+                )
                 
                 return [
                     Request(
@@ -566,10 +576,21 @@ class FfmpegDownloadPipeline(BaseDownloadPipeline):
                 )
                 return self.create_downloaded_item_from_path(item, file_path, spider)
             
+            # Check disk space before downloading
+            has_space, available_gb = check_available_disk_space(self.store_uri)
+            if not has_space:
+                spider.logger.error(
+                    "[FfmpegDownloadPipeline] Insufficient disk space (%.2fGB available, 50GB required). Skipping download: %s",
+                    available_gb, file_path
+                )
+                from scrapy.exceptions import DropItem
+                raise DropItem(f"Insufficient disk space: {available_gb:.2f}GB available, 50GB required")
+            
             # File doesn't exist, download with ffmpeg
             full_path = os.path.join(self.store_uri, file_path)
             spider.logger.info(
-                "[FfmpegDownloadPipeline] Downloading with ffmpeg to: %s", full_path
+                "[FfmpegDownloadPipeline] Downloading with ffmpeg to (%.2fGB available): %s", 
+                available_gb, full_path
             )
             
             actual_path = self.download_hls_with_ffmpeg(item["url"], full_path, spider)
