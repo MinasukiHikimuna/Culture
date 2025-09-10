@@ -141,7 +141,7 @@ class BralessForeverSpider(scrapy.Spider):
                 url=full_url,
                 callback=self.parse_category_videos,
                 cookies=cookies,
-                meta={'category': test_category},
+                meta={'category': test_category, 'current_page': 1},
                 dont_filter=True,
             )
         else:
@@ -151,13 +151,14 @@ class BralessForeverSpider(scrapy.Spider):
         """Parse videos from a specific category page."""
         category = response.meta.get('category', {})
         category_name = category.get('name', 'Unknown')
+        current_page = response.meta.get('current_page', 1)
         
-        self.logger.info(f"🎬 Processing videos for category: '{category_name}'")
+        self.logger.info(f"🎬 Processing videos for category: '{category_name}' (Page {current_page})")
         self.logger.info(f"📊 Response status: {response.status} for {response.url}")
         
         # Extract video cards - same structure as main videos page
         video_cards = response.css('div.collection-card')
-        self.logger.info(f"🔍 Found {len(video_cards)} video cards in '{category_name}'")
+        self.logger.info(f"🔍 Found {len(video_cards)} video cards in '{category_name}' (Page {current_page})")
         
         videos_processed = 0
         videos_skipped = 0
@@ -238,10 +239,64 @@ class BralessForeverSpider(scrapy.Spider):
                 dont_filter=True,
             )
         
-        self.logger.info(f"✅ Category '{category_name}' processing complete:")
+        self.logger.info(f"✅ Category '{category_name}' page {current_page} processing complete:")
         self.logger.info(f"   📈 Videos processed: {videos_processed}")
         self.logger.info(f"   ⏩ Videos skipped (Premiere): {videos_skipped}")
         self.logger.info(f"   📊 Total videos found: {len(video_cards)}")
+        
+        # Check for pagination - look for next page button
+        pagination_nav = response.css('nav[role="navigation"][aria-label="pagination"]')
+        if pagination_nav:
+            # Look for next page button (chevron-right)
+            next_button = pagination_nav.css('button[aria-label="Go to next page"]')
+            # Also check if the next button is disabled (which would indicate last page)
+            is_next_disabled = next_button.css('::attr(disabled)').get() is not None if next_button else True
+            
+            if not is_next_disabled and videos_processed > 0:
+                # Extract current page from URL or default to current_page
+                next_page = current_page + 1
+                
+                # Build next page URL - based on the pattern you provided
+                current_url = response.url
+                # Use a more robust URL parsing approach
+                from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+                
+                parsed_url = urlparse(current_url)
+                query_params = parse_qs(parsed_url.query)
+                
+                # Update page parameter
+                query_params['page'] = [str(next_page)]
+                
+                # Reconstruct URL
+                new_query = urlencode(query_params, doseq=True)
+                next_url = urlunparse((
+                    parsed_url.scheme,
+                    parsed_url.netloc,
+                    parsed_url.path,
+                    parsed_url.params,
+                    new_query,
+                    parsed_url.fragment
+                ))
+                
+                self.logger.info(f"🔄 Found more pages. Moving to page {next_page}: {next_url}")
+                
+                yield scrapy.Request(
+                    url=next_url,
+                    callback=self.parse_category_videos,
+                    cookies=cookies,
+                    meta={
+                        'category': category,
+                        'current_page': next_page
+                    },
+                    dont_filter=True,
+                )
+            else:
+                if is_next_disabled:
+                    self.logger.info(f"🏁 Reached last page for category '{category_name}' (page {current_page})")
+                else:
+                    self.logger.info(f"🔚 No more videos to process for category '{category_name}' (page {current_page})")
+        else:
+            self.logger.warning(f"⚠️ No pagination navigation found for category '{category_name}'")
     
     def parse_video(self, response):
         """Parse individual video page to extract scene details."""
