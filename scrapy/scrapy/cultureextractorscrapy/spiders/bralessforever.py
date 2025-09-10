@@ -196,7 +196,8 @@ class BralessForeverSpider(scrapy.Spider):
                     })
             
             # Extract cover image
-            cover_img = card.css('img::attr(src)').get()
+            cover_img_src = card.css('img::attr(src)').get()
+            cover_img = response.urljoin(cover_img_src) if cover_img_src else None
             
             # Extract release date from time element
             release_date_element = card.css('time::attr(datetime)')
@@ -273,11 +274,34 @@ class BralessForeverSpider(scrapy.Spider):
         scene_images = []
         for img in image_elements:
             src = img.css('::attr(src)').get()
-            if src and ('thumb' not in src.lower() and 'avatar' not in src.lower() and 'logo' not in src.lower()):
-                scene_images.append(src)
+            if src:
+                # Convert relative URLs to absolute
+                full_src = response.urljoin(src)
+                # Filter out small icons, avatars, and logos but keep thumbnails and content images
+                if not any(exclude in src.lower() for exclude in ['avatar', 'logo', 'icon']):
+                    scene_images.append(full_src)
+                    self.logger.debug(f"Found scene image: {full_src}")
         
-        # Use the cover image from listing if available, otherwise first scene image
-        cover_image = video_data.get('cover_img') or (scene_images[0] if scene_images else None)
+        # Extract cover image from JSON-LD data (preferred) or fallback to other sources
+        cover_image = None
+        thumbnail_image = None
+        
+        if json_ld_data and isinstance(json_ld_data, dict):
+            # Get full resolution image
+            cover_image = json_ld_data.get('image')
+            # Get thumbnail image  
+            thumbnail_image = json_ld_data.get('thumbnailUrl')
+            
+            if cover_image:
+                self.logger.info(f"🖼️ Found cover image from JSON-LD: {cover_image}")
+            if thumbnail_image:
+                self.logger.info(f"🖼️ Found thumbnail image from JSON-LD: {thumbnail_image}")
+        
+        # Fallback to video card cover image or scene images
+        if not cover_image:
+            cover_image = video_data.get('cover_img') or (scene_images[0] if scene_images else None)
+            if cover_image and not cover_image.startswith('http'):
+                cover_image = response.urljoin(cover_image)
         
         # Extract release date from video page (more reliable than category listing)
         video_release_date = None
@@ -375,17 +399,31 @@ class BralessForeverSpider(scrapy.Spider):
             )
             available_files.append(video_file)
         
-        # Add cover image
-        if cover_image:
+        # Add cover image (full resolution)
+        if cover_image and cover_image.startswith('http'):
+            self.logger.info(f"🖼️ Adding cover image: {cover_image}")
             image_file = AvailableImageFile(
                 file_type="image",
                 content_type="cover",
-                variant="cover",
+                variant="full",  # Full resolution
                 url=cover_image,
-                resolution_width=640,  # Standard thumbnail width from realms.tv
-                resolution_height=360,  # Standard thumbnail height from realms.tv
             )
             available_files.append(image_file)
+        elif cover_image:
+            self.logger.warning(f"⚠️ Skipping invalid cover image URL: {cover_image}")
+        
+        # Add thumbnail image if different from cover
+        if thumbnail_image and thumbnail_image.startswith('http') and thumbnail_image != cover_image:
+            self.logger.info(f"🖼️ Adding thumbnail image: {thumbnail_image}")
+            thumbnail_file = AvailableImageFile(
+                file_type="image",
+                content_type="cover",
+                variant="thumbnail",
+                url=thumbnail_image,
+            )
+            available_files.append(thumbnail_file)
+        elif thumbnail_image and thumbnail_image != cover_image:
+            self.logger.warning(f"⚠️ Skipping invalid thumbnail image URL: {thumbnail_image}")
         
         # Check if this release already exists
         existing_release = self.existing_releases.get(video_id)
@@ -421,6 +459,7 @@ class BralessForeverSpider(scrapy.Spider):
                 },
                 'hls_url': hls_url,
                 'cover_image': cover_image,
+                'thumbnail_image': thumbnail_image,
                 'scene_images': scene_images,
                 'release_date': final_release_date,
                 'original_datetime': time_element,  # Store original datetime for reference
