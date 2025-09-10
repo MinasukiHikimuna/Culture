@@ -517,6 +517,28 @@ class AvailableFilesPipeline(BaseDownloadPipeline, FilesPipeline):
                 "[AvailableFilesPipeline] Item completed for URL: %s", item["url"]
             )
             spider.logger.info("[AvailableFilesPipeline] Download results: %s", results)
+            
+            # Log detailed failure information
+            for ok, result in results:
+                if not ok:
+                    spider.logger.error(
+                        "[AvailableFilesPipeline] Download failed for URL %s: %s", 
+                        item["url"], result
+                    )
+                    # Try to extract more detailed error information
+                    if hasattr(result, 'value'):
+                        spider.logger.error(
+                            "[AvailableFilesPipeline] Failure value: %s", result.value
+                        )
+                    if hasattr(result, 'getErrorMessage'):
+                        spider.logger.error(
+                            "[AvailableFilesPipeline] Error message: %s", result.getErrorMessage()
+                        )
+                else:
+                    spider.logger.info(
+                        "[AvailableFilesPipeline] Download successful: %s", result
+                    )
+            
             file_paths = [x["path"] for ok, x in results if ok]
             spider.logger.info(
                 "[AvailableFilesPipeline] File paths from results: %s", file_paths
@@ -529,6 +551,10 @@ class AvailableFilesPipeline(BaseDownloadPipeline, FilesPipeline):
                     "[AvailableFilesPipeline] Processing file: %s", full_path
                 )
                 return self.create_downloaded_item_from_path(item, file_paths[0], spider)
+            else:
+                spider.logger.warning(
+                    "[AvailableFilesPipeline] No successful downloads for URL: %s", item["url"]
+                )
         return item
 
 

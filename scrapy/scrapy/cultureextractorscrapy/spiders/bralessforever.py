@@ -64,6 +64,12 @@ class BralessForeverSpider(scrapy.Spider):
     # Add desired performer short names for filtering
     # Set to empty list to scrape all performers, or add specific performer short names
     desired_performers = []
+    
+    # Debug settings - uncomment to limit to 1 release for testing
+    # custom_settings = {
+    #     'CLOSESPIDER_ITEMCOUNT': 1,  # Stop after processing 1 release
+    #     'LOG_LEVEL': 'DEBUG'  # Enable debug logging
+    # }
 
     def __init__(self, *args, **kwargs):
         super(BralessForeverSpider, self).__init__(*args, **kwargs)
@@ -569,7 +575,7 @@ class BralessForeverSpider(scrapy.Spider):
         
         # Now yield appropriate download items based on file type
         for file_info in files_to_download:
-            # Check if this is an m3u8/HLS URL that needs ffmpeg processing
+            # Check if this is an m3u8/HLS URL that needs M3U8 processing
             if file_info.url.endswith('.m3u8') or '.m3u8' in file_info.url:
                 self.logger.info(f"🎬 Yielding M3u8DownloadItem for m3u8 URL: {file_info.url}")
                 yield M3u8DownloadItem(
