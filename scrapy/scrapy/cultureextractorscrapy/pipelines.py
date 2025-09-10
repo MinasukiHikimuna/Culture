@@ -23,7 +23,7 @@ from .items import (
     AvailableGalleryZipFile,
     DownloadedFileItem,
     DirectDownloadItem,
-    FfmpegDownloadItem,
+    M3u8DownloadItem,
 )
 from datetime import datetime
 import json
@@ -532,8 +532,351 @@ class AvailableFilesPipeline(BaseDownloadPipeline, FilesPipeline):
         return item
 
 
+class M3u8DownloadPipeline(BaseDownloadPipeline):
+    """Pipeline for downloading M3U8/HLS streams using yt-dlp with robust progress monitoring and timeout detection"""
+    
+    def __init__(self, store_uri, settings=None):
+        super().__init__(store_uri, settings)
+        # Configuration for timeout detection and retry behavior
+        self.progress_timeout = 300  # 5 minutes without progress = timeout
+        self.max_retries = 2  # Try up to 3 times total
+        self.retry_delay = 30  # Wait 30 seconds between retries
+    
+    @classmethod
+    def from_crawler(cls, crawler):
+        return cls(crawler.settings["FILES_STORE"], settings=crawler.settings)
+
+    def process_item(self, item, spider):
+        if isinstance(item, M3u8DownloadItem):
+            spider.logger.info(
+                "[M3u8DownloadPipeline] Processing M3u8DownloadItem for URL: %s",
+                item["url"],
+            )
+            spider.logger.info(
+                "[M3u8DownloadPipeline] DEBUG: Release ID: %s", item["release_id"]
+            )
+            spider.logger.info(
+                "[M3u8DownloadPipeline] DEBUG: File info: %s", item["file_info"]
+            )
+            
+            # Generate file path using base class method
+            file_path = self.get_file_path(item["release_id"], item["file_info"])
+            
+            # Check if file already exists
+            spider.logger.info(
+                "[M3u8DownloadPipeline] DEBUG: Checking file existence for path: %s", file_path
+            )
+            full_path_check = os.path.join(self.store_uri, file_path)
+            spider.logger.info(
+                "[M3u8DownloadPipeline] DEBUG: Full path for existence check: %s", full_path_check
+            )
+            spider.logger.info(
+                "[M3u8DownloadPipeline] DEBUG: File exists result: %s", os.path.exists(full_path_check)
+            )
+            
+            if self.file_exists_check(file_path):
+                spider.logger.info(
+                    "[M3u8DownloadPipeline] File already exists: %s", file_path
+                )
+                return self.create_downloaded_item_from_path(item, file_path, spider)
+            
+            # Check disk space before downloading
+            has_space, available_gb = check_available_disk_space(self.store_uri)
+            if not has_space:
+                spider.logger.error(
+                    "[M3u8DownloadPipeline] Insufficient disk space (%.2fGB available, 50GB required). Skipping download: %s",
+                    available_gb, file_path
+                )
+                from scrapy.exceptions import DropItem
+                raise DropItem(f"Insufficient disk space: {available_gb:.2f}GB available, 50GB required")
+            
+            # File doesn't exist, download with yt-dlp
+            full_path = os.path.join(self.store_uri, file_path)
+            spider.logger.info(
+                "[M3u8DownloadPipeline] Downloading with yt-dlp to (%.2fGB available): %s", 
+                available_gb, full_path
+            )
+            
+            actual_path = self.download_hls_with_ytdlp(item["url"], full_path, spider)
+            if actual_path:
+                spider.logger.info(
+                    "[M3u8DownloadPipeline] Download completed successfully: %s",
+                    actual_path,
+                )
+                # Convert full path back to relative path for create_downloaded_item_from_path
+                relative_path = os.path.relpath(actual_path, self.store_uri)
+                return self.create_downloaded_item_from_path(item, relative_path, spider)
+            else:
+                spider.logger.error(
+                    "[M3u8DownloadPipeline] Download failed: %s", item["url"]
+                )
+                from scrapy.exceptions import DropItem
+                raise DropItem(f"M3U8 download failed: {item['url']}")
+        
+        return item
+
+    def download_hls_with_ytdlp(self, url, output_path, spider):
+        """Download HLS stream using yt-dlp with timeout detection and retry logic"""
+        import subprocess
+        import os
+        import time
+        import json
+        
+        for attempt in range(self.max_retries + 1):
+            if attempt > 0:
+                spider.logger.info(
+                    "[M3u8DownloadPipeline] Retry attempt %d/%d after %d seconds delay", 
+                    attempt, self.max_retries, self.retry_delay
+                )
+                time.sleep(self.retry_delay)
+            
+            try:
+                # Ensure the directory exists
+                os.makedirs(os.path.dirname(output_path), exist_ok=True)
+                
+                # Configure yt-dlp command with robust options
+                cmd = [
+                    'yt-dlp',
+                    '--progress',  # Show progress bar
+                    '--newline',  # Each progress update on new line
+                    '--no-warnings',  # Reduce noise
+                    '--fragment-retries', '10',  # Retry fragments up to 10 times
+                    '--retry-sleep', 'fragment:exp=1:20',  # Exponential backoff for fragment retries
+                    '--concurrent-fragments', '3',  # Download 3 fragments concurrently
+                    '--throttled-rate', '100K',  # Detect throttling if below 100KB/s
+                    '--socket-timeout', '30',  # 30 second socket timeout
+                    '--no-continue',  # Don't resume partial downloads (avoid corruption)
+                    '-f', 'best',  # Select best quality
+                    '-o', output_path,  # Output path
+                    url
+                ]
+                
+                spider.logger.info(
+                    "[M3u8DownloadPipeline] Starting yt-dlp download (attempt %d): %s", 
+                    attempt + 1, ' '.join(cmd)
+                )
+                
+                # Track progress for timeout detection
+                last_progress_time = time.time()
+                last_downloaded_bytes = 0
+                last_fragment = 0
+                stall_count = 0
+                
+                # Use Popen to capture output in real-time
+                process = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    universal_newlines=True
+                )
+                
+                # Monitor progress with timeout detection
+                while True:
+                    output = process.stdout.readline()
+                    if output == '' and process.poll() is not None:
+                        break
+                    
+                    if output:
+                        current_time = time.time()
+                        progress_info = self.parse_ytdlp_progress(output)
+                        
+                        if progress_info:
+                            downloaded_bytes = progress_info.get('downloaded_bytes', 0)
+                            current_fragment = progress_info.get('current_fragment', 0)
+                            
+                            # Check for progress (fragment or bytes advancing)
+                            has_progress = (
+                                current_fragment > last_fragment or 
+                                downloaded_bytes > last_downloaded_bytes
+                            )
+                            
+                            if has_progress:
+                                last_progress_time = current_time
+                                last_downloaded_bytes = downloaded_bytes
+                                last_fragment = current_fragment
+                                stall_count = 0
+                                
+                                # Log progress every 30 seconds or when fragment changes significantly
+                                if (current_time - getattr(self, 'last_log_time', 0) > 30 or 
+                                    current_fragment - getattr(self, 'last_logged_fragment', 0) >= 10):
+                                    spider.logger.info(
+                                        "[M3u8DownloadPipeline] Progress: %s", 
+                                        output.strip()
+                                    )
+                                    self.last_log_time = current_time
+                                    self.last_logged_fragment = current_fragment
+                            else:
+                                # No progress detected (neither fragments nor bytes advancing)
+                                time_since_progress = current_time - last_progress_time
+                                if time_since_progress > 30:  # Log stall every 30s
+                                    stall_count += 1
+                                    spider.logger.warning(
+                                        "[M3u8DownloadPipeline] No progress for %.1f seconds (stall #%d) - fragment %d, bytes %d: %s",
+                                        time_since_progress, stall_count, current_fragment, downloaded_bytes, output.strip()
+                                    )
+                                
+                                # Timeout if no progress for too long (reduced to 3 minutes for fragment-level detection)
+                                fragment_timeout = 180  # 3 minutes for fragment stalls
+                                if time_since_progress > fragment_timeout:
+                                    spider.logger.error(
+                                        "[M3u8DownloadPipeline] Download stalled for %.1f seconds, killing process",
+                                        time_since_progress
+                                    )
+                                    process.terminate()
+                                    try:
+                                        process.wait(timeout=10)
+                                    except subprocess.TimeoutExpired:
+                                        process.kill()
+                                    break
+                        else:
+                            # Non-progress output, log occasionally
+                            spider.logger.debug(
+                                "[M3u8DownloadPipeline] yt-dlp: %s", 
+                                output.strip()
+                            )
+                
+                # Check final result
+                return_code = process.wait()
+                
+                if return_code == 0 and os.path.exists(output_path):
+                    file_size = os.path.getsize(output_path)
+                    spider.logger.info(
+                        "[M3u8DownloadPipeline] Download successful: %s (%.1f MB)", 
+                        output_path, file_size / (1024*1024)
+                    )
+                    return output_path
+                else:
+                    # Get any remaining stderr output
+                    stderr_output = process.stderr.read()
+                    spider.logger.error(
+                        "[M3u8DownloadPipeline] yt-dlp failed with return code %s (attempt %d): %s", 
+                        return_code, attempt + 1, stderr_output
+                    )
+                    
+                    # Clean up partial file
+                    if os.path.exists(output_path):
+                        try:
+                            os.remove(output_path)
+                            spider.logger.info("[M3u8DownloadPipeline] Cleaned up partial file")
+                        except OSError:
+                            pass
+                    
+                    # Don't retry on certain permanent failures
+                    if return_code in [1, 2] and 'not available' in stderr_output.lower():
+                        spider.logger.error("[M3u8DownloadPipeline] Permanent failure, not retrying")
+                        break
+                        
+            except subprocess.TimeoutExpired:
+                spider.logger.error(
+                    "[M3u8DownloadPipeline] yt-dlp process timed out (attempt %d)", 
+                    attempt + 1
+                )
+                try:
+                    process.kill()
+                except:
+                    pass
+            except FileNotFoundError:
+                spider.logger.error(
+                    "[M3u8DownloadPipeline] yt-dlp not found in PATH. Please install yt-dlp."
+                )
+                break  # Don't retry if yt-dlp is missing
+            except Exception as e:
+                spider.logger.error(
+                    "[M3u8DownloadPipeline] yt-dlp download error (attempt %d): %s", 
+                    attempt + 1, str(e)
+                )
+        
+        spider.logger.error(
+            "[M3u8DownloadPipeline] All %d attempts failed for URL: %s", 
+            self.max_retries + 1, url
+        )
+        return False
+
+    def parse_ytdlp_progress(self, output_line):
+        """Parse yt-dlp progress output to extract download statistics including fragment info"""
+        import re
+        
+        # Enhanced regex to capture fragment info: [download] 32.9% of ~ 3.18GiB at 30.49MiB/s ETA 01:14 (frag 86/262)
+        fragment_progress_match = re.search(
+            r'\[download\]\s+(\d+\.?\d*)%\s+of\s+~?\s*([\d.]+\w+)(?:\s+at\s+([\d.]+\w+/s))?\s+ETA\s+([\d:]+)\s+\(frag\s+(\d+)/(\d+)\)',
+            output_line
+        )
+        
+        if fragment_progress_match:
+            percent = float(fragment_progress_match.group(1))
+            total_size_str = fragment_progress_match.group(2)
+            speed_str = fragment_progress_match.group(3) or "0B/s"
+            eta_str = fragment_progress_match.group(4) or "unknown"
+            current_frag = int(fragment_progress_match.group(5))
+            total_frags = int(fragment_progress_match.group(6))
+            
+            # Convert size strings to bytes (rough estimation)
+            total_bytes = self.parse_size_string(total_size_str)
+            downloaded_bytes = int(total_bytes * percent / 100) if total_bytes else 0
+            
+            return {
+                'downloaded_bytes': downloaded_bytes,
+                'total_bytes': total_bytes,
+                'percent': percent,
+                'speed': speed_str,
+                'eta': eta_str,
+                'current_fragment': current_frag,
+                'total_fragments': total_frags
+            }
+        
+        # Fallback to original regex for non-fragment downloads: [download] 12.5% of 1.23GB at 156.78KB/s ETA 00:45
+        basic_progress_match = re.search(
+            r'\[download\]\s+(\d+\.?\d*)%\s+of\s+~?\s*([\d.]+\w+)(?:\s+at\s+([\d.]+\w+/s))?(?:\s+ETA\s+([\d:]+))?',
+            output_line
+        )
+        
+        if basic_progress_match:
+            percent = float(basic_progress_match.group(1))
+            total_size_str = basic_progress_match.group(2)
+            speed_str = basic_progress_match.group(3) or "0B/s"
+            eta_str = basic_progress_match.group(4) or "unknown"
+            
+            # Convert size strings to bytes (rough estimation)
+            total_bytes = self.parse_size_string(total_size_str)
+            downloaded_bytes = int(total_bytes * percent / 100) if total_bytes else 0
+            
+            return {
+                'downloaded_bytes': downloaded_bytes,
+                'total_bytes': total_bytes,
+                'percent': percent,
+                'speed': speed_str,
+                'eta': eta_str,
+                'current_fragment': 0,  # No fragment info available
+                'total_fragments': 0
+            }
+        
+        return None
+
+    def parse_size_string(self, size_str):
+        """Convert size string like '1.23GB' to bytes"""
+        import re
+        
+        match = re.match(r'([\d.]+)(\w+)', size_str)
+        if not match:
+            return 0
+        
+        size = float(match.group(1))
+        unit = match.group(2).upper()
+        
+        multipliers = {
+            'B': 1,
+            'KB': 1024,
+            'MB': 1024**2,
+            'GB': 1024**3,
+            'TB': 1024**4
+        }
+        
+        return int(size * multipliers.get(unit, 1))
+
+
 class FfmpegDownloadPipeline(BaseDownloadPipeline):
-    """Pipeline for downloading M3U8/HLS streams using ffmpeg"""
+    """Legacy pipeline for downloading M3U8/HLS streams using ffmpeg (kept for backward compatibility)"""
     
     def __init__(self, store_uri, settings=None):
         super().__init__(store_uri, settings)
@@ -543,9 +886,9 @@ class FfmpegDownloadPipeline(BaseDownloadPipeline):
         return cls(crawler.settings["FILES_STORE"], settings=crawler.settings)
 
     def process_item(self, item, spider):
-        if isinstance(item, FfmpegDownloadItem):
+        if isinstance(item, M3u8DownloadItem):
             spider.logger.info(
-                "[FfmpegDownloadPipeline] Processing FfmpegDownloadItem for URL: %s",
+                "[FfmpegDownloadPipeline] Processing M3u8DownloadItem for URL: %s",
                 item["url"],
             )
             spider.logger.info(

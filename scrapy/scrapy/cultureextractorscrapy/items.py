@@ -188,8 +188,12 @@ class DirectDownloadItem(scrapy.Item):
     url = scrapy.Field()
 
 
-class FfmpegDownloadItem(scrapy.Item):
+class M3u8DownloadItem(scrapy.Item):
     release_id = scrapy.Field()
     file_info = scrapy.Field()
     url = scrapy.Field()
     output_path = scrapy.Field()
+
+
+# Backward compatibility alias
+FfmpegDownloadItem = M3u8DownloadItem

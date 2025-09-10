@@ -33,7 +33,7 @@ from cultureextractorscrapy.items import (
     AvailableFileEncoder,
     ReleaseItem,
     DirectDownloadItem,
-    FfmpegDownloadItem,
+    M3u8DownloadItem,
 )
 from cultureextractorscrapy.utils import (
     parse_resolution_height,
@@ -571,8 +571,8 @@ class BralessForeverSpider(scrapy.Spider):
         for file_info in files_to_download:
             # Check if this is an m3u8/HLS URL that needs ffmpeg processing
             if file_info.url.endswith('.m3u8') or '.m3u8' in file_info.url:
-                self.logger.info(f"🎬 Yielding FfmpegDownloadItem for m3u8 URL: {file_info.url}")
-                yield FfmpegDownloadItem(
+                self.logger.info(f"🎬 Yielding M3u8DownloadItem for m3u8 URL: {file_info.url}")
+                yield M3u8DownloadItem(
                     release_id=str(release_id),
                     file_info=ItemAdapter(file_info).asdict(),
                     url=file_info.url,
