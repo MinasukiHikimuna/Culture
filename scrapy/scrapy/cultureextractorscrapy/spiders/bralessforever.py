@@ -256,6 +256,16 @@ class BralessForeverSpider(scrapy.Spider):
         self.logger.info(f"🎬 Processing individual video: '{video_data.get('title', 'Unknown')}'")
         self.logger.info(f"📊 Response status: {response.status} for {response.url}")
         
+        # Parse JSON-LD data first as it's used throughout the function
+        json_ld_data = None
+        json_ld_script = response.css('script[type="application/ld+json"]::text').get()
+        if json_ld_script:
+            try:
+                json_ld_data = json.loads(json_ld_script)
+            except (json.JSONDecodeError, AttributeError) as e:
+                self.logger.warning(f"Could not parse JSON-LD data: {e}")
+                json_ld_data = None
+        
         # Extract video download links/streams
         video_elements = response.css('video source, video::attr(src), a[href*=".mp4"], a[href*=".m4v"]')
         self.logger.info(f"🎞️ Found {len(video_elements)} potential video elements")
@@ -318,20 +328,19 @@ class BralessForeverSpider(scrapy.Spider):
         # Use video page date if available, otherwise fall back to category listing date
         final_release_date = video_release_date or video_data.get('release_date') or '1900-01-01'
         
-        # Extract description from JSON-LD structured data
+        # Extract description from DOM (preferred) and JSON-LD structured data
         description = ''
-        json_ld_data = None
-        json_ld_script = response.css('script[type="application/ld+json"]::text').get()
-        if json_ld_script:
-            try:
-                json_ld_data = json.loads(json_ld_script)
-                if isinstance(json_ld_data, dict) and json_ld_data.get('@type') == 'VideoObject':
-                    description = json_ld_data.get('description', '')
-                    if description:
-                        self.logger.info(f"📝 Extracted description: {description[:100]}{'...' if len(description) > 100 else ''}")
-            except (json.JSONDecodeError, AttributeError) as e:
-                self.logger.warning(f"Could not parse JSON-LD data: {e}")
-                json_ld_data = None
+        
+        # Try to get full description from DOM element first
+        description_element = response.css('.line-clamp-6.sm\\:line-clamp-4 .mt-1, div.line-clamp-6.sm\\:line-clamp-4.mt-1::text').get()
+        if description_element:
+            description = description_element.strip()
+            self.logger.info(f"📝 Extracted full description from DOM: {description[:100]}{'...' if len(description) > 100 else ''}")
+        elif json_ld_data and isinstance(json_ld_data, dict) and json_ld_data.get('@type') == 'VideoObject':
+            # Use JSON-LD description as fallback if DOM extraction failed
+            description = json_ld_data.get('description', '')
+            if description:
+                self.logger.info(f"📝 Using JSON-LD description as fallback: {description[:100]}{'...' if len(description) > 100 else ''}")
         
         # Convert duration from MM:SS to seconds
         duration_seconds = 0
