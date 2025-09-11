@@ -57,7 +57,7 @@ base_url = "https://app.bralessforever.com"
 
 class BralessForeverSpider(scrapy.Spider):
     name = "bralessforever"
-    allowed_domains = ["app.bralessforever.com", "private-blvideo.b-cdn.net", "cdn.realms.tv"]
+    allowed_domains = ["app.bralessforever.com", "public-blvideo.b-cdn.net", "private-blvideo.b-cdn.net", "cdn.realms.tv"]
     start_urls = [base_url]
     site_short_name = "bralessforever"
     
