@@ -170,10 +170,11 @@ def get_performers_value(performers: List[Dict]) -> str:
     }
 
     # Sort performers by gender priority, favorite status (True comes before False), and name
+    # Use 999 for None gender values to put them last
     sorted_performers = sorted(
         performers,
         key=lambda x: (
-            gender_priority.get(x["stashapp_performers_gender"]),
+            gender_priority.get(x["stashapp_performers_gender"], 999),
             not x.get("stashapp_performers_favorite", False),
             x["stashapp_performers_name"]
         )
