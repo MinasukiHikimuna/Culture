@@ -137,19 +137,19 @@ class BralessForeverSpider(scrapy.Spider):
         
         self.logger.info(f"✅ Successfully parsed {len(categories_found)} categories")
         
-        # TODO: For now, let's scrape just one category for testing
+        # Process all categories
         if categories_found:
-            test_category = categories_found[0]  # Take first category for testing
-            self.logger.info(f"🧪 Testing with category: '{test_category['name']}'")
-            
-            full_url = response.urljoin(test_category['url'])
-            yield scrapy.Request(
-                url=full_url,
-                callback=self.parse_category_videos,
-                cookies=cookies,
-                meta={'category': test_category, 'current_page': 1},
-                dont_filter=True,
-            )
+            for category in categories_found:
+                self.logger.info(f"🚀 Processing category: '{category['name']}'")
+                
+                full_url = response.urljoin(category['url'])
+                yield scrapy.Request(
+                    url=full_url,
+                    callback=self.parse_category_videos,
+                    cookies=cookies,
+                    meta={'category': category, 'current_page': 1},
+                    dont_filter=True,
+                )
         else:
             self.logger.warning("⚠️ No categories found on the page")
     
