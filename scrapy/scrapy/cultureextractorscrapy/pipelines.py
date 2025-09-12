@@ -666,8 +666,9 @@ class M3u8DownloadPipeline(BaseDownloadPipeline):
                     '--progress',  # Show progress bar
                     '--newline',  # Each progress update on new line
                     '--no-warnings',  # Reduce noise
-                    '--fragment-retries', '10',  # Retry fragments up to 10 times
-                    '--retry-sleep', 'fragment:exp=1:20',  # Exponential backoff for fragment retries
+                    '--fragment-retries', '3',  # Retry fragments up to 3 times (reduced from 10)
+                    '--retry-sleep', 'fragment:exp=1:5',  # Exponential backoff for fragment retries (reduced from 20)
+                    '--abort-on-unavailable-fragment',  # Abort download if fragments are unavailable
                     '--concurrent-fragments', '3',  # Download 3 fragments concurrently
                     '--throttled-rate', '100K',  # Detect throttling if below 100KB/s
                     '--socket-timeout', '30',  # 30 second socket timeout
