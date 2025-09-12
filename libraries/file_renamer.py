@@ -3,6 +3,78 @@ from typing import Dict, List, Optional
 
 MAX_LENGTH = 255
 
+def create_filename_with_directory(use_studio_code_tag: Dict, row: Dict, base_directory: str = None) -> Dict[str, str]:
+    """
+    Create a filename and directory structure from a Polars DataFrame row dictionary.
+    
+    Args:
+        use_studio_code_tag: Tag information for studio codes
+        row: Dictionary containing scene information with stashapp_ prefixed keys
+        base_directory: Base directory path (if None, derives from file's drive + \\Culture\\Videos)
+    
+    Returns:
+        Dictionary with 'filename', 'directory', and 'full_path' keys
+    """
+    filename = create_filename(use_studio_code_tag, row)
+    if not filename:
+        return {"filename": None, "directory": None, "full_path": None}
+    
+    # Determine base directory if not provided
+    if base_directory is None:
+        current_file_path = row.get('stashapp_primary_file_path', '')
+        if current_file_path:
+            # Get the drive letter from the current file path
+            drive = os.path.splitdrive(current_file_path)[0]
+            base_directory = os.path.join(drive, os.sep, "Culture", "Videos")
+        else:
+            # No file path available - cannot determine directory
+            return {"filename": filename, "directory": None, "full_path": None}
+    
+    # Get studio information for directory structure
+    studio = row.get('stashapp_studio')
+    if not studio:
+        # Fallback to current directory if no studio
+        current_dir = os.path.dirname(row.get('stashapp_primary_file_path', ''))
+        return {
+            "filename": filename,
+            "directory": current_dir,
+            "full_path": os.path.join(current_dir, filename)
+        }
+    
+    studio_name = studio.get("name", "Unknown Studio")
+    parent_studio = studio.get("parent_studio")
+    
+    if parent_studio:
+        # Network structure: Sites\[Network]\[Network]: [Site]
+        network_name = parent_studio.get("name", "Unknown Network")
+        site_name = studio_name
+        
+        # Clean network and site names for directory use
+        clean_network = _clean_for_directory(network_name)
+        clean_site = _clean_for_directory(site_name)
+        
+        # Create directory structure
+        directory = os.path.join(
+            base_directory,
+            "Sites",
+            clean_network,
+            f"{clean_network}꞉ {clean_site}"
+        )
+    else:
+        # No parent studio, use studio name directly
+        clean_studio = _clean_for_directory(studio_name)
+        directory = os.path.join(
+            base_directory,
+            "Sites",
+            clean_studio
+        )
+    
+    return {
+        "filename": filename,
+        "directory": directory,
+        "full_path": os.path.join(directory, filename)
+    }
+
 def create_filename(use_studio_code_tag: Dict, row: Dict) -> str:
     """
     Create a filename from a Polars DataFrame row dictionary.
@@ -82,6 +154,13 @@ def _title_case_except_acronyms(text):
 
 def _clean_for_filename(input):
     input = _title_case_except_acronyms(input)
+    return input.replace(":", "꞉").replace("?", "？").replace("/", "∕").replace("\\", "＼").replace("*", "＊").replace("\"", "＂").replace("<", "＜").replace(">", "＞").replace("|", "｜").replace("  ", " ")
+
+def _clean_for_directory(input):
+    """Clean text for use in directory names, but keep most characters allowed by filesystems"""
+    input = _title_case_except_acronyms(input)
+    # Remove or replace characters that are not allowed in Windows directory names
+    # Keep colon as ꞉ for display purposes, but it will be handled specially in paths
     return input.replace(":", "꞉").replace("?", "？").replace("/", "∕").replace("\\", "＼").replace("*", "＊").replace("\"", "＂").replace("<", "＜").replace(">", "＞").replace("|", "｜").replace("  ", " ")
 
 def get_suffix(primary_file_basename: str) -> str:
