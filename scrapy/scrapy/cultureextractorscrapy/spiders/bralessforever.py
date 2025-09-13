@@ -220,34 +220,41 @@ class BralessForeverSpider(scrapy.Spider):
                     except (ValueError, AttributeError) as e:
                         self.logger.warning(f"Could not parse release date: {release_date_str} - {e}")
             
+            # Check if we already have this release
+            existing_release = self.existing_releases.get(video_id)
+            
             # Log the video details in a single comprehensive line
             cast_names = [member['name'] for member in cast_members] if cast_members else []
             cast_info = f" | Cast: {', '.join(cast_names)}" if cast_names else ""
             self.logger.info(f"🎥 {category_name} → '{title}' ({duration or 'No duration'}){cast_info}")
             
-            videos_processed += 1
-            
-            yield scrapy.Request(
-                url=response.urljoin(video_url),
-                callback=self.parse_video,
-                cookies=cookies,
-                meta={
-                    'category': category,
-                    'video_data': {
-                        'title': title,
-                        'video_id': video_id,
-                        'duration': duration,
-                        'cast_members': cast_members,
-                        'cover_img': cover_img,
-                        'release_date': release_date
-                    }
-                },
-                dont_filter=True,
-            )
+            if self.force_update or not existing_release:
+                videos_processed += 1
+                
+                yield scrapy.Request(
+                    url=response.urljoin(video_url),
+                    callback=self.parse_video,
+                    cookies=cookies,
+                    meta={
+                        'category': category,
+                        'video_data': {
+                            'title': title,
+                            'video_id': video_id,
+                            'duration': duration,
+                            'cast_members': cast_members,
+                            'cover_img': cover_img,
+                            'release_date': release_date
+                        }
+                    },
+                    dont_filter=True,
+                )
+            else:
+                videos_skipped += 1
+                self.logger.info(f"⏩ Skipping existing video release: '{title}' (ID: {video_id})")
         
         self.logger.info(f"✅ Category '{category_name}' page {current_page} processing complete:")
         self.logger.info(f"   📈 Videos processed: {videos_processed}")
-        self.logger.info(f"   ⏩ Videos skipped (Premiere): {videos_skipped}")
+        self.logger.info(f"   ⏩ Videos skipped: {videos_skipped} (Premiere + existing)")
         self.logger.info(f"   📊 Total videos found: {len(video_cards)}")
         
         # Check for pagination - look for next page button
@@ -550,6 +557,14 @@ class BralessForeverSpider(scrapy.Spider):
         self.logger.info(f"   🏷️ Tags: {len(tags)}")
         
         yield release_item
+        
+        # Update existing_releases to track this release for future duplicate detection
+        if not existing_release:
+            self.existing_releases[video_id] = {
+                "uuid": release_id,
+                "available_files": available_files,
+                "downloaded_files": set(),
+            }
         
         # Check for duplicate downloads before yielding download items
         files_to_download = available_files
