@@ -265,7 +265,7 @@ class BralessForeverSpider(scrapy.Spider):
             # Also check if the next button is disabled (which would indicate last page)
             is_next_disabled = next_button.css('::attr(disabled)').get() is not None if next_button else True
             
-            if not is_next_disabled and videos_processed > 0:
+            if not is_next_disabled:
                 # Extract current page from URL or default to current_page
                 next_page = current_page + 1
                 
@@ -406,7 +406,7 @@ class BralessForeverSpider(scrapy.Spider):
             self.logger.info(f"📝 Extracted full description from DOM: {description[:100]}{'...' if len(description) > 100 else ''}")
         elif json_ld_data and isinstance(json_ld_data, dict) and json_ld_data.get('@type') == 'VideoObject':
             # Use JSON-LD description as fallback if DOM extraction failed
-            description = json_ld_data.get('description', '')
+            description = json_ld_data.get('description') or ''
             if description:
                 self.logger.info(f"📝 Using JSON-LD description as fallback: {description[:100]}{'...' if len(description) > 100 else ''}")
         
