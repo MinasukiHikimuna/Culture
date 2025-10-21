@@ -567,20 +567,21 @@ class BralessForeverSpider(scrapy.Spider):
             }
         
         # Check for duplicate downloads before yielding download items
+        # ALWAYS check for duplicates regardless of force_update to avoid re-downloading
         files_to_download = available_files
-        if existing_release and not self.force_update:
+        if existing_release:
             # Compare available files with downloaded files
             existing_available_files = existing_release['available_files']
             downloaded_files = existing_release['downloaded_files']
-            
+
             needed_files = set(
-                (f.file_type, f.content_type, f.variant) 
+                (f.file_type, f.content_type, f.variant)
                 for f in available_files
             )
-            
+
             if not needed_files.issubset(downloaded_files):
                 # We have missing files - filter to only missing ones
-                missing_files = [f for f in available_files if 
+                missing_files = [f for f in available_files if
                     (f.file_type, f.content_type, f.variant) not in downloaded_files]
                 files_to_download = missing_files
                 self.logger.info(f"Release {video_id} exists but missing {len(missing_files)} files. Downloading them.")
