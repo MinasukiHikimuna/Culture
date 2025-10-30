@@ -147,8 +147,15 @@ def _title_case_except_acronyms(text):
             # Rejoin the parts with an apostrophe
             title_cased_words.append("'".join(new_parts))
         else:
-            # Apply the original logic if there's no apostrophe
-            title_cased_words.append(word if word.isupper() and len(word) > 1 else word.title())
+            # Check if word is all uppercase (acronym) - preserve it
+            if word.isupper() and len(word) > 1:
+                title_cased_words.append(word)
+            # Check if word has mixed case (like CamelCase) - preserve it
+            elif any(c.isupper() for c in word[1:]):  # Has uppercase after first char
+                title_cased_words.append(word)
+            # Otherwise apply title case
+            else:
+                title_cased_words.append(word.title())
 
     return ' '.join(title_cased_words)
 
