@@ -1,17 +1,15 @@
 """Configuration utilities for Culture Extractor CLI."""
 
 import os
-import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
 
-
-# Add libraries to path
-_REPO_ROOT = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(_REPO_ROOT))
-
 from libraries.client_culture_extractor import ClientCultureExtractor
+
+
+# Repository root for .env file location
+_REPO_ROOT = Path(__file__).parent.parent.parent
 
 
 class Config:
