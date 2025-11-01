@@ -38,7 +38,6 @@ def main(
     ] = False,
 ) -> None:
     """Culture Extractor CLI - A modern command-line interface for Culture Extractor database operations."""
-    pass
 
 
 if __name__ == "__main__":
