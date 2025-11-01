@@ -3,7 +3,7 @@
 from typing import Optional
 
 import typer
-from typing_extensions import Annotated
+from typing import Annotated
 
 from ce_cli.utils.config import config
 from ce_cli.utils.formatters import (
