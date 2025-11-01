@@ -152,8 +152,7 @@ def format_json(data: Any, pretty: bool = True) -> str:
 
     if pretty:
         return json.dumps(data, indent=2, default=str)
-    else:
-        return json.dumps(data, default=str)
+    return json.dumps(data, default=str)
 
 
 def print_table(table: Table) -> None:
