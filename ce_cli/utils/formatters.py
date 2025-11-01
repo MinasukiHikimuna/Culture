@@ -23,7 +23,7 @@ if sys.platform == "win32":
 console = Console()
 
 
-def format_releases_table(releases_df: pl.DataFrame, site_name: str = None) -> Table:
+def format_releases_table(releases_df: pl.DataFrame, site_name: str | None = None) -> Table:
     """Format releases dataframe as a Rich table.
 
     Args:
@@ -200,7 +200,7 @@ def print_info(message: str) -> None:
     console.print(f"[bold blue]ℹ[/bold blue] {message}")
 
 
-def format_performers_table(performers_df: pl.DataFrame, site_name: str = None) -> Table:
+def format_performers_table(performers_df: pl.DataFrame, site_name: str | None = None) -> Table:
     """Format performers dataframe as a Rich table.
 
     Args:
@@ -254,7 +254,7 @@ def format_performers_table(performers_df: pl.DataFrame, site_name: str = None) 
     return table
 
 
-def format_performer_detail(performer_df: pl.DataFrame, external_ids: dict = None) -> str:
+def format_performer_detail(performer_df: pl.DataFrame, external_ids: dict | None = None) -> str:
     """Format a single performer as detailed text view.
 
     Args:
