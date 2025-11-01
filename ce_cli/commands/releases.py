@@ -1,6 +1,5 @@
 """Releases-related commands for the CLI."""
 
-from typing import Optional
 
 import typer
 from typing import Annotated

@@ -75,7 +75,6 @@ def format_release_detail(release_df: pl.DataFrame) -> str:
     import json
 
     from rich.panel import Panel
-    from rich.syntax import Syntax
 
     row = scene_df.to_dicts()[0]
 
