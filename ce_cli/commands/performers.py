@@ -1,8 +1,9 @@
 """Performers-related commands for the CLI."""
 
 
-import typer
 from typing import Annotated
+
+import typer
 
 from ce_cli.utils.config import config
 from ce_cli.utils.formatters import (

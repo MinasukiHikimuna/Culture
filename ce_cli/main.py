@@ -1,7 +1,8 @@
 """Main entry point for Culture Extractor CLI."""
 
-import typer
 from typing import Annotated
+
+import typer
 
 from ce_cli import __version__
 from ce_cli.commands.performers import performers_app
