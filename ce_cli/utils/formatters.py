@@ -11,13 +11,13 @@ from rich.table import Table
 # Force UTF-8 encoding for stdout/stderr if on Windows
 if sys.platform == "win32":
     try:
-        sys.stdout.reconfigure(encoding='utf-8')
-        sys.stderr.reconfigure(encoding='utf-8')
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
     except AttributeError:
         # Python < 3.7 doesn't have reconfigure
         import codecs
-        sys.stdout = codecs.getwriter('utf-8')(sys.stdout.detach())
-        sys.stderr = codecs.getwriter('utf-8')(sys.stderr.detach())
+        sys.stdout = codecs.getwriter("utf-8")(sys.stdout.detach())
+        sys.stderr = codecs.getwriter("utf-8")(sys.stderr.detach())
 
 console = Console()
 
@@ -86,14 +86,14 @@ def format_release_detail(release_df: pl.DataFrame) -> str:
     details.append(f"[yellow]Date:[/yellow] {row.get('ce_release_date', 'N/A')}")
     details.append(f"[yellow]URL:[/yellow] {row.get('ce_release_url', 'N/A')}")
     details.append(f"\n[yellow]Description:[/yellow]")
-    details.append(row.get('ce_release_description', 'N/A') or 'N/A')
+    details.append(row.get("ce_release_description", "N/A") or "N/A")
 
     detail_text = "\n".join(details)
 
     console.print(Panel(detail_text, border_style="cyan"))
 
     # Show available files if present
-    available_files = row.get('ce_release_available_files')
+    available_files = row.get("ce_release_available_files")
     if available_files:
         try:
             files_json = json.loads(available_files) if isinstance(available_files, str) else available_files
