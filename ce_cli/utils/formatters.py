@@ -76,7 +76,7 @@ def format_release_detail(release_df: pl.DataFrame) -> str:
 
     from rich.panel import Panel
 
-    row = scene_df.to_dicts()[0]
+    row = release_df.to_dicts()[0]
 
     # Build detail text
     details = []
