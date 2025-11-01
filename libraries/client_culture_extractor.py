@@ -616,3 +616,294 @@ class ClientCultureExtractor:
             )
             self.connection.commit()
             return sub_site_uuid
+
+    def get_performers_all(self, name_filter: str = None) -> pl.DataFrame:
+        """Get all performers across all sites, with optional name filtering.
+
+        Args:
+            name_filter: Optional case-insensitive substring to filter performer names
+
+        Returns:
+            DataFrame containing all performers (optionally filtered)
+        """
+        with self.connection.cursor() as cursor:
+            # Build query with optional name filter
+            if name_filter:
+                query = """
+                    SELECT DISTINCT
+                        p.uuid AS ce_performers_uuid,
+                        p.short_name AS ce_performers_short_name,
+                        p.name AS ce_performers_name,
+                        p.url AS ce_performers_url,
+                        s.uuid AS ce_site_uuid,
+                        s.name AS ce_site_name
+                    FROM performers p
+                    JOIN release_entity_site_performer_entity resp ON p.uuid = resp.performers_uuid
+                    JOIN releases r ON resp.releases_uuid = r.uuid
+                    JOIN sites s ON r.site_uuid = s.uuid
+                    WHERE p.name ILIKE %s OR p.short_name ILIKE %s
+                    ORDER BY p.name, s.name
+                """
+                params = (f"%{name_filter}%", f"%{name_filter}%")
+            else:
+                query = """
+                    SELECT DISTINCT
+                        p.uuid AS ce_performers_uuid,
+                        p.short_name AS ce_performers_short_name,
+                        p.name AS ce_performers_name,
+                        p.url AS ce_performers_url,
+                        s.uuid AS ce_site_uuid,
+                        s.name AS ce_site_name
+                    FROM performers p
+                    JOIN release_entity_site_performer_entity resp ON p.uuid = resp.performers_uuid
+                    JOIN releases r ON resp.releases_uuid = r.uuid
+                    JOIN sites s ON r.site_uuid = s.uuid
+                    ORDER BY p.name, s.name
+                """
+                params = ()
+
+            cursor.execute(query, params)
+            performers_rows = cursor.fetchall()
+
+            performers = [
+                {
+                    "ce_performers_uuid": str(row[0]),
+                    "ce_performers_short_name": row[1],
+                    "ce_performers_name": row[2],
+                    "ce_performers_url": row[3],
+                    "ce_site_uuid": str(row[4]),
+                    "ce_site_name": row[5],
+                }
+                for row in performers_rows
+            ]
+
+            schema = {
+                "ce_performers_uuid": pl.Utf8,
+                "ce_performers_short_name": pl.Utf8,
+                "ce_performers_name": pl.Utf8,
+                "ce_performers_url": pl.Utf8,
+                "ce_site_uuid": pl.Utf8,
+                "ce_site_name": pl.Utf8,
+            }
+
+            return pl.DataFrame(performers, schema=schema)
+
+    def get_performers(self, site_uuid: str, name_filter: str = None) -> pl.DataFrame:
+        """Get all performers for a given site UUID, with optional name filtering.
+
+        Args:
+            site_uuid: UUID of the site to get performers for
+            name_filter: Optional case-insensitive substring to filter performer names
+
+        Returns:
+            DataFrame containing all performers for the site
+        """
+        with self.connection.cursor() as cursor:
+            # Get site info to verify it exists
+            cursor.execute(
+                """
+                SELECT name, uuid
+                FROM sites
+                WHERE sites.uuid = %s
+            """,
+                (site_uuid,),
+            )
+            site_row = cursor.fetchone()
+            if not site_row:
+                return pl.DataFrame()
+            site_name = site_row[0]
+
+            # Build query with optional name filter
+            if name_filter:
+                query = """
+                    SELECT DISTINCT
+                        p.uuid AS ce_performers_uuid,
+                        p.short_name AS ce_performers_short_name,
+                        p.name AS ce_performers_name,
+                        p.url AS ce_performers_url
+                    FROM performers p
+                    JOIN release_entity_site_performer_entity resp ON p.uuid = resp.performers_uuid
+                    JOIN releases r ON resp.releases_uuid = r.uuid
+                    WHERE r.site_uuid = %s
+                      AND (p.name ILIKE %s OR p.short_name ILIKE %s)
+                    ORDER BY p.name
+                """
+                params = (site_uuid, f"%{name_filter}%", f"%{name_filter}%")
+            else:
+                query = """
+                    SELECT DISTINCT
+                        p.uuid AS ce_performers_uuid,
+                        p.short_name AS ce_performers_short_name,
+                        p.name AS ce_performers_name,
+                        p.url AS ce_performers_url
+                    FROM performers p
+                    JOIN release_entity_site_performer_entity resp ON p.uuid = resp.performers_uuid
+                    JOIN releases r ON resp.releases_uuid = r.uuid
+                    WHERE r.site_uuid = %s
+                    ORDER BY p.name
+                """
+                params = (site_uuid,)
+
+            cursor.execute(query, params)
+            performers_rows = cursor.fetchall()
+
+            performers = [
+                {
+                    "ce_site_uuid": str(site_uuid),
+                    "ce_site_name": site_name,
+                    "ce_performers_uuid": str(row[0]),
+                    "ce_performers_short_name": row[1],
+                    "ce_performers_name": row[2],
+                    "ce_performers_url": row[3],
+                }
+                for row in performers_rows
+            ]
+
+            schema = {
+                "ce_site_uuid": pl.Utf8,
+                "ce_site_name": pl.Utf8,
+                "ce_performers_uuid": pl.Utf8,
+                "ce_performers_short_name": pl.Utf8,
+                "ce_performers_name": pl.Utf8,
+                "ce_performers_url": pl.Utf8,
+            }
+
+            return pl.DataFrame(performers, schema=schema)
+
+    def get_performer_by_uuid(self, performer_uuid: str) -> pl.DataFrame:
+        """Get a specific performer by its UUID.
+
+        Args:
+            performer_uuid: UUID of the performer to get
+
+        Returns:
+            DataFrame containing the performer data
+        """
+        with self.connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT
+                    uuid AS ce_performers_uuid,
+                    short_name AS ce_performers_short_name,
+                    name AS ce_performers_name,
+                    url AS ce_performers_url
+                FROM performers
+                WHERE uuid = %s
+            """,
+                (performer_uuid,),
+            )
+            performer_row = cursor.fetchone()
+            if not performer_row:
+                return pl.DataFrame()
+
+            performer_data = {
+                "ce_performers_uuid": str(performer_row[0]),
+                "ce_performers_short_name": performer_row[1],
+                "ce_performers_name": performer_row[2],
+                "ce_performers_url": performer_row[3],
+            }
+
+            schema = {
+                "ce_performers_uuid": pl.Utf8,
+                "ce_performers_short_name": pl.Utf8,
+                "ce_performers_name": pl.Utf8,
+                "ce_performers_url": pl.Utf8,
+            }
+
+            return pl.DataFrame([performer_data], schema=schema)
+
+    def get_performer_external_ids(self, performer_uuid: str) -> dict:
+        """Get external IDs for a performer from the performer_external_ids table.
+
+        Args:
+            performer_uuid: UUID of the performer
+
+        Returns:
+            Dictionary containing external IDs by target system name
+        """
+        with self.connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT ts.name, pei.external_id
+                FROM performer_external_ids pei
+                JOIN target_systems ts ON pei.target_system_uuid = ts.uuid
+                WHERE pei.performer_uuid = %s
+            """,
+                (performer_uuid,),
+            )
+            results = cursor.fetchall()
+
+            # Return as dictionary with target system name as key
+            return {row[0]: row[1] for row in results}
+
+    def set_performer_external_id(
+        self, performer_uuid: str, target_system_name: str, external_id: str
+    ) -> None:
+        """Set an external ID for a performer in the performer_external_ids table.
+
+        Args:
+            performer_uuid: UUID of the performer
+            target_system_name: Name of the target system (e.g., 'stashapp', 'stashdb')
+            external_id: The external ID value (as string)
+        """
+        with self.connection.cursor() as cursor:
+            # Verify performer exists
+            cursor.execute(
+                "SELECT uuid FROM performers WHERE uuid = %s", (performer_uuid,)
+            )
+            if not cursor.fetchone():
+                raise ValueError(f"Performer with UUID {performer_uuid} does not exist")
+
+            # Get or create target system
+            cursor.execute(
+                "SELECT uuid FROM target_systems WHERE name = %s",
+                (target_system_name,),
+            )
+            target_system_row = cursor.fetchone()
+
+            if target_system_row:
+                target_system_uuid = target_system_row[0]
+            else:
+                # Create new target system
+                target_system_uuid = str(newnewid.uuid7())
+                cursor.execute(
+                    """
+                    INSERT INTO target_systems (uuid, name, description, created, last_updated)
+                    VALUES (%s, %s, %s, NOW(), NOW())
+                """,
+                    (target_system_uuid, target_system_name, f"External system: {target_system_name}"),
+                )
+
+            # Check if external ID already exists for this performer and target system
+            cursor.execute(
+                """
+                SELECT uuid FROM performer_external_ids
+                WHERE performer_uuid = %s AND target_system_uuid = %s
+            """,
+                (performer_uuid, target_system_uuid),
+            )
+            existing_row = cursor.fetchone()
+
+            if existing_row:
+                # Update existing
+                cursor.execute(
+                    """
+                    UPDATE performer_external_ids
+                    SET external_id = %s, last_updated = NOW()
+                    WHERE uuid = %s
+                """,
+                    (external_id, existing_row[0]),
+                )
+            else:
+                # Insert new
+                external_id_uuid = str(newnewid.uuid7())
+                cursor.execute(
+                    """
+                    INSERT INTO performer_external_ids
+                    (uuid, performer_uuid, target_system_uuid, external_id, created, last_updated)
+                    VALUES (%s, %s, %s, %s, NOW(), NOW())
+                """,
+                    (external_id_uuid, performer_uuid, target_system_uuid, external_id),
+                )
+
+            self.connection.commit()

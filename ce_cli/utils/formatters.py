@@ -198,3 +198,94 @@ def print_info(message: str) -> None:
         message: Info message to display
     """
     console.print(f"[bold blue]ℹ[/bold blue] {message}")
+
+
+def format_performers_table(performers_df: pl.DataFrame, site_name: str = None) -> Table:
+    """Format performers dataframe as a Rich table.
+
+    Args:
+        performers_df: Polars DataFrame with performer information
+        site_name: Optional site name for table title (if None, shows multi-site view)
+
+    Returns:
+        Rich Table object ready for display
+    """
+    # Check if this is a multi-site query by looking for ce_site_name column
+    is_multi_site = "ce_site_name" in performers_df.columns
+
+    title = f"Performers from {site_name}" if site_name else "Performers (All Sites)"
+    table = Table(title=title, show_header=True, header_style="bold cyan", expand=False)
+
+    # Add columns
+    table.add_column("Name", style="green")
+    if is_multi_site:
+        table.add_column("Site", style="cyan")
+    table.add_column("Short Name", style="yellow")
+    table.add_column("UUID", style="dim")
+
+    # Add rows
+    for row in performers_df.iter_rows(named=True):
+        performer_name = str(row.get("ce_performers_name", "")) or "-"
+        performer_short_name = str(row.get("ce_performers_short_name", "")) or "-"
+        performer_uuid = str(row.get("ce_performers_uuid", "")) or "-"
+
+        # Truncate long names
+        if performer_name != "-" and len(performer_name) > 40:
+            performer_name = performer_name[:37] + "..."
+
+        if is_multi_site:
+            site_display = str(row.get("ce_site_name", "")) or "-"
+            if site_display != "-" and len(site_display) > 20:
+                site_display = site_display[:17] + "..."
+
+            table.add_row(
+                performer_name,
+                site_display,
+                performer_short_name,
+                performer_uuid,
+            )
+        else:
+            table.add_row(
+                performer_name,
+                performer_short_name,
+                performer_uuid,
+            )
+
+    return table
+
+
+def format_performer_detail(performer_df: pl.DataFrame, external_ids: dict = None) -> str:
+    """Format a single performer as detailed text view.
+
+    Args:
+        performer_df: Polars DataFrame with single performer information
+        external_ids: Optional dictionary of external IDs
+
+    Returns:
+        Formatted string with performer details
+    """
+    from rich.panel import Panel
+
+    row = performer_df.to_dicts()[0]
+
+    # Build detail text
+    details = []
+    details.append(f"[bold cyan]Performer Details[/bold cyan]\n")
+    details.append(f"[yellow]UUID:[/yellow] {row.get('ce_performers_uuid', 'N/A')}")
+    details.append(f"[yellow]Name:[/yellow] {row.get('ce_performers_name', 'N/A')}")
+    details.append(f"[yellow]Short Name:[/yellow] {row.get('ce_performers_short_name', 'N/A')}")
+    details.append(f"[yellow]URL:[/yellow] {row.get('ce_performers_url', 'N/A')}")
+
+    # Add external IDs if present
+    if external_ids:
+        details.append(f"\n[bold cyan]External IDs[/bold cyan]")
+        for system_name, ext_id in external_ids.items():
+            # Format the system name nicely (capitalize first letter)
+            formatted_name = system_name.replace("_", " ").title()
+            details.append(f"[yellow]{formatted_name}:[/yellow] {ext_id}")
+
+    detail_text = "\n".join(details)
+
+    console.print(Panel(detail_text, border_style="cyan"))
+
+    return ""

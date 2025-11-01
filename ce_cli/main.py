@@ -6,6 +6,7 @@ from typing_extensions import Annotated
 from ce_cli import __version__
 from ce_cli.commands.sites import sites_app
 from ce_cli.commands.releases import releases_app
+from ce_cli.commands.performers import performers_app
 
 
 # Create main app
@@ -18,6 +19,7 @@ app = typer.Typer(
 # Register command groups
 app.add_typer(sites_app, name="sites")
 app.add_typer(releases_app, name="releases")
+app.add_typer(performers_app, name="performers")
 
 
 def version_callback(value: bool) -> None:
