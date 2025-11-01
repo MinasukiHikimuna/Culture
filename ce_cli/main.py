@@ -4,9 +4,9 @@ import typer
 from typing_extensions import Annotated
 
 from ce_cli import __version__
-from ce_cli.commands.sites import sites_app
-from ce_cli.commands.releases import releases_app
 from ce_cli.commands.performers import performers_app
+from ce_cli.commands.releases import releases_app
+from ce_cli.commands.sites import sites_app
 
 
 # Create main app

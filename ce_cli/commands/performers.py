@@ -1,18 +1,19 @@
 """Performers-related commands for the CLI."""
 
-import typer
 from typing import Optional
+
+import typer
 from typing_extensions import Annotated
 
 from ce_cli.utils.config import config
 from ce_cli.utils.formatters import (
-    format_performers_table,
     format_performer_detail,
-    print_table,
-    print_json,
+    format_performers_table,
     print_error,
-    print_success,
     print_info,
+    print_json,
+    print_success,
+    print_table,
 )
 
 

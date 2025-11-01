@@ -3,6 +3,7 @@
 import json
 import sys
 from typing import Any
+
 import polars as pl
 from rich.console import Console
 from rich.table import Table
@@ -71,9 +72,10 @@ def format_release_detail(release_df: pl.DataFrame) -> str:
     Returns:
         Formatted string with release details
     """
+    import json
+
     from rich.panel import Panel
     from rich.syntax import Syntax
-    import json
 
     row = scene_df.to_dicts()[0]
 

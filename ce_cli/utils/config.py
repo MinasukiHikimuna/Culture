@@ -1,10 +1,12 @@
 """Configuration utilities for Culture Extractor CLI."""
 
 import os
-from pathlib import Path
-from dotenv import load_dotenv
-from typing import Optional
 import sys
+from pathlib import Path
+from typing import Optional
+
+from dotenv import load_dotenv
+
 
 # Add libraries to path
 _REPO_ROOT = Path(__file__).parent.parent.parent

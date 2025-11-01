@@ -6,10 +6,10 @@ from typing_extensions import Annotated
 from ce_cli.utils.config import config
 from ce_cli.utils.formatters import (
     format_sites_table,
-    print_table,
-    print_json,
     print_error,
+    print_json,
     print_success,
+    print_table,
 )
 
 
