@@ -100,7 +100,7 @@ def format_release_detail(release_df: pl.DataFrame) -> str:
             files_json = json.loads(available_files) if isinstance(available_files, str) else available_files
             console.print("\n[bold cyan]Available Files:[/bold cyan]")
             console.print_json(json.dumps(files_json, indent=2))
-        except:
+        except (json.JSONDecodeError, TypeError):
             pass
 
     return ""
