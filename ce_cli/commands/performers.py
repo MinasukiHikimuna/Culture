@@ -24,15 +24,15 @@ performers_app = typer.Typer(help="Manage Culture Extractor performers")
 @performers_app.command("list")
 def list_performers(
     site: Annotated[
-        Optional[str],
+        str | None,
         typer.Option("--site", "-s", help="Filter by site (short name or UUID)"),
     ] = None,
     name: Annotated[
-        Optional[str],
+        str | None,
         typer.Option("--name", "-n", help="Filter by performer name (case-insensitive)"),
     ] = None,
     limit: Annotated[
-        Optional[int],
+        int | None,
         typer.Option("--limit", "-l", help="Limit number of results (useful when querying all sites)"),
     ] = None,
     json_output: Annotated[
@@ -180,11 +180,11 @@ def show_performer(
 def link_performer(
     uuid: Annotated[str, typer.Argument(help="Performer UUID to link")],
     stashapp_id: Annotated[
-        Optional[int],
+        int | None,
         typer.Option("--stashapp-id", help="Stashapp performer ID"),
     ] = None,
     stashdb_id: Annotated[
-        Optional[str],
+        str | None,
         typer.Option("--stashdb-id", help="StashDB performer ID (UUID/GUID)"),
     ] = None,
 ) -> None:

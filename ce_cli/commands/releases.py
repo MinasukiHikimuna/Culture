@@ -23,11 +23,11 @@ releases_app = typer.Typer(help="Manage Culture Extractor releases")
 @releases_app.command("list")
 def list_releases(
     site: Annotated[
-        Optional[str],
+        str | None,
         typer.Option("--site", "-s", help="Filter by site (short name or UUID)"),
     ] = None,
     limit: Annotated[
-        Optional[int],
+        int | None,
         typer.Option("--limit", "-l", help="Limit number of results (default: all)"),
     ] = None,
     json_output: Annotated[
