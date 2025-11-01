@@ -53,52 +53,14 @@ def list_performers(
         ce performers list --site meanawolf --json       # JSON output
     """
     try:
-        # Get Culture Extractor client
         client = config.get_client()
 
-        # Determine if we're querying by site or all sites
-        if site:
-            # Site-specific query
-            sites_df = client.get_sites()
+        # Fetch performers based on filters
+        performers_df, site_name = _fetch_performers(client, site, name)
 
-            # Check if it's a UUID or short name
-            site_match = sites_df.filter(
-                (sites_df["ce_sites_short_name"] == site)
-                | (sites_df["ce_sites_uuid"] == site)
-                | (sites_df["ce_sites_name"] == site)
-            )
-
-            if site_match.shape[0] == 0:
-                print_error(f"Site '{site}' not found")
-                print_info("To see available sites, run: ce sites list")
-                raise typer.Exit(code=1)
-
-            site_uuid = site_match["ce_sites_uuid"][0]
-            site_name = site_match["ce_sites_name"][0]
-
-            # Fetch performers for the site
-            filter_msg = f" matching '{name}'" if name else ""
-            print_info(f"Fetching performers from '{site_name}'{filter_msg}...")
-
-            performers_df = client.get_performers(site_uuid, name_filter=name)
-        else:
-            # All sites query
-            if not name:
-                print_error("When querying across all sites, --name filter is required to avoid overwhelming results")
-                print_info("Use --name to search for a specific performer, or use --site to browse a specific site")
-                raise typer.Exit(code=1)
-
-            filter_msg = f" matching '{name}'"
-            print_info(f"Searching performers across all sites{filter_msg}...")
-
-            performers_df = client.get_performers_all(name_filter=name)
-
+        # Check if any results were found
         if performers_df.shape[0] == 0:
-            msg = "No performers found"
-            if site:
-                msg += f" for site '{site_name}'"
-            if name:
-                msg += f" matching '{name}'"
+            msg = _build_not_found_message(site_name, name)
             print_info(msg)
             raise typer.Exit(code=0)
 
@@ -111,15 +73,9 @@ def list_performers(
         if json_output:
             print_json(performers_df)
         else:
-            # When showing all sites, include site column in table
-            table = format_performers_table(performers_df, site_name if site else None)
+            table = format_performers_table(performers_df, site_name)
             print_table(table)
-
-            filter_msg = ""
-            if name:
-                filter_msg = f" matching '{name}'"
-            limit_msg = f" (showing first {limit})" if limit else ""
-            print_success(f"Found {count} performer(s){filter_msg}{limit_msg}")
+            print_success(_build_success_message(count, name, limit))
 
     except ValueError as e:
         print_error(str(e))
@@ -127,6 +83,84 @@ def list_performers(
     except Exception as e:
         print_error(f"Failed to fetch performers: {e}")
         raise typer.Exit(code=1) from e
+
+
+def _fetch_performers(client, site: str | None, name: str | None):
+    """Fetch performers based on site and name filters.
+
+    Args:
+        client: Culture Extractor client
+        site: Optional site identifier
+        name: Optional name filter
+
+    Returns:
+        Tuple of (performers_df, site_name or None)
+    """
+    if site:
+        site_uuid, site_name = _resolve_site_uuid(client, site)
+
+        filter_msg = f" matching '{name}'" if name else ""
+        print_info(f"Fetching performers from '{site_name}'{filter_msg}...")
+
+        performers_df = client.get_performers(site_uuid, name_filter=name)
+        return performers_df, site_name
+    else:
+        if not name:
+            print_error("When querying across all sites, --name filter is required to avoid overwhelming results")
+            print_info("Use --name to search for a specific performer, or use --site to browse a specific site")
+            raise ValueError("Name filter required for all-sites query")
+
+        filter_msg = f" matching '{name}'"
+        print_info(f"Searching performers across all sites{filter_msg}...")
+
+        performers_df = client.get_performers_all(name_filter=name)
+        return performers_df, None
+
+
+def _resolve_site_uuid(client, site: str) -> tuple[str, str]:
+    """Resolve a site identifier (UUID, short name, or name) to UUID and name.
+
+    Args:
+        client: Culture Extractor client
+        site: Site identifier (UUID, short name, or full name)
+
+    Returns:
+        Tuple of (site_uuid, site_name)
+
+    Raises:
+        ValueError: If site is not found
+    """
+    sites_df = client.get_sites()
+
+    site_match = sites_df.filter(
+        (sites_df["ce_sites_short_name"] == site)
+        | (sites_df["ce_sites_uuid"] == site)
+        | (sites_df["ce_sites_name"] == site)
+    )
+
+    if site_match.shape[0] == 0:
+        print_error(f"Site '{site}' not found")
+        print_info("To see available sites, run: ce sites list")
+        raise ValueError(f"Site '{site}' not found")
+
+    return site_match["ce_sites_uuid"][0], site_match["ce_sites_name"][0]
+
+
+def _build_not_found_message(site_name: str | None, name: str | None) -> str:
+    """Build a descriptive message when no performers are found."""
+    msg = "No performers found"
+    if site_name:
+        msg += f" for site '{site_name}'"
+    if name:
+        msg += f" matching '{name}'"
+    return msg
+
+
+def _build_success_message(count: int, name: str | None, limit: int | None) -> str:
+    """Build a success message with count and filter information."""
+    filter_msg = f" matching '{name}'" if name else ""
+    limit_msg = f" (showing first {limit})" if limit else ""
+    return f"Found {count} performer(s){filter_msg}{limit_msg}"
 
 
 @performers_app.command("show")
