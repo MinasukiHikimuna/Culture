@@ -7,6 +7,7 @@ import typer
 
 from ce_cli.utils.config import config
 from ce_cli.utils.formatters import (
+    format_release_detail,
     format_releases_table,
     print_error,
     print_info,
@@ -133,7 +134,6 @@ def show_release(
             print_json(release_df)
         else:
             # Format as detailed view
-            from ce_cli.utils.formatters import format_release_detail
             detail = format_release_detail(release_df)
             print(detail)
             print_success(f"Release details for {uuid}")

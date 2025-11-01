@@ -6,6 +6,7 @@ from typing import Any
 
 import polars as pl
 from rich.console import Console
+from rich.panel import Panel
 from rich.table import Table
 
 
@@ -72,10 +73,6 @@ def format_release_detail(release_df: pl.DataFrame) -> str:
     Returns:
         Formatted string with release details
     """
-    import json
-
-    from rich.panel import Panel
-
     row = release_df.to_dicts()[0]
 
     # Build detail text
@@ -264,8 +261,6 @@ def format_performer_detail(performer_df: pl.DataFrame, external_ids: dict | Non
     Returns:
         Formatted string with performer details
     """
-    from rich.panel import Panel
-
     row = performer_df.to_dicts()[0]
 
     # Build detail text
