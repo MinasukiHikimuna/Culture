@@ -79,13 +79,13 @@ def format_release_detail(release_df: pl.DataFrame) -> str:
 
     # Build detail text
     details = []
-    details.append(f"[bold cyan]Scene Details[/bold cyan]\n")
+    details.append("[bold cyan]Scene Details[/bold cyan]\n")
     details.append(f"[yellow]UUID:[/yellow] {row.get('ce_release_uuid', 'N/A')}")
     details.append(f"[yellow]Name:[/yellow] {row.get('ce_release_name', 'N/A')}")
     details.append(f"[yellow]Short Name:[/yellow] {row.get('ce_release_short_name', 'N/A')}")
     details.append(f"[yellow]Date:[/yellow] {row.get('ce_release_date', 'N/A')}")
     details.append(f"[yellow]URL:[/yellow] {row.get('ce_release_url', 'N/A')}")
-    details.append(f"\n[yellow]Description:[/yellow]")
+    details.append("\n[yellow]Description:[/yellow]")
     details.append(row.get("ce_release_description", "N/A") or "N/A")
 
     detail_text = "\n".join(details)
@@ -270,7 +270,7 @@ def format_performer_detail(performer_df: pl.DataFrame, external_ids: dict = Non
 
     # Build detail text
     details = []
-    details.append(f"[bold cyan]Performer Details[/bold cyan]\n")
+    details.append("[bold cyan]Performer Details[/bold cyan]\n")
     details.append(f"[yellow]UUID:[/yellow] {row.get('ce_performers_uuid', 'N/A')}")
     details.append(f"[yellow]Name:[/yellow] {row.get('ce_performers_name', 'N/A')}")
     details.append(f"[yellow]Short Name:[/yellow] {row.get('ce_performers_short_name', 'N/A')}")
@@ -278,7 +278,7 @@ def format_performer_detail(performer_df: pl.DataFrame, external_ids: dict = Non
 
     # Add external IDs if present
     if external_ids:
-        details.append(f"\n[bold cyan]External IDs[/bold cyan]")
+        details.append("\n[bold cyan]External IDs[/bold cyan]")
         for system_name, ext_id in external_ids.items():
             # Format the system name nicely (capitalize first letter)
             formatted_name = system_name.replace("_", " ").title()
