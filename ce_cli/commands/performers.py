@@ -104,17 +104,16 @@ def _fetch_performers(client, site: str | None, name: str | None):
 
         performers_df = client.get_performers(site_uuid, name_filter=name)
         return performers_df, site_name
-    else:
-        if not name:
-            print_error("When querying across all sites, --name filter is required to avoid overwhelming results")
-            print_info("Use --name to search for a specific performer, or use --site to browse a specific site")
-            raise ValueError("Name filter required for all-sites query")
+    if not name:
+        print_error("When querying across all sites, --name filter is required to avoid overwhelming results")
+        print_info("Use --name to search for a specific performer, or use --site to browse a specific site")
+        raise ValueError("Name filter required for all-sites query")
 
-        filter_msg = f" matching '{name}'"
-        print_info(f"Searching performers across all sites{filter_msg}...")
+    filter_msg = f" matching '{name}'"
+    print_info(f"Searching performers across all sites{filter_msg}...")
 
-        performers_df = client.get_performers_all(name_filter=name)
-        return performers_df, None
+    performers_df = client.get_performers_all(name_filter=name)
+    return performers_df, None
 
 
 def _resolve_site_uuid(client, site: str) -> tuple[str, str]:
