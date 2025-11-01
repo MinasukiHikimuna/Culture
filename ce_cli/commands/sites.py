@@ -50,7 +50,7 @@ def list_sites(
 
     except ValueError as e:
         print_error(str(e))
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
     except Exception as e:
         print_error(f"Failed to fetch sites: {e}")
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e

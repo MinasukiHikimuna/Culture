@@ -123,10 +123,10 @@ def list_performers(
 
     except ValueError as e:
         print_error(str(e))
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
     except Exception as e:
         print_error(f"Failed to fetch performers: {e}")
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
 
 
 @performers_app.command("show")
@@ -170,10 +170,10 @@ def show_performer(
 
     except ValueError as e:
         print_error(str(e))
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
     except Exception as e:
         print_error(f"Failed to fetch performer: {e}")
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
 
 
 @performers_app.command("link")
@@ -229,7 +229,7 @@ def link_performer(
 
     except ValueError as e:
         print_error(str(e))
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
     except Exception as e:
         print_error(f"Failed to link performer: {e}")
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e

@@ -98,10 +98,10 @@ def list_releases(
 
     except ValueError as e:
         print_error(str(e))
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
     except Exception as e:
         print_error(f"Failed to fetch releases: {e}")
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
 
 
 @releases_app.command("show")
@@ -140,7 +140,7 @@ def show_release(
 
     except ValueError as e:
         print_error(str(e))
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
     except Exception as e:
         print_error(f"Failed to fetch release: {e}")
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
