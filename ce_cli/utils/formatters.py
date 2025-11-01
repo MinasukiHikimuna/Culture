@@ -197,7 +197,7 @@ def print_info(message: str) -> None:
     Args:
         message: Info message to display
     """
-    console.print(f"[bold blue]ℹ[/bold blue] {message}")
+    console.print(f"[bold blue]i[/bold blue] {message}")
 
 
 def format_performers_table(performers_df: pl.DataFrame, site_name: str | None = None) -> Table:
