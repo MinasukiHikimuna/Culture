@@ -770,6 +770,60 @@ class ClientCultureExtractor:
 
             return pl.DataFrame(performers, schema=schema)
 
+    def get_release_performers(self, release_uuid: str) -> pl.DataFrame:
+        """Get all performers for a specific release.
+
+        Args:
+            release_uuid: UUID of the release
+
+        Returns:
+            DataFrame containing performers for the release with their external IDs
+        """
+        with self.connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT DISTINCT
+                    p.uuid AS ce_performers_uuid,
+                    p.short_name AS ce_performers_short_name,
+                    p.name AS ce_performers_name,
+                    p.url AS ce_performers_url
+                FROM performers p
+                JOIN release_entity_site_performer_entity resp ON p.uuid = resp.performers_uuid
+                WHERE resp.releases_uuid = %s
+                ORDER BY p.name
+            """,
+                (release_uuid,),
+            )
+            performers_rows = cursor.fetchall()
+
+            performers = []
+            for row in performers_rows:
+                performer_uuid = str(row[0])
+                # Get external IDs for this performer
+                external_ids = self.get_performer_external_ids(performer_uuid)
+
+                performers.append(
+                    {
+                        "ce_performers_uuid": performer_uuid,
+                        "ce_performers_short_name": row[1],
+                        "ce_performers_name": row[2],
+                        "ce_performers_url": row[3],
+                        "ce_performers_stashapp_id": external_ids.get("stashapp"),
+                        "ce_performers_stashdb_id": external_ids.get("stashdb"),
+                    }
+                )
+
+            schema = {
+                "ce_performers_uuid": pl.Utf8,
+                "ce_performers_short_name": pl.Utf8,
+                "ce_performers_name": pl.Utf8,
+                "ce_performers_url": pl.Utf8,
+                "ce_performers_stashapp_id": pl.Utf8,
+                "ce_performers_stashdb_id": pl.Utf8,
+            }
+
+            return pl.DataFrame(performers, schema=schema)
+
     def get_performer_by_uuid(self, performer_uuid: str) -> pl.DataFrame:
         """Get a specific performer by its UUID.
 
