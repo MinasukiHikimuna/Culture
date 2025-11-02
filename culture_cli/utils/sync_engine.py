@@ -285,7 +285,7 @@ class SyncEngine:
             )
 
         # Match performers
-        performer_diffs = self._match_performers(ce_performers, stash_data.get("performers", []))
+        performer_diffs = self._match_performers(ce_performers)
 
         return SyncPlan(
             ce_uuid=ce_release["ce_release_uuid"],
@@ -296,12 +296,11 @@ class SyncEngine:
             performer_diffs=performer_diffs,
         )
 
-    def _match_performers(self, ce_performers: list[dict], stash_performers: list[dict]) -> list[PerformerDiff]:
+    def _match_performers(self, ce_performers: list[dict]) -> list[PerformerDiff]:
         """Match CE performers with Stashapp performers.
 
         Args:
             ce_performers: List of CE performers
-            stash_performers: List of Stashapp performers
 
         Returns:
             List of PerformerDiff objects
