@@ -309,38 +309,26 @@ class SyncEngine:
         """
         performer_diffs = []
 
-        # Get all Stashapp performers for matching
-        all_stash_performers_df = self.stash_client.get_performers()
-        all_stash_performers = all_stash_performers_df.to_dicts() if all_stash_performers_df.shape[0] > 0 else []
-
         for ce_performer in ce_performers:
             ce_uuid = ce_performer["ce_performers_uuid"]
             ce_name = ce_performer["ce_performers_name"]
+            ce_stashapp_id = ce_performer.get("ce_performers_stashapp_id")
 
-            # Look for matching performer in Stashapp by CE UUID in stash_ids
-            matched = False
-            for stash_performer in all_stash_performers:
-                for stash_id in stash_performer.get("stashapp_stash_ids", []):
-                    if (
-                        stash_id.get("endpoint") == "https://culture.extractor/graphql"
-                        and stash_id.get("stash_id") == ce_uuid
-                    ):
-                        performer_diffs.append(
-                            PerformerDiff(
-                                ce_uuid=ce_uuid,
-                                ce_name=ce_name,
-                                status="matched",
-                                stashapp_id=stash_performer["stashapp_id"],
-                                stashapp_name=stash_performer["stashapp_name"],
-                                message=f"Matched to Stashapp performer #{stash_performer['stashapp_id']} ({stash_performer['stashapp_name']})",
-                            )
-                        )
-                        matched = True
-                        break
-                if matched:
-                    break
-
-            if not matched:
+            # Check if CE already has a Stashapp ID for this performer
+            if ce_stashapp_id:
+                # CE already has the performer linked - use that ID
+                performer_diffs.append(
+                    PerformerDiff(
+                        ce_uuid=ce_uuid,
+                        ce_name=ce_name,
+                        status="matched",
+                        stashapp_id=int(ce_stashapp_id),
+                        stashapp_name=ce_name,  # We'll use the CE name since we trust the ID is correct
+                        message=f"Matched to Stashapp performer #{ce_stashapp_id} (via CE link)",
+                    )
+                )
+            else:
+                # No Stashapp ID in CE - performer not linked yet
                 performer_diffs.append(
                     PerformerDiff(
                         ce_uuid=ce_uuid,
@@ -348,7 +336,7 @@ class SyncEngine:
                         status="not_found",
                         stashapp_id=None,
                         stashapp_name=None,
-                        message=f"Performer '{ce_name}' not found in Stashapp (CE UUID: {ce_uuid})",
+                        message=f"Performer '{ce_name}' not linked to Stashapp yet (CE UUID: {ce_uuid})",
                     )
                 )
 
