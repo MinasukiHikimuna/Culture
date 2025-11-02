@@ -1,5 +1,5 @@
 [project]
-name = "ce-cli"
+name = "CultureDataAnalysis"
 version = "0.1.0"
 description = "CLI tool for Culture Extractor database operations"
 readme = "README.md"
