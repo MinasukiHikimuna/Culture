@@ -1129,6 +1129,37 @@ class StashAppClient:
 
         self.stash.update_studio({"id": studio_id, "stash_ids": new_stash_ids})
 
+    def create_performer(
+        self, name: str, stashdb_id: str | None = None, ce_id: str | None = None
+    ) -> dict:
+        """Create a new performer with optional external IDs.
+
+        Args:
+            name: Performer name
+            stashdb_id: StashDB UUID (optional)
+            ce_id: Culture Extractor UUID (optional)
+
+        Returns:
+            Created performer data
+        """
+        performer_data = {"name": name}
+
+        # Add stash IDs if provided
+        stash_ids = []
+        if stashdb_id:
+            stash_ids.append(
+                {"endpoint": "https://stashdb.org/graphql", "stash_id": stashdb_id}
+            )
+        if ce_id:
+            stash_ids.append(
+                {"endpoint": "https://culture.extractor/graphql", "stash_id": ce_id}
+            )
+
+        if stash_ids:
+            performer_data["stash_ids"] = stash_ids
+
+        return self.stash.create_performer(performer_data)
+
     def update_performer_custom_fields(
         self, performer_id: int, custom_fields: Dict[str, str]
     ):

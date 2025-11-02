@@ -127,6 +127,31 @@ stash-cli performers show 123
 stash-cli performers show 456 --prefix BACKUP_
 ```
 
+### Create Performer
+
+Create a new performer with optional external IDs:
+
+```bash
+# Create performer with name only
+stash-cli performers create "Jane Doe"
+
+# Create with StashDB ID
+stash-cli performers create "Jane Doe" --stashdb-id "fb7a0e15-fa8c-4b3d-9cdf-69c75351d785"
+
+# Create with both StashDB and Culture Extractor IDs
+stash-cli performers create "Jane Doe" \
+  --stashdb-id "fb7a0e15-fa8c-4b3d-9cdf-69c75351d785" \
+  --ce-id "01993396-a5f5-70b0-9294-d9ce343a0829"
+
+# Create in alternative instance
+stash-cli performers create "Jane Doe" --stashdb-id "abc123..." --prefix BACKUP_
+```
+
+Short flags are also available:
+- `-s` for `--stashdb-id`
+- `-c` for `--ce-id`
+- `-p` for `--prefix`
+
 ## Output Format
 
 ### Table Output (Default)
@@ -202,6 +227,21 @@ stash-cli performers show 123
 
 ```bash
 stash-cli performers list --name "Jane" --prefix BACKUP_
+```
+
+### Create missing performers from StashDB
+
+If you have performers that exist in StashDB but not in Stashapp:
+
+```bash
+# First, check if the StashDB ID exists in Stashapp
+stash-cli performers list --stashdb-id "81c09da6-c015-4bda-8b60-215413f7a848"
+
+# If not found, create the performer with the StashDB ID
+stash-cli performers create "Bonni Gee" --stashdb-id "81c09da6-c015-4bda-8b60-215413f7a848"
+
+# Verify the performer was created
+stash-cli performers list --stashdb-id "81c09da6-c015-4bda-8b60-215413f7a848"
 ```
 
 ## Development

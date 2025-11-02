@@ -6,6 +6,7 @@ from typing import Optional
 import polars as pl
 import typer
 from rich.console import Console
+from rich.panel import Panel
 from rich.table import Table
 
 from libraries.client_stashapp import StashAppClient
@@ -149,6 +150,53 @@ def show_performer(
 
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@app.command("create")
+def create_performer(
+    name: str = typer.Argument(..., help="Performer name"),
+    stashdb_id: Optional[str] = typer.Option(None, "--stashdb-id", "-s", help="StashDB performer ID (UUID)"),
+    ce_id: Optional[str] = typer.Option(None, "--ce-id", "-c", help="Culture Extractor performer ID (UUID)"),
+    prefix: str = typer.Option("", "--prefix", "-p", help="Environment variable prefix for Stashapp connection"),
+) -> None:
+    """Create a new performer in Stashapp with optional external IDs.
+
+    Examples:
+        stash-cli performers create "Jane Doe"
+        stash-cli performers create "Jane Doe" --stashdb-id "abc123-def456-..."
+        stash-cli performers create "Jane Doe" --stashdb-id "abc123..." --ce-id "def456..."
+    """
+    try:
+        client = StashAppClient(prefix=prefix)
+
+        # Show what we're about to create
+        console.print("\n[bold cyan]Creating Performer[/bold cyan]")
+        console.print(f"[green]Name:[/green] {name}")
+        if stashdb_id:
+            console.print(f"[green]StashDB ID:[/green] {stashdb_id}")
+        if ce_id:
+            console.print(f"[green]Culture Extractor ID:[/green] {ce_id}")
+
+        # Create the performer
+        console.print("\n[blue]Creating performer in Stashapp...[/blue]")
+        result = client.create_performer(name=name, stashdb_id=stashdb_id, ce_id=ce_id)
+
+        # Display success message
+        performer_id = result.get("id")
+        console.print(
+            Panel(
+                f"[bold green]Successfully created performer![/bold green]\n\n"
+                f"ID: {performer_id}\n"
+                f"Name: {result.get('name')}\n"
+                f"\nView details with: [cyan]stash-cli performers show {performer_id}[/cyan]",
+                title="Success",
+                border_style="green",
+            )
+        )
+
+    except Exception as e:
+        console.print(f"[red]Error creating performer: {e}[/red]")
         sys.exit(1)
 
 
