@@ -29,95 +29,122 @@ def display_scene_details(scene: dict) -> None:
         )
     )
 
-    # Stash IDs (external identifiers)
-    if scene.get("stash_ids"):
-        stash_id_table = Table(
-            title="External IDs", show_header=True, header_style="bold magenta"
-        )
-        stash_id_table.add_column("Endpoint", style="cyan")
-        stash_id_table.add_column("ID", style="yellow")
-
-        for stash_id in scene["stash_ids"]:
-            stash_id_table.add_row(
-                stash_id.get("endpoint", "N/A"), stash_id.get("stash_id", "N/A")
-            )
-
-        console.print(stash_id_table)
-
-    # Files
-    if scene.get("files"):
-        file_table = Table(title="Files", show_header=True, header_style="bold magenta")
-        file_table.add_column("Path", style="cyan")
-        file_table.add_column("Size", style="yellow")
-        file_table.add_column("Duration", style="green")
-        file_table.add_column("Resolution", style="blue")
-
-        for file in scene["files"]:
-            size_mb = (
-                f"{int(file['size']) / 1024 / 1024:.1f} MB"
-                if file.get("size")
-                else "N/A"
-            )
-            duration = f"{file['duration']:.1f}s" if file.get("duration") else "N/A"
-            resolution = (
-                f"{file['width']}x{file['height']}"
-                if file.get("width") and file.get("height")
-                else "N/A"
-            )
-            file_table.add_row(file.get("path", "N/A"), size_mb, duration, resolution)
-
-        console.print(file_table)
-
-    # Performers
-    if scene.get("performers"):
-        performer_table = Table(
-            title="Performers", show_header=True, header_style="bold magenta"
-        )
-        performer_table.add_column("ID", style="cyan")
-        performer_table.add_column("Name", style="green")
-        performer_table.add_column("CE UUID", style="yellow")
-
-        for performer in scene["performers"]:
-            ce_uuid = None
-            for sid in performer.get("stash_ids", []):
-                if sid.get("endpoint") == "https://culture.extractor/graphql":
-                    ce_uuid = sid.get("stash_id")
-                    break
-
-            performer_table.add_row(
-                performer["id"], performer.get("name", "N/A"), ce_uuid or "Not linked"
-            )
-
-        console.print(performer_table)
-
-    # Tags
-    if scene.get("tags"):
-        tag_names = [tag.get("name", "N/A") for tag in scene["tags"]]
-        console.print(Panel(", ".join(tag_names), title="Tags", border_style="magenta"))
-
-    # Galleries
-    if scene.get("galleries"):
-        gallery_table = Table(
-            title="Galleries", show_header=True, header_style="bold magenta"
-        )
-        gallery_table.add_column("ID", style="cyan")
-        gallery_table.add_column("Title", style="green")
-        gallery_table.add_column("CE URL", style="yellow")
-
-        for gallery in scene["galleries"]:
-            ce_url = None
-            for url in gallery.get("urls", []):
-                if "culture.extractor/galleries/" in url:
-                    ce_url = url
-                    break
-
-            gallery_table.add_row(
-                gallery["id"], gallery.get("title", "N/A"), ce_url or "Not linked"
-            )
-
-        console.print(gallery_table)
+    # Display all sections using helper functions
+    _display_stash_ids(scene)
+    _display_files(scene)
+    _display_performers(scene)
+    _display_tags(scene)
+    _display_galleries(scene)
 
     console.print("\n")
+
+
+def _display_stash_ids(scene: dict) -> None:
+    """Display external IDs table."""
+    if not scene.get("stash_ids"):
+        return
+
+    stash_id_table = Table(
+        title="External IDs", show_header=True, header_style="bold magenta"
+    )
+    stash_id_table.add_column("Endpoint", style="cyan")
+    stash_id_table.add_column("ID", style="yellow")
+
+    for stash_id in scene["stash_ids"]:
+        stash_id_table.add_row(
+            stash_id.get("endpoint", "N/A"), stash_id.get("stash_id", "N/A")
+        )
+
+    console.print(stash_id_table)
+
+
+def _display_files(scene: dict) -> None:
+    """Display files table."""
+    if not scene.get("files"):
+        return
+
+    file_table = Table(title="Files", show_header=True, header_style="bold magenta")
+    file_table.add_column("Path", style="cyan")
+    file_table.add_column("Size", style="yellow")
+    file_table.add_column("Duration", style="green")
+    file_table.add_column("Resolution", style="blue")
+
+    for file in scene["files"]:
+        size_mb = (
+            f"{int(file['size']) / 1024 / 1024:.1f} MB"
+            if file.get("size")
+            else "N/A"
+        )
+        duration = f"{file['duration']:.1f}s" if file.get("duration") else "N/A"
+        resolution = (
+            f"{file['width']}x{file['height']}"
+            if file.get("width") and file.get("height")
+            else "N/A"
+        )
+        file_table.add_row(file.get("path", "N/A"), size_mb, duration, resolution)
+
+    console.print(file_table)
+
+
+def _display_performers(scene: dict) -> None:
+    """Display performers table."""
+    if not scene.get("performers"):
+        return
+
+    performer_table = Table(
+        title="Performers", show_header=True, header_style="bold magenta"
+    )
+    performer_table.add_column("ID", style="cyan")
+    performer_table.add_column("Name", style="green")
+    performer_table.add_column("CE UUID", style="yellow")
+
+    for performer in scene["performers"]:
+        ce_uuid = None
+        for sid in performer.get("stash_ids", []):
+            if sid.get("endpoint") == "https://culture.extractor/graphql":
+                ce_uuid = sid.get("stash_id")
+                break
+
+        performer_table.add_row(
+            performer["id"], performer.get("name", "N/A"), ce_uuid or "Not linked"
+        )
+
+    console.print(performer_table)
+
+
+def _display_tags(scene: dict) -> None:
+    """Display tags panel."""
+    if not scene.get("tags"):
+        return
+
+    tag_names = [tag.get("name", "N/A") for tag in scene["tags"]]
+    console.print(Panel(", ".join(tag_names), title="Tags", border_style="magenta"))
+
+
+def _display_galleries(scene: dict) -> None:
+    """Display galleries table."""
+    if not scene.get("galleries"):
+        return
+
+    gallery_table = Table(
+        title="Galleries", show_header=True, header_style="bold magenta"
+    )
+    gallery_table.add_column("ID", style="cyan")
+    gallery_table.add_column("Title", style="green")
+    gallery_table.add_column("CE URL", style="yellow")
+
+    for gallery in scene["galleries"]:
+        ce_url = None
+        for url in gallery.get("urls", []):
+            if "culture.extractor/galleries/" in url:
+                ce_url = url
+                break
+
+        gallery_table.add_row(
+            gallery["id"], gallery.get("title", "N/A"), ce_url or "Not linked"
+        )
+
+    console.print(gallery_table)
 
 
 @app.command("find")
