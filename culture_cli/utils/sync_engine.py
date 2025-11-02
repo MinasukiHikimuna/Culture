@@ -1,7 +1,11 @@
 """Core sync engine for synchronizing data between systems."""
 
+import base64
+import mimetypes
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable
+from pathlib import Path
+from typing import Any
 
 from libraries.client_culture_extractor import ClientCultureExtractor
 from libraries.client_stashapp import StashAppClient
@@ -68,15 +72,22 @@ class SyncResult:
 class SyncEngine:
     """Engine for synchronizing data between Culture Extractor and Stashapp."""
 
-    def __init__(self, ce_client: ClientCultureExtractor, stash_client: StashAppClient):
+    def __init__(
+        self,
+        ce_client: ClientCultureExtractor,
+        stash_client: StashAppClient,
+        metadata_base_path: str | Path | None = None,
+    ):
         """Initialize the sync engine.
 
         Args:
             ce_client: Culture Extractor client
             stash_client: Stashapp client
+            metadata_base_path: Base path where downloaded files are stored (optional)
         """
         self.ce_client = ce_client
         self.stash_client = stash_client
+        self.metadata_base_path = Path(metadata_base_path) if metadata_base_path else None
 
     def fetch_ce_data(self, ce_uuid: str) -> dict:
         """Fetch release and performer data from Culture Extractor.
@@ -98,9 +109,35 @@ class SyncEngine:
         performers_df = self.ce_client.get_release_performers(ce_uuid)
         performers = performers_df.to_dicts() if performers_df.shape[0] > 0 else []
 
+        # Get cover image if available
+        downloads_df = self.ce_client.get_release_downloads(ce_uuid)
+        cover_image_path = None
+
+        if downloads_df.shape[0] > 0:
+            # Filter for cover images
+            covers = downloads_df.filter(
+                (downloads_df["ce_downloads_file_type"] == "image")
+                & (downloads_df["ce_downloads_content_type"] == "cover")
+            )
+            if covers.shape[0] > 0:
+                saved_filename = covers["ce_downloads_saved_filename"][0]
+
+                # Construct full path if metadata_base_path is provided
+                if self.metadata_base_path and saved_filename:
+                    # Path structure: {base_path}/{site_name}/Metadata/{release_uuid}/{filename}
+                    site_name = release.get("ce_site_name", "")
+                    full_path = (
+                        self.metadata_base_path / site_name / "Metadata" / ce_uuid / saved_filename
+                    )
+                    cover_image_path = str(full_path)
+                else:
+                    # Just use the filename if no base path configured
+                    cover_image_path = saved_filename
+
         return {
             "release": release,
             "performers": performers,
+            "cover_image_path": cover_image_path,
         }
 
     def fetch_stashapp_data(self, stashapp_id: int) -> dict:
@@ -214,6 +251,29 @@ class SyncEngine:
                 )
             )
 
+        # Compare cover image
+        cover_image_path = ce_data.get("cover_image_path")
+        if cover_image_path:
+            field_diffs.append(
+                FieldDiff(
+                    field_name="cover_image",
+                    action="update",
+                    current_value=None,
+                    new_value=cover_image_path,
+                    message=f"Update cover image from: {cover_image_path}",
+                )
+            )
+        else:
+            field_diffs.append(
+                FieldDiff(
+                    field_name="cover_image",
+                    action="no_change",
+                    current_value=None,
+                    new_value=None,
+                    message="No cover image available",
+                )
+            )
+
         # Match performers
         performer_diffs = self._match_performers(ce_performers)
 
@@ -319,6 +379,42 @@ class SyncEngine:
 
         return performer_diffs
 
+    def _process_cover_image(self, cover_path: Path) -> tuple[str | None, list[str]]:
+        """Process cover image file and return base64 encoded data.
+
+        Args:
+            cover_path: Path to the cover image file
+
+        Returns:
+            Tuple of (base64_encoded_image, errors_list)
+        """
+        errors = []
+
+        if not cover_path.exists():
+            errors.append(f"Cover image file not found: {cover_path}")
+            return None, errors
+
+        try:
+            # Read and encode the image
+            with cover_path.open("rb") as img_file:
+                image_data = img_file.read()
+                base64_image = base64.b64encode(image_data).decode("utf-8")
+
+            # Detect MIME type
+            mime_type, _ = mimetypes.guess_type(str(cover_path))
+            if not mime_type or not mime_type.startswith("image/"):
+                mime_type = "image/jpeg"  # Default fallback
+
+            cover_image_base64 = f"data:{mime_type};base64,{base64_image}"
+            return cover_image_base64, errors
+
+        except OSError as e:
+            errors.append(f"Failed to read cover image: {e}")
+            return None, errors
+        except Exception as e:
+            errors.append(f"Failed to process cover image: {e}")
+            return None, errors
+
     def apply_sync(self, plan: SyncPlan) -> SyncResult:
         """Apply the synchronization plan.
 
@@ -360,6 +456,17 @@ class SyncEngine:
                 new_urls = [*current_urls, url_diff.new_value]
                 update_data["urls"] = new_urls
                 fields_updated.append("url")
+
+            # Update cover image if available
+            cover_diff = next((d for d in plan.field_diffs if d.field_name == "cover_image"), None)
+            if cover_diff and cover_diff.action in ["update", "add"] and cover_diff.new_value:
+                cover_path = Path(cover_diff.new_value)
+                cover_image_base64, cover_errors = self._process_cover_image(cover_path)
+                errors.extend(cover_errors)
+
+                if cover_image_base64:
+                    update_data["cover_image"] = cover_image_base64
+                    fields_updated.append("cover_image")
 
             # Update performer IDs
             matched_performer_ids = [

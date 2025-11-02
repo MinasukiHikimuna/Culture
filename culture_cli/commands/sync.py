@@ -146,4 +146,7 @@ def _initialize_sync_engine() -> SyncEngine:
     print_info("Connecting to Stashapp...")
     stash_client = StashAppClient()
 
-    return SyncEngine(ce_client, stash_client)
+    # Get metadata base path from environment (optional)
+    metadata_base_path = os.environ.get("CE_METADATA_BASE_PATH")
+
+    return SyncEngine(ce_client, stash_client, metadata_base_path)
