@@ -123,29 +123,29 @@ def show_performer(
         performer = performer_df.to_dicts()[0]
 
         # Display detailed information
-        console.print(f"\n[bold cyan]Performer Details[/bold cyan]")
+        console.print("\n[bold cyan]Performer Details[/bold cyan]")
         console.print(f"[green]ID:[/green] {performer['stashapp_id']}")
         console.print(f"[green]Name:[/green] {performer['stashapp_name']}")
         console.print(f"[green]Gender:[/green] {performer['stashapp_gender']}")
         console.print(f"[green]Favorite:[/green] {'Yes ⭐' if performer['stashapp_favorite'] else 'No'}")
 
-        if performer['stashapp_stashdb_id']:
+        if performer["stashapp_stashdb_id"]:
             console.print(f"[green]StashDB ID:[/green] {performer['stashapp_stashdb_id']}")
 
-        if performer['stashapp_tpdb_id']:
+        if performer["stashapp_tpdb_id"]:
             console.print(f"[green]TPDB ID:[/green] {performer['stashapp_tpdb_id']}")
 
-        if performer['stashapp_alias_list']:
+        if performer["stashapp_alias_list"]:
             console.print(f"[green]Aliases:[/green] {', '.join(performer['stashapp_alias_list'])}")
 
-        if performer['stashapp_urls']:
-            console.print(f"[green]URLs:[/green]")
-            for url in performer['stashapp_urls']:
+        if performer["stashapp_urls"]:
+            console.print("[green]URLs:[/green]")
+            for url in performer["stashapp_urls"]:
                 console.print(f"  - {url}")
 
-        if performer['stashapp_custom_fields']:
-            console.print(f"[green]Custom Fields:[/green]")
-            for field in performer['stashapp_custom_fields']:
+        if performer["stashapp_custom_fields"]:
+            console.print("[green]Custom Fields:[/green]")
+            for field in performer["stashapp_custom_fields"]:
                 console.print(f"  {field['key']}: {field['value']}")
 
     except Exception as e:

@@ -3,7 +3,6 @@
 from dataclasses import dataclass
 from typing import Any
 
-
 from libraries.client_culture_extractor import ClientCultureExtractor
 from libraries.client_stashapp import StashAppClient
 
