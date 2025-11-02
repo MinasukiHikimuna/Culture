@@ -1,0 +1,156 @@
+"""Performer commands for stash-cli."""
+
+import sys
+from typing import Optional
+
+import polars as pl
+import typer
+from rich.console import Console
+from rich.table import Table
+
+from libraries.client_stashapp import StashAppClient
+
+app = typer.Typer()
+console = Console()
+
+
+def create_performers_table(df: pl.DataFrame) -> Table:
+    """Create a rich table for displaying performers."""
+    table = Table(title="Stashapp Performers", show_header=True, header_style="bold magenta")
+    table.add_column("ID", style="cyan", no_wrap=True)
+    table.add_column("Name", style="green")
+    table.add_column("Gender", style="yellow")
+    table.add_column("Favorite", style="red")
+    table.add_column("StashDB ID", style="blue")
+    table.add_column("TPDB ID", style="blue")
+
+    for row in df.iter_rows(named=True):
+        table.add_row(
+            str(row["stashapp_id"]),
+            row["stashapp_name"] or "",
+            row["stashapp_gender"] or "",
+            "⭐" if row["stashapp_favorite"] else "",
+            row["stashapp_stashdb_id"] or "",
+            row["stashapp_tpdb_id"] or "",
+        )
+
+    return table
+
+
+@app.command("list")
+def list_performers(
+    name: Optional[str] = typer.Option(None, "--name", "-n", help="Filter performers by name (case-insensitive partial match)"),
+    stashdb_id: Optional[str] = typer.Option(None, "--stashdb-id", "-s", help="Filter performers by StashDB ID"),
+    tpdb_id: Optional[str] = typer.Option(None, "--tpdb-id", "-t", help="Filter performers by ThePornDB ID"),
+    favorite: Optional[bool] = typer.Option(None, "--favorite", "-f", help="Filter by favorite status"),
+    gender: Optional[str] = typer.Option(None, "--gender", "-g", help="Filter by gender (MALE, FEMALE, TRANSGENDER_MALE, TRANSGENDER_FEMALE, NON_BINARY)"),
+    json_output: bool = typer.Option(False, "--json", help="Output results as JSON"),
+    limit: Optional[int] = typer.Option(None, "--limit", "-l", help="Limit number of results"),
+    prefix: str = typer.Option("", "--prefix", "-p", help="Environment variable prefix for Stashapp connection"),
+) -> None:
+    """List performers from Stashapp with optional filters.
+
+    Examples:
+        stash-cli performers list --name "Jane"
+        stash-cli performers list --stashdb-id "abc123"
+        stash-cli performers list --favorite --gender FEMALE
+    """
+    try:
+        client = StashAppClient(prefix=prefix)
+        console.print("[blue]Fetching performers from Stashapp...[/blue]")
+
+        df = client.get_performers()
+
+        # Apply filters
+        if name:
+            df = df.filter(pl.col("stashapp_name").str.to_lowercase().str.contains(name.lower()))
+
+        if stashdb_id:
+            df = df.filter(pl.col("stashapp_stashdb_id") == stashdb_id)
+
+        if tpdb_id:
+            df = df.filter(pl.col("stashapp_tpdb_id") == tpdb_id)
+
+        if favorite is not None:
+            df = df.filter(pl.col("stashapp_favorite") == favorite)
+
+        if gender:
+            gender_upper = gender.upper()
+            df = df.filter(pl.col("stashapp_gender") == gender_upper)
+
+        # Apply limit
+        if limit:
+            df = df.head(limit)
+
+        if df.height == 0:
+            console.print("[yellow]No performers found matching the criteria.[/yellow]")
+            return
+
+        if json_output:
+            print(df.write_json())
+        else:
+            table = create_performers_table(df)
+            console.print(table)
+            console.print(f"\n[green]Total: {df.height} performer(s)[/green]")
+
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@app.command("show")
+def show_performer(
+    performer_id: int = typer.Argument(..., help="Performer ID to display"),
+    prefix: str = typer.Option("", "--prefix", "-p", help="Environment variable prefix for Stashapp connection"),
+) -> None:
+    """Show detailed information about a specific performer.
+
+    Example:
+        stash-cli performers show 123
+    """
+    try:
+        client = StashAppClient(prefix=prefix)
+        console.print(f"[blue]Fetching performer {performer_id} from Stashapp...[/blue]")
+
+        df = client.get_performers()
+        performer_df = df.filter(pl.col("stashapp_id") == performer_id)
+
+        if performer_df.height == 0:
+            console.print(f"[red]Performer with ID {performer_id} not found.[/red]")
+            sys.exit(1)
+
+        performer = performer_df.to_dicts()[0]
+
+        # Display detailed information
+        console.print(f"\n[bold cyan]Performer Details[/bold cyan]")
+        console.print(f"[green]ID:[/green] {performer['stashapp_id']}")
+        console.print(f"[green]Name:[/green] {performer['stashapp_name']}")
+        console.print(f"[green]Gender:[/green] {performer['stashapp_gender']}")
+        console.print(f"[green]Favorite:[/green] {'Yes ⭐' if performer['stashapp_favorite'] else 'No'}")
+
+        if performer['stashapp_stashdb_id']:
+            console.print(f"[green]StashDB ID:[/green] {performer['stashapp_stashdb_id']}")
+
+        if performer['stashapp_tpdb_id']:
+            console.print(f"[green]TPDB ID:[/green] {performer['stashapp_tpdb_id']}")
+
+        if performer['stashapp_alias_list']:
+            console.print(f"[green]Aliases:[/green] {', '.join(performer['stashapp_alias_list'])}")
+
+        if performer['stashapp_urls']:
+            console.print(f"[green]URLs:[/green]")
+            for url in performer['stashapp_urls']:
+                console.print(f"  - {url}")
+
+        if performer['stashapp_custom_fields']:
+            console.print(f"[green]Custom Fields:[/green]")
+            for field in performer['stashapp_custom_fields']:
+                console.print(f"  {field['key']}: {field['value']}")
+
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    app()
