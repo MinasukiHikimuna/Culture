@@ -1,7 +1,6 @@
 """Performer commands for stash-cli."""
 
 import sys
-from typing import Optional
 
 import polars as pl
 import typer
@@ -41,13 +40,13 @@ def create_performers_table(df: pl.DataFrame) -> Table:
 
 @app.command("list")
 def list_performers(
-    name: Optional[str] = typer.Option(None, "--name", "-n", help="Filter performers by name (case-insensitive partial match)"),
-    stashdb_id: Optional[str] = typer.Option(None, "--stashdb-id", "-s", help="Filter performers by StashDB ID"),
-    tpdb_id: Optional[str] = typer.Option(None, "--tpdb-id", "-t", help="Filter performers by ThePornDB ID"),
-    favorite: Optional[bool] = typer.Option(None, "--favorite", "-f", help="Filter by favorite status"),
-    gender: Optional[str] = typer.Option(None, "--gender", "-g", help="Filter by gender (MALE, FEMALE, TRANSGENDER_MALE, TRANSGENDER_FEMALE, NON_BINARY)"),
+    name: str | None = typer.Option(None, "--name", "-n", help="Filter performers by name (case-insensitive partial match)"),
+    stashdb_id: str | None = typer.Option(None, "--stashdb-id", "-s", help="Filter performers by StashDB ID"),
+    tpdb_id: str | None = typer.Option(None, "--tpdb-id", "-t", help="Filter performers by ThePornDB ID"),
+    favorite: bool | None = typer.Option(None, "--favorite", "-f", help="Filter by favorite status"),
+    gender: str | None = typer.Option(None, "--gender", "-g", help="Filter by gender (MALE, FEMALE, TRANSGENDER_MALE, TRANSGENDER_FEMALE, NON_BINARY)"),
     json_output: bool = typer.Option(False, "--json", help="Output results as JSON"),
-    limit: Optional[int] = typer.Option(None, "--limit", "-l", help="Limit number of results"),
+    limit: int | None = typer.Option(None, "--limit", "-l", help="Limit number of results"),
     prefix: str = typer.Option("", "--prefix", "-p", help="Environment variable prefix for Stashapp connection"),
 ) -> None:
     """List performers from Stashapp with optional filters.
@@ -157,8 +156,8 @@ def show_performer(
 @app.command("create")
 def create_performer(
     name: str = typer.Argument(..., help="Performer name"),
-    stashdb_id: Optional[str] = typer.Option(None, "--stashdb-id", "-s", help="StashDB performer ID (UUID)"),
-    ce_id: Optional[str] = typer.Option(None, "--ce-id", "-c", help="Culture Extractor performer ID (UUID)"),
+    stashdb_id: str | None = typer.Option(None, "--stashdb-id", "-s", help="StashDB performer ID (UUID)"),
+    ce_id: str | None = typer.Option(None, "--ce-id", "-c", help="Culture Extractor performer ID (UUID)"),
     prefix: str = typer.Option("", "--prefix", "-p", help="Environment variable prefix for Stashapp connection"),
 ) -> None:
     """Create a new performer in Stashapp with optional external IDs.

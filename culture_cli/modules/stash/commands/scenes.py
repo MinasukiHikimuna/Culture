@@ -2,7 +2,6 @@
 
 import sys
 import traceback
-from typing import Optional
 
 import typer
 from rich.console import Console
@@ -123,14 +122,14 @@ def display_scene_details(scene: dict) -> None:
 
 @app.command("find")
 def find_scenes(
-    ce_id: Optional[str] = typer.Option(
+    ce_id: str | None = typer.Option(
         None, "--ce-id", help="Filter by Culture Extractor UUID"
     ),
-    title: Optional[str] = typer.Option(None, "--title", "-t", help="Filter by title"),
-    scene_id: Optional[int] = typer.Option(
+    title: str | None = typer.Option(None, "--title", "-t", help="Filter by title"),
+    scene_id: int | None = typer.Option(
         None, "--id", help="Find specific scene by ID"
     ),
-    limit: Optional[int] = typer.Option(
+    limit: int | None = typer.Option(
         None, "--limit", "-l", help="Limit number of results"
     ),
 ) -> None:
