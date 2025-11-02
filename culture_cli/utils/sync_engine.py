@@ -155,6 +155,10 @@ class SyncEngine:
             date
             details
             urls
+            studio {
+                id
+                name
+            }
             performers {
                 id
                 name
@@ -271,6 +275,57 @@ class SyncEngine:
                     current_value=None,
                     new_value=None,
                     message="No cover image available",
+                )
+            )
+
+        # Compare studio
+        ce_site_uuid = ce_release.get("ce_site_uuid")
+        stash_studio = stash_data.get("studio")
+        stash_studio_id = stash_studio.get("id") if stash_studio else None
+        stash_studio_name = stash_studio.get("name") if stash_studio else None
+
+        # Get CE site's Stashapp ID mapping if it exists
+        ce_studio_stashapp_id = None
+        if ce_site_uuid:
+            site_external_ids = self.ce_client.get_site_external_ids(ce_site_uuid)
+            ce_studio_stashapp_id = site_external_ids.get("stashapp")
+            if ce_studio_stashapp_id:
+                ce_studio_stashapp_id = int(ce_studio_stashapp_id)
+
+        if ce_studio_stashapp_id:
+            if stash_studio_id != ce_studio_stashapp_id:
+                field_diffs.append(
+                    FieldDiff(
+                        field_name="studio",
+                        action="update" if stash_studio_id else "add",
+                        current_value=stash_studio_id,
+                        new_value=ce_studio_stashapp_id,
+                        message=f"{'Update' if stash_studio_id else 'Add'} studio: "
+                        f"{stash_studio_name or 'None'} (ID: {stash_studio_id}) → "
+                        f"Studio ID: {ce_studio_stashapp_id}",
+                    )
+                )
+            else:
+                field_diffs.append(
+                    FieldDiff(
+                        field_name="studio",
+                        action="no_change",
+                        current_value=stash_studio_id,
+                        new_value=ce_studio_stashapp_id,
+                        message=f"Studio unchanged: {stash_studio_name} (ID: {stash_studio_id})",
+                    )
+                )
+        else:
+            # No studio mapping available
+            field_diffs.append(
+                FieldDiff(
+                    field_name="studio",
+                    action="warning" if not stash_studio_id else "no_change",
+                    current_value=stash_studio_id,
+                    new_value=None,
+                    message="No studio mapping available in CE (link site to Stashapp studio first)"
+                    if not stash_studio_id
+                    else f"Studio in Stashapp: {stash_studio_name} (ID: {stash_studio_id}), but no CE mapping",
                 )
             )
 
@@ -467,6 +522,12 @@ class SyncEngine:
                 if cover_image_base64:
                     update_data["cover_image"] = cover_image_base64
                     fields_updated.append("cover_image")
+
+            # Update studio if changed
+            studio_diff = next((d for d in plan.field_diffs if d.field_name == "studio"), None)
+            if studio_diff and studio_diff.action in ["update", "add"]:
+                update_data["studio_id"] = studio_diff.new_value
+                fields_updated.append("studio")
 
             # Update performer IDs
             matched_performer_ids = [
