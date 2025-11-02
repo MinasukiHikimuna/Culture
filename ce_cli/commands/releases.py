@@ -133,15 +133,45 @@ def show_release(
         # Get external IDs
         external_ids = client.get_release_external_ids(uuid)
 
+        # Get performers for this release
+        performers_df = client.get_release_performers(uuid)
+
         if json_output:
-            # Combine release data with external IDs
+            # Combine release data with external IDs and performers
             release_dict = release_df.to_dicts()[0]
             release_dict["external_ids"] = external_ids
+            release_dict["performers"] = performers_df.to_dicts() if performers_df.shape[0] > 0 else []
             print_json(release_dict)
         else:
             # Format as detailed view
             detail = format_release_detail(release_df, external_ids)
             print(detail)
+
+            # Display performers if any
+            if performers_df.shape[0] > 0:
+                from rich.table import Table
+                from rich.console import Console
+
+                console = Console()
+                performer_table = Table(
+                    title="Performers", show_header=True, header_style="bold magenta"
+                )
+                performer_table.add_column("Name", style="green")
+                performer_table.add_column("CE UUID", style="cyan")
+                performer_table.add_column("Stashapp ID", style="yellow")
+                performer_table.add_column("StashDB ID", style="blue")
+
+                for performer in performers_df.iter_rows(named=True):
+                    performer_table.add_row(
+                        performer["ce_performers_name"] or "N/A",
+                        performer["ce_performers_uuid"] or "N/A",
+                        performer["ce_performers_stashapp_id"] or "Not linked",
+                        performer["ce_performers_stashdb_id"] or "Not linked",
+                    )
+
+                console.print(performer_table)
+                print()
+
             print_success(f"Release details for {uuid}")
 
     except ValueError as e:
