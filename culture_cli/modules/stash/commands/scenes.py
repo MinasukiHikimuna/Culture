@@ -147,6 +147,56 @@ def _display_galleries(scene: dict) -> None:
     console.print(gallery_table)
 
 
+def _apply_scene_filters(scenes, scene_id, ce_id, title, limit):
+    """Apply post-query filters to scenes list."""
+    if scene_id:
+        scenes = [s for s in scenes if s["id"] == str(scene_id)]
+
+    if ce_id:
+        scenes = [
+            s
+            for s in scenes
+            if any(
+                sid.get("endpoint") == "https://culture.extractor/graphql"
+                and sid.get("stash_id") == ce_id
+                for sid in s.get("stash_ids", [])
+            )
+        ]
+
+    if title:
+        scenes = [
+            s
+            for s in scenes
+            if s.get("title") and title.lower() in s["title"].lower()
+        ]
+
+    if limit:
+        scenes = scenes[:limit]
+
+    return scenes
+
+
+def _display_scenes_list_format(scenes):
+    """Display scenes in simple list format."""
+    console.print("[bold cyan]Stashapp ID -> CE ID mapping:[/bold cyan]\n")
+    for scene in scenes:
+        ce_id = _get_ce_id_from_scene(scene)
+        if ce_id:
+            console.print(f"[yellow]{scene['id']}[/yellow] -> [green]{ce_id}[/green]")
+        else:
+            console.print(f"[yellow]{scene['id']}[/yellow] -> [dim]No CE ID[/dim]")
+
+    console.print("\n[dim]Use: ce releases link <ce_id> --stashapp-id <stashapp_id>[/dim]")
+
+
+def _get_ce_id_from_scene(scene):
+    """Extract CE ID from scene's stash_ids."""
+    for stash_id in scene.get("stash_ids", []):
+        if stash_id.get("endpoint") == "https://culture.extractor/graphql":
+            return stash_id.get("stash_id")
+    return None
+
+
 @app.command("find")
 def find_scenes(
     ce_id: str | None = typer.Option(
@@ -155,6 +205,15 @@ def find_scenes(
     title: str | None = typer.Option(None, "--title", "-t", help="Filter by title"),
     scene_id: int | None = typer.Option(
         None, "--id", help="Find specific scene by ID"
+    ),
+    query: str | None = typer.Option(
+        None, "--query", "-q", help="Search query (searches across all fields)"
+    ),
+    ce_only: bool = typer.Option(
+        False, "--ce-only", help="Show only scenes with CE IDs"
+    ),
+    list_format: bool = typer.Option(
+        False, "--list", help="Output as simple list (stashapp_id -> ce_id)"
     ),
     limit: int | None = typer.Option(
         None, "--limit", "-l", help="Limit number of results"
@@ -166,6 +225,8 @@ def find_scenes(
         stash-cli scenes find --ce-id 01993924-76de-743c-b28b-6d9205dfa184
         stash-cli scenes find --title "Beach Play"
         stash-cli scenes find --id 35733
+        stash-cli scenes find --query "Braless Forever" --ce-only
+        stash-cli scenes find --query "Braless Forever" --ce-only --list
         stash-cli scenes find --limit 10
     """
     try:
@@ -173,11 +234,22 @@ def find_scenes(
         stash_raw_client = get_stashapp_client()
 
         console.print("[blue]Fetching scenes...[/blue]")
-        scenes = stash_raw_client.find_scenes(
-            fragment="""
+
+        # Build filter for API query
+        api_filter = {}
+        if ce_only:
+            api_filter["stash_id_endpoint"] = {
+                "endpoint": "https://culture.extractor/graphql",
+                "stash_id": "",
+                "modifier": "NOT_NULL"
+            }
+
+        # Call find_scenes with filter and query
+        kwargs = {"fragment": """
             id
             title
             date
+            code
             stash_ids {
                 endpoint
                 stash_id
@@ -206,33 +278,17 @@ def find_scenes(
                 width
                 height
             }
-            """
-        )
+            """}
 
-        # Apply filters
-        if scene_id:
-            scenes = [s for s in scenes if s["id"] == str(scene_id)]
+        if api_filter:
+            kwargs["f"] = api_filter
+        if query:
+            kwargs["q"] = query
 
-        if ce_id:
-            scenes = [
-                s
-                for s in scenes
-                if any(
-                    sid.get("endpoint") == "https://culture.extractor/graphql"
-                    and sid.get("stash_id") == ce_id
-                    for sid in s.get("stash_ids", [])
-                )
-            ]
+        scenes = stash_raw_client.find_scenes(**kwargs)
 
-        if title:
-            scenes = [
-                s
-                for s in scenes
-                if s.get("title") and title.lower() in s["title"].lower()
-            ]
-
-        if limit:
-            scenes = scenes[:limit]
+        # Apply post-query filters
+        scenes = _apply_scene_filters(scenes, scene_id, ce_id, title, limit)
 
         # Display results
         if not scenes:
@@ -252,8 +308,12 @@ def find_scenes(
 
         console.print(f"\n[green]Found {len(scenes)} scene(s)[/green]\n")
 
-        for scene in scenes:
-            display_scene_details(scene)
+        # Display results based on format
+        if list_format:
+            _display_scenes_list_format(scenes)
+        else:
+            for scene in scenes:
+                display_scene_details(scene)
 
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
