@@ -157,108 +157,39 @@ class SyncEngine:
         # Compare title
         ce_title = ce_release.get("ce_release_name") or ""
         stash_title = stash_data.get("title") or ""
-        if ce_title != stash_title:
-            if not stash_title:
-                field_diffs.append(
-                    FieldDiff(
-                        field_name="title",
-                        action="add",
-                        current_value=stash_title,
-                        new_value=ce_title,
-                        message=f'Add title: "{ce_title}"',
-                    )
-                )
-            else:
-                field_diffs.append(
-                    FieldDiff(
-                        field_name="title",
-                        action="update",
-                        current_value=stash_title,
-                        new_value=ce_title,
-                        message=f'Update title: "{stash_title}" → "{ce_title}"',
-                    )
-                )
-        else:
-            field_diffs.append(
-                FieldDiff(
-                    field_name="title",
-                    action="no_change",
-                    current_value=stash_title,
-                    new_value=ce_title,
-                    message=f'Title unchanged: "{stash_title}"',
-                )
+        field_diffs.append(
+            self._create_field_diff(
+                "title",
+                stash_title,
+                ce_title,
+                lambda action, curr, new: {
+                    "add": f'Add title: "{new}"',
+                    "update": f'Update title: "{curr}" → "{new}"',
+                    "no_change": f'Title unchanged: "{curr}"',
+                }[action],
             )
+        )
 
         # Compare date
         ce_date = str(ce_release.get("ce_release_date")) if ce_release.get("ce_release_date") else ""
         stash_date = stash_data.get("date") or ""
-        if ce_date != stash_date:
-            if not stash_date:
-                field_diffs.append(
-                    FieldDiff(
-                        field_name="date",
-                        action="add",
-                        current_value=stash_date,
-                        new_value=ce_date,
-                        message=f"Add date: {ce_date}",
-                    )
-                )
-            else:
-                field_diffs.append(
-                    FieldDiff(
-                        field_name="date",
-                        action="update",
-                        current_value=stash_date,
-                        new_value=ce_date,
-                        message=f"Update date: {stash_date} → {ce_date}",
-                    )
-                )
-        else:
-            field_diffs.append(
-                FieldDiff(
-                    field_name="date",
-                    action="no_change",
-                    current_value=stash_date,
-                    new_value=ce_date,
-                    message=f"Date unchanged: {stash_date}",
-                )
-            )
+        field_diffs.append(self._create_field_diff("date", stash_date, ce_date))
 
         # Compare description/details
         ce_details = ce_release.get("ce_release_description") or ""
         stash_details = stash_data.get("details") or ""
-        if ce_details != stash_details:
-            preview = ce_details[:50] + "..." if len(ce_details) > 50 else ce_details
-            if not stash_details:
-                field_diffs.append(
-                    FieldDiff(
-                        field_name="details",
-                        action="add",
-                        current_value=stash_details,
-                        new_value=ce_details,
-                        message=f'Add details: "{preview}"',
-                    )
-                )
-            else:
-                field_diffs.append(
-                    FieldDiff(
-                        field_name="details",
-                        action="update",
-                        current_value=stash_details,
-                        new_value=ce_details,
-                        message=f'Update details: "{preview}"',
-                    )
-                )
-        else:
-            field_diffs.append(
-                FieldDiff(
-                    field_name="details",
-                    action="no_change",
-                    current_value=stash_details,
-                    new_value=ce_details,
-                    message="Details unchanged",
-                )
+        field_diffs.append(
+            self._create_field_diff(
+                "details",
+                stash_details,
+                ce_details,
+                lambda action, curr, new: {
+                    "add": f'Add details: "{new[:50]}{"..." if len(new) > 50 else ""}"',
+                    "update": f'Update details: "{new[:50]}{"..." if len(new) > 50 else ""}"',
+                    "no_change": "Details unchanged",
+                }[action],
             )
+        )
 
         # Compare URL
         ce_url = ce_release.get("ce_release_url") or ""
@@ -294,6 +225,43 @@ class SyncEngine:
             stashapp_title=stash_title,
             field_diffs=field_diffs,
             performer_diffs=performer_diffs,
+        )
+
+    def _create_field_diff(
+        self,
+        field_name: str,
+        current_value: Any,
+        new_value: Any,
+        format_message: callable = None,
+    ) -> FieldDiff:
+        """Create a FieldDiff for a single field comparison.
+
+        Args:
+            field_name: Name of the field being compared
+            current_value: Current value in Stashapp
+            new_value: New value from CE
+            format_message: Optional function to format the message
+
+        Returns:
+            FieldDiff object
+        """
+        if new_value != current_value:
+            if not current_value:
+                action = "add"
+                message = f"Add {field_name}: {new_value}" if not format_message else format_message("add", current_value, new_value)
+            else:
+                action = "update"
+                message = f"Update {field_name}: {current_value} → {new_value}" if not format_message else format_message("update", current_value, new_value)
+        else:
+            action = "no_change"
+            message = f"{field_name.capitalize()} unchanged: {current_value}" if not format_message else format_message("no_change", current_value, new_value)
+
+        return FieldDiff(
+            field_name=field_name,
+            action=action,
+            current_value=current_value,
+            new_value=new_value,
+            message=message,
         )
 
     def _match_performers(self, ce_performers: list[dict]) -> list[PerformerDiff]:
