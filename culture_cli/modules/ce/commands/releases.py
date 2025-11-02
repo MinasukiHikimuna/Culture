@@ -23,6 +23,77 @@ from culture_cli.modules.ce.utils.formatters import (
 releases_app = typer.Typer(help="Manage Culture Extractor releases")
 
 
+def _display_performers_table(performers_df) -> None:
+    """Display performers in a formatted table."""
+    console = Console()
+    performer_table = Table(title="Performers", show_header=True, header_style="bold magenta")
+    performer_table.add_column("Name", style="green")
+    performer_table.add_column("CE UUID", style="cyan")
+    performer_table.add_column("Stashapp ID", style="yellow")
+    performer_table.add_column("StashDB ID", style="blue")
+
+    for performer in performers_df.iter_rows(named=True):
+        performer_table.add_row(
+            performer["ce_performers_name"] or "N/A",
+            performer["ce_performers_uuid"] or "N/A",
+            performer["ce_performers_stashapp_id"] or "Not linked",
+            performer["ce_performers_stashdb_id"] or "Not linked",
+        )
+
+    console.print(performer_table)
+    print()
+
+
+def _display_tags_table(tags_df) -> None:
+    """Display tags in a formatted table."""
+    console = Console()
+    tags_table = Table(title="Tags", show_header=True, header_style="bold magenta")
+    tags_table.add_column("Name", style="green")
+    tags_table.add_column("CE UUID", style="cyan")
+
+    for tag in tags_df.iter_rows(named=True):
+        tags_table.add_row(
+            tag["ce_tags_name"] or "N/A",
+            tag["ce_tags_uuid"] or "N/A",
+        )
+
+    console.print(tags_table)
+    print()
+
+
+def _display_downloads_table(downloads_df) -> None:
+    """Display downloaded files in a formatted table."""
+    console = Console()
+    downloads_table = Table(title="Downloaded Files", show_header=True, header_style="bold magenta")
+    downloads_table.add_column("Filename", style="green")
+    downloads_table.add_column("File Type", style="cyan")
+    downloads_table.add_column("Content Type", style="yellow")
+    downloads_table.add_column("Variant", style="blue")
+    downloads_table.add_column("Downloaded At", style="white")
+
+    for download in downloads_df.iter_rows(named=True):
+        filename = (
+            download["ce_downloads_saved_filename"]
+            or download["ce_downloads_original_filename"]
+            or "N/A"
+        )
+        downloaded_at = (
+            str(download["ce_downloads_downloaded_at"])
+            if download["ce_downloads_downloaded_at"]
+            else "N/A"
+        )
+        downloads_table.add_row(
+            filename,
+            download["ce_downloads_file_type"] or "N/A",
+            download["ce_downloads_content_type"] or "N/A",
+            download["ce_downloads_variant"] or "N/A",
+            downloaded_at,
+        )
+
+    console.print(downloads_table)
+    print()
+
+
 @releases_app.command("list")
 def list_releases(
     site: Annotated[
@@ -159,67 +230,15 @@ def show_release(
 
             # Display performers if any
             if performers_df.shape[0] > 0:
-                console = Console()
-                performer_table = Table(
-                    title="Performers", show_header=True, header_style="bold magenta"
-                )
-                performer_table.add_column("Name", style="green")
-                performer_table.add_column("CE UUID", style="cyan")
-                performer_table.add_column("Stashapp ID", style="yellow")
-                performer_table.add_column("StashDB ID", style="blue")
-
-                for performer in performers_df.iter_rows(named=True):
-                    performer_table.add_row(
-                        performer["ce_performers_name"] or "N/A",
-                        performer["ce_performers_uuid"] or "N/A",
-                        performer["ce_performers_stashapp_id"] or "Not linked",
-                        performer["ce_performers_stashdb_id"] or "Not linked",
-                    )
-
-                console.print(performer_table)
-                print()
+                _display_performers_table(performers_df)
 
             # Display tags if any
             if tags_df.shape[0] > 0:
-                console = Console()
-                tags_table = Table(
-                    title="Tags", show_header=True, header_style="bold magenta"
-                )
-                tags_table.add_column("Name", style="green")
-                tags_table.add_column("CE UUID", style="cyan")
-
-                for tag in tags_df.iter_rows(named=True):
-                    tags_table.add_row(
-                        tag["ce_tags_name"] or "N/A",
-                        tag["ce_tags_uuid"] or "N/A",
-                    )
-
-                console.print(tags_table)
-                print()
+                _display_tags_table(tags_df)
 
             # Display downloads if any
             if downloads_df.shape[0] > 0:
-                console = Console()
-                downloads_table = Table(
-                    title="Downloaded Files", show_header=True, header_style="bold magenta"
-                )
-                downloads_table.add_column("Filename", style="green")
-                downloads_table.add_column("File Type", style="cyan")
-                downloads_table.add_column("Content Type", style="yellow")
-                downloads_table.add_column("Variant", style="blue")
-                downloads_table.add_column("Downloaded At", style="white")
-
-                for download in downloads_df.iter_rows(named=True):
-                    downloads_table.add_row(
-                        download["ce_downloads_saved_filename"] or download["ce_downloads_original_filename"] or "N/A",
-                        download["ce_downloads_file_type"] or "N/A",
-                        download["ce_downloads_content_type"] or "N/A",
-                        download["ce_downloads_variant"] or "N/A",
-                        str(download["ce_downloads_downloaded_at"]) if download["ce_downloads_downloaded_at"] else "N/A",
-                    )
-
-                console.print(downloads_table)
-                print()
+                _display_downloads_table(downloads_df)
 
             print_success(f"Release details for {uuid}")
 
