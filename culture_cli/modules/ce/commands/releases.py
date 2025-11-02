@@ -153,8 +153,8 @@ def show_release(
 
             # Display performers if any
             if performers_df.shape[0] > 0:
-                from rich.table import Table
                 from rich.console import Console
+                from rich.table import Table
 
                 console = Console()
                 performer_table = Table(
@@ -178,8 +178,8 @@ def show_release(
 
             # Display tags if any
             if tags_df.shape[0] > 0:
-                from rich.table import Table
                 from rich.console import Console
+                from rich.table import Table
 
                 console = Console()
                 tags_table = Table(

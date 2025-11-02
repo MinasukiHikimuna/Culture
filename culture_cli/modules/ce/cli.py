@@ -1,9 +1,11 @@
 """Culture Extractor module for the Culture CLI."""
 
 import typer
+
 from culture_cli.modules.ce.commands.performers import performers_app
 from culture_cli.modules.ce.commands.releases import releases_app
 from culture_cli.modules.ce.commands.sites import sites_app
+
 
 ce_app = typer.Typer(
     name="ce",

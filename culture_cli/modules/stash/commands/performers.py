@@ -11,6 +11,7 @@ from rich.table import Table
 
 from libraries.client_stashapp import StashAppClient
 
+
 app = typer.Typer()
 console = Console()
 

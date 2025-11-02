@@ -1,7 +1,9 @@
 """Stashapp module for the Culture CLI."""
 
 import typer
+
 from culture_cli.modules.stash.commands import performers, scenes
+
 
 stash_app = typer.Typer(
     name="stash",

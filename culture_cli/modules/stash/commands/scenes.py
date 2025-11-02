@@ -10,6 +10,7 @@ from rich.table import Table
 
 from libraries.client_stashapp import get_stashapp_client
 
+
 app = typer.Typer()
 console = Console()
 
