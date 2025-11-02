@@ -1,6 +1,7 @@
 """Sync command for synchronizing data between systems."""
 
 import os
+import traceback
 from pathlib import Path
 from typing import Annotated
 
@@ -132,7 +133,5 @@ def sync_scene(
         raise
     except Exception as e:
         print_error(f"Unexpected error: {e}")
-        import traceback
-
         print(traceback.format_exc())
         raise typer.Exit(code=1) from e

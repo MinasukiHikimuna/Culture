@@ -1,6 +1,7 @@
 """Scene commands for stash-cli."""
 
 import sys
+import traceback
 from typing import Optional
 
 import typer
@@ -230,8 +231,6 @@ def find_scenes(
 
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
-        import traceback
-
         console.print(f"[red]{traceback.format_exc()}[/red]")
         sys.exit(1)
 

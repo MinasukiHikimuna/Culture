@@ -2,6 +2,7 @@
 
 import typer
 
+from culture_cli import __version__
 from culture_cli.commands import sync
 from culture_cli.modules.ce.cli import ce_app
 from culture_cli.modules.stash.cli import stash_app
@@ -24,8 +25,6 @@ app.add_typer(stash_app, name="stash", help="Stashapp operations")
 def version_callback(value: bool) -> None:
     """Show version information."""
     if value:
-        from culture_cli import __version__
-
         typer.echo(f"culture version {__version__}")
         raise typer.Exit()
 

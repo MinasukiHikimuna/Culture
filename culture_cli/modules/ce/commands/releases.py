@@ -4,6 +4,8 @@
 from typing import Annotated
 
 import typer
+from rich.console import Console
+from rich.table import Table
 
 from culture_cli.modules.ce.utils.config import config
 from culture_cli.modules.ce.utils.formatters import (
@@ -153,9 +155,6 @@ def show_release(
 
             # Display performers if any
             if performers_df.shape[0] > 0:
-                from rich.console import Console
-                from rich.table import Table
-
                 console = Console()
                 performer_table = Table(
                     title="Performers", show_header=True, header_style="bold magenta"
@@ -178,9 +177,6 @@ def show_release(
 
             # Display tags if any
             if tags_df.shape[0] > 0:
-                from rich.console import Console
-                from rich.table import Table
-
                 console = Console()
                 tags_table = Table(
                     title="Tags", show_header=True, header_style="bold magenta"
