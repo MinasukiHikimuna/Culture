@@ -64,11 +64,12 @@ def format_releases_table(releases_df: pl.DataFrame, site_name: str | None = Non
     return table
 
 
-def format_release_detail(release_df: pl.DataFrame) -> str:
+def format_release_detail(release_df: pl.DataFrame, external_ids: dict | None = None) -> str:
     """Format a single release as detailed text view.
 
     Args:
         release_df: Polars DataFrame with single release information
+        external_ids: Optional dictionary of external IDs
 
     Returns:
         Formatted string with release details
@@ -85,6 +86,14 @@ def format_release_detail(release_df: pl.DataFrame) -> str:
     details.append(f"[yellow]URL:[/yellow] {row.get('ce_release_url', 'N/A')}")
     details.append("\n[yellow]Description:[/yellow]")
     details.append(row.get("ce_release_description", "N/A") or "N/A")
+
+    # Add external IDs if present
+    if external_ids:
+        details.append("\n[bold cyan]External IDs[/bold cyan]")
+        for system_name, ext_id in external_ids.items():
+            # Format the system name nicely (capitalize first letter)
+            formatted_name = system_name.replace("_", " ").title()
+            details.append(f"[yellow]{formatted_name}:[/yellow] {ext_id}")
 
     detail_text = "\n".join(details)
 

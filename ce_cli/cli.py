@@ -3,6 +3,8 @@
 import typer
 from ce_cli.commands import scenes
 from ce_cli.commands.performers import performers_app
+from ce_cli.commands.releases import releases_app
+from ce_cli.commands.sites import sites_app
 
 app = typer.Typer(
     name="ce",
@@ -11,7 +13,9 @@ app = typer.Typer(
 )
 
 # Register command groups
-app.add_typer(scenes.app, name="scenes", help="Manage and query scenes/releases")
+app.add_typer(sites_app, name="sites", help="Manage and query sites")
+app.add_typer(releases_app, name="releases", help="Manage and query releases/scenes")
+app.add_typer(scenes.app, name="scenes", help="Manage and query scenes/releases (alias)")
 app.add_typer(performers_app, name="performers", help="Manage and query performers")
 
 

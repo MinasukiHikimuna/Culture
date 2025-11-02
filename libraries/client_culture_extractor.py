@@ -961,3 +961,99 @@ class ClientCultureExtractor:
                 )
 
             self.connection.commit()
+
+    def get_release_external_ids(self, release_uuid: str) -> dict:
+        """Get external IDs for a release from the release_external_ids table.
+
+        Args:
+            release_uuid: UUID of the release
+
+        Returns:
+            Dictionary containing external IDs by target system name
+        """
+        with self.connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT ts.name, rei.external_id
+                FROM release_external_ids rei
+                JOIN target_systems ts ON rei.target_system_uuid = ts.uuid
+                WHERE rei.release_uuid = %s
+            """,
+                (release_uuid,),
+            )
+            results = cursor.fetchall()
+
+            # Return as dictionary with target system name as key
+            return {row[0]: row[1] for row in results}
+
+    def set_release_external_id(
+        self, release_uuid: str, target_system_name: str, external_id: str
+    ) -> None:
+        """Set an external ID for a release in the release_external_ids table.
+
+        Args:
+            release_uuid: UUID of the release
+            target_system_name: Name of the target system (e.g., 'stashapp', 'stashdb')
+            external_id: The external ID value (as string)
+        """
+        with self.connection.cursor() as cursor:
+            # Verify release exists
+            cursor.execute(
+                "SELECT uuid FROM releases WHERE uuid = %s", (release_uuid,)
+            )
+            if not cursor.fetchone():
+                raise ValueError(f"Release with UUID {release_uuid} does not exist")
+
+            # Get or create target system
+            cursor.execute(
+                "SELECT uuid FROM target_systems WHERE name = %s",
+                (target_system_name,),
+            )
+            target_system_row = cursor.fetchone()
+
+            if target_system_row:
+                target_system_uuid = target_system_row[0]
+            else:
+                # Create new target system
+                target_system_uuid = str(newnewid.uuid7())
+                cursor.execute(
+                    """
+                    INSERT INTO target_systems (uuid, name, description, created, last_updated)
+                    VALUES (%s, %s, %s, NOW(), NOW())
+                """,
+                    (target_system_uuid, target_system_name, f"External system: {target_system_name}"),
+                )
+
+            # Check if external ID already exists for this release and target system
+            cursor.execute(
+                """
+                SELECT uuid FROM release_external_ids
+                WHERE release_uuid = %s AND target_system_uuid = %s
+            """,
+                (release_uuid, target_system_uuid),
+            )
+            existing_row = cursor.fetchone()
+
+            if existing_row:
+                # Update existing
+                cursor.execute(
+                    """
+                    UPDATE release_external_ids
+                    SET external_id = %s, last_updated = NOW()
+                    WHERE uuid = %s
+                """,
+                    (external_id, existing_row[0]),
+                )
+            else:
+                # Insert new
+                external_id_uuid = str(newnewid.uuid7())
+                cursor.execute(
+                    """
+                    INSERT INTO release_external_ids
+                    (uuid, release_uuid, target_system_uuid, external_id, created, last_updated)
+                    VALUES (%s, %s, %s, %s, NOW(), NOW())
+                """,
+                    (external_id_uuid, release_uuid, target_system_uuid, external_id),
+                )
+
+            self.connection.commit()

@@ -130,11 +130,17 @@ def show_release(
             print_error(f"Release with UUID '{uuid}' not found")
             raise typer.Exit(code=1)
 
+        # Get external IDs
+        external_ids = client.get_release_external_ids(uuid)
+
         if json_output:
-            print_json(release_df)
+            # Combine release data with external IDs
+            release_dict = release_df.to_dicts()[0]
+            release_dict["external_ids"] = external_ids
+            print_json(release_dict)
         else:
             # Format as detailed view
-            detail = format_release_detail(release_df)
+            detail = format_release_detail(release_df, external_ids)
             print(detail)
             print_success(f"Release details for {uuid}")
 
@@ -143,4 +149,63 @@ def show_release(
         raise typer.Exit(code=1) from e
     except Exception as e:
         print_error(f"Failed to fetch release: {e}")
+        raise typer.Exit(code=1) from e
+
+
+@releases_app.command("link")
+def link_release(
+    uuid: Annotated[str, typer.Argument(help="Release UUID to link")],
+    stashapp_id: Annotated[
+        int | None,
+        typer.Option("--stashapp-id", help="Stashapp scene ID"),
+    ] = None,
+    stashdb_id: Annotated[
+        str | None,
+        typer.Option("--stashdb-id", help="StashDB scene ID (UUID/GUID)"),
+    ] = None,
+) -> None:
+    """Link a Culture Extractor release to external systems.
+
+    Sets external IDs for a release, allowing you to associate them with
+    Stashapp scenes, StashDB entries, etc.
+
+    Examples:
+        ce releases link 018f1477-f285-726b-9136-21956e3e8b92 --stashapp-id 12345
+        ce releases link 018f1477-f285-726b-9136-21956e3e8b92 --stashdb-id "a1b2c3d4-..."
+        ce releases link 018f1477-f285-726b-9136-21956e3e8b92 --stashapp-id 12345 --stashdb-id "a1b2c3d4-..."
+    """
+    try:
+        # Validate that at least one ID was provided
+        if stashapp_id is None and stashdb_id is None:
+            print_error("At least one external ID must be provided")
+            print_info("Use --stashapp-id and/or --stashdb-id")
+            raise typer.Exit(code=1)
+
+        # Get Culture Extractor client
+        client = config.get_client()
+
+        # Verify release exists
+        release_df = client.get_release_by_uuid(uuid)
+        if release_df.shape[0] == 0:
+            print_error(f"Release with UUID '{uuid}' not found")
+            raise typer.Exit(code=1)
+
+        release_name = release_df["ce_release_name"][0]
+
+        # Set external IDs
+        links = []
+        if stashapp_id is not None:
+            client.set_release_external_id(uuid, "stashapp", str(stashapp_id))
+            links.append(f"Stashapp ID: {stashapp_id}")
+        if stashdb_id is not None:
+            client.set_release_external_id(uuid, "stashdb", stashdb_id)
+            links.append(f"StashDB ID: {stashdb_id}")
+
+        print_success(f"Linked release '{release_name}' to {', '.join(links)}")
+
+    except ValueError as e:
+        print_error(str(e))
+        raise typer.Exit(code=1) from e
+    except Exception as e:
+        print_error(f"Failed to link release: {e}")
         raise typer.Exit(code=1) from e
