@@ -824,6 +824,51 @@ class ClientCultureExtractor:
 
             return pl.DataFrame(performers, schema=schema)
 
+    def get_release_tags(self, release_uuid: str) -> pl.DataFrame:
+        """Get all tags for a specific release.
+
+        Args:
+            release_uuid: UUID of the release
+
+        Returns:
+            DataFrame containing tags for the release
+        """
+        with self.connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT DISTINCT
+                    t.uuid AS ce_tags_uuid,
+                    t.short_name AS ce_tags_short_name,
+                    t.name AS ce_tags_name,
+                    t.url AS ce_tags_url
+                FROM tags t
+                JOIN release_entity_site_tag_entity rest ON t.uuid = rest.tags_uuid
+                WHERE rest.releases_uuid = %s
+                ORDER BY t.name
+            """,
+                (release_uuid,),
+            )
+            tags_rows = cursor.fetchall()
+
+            tags = [
+                {
+                    "ce_tags_uuid": str(row[0]),
+                    "ce_tags_short_name": row[1],
+                    "ce_tags_name": row[2],
+                    "ce_tags_url": row[3],
+                }
+                for row in tags_rows
+            ]
+
+            schema = {
+                "ce_tags_uuid": pl.Utf8,
+                "ce_tags_short_name": pl.Utf8,
+                "ce_tags_name": pl.Utf8,
+                "ce_tags_url": pl.Utf8,
+            }
+
+            return pl.DataFrame(tags, schema=schema)
+
     def get_performer_by_uuid(self, performer_uuid: str) -> pl.DataFrame:
         """Get a specific performer by its UUID.
 

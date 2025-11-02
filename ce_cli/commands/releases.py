@@ -136,11 +136,15 @@ def show_release(
         # Get performers for this release
         performers_df = client.get_release_performers(uuid)
 
+        # Get tags for this release
+        tags_df = client.get_release_tags(uuid)
+
         if json_output:
-            # Combine release data with external IDs and performers
+            # Combine release data with external IDs, performers, and tags
             release_dict = release_df.to_dicts()[0]
             release_dict["external_ids"] = external_ids
             release_dict["performers"] = performers_df.to_dicts() if performers_df.shape[0] > 0 else []
+            release_dict["tags"] = tags_df.to_dicts() if tags_df.shape[0] > 0 else []
             print_json(release_dict)
         else:
             # Format as detailed view
@@ -170,6 +174,27 @@ def show_release(
                     )
 
                 console.print(performer_table)
+                print()
+
+            # Display tags if any
+            if tags_df.shape[0] > 0:
+                from rich.table import Table
+                from rich.console import Console
+
+                console = Console()
+                tags_table = Table(
+                    title="Tags", show_header=True, header_style="bold magenta"
+                )
+                tags_table.add_column("Name", style="green")
+                tags_table.add_column("CE UUID", style="cyan")
+
+                for tag in tags_df.iter_rows(named=True):
+                    tags_table.add_row(
+                        tag["ce_tags_name"] or "N/A",
+                        tag["ce_tags_uuid"] or "N/A",
+                    )
+
+                console.print(tags_table)
                 print()
 
             print_success(f"Release details for {uuid}")
