@@ -3,6 +3,7 @@
 import typer
 
 from culture_cli.commands import sync
+from culture_cli.modules.ce.cli import ce_app
 
 
 app = typer.Typer(
@@ -13,6 +14,9 @@ app = typer.Typer(
 
 # Register sync command
 app.command("sync")(sync.sync_scene)
+
+# Register module subcommands
+app.add_typer(ce_app, name="ce", help="Culture Extractor operations")
 
 
 def version_callback(value: bool) -> None:
