@@ -379,7 +379,7 @@ class SyncEngine:
             url_diff = next((d for d in plan.field_diffs if d.field_name == "url"), None)
             if url_diff and url_diff.action == "add":
                 current_urls = url_diff.current_value if isinstance(url_diff.current_value, list) else []
-                new_urls = current_urls + [url_diff.new_value]
+                new_urls = [*current_urls, url_diff.new_value]
                 update_data["urls"] = new_urls
                 fields_updated.append("url")
 

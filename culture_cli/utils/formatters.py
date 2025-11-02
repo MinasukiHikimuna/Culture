@@ -77,10 +77,7 @@ def _format_field_diff_table(field_diffs: list) -> Table:
 
         # Format the message based on action
         if diff.action == "no_change":
-            if diff.field_name == "url":
-                message = diff.message
-            else:
-                message = f"[dim]{diff.current_value or 'N/A'}[/dim]"
+            message = diff.message if diff.field_name == "url" else f"[dim]{diff.current_value or 'N/A'}[/dim]"
         else:
             message = diff.message
 
@@ -201,7 +198,7 @@ def print_info(message: str) -> None:
     Args:
         message: Info message to display
     """
-    console.print(f"[blue]ℹ[/blue] {message}")
+    console.print(f"[blue]ℹ[/blue] {message}")  # noqa: RUF001 - Intentional info icon
 
 
 def print_success(message: str) -> None:
