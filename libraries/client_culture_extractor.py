@@ -1,7 +1,8 @@
-import psycopg
-import polars as pl
 import json
+
 import newnewid
+import polars as pl
+import psycopg
 
 
 class ClientCultureExtractor:
@@ -128,8 +129,8 @@ class ClientCultureExtractor:
             # Get site info
             cursor.execute(
                 """
-                SELECT name, uuid 
-                FROM sites 
+                SELECT name, uuid
+                FROM sites
                 WHERE sites.uuid = %s
             """,
                 (site_uuid,),
@@ -198,7 +199,7 @@ class ClientCultureExtractor:
         """
         cursor.execute(
             f"""
-            SELECT 
+            SELECT
                 uuid,
                 NULLIF(release_date, '-infinity') as release_date,
                 short_name,
@@ -210,7 +211,7 @@ class ClientCultureExtractor:
                 available_files::text,
                 json_document::text,
                 site_uuid
-            FROM releases 
+            FROM releases
             {where_clause}
         """,
             params,
@@ -271,13 +272,13 @@ class ClientCultureExtractor:
 
         return pl.DataFrame(releases, schema=schema)
 
-    def get_downloads(self, site_uuid: str, sub_site_uuid: str = None) -> pl.DataFrame:
+    def get_downloads(self, site_uuid: str, sub_site_uuid: str | None = None) -> pl.DataFrame:
         with self.connection.cursor() as cursor:
             # Get site info
             cursor.execute(
                 """
-                SELECT name, uuid 
-                FROM sites 
+                SELECT name, uuid
+                FROM sites
                 WHERE sites.uuid = %s
             """,
                 (site_uuid,),
@@ -291,8 +292,8 @@ class ClientCultureExtractor:
             if sub_site_uuid:
                 cursor.execute(
                     """
-                    SELECT name, uuid 
-                    FROM sub_sites 
+                    SELECT name, uuid
+                    FROM sub_sites
                     WHERE uuid = %s
                 """,
                     (sub_site_uuid,),
@@ -300,13 +301,13 @@ class ClientCultureExtractor:
                 sub_site_row = cursor.fetchone()
                 if not sub_site_row:
                     return pl.DataFrame()
-                sub_site_name = sub_site_row[0]
+                sub_site_row[0]
 
             # Get all releases for the site
             if not sub_site_uuid:
                 cursor.execute(
                     """
-                    SELECT 
+                    SELECT
                         uuid,
                         NULLIF(release_date, '-infinity') as release_date,
                         short_name,
@@ -318,7 +319,7 @@ class ClientCultureExtractor:
                         available_files::text,
                         json_document::text,
                         sub_site_uuid
-                    FROM releases 
+                    FROM releases
                     WHERE site_uuid = %s
                 """,
                     (site_uuid,),
@@ -326,7 +327,7 @@ class ClientCultureExtractor:
             else:
                 cursor.execute(
                     """
-                    SELECT 
+                    SELECT
                         uuid,
                         NULLIF(release_date, '-infinity') as release_date,
                         short_name,
@@ -338,7 +339,7 @@ class ClientCultureExtractor:
                         available_files::text,
                         json_document::text,
                         sub_site_uuid
-                    FROM releases 
+                    FROM releases
                     WHERE site_uuid = %s AND sub_site_uuid = %s
                 """,
                     (site_uuid, sub_site_uuid),
@@ -354,8 +355,8 @@ class ClientCultureExtractor:
             if sub_site_uuids:
                 cursor.execute(
                     """
-                    SELECT uuid, name 
-                    FROM sub_sites 
+                    SELECT uuid, name
+                    FROM sub_sites
                     WHERE uuid = ANY(%s)
                 """,
                     (list(sub_site_uuids),),
@@ -549,8 +550,8 @@ class ClientCultureExtractor:
         short_name: str,
         name: str,
         url: str,
-        username: str = None,
-        password: str = None,
+        username: str | None = None,
+        password: str | None = None,
     ) -> str:
         """Create a new site in the database.
 
@@ -578,7 +579,7 @@ class ClientCultureExtractor:
             return site_uuid
 
     def create_sub_site(
-        self, site_uuid: str, short_name: str, name: str, json_document: dict = None
+        self, site_uuid: str, short_name: str, name: str, json_document: dict | None = None
     ) -> str:
         """Create a new sub-site in the database.
 
@@ -617,7 +618,145 @@ class ClientCultureExtractor:
             self.connection.commit()
             return sub_site_uuid
 
-    def get_performers_all(self, name_filter: str = None) -> pl.DataFrame:
+    def get_site_by_uuid(self, site_uuid: str) -> pl.DataFrame:
+        """Get a specific site by its UUID.
+
+        Args:
+            site_uuid: UUID of the site to get
+
+        Returns:
+            DataFrame containing the site data
+        """
+        with self.connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT
+                    uuid AS ce_sites_uuid,
+                    short_name AS ce_sites_short_name,
+                    name AS ce_sites_name,
+                    url AS ce_sites_url
+                FROM sites
+                WHERE uuid = %s
+            """,
+                (site_uuid,),
+            )
+            site_row = cursor.fetchone()
+            if not site_row:
+                return pl.DataFrame()
+
+            site_data = {
+                "ce_sites_uuid": str(site_row[0]),
+                "ce_sites_short_name": site_row[1],
+                "ce_sites_name": site_row[2],
+                "ce_sites_url": site_row[3],
+            }
+
+            schema = {
+                "ce_sites_uuid": pl.Utf8,
+                "ce_sites_short_name": pl.Utf8,
+                "ce_sites_name": pl.Utf8,
+                "ce_sites_url": pl.Utf8,
+            }
+
+            return pl.DataFrame([site_data], schema=schema)
+
+    def get_site_external_ids(self, site_uuid: str) -> dict:
+        """Get external IDs for a site from the site_external_ids table.
+
+        Args:
+            site_uuid: UUID of the site
+
+        Returns:
+            Dictionary containing external IDs by target system name
+        """
+        with self.connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT ts.name, sei.external_id
+                FROM site_external_ids sei
+                JOIN target_systems ts ON sei.target_system_uuid = ts.uuid
+                WHERE sei.site_uuid = %s
+            """,
+                (site_uuid,),
+            )
+            results = cursor.fetchall()
+
+            # Return as dictionary with target system name as key
+            return {row[0]: row[1] for row in results}
+
+    def set_site_external_id(
+        self, site_uuid: str, target_system_name: str, external_id: str
+    ) -> None:
+        """Set an external ID for a site in the site_external_ids table.
+
+        Args:
+            site_uuid: UUID of the site
+            target_system_name: Name of the target system (e.g., 'stashapp', 'stashdb')
+            external_id: The external ID value (as string)
+        """
+        with self.connection.cursor() as cursor:
+            # Verify site exists
+            cursor.execute(
+                "SELECT uuid FROM sites WHERE uuid = %s", (site_uuid,)
+            )
+            if not cursor.fetchone():
+                raise ValueError(f"Site with UUID {site_uuid} does not exist")
+
+            # Get or create target system
+            cursor.execute(
+                "SELECT uuid FROM target_systems WHERE name = %s",
+                (target_system_name,),
+            )
+            target_system_row = cursor.fetchone()
+
+            if target_system_row:
+                target_system_uuid = target_system_row[0]
+            else:
+                # Create new target system
+                target_system_uuid = str(newnewid.uuid7())
+                cursor.execute(
+                    """
+                    INSERT INTO target_systems (uuid, name, description, created, last_updated)
+                    VALUES (%s, %s, %s, NOW(), NOW())
+                """,
+                    (target_system_uuid, target_system_name, f"External system: {target_system_name}"),
+                )
+
+            # Check if external ID already exists for this site and target system
+            cursor.execute(
+                """
+                SELECT uuid FROM site_external_ids
+                WHERE site_uuid = %s AND target_system_uuid = %s
+            """,
+                (site_uuid, target_system_uuid),
+            )
+            existing_row = cursor.fetchone()
+
+            if existing_row:
+                # Update existing
+                cursor.execute(
+                    """
+                    UPDATE site_external_ids
+                    SET external_id = %s, last_updated = NOW()
+                    WHERE uuid = %s
+                """,
+                    (external_id, existing_row[0]),
+                )
+            else:
+                # Insert new
+                external_id_uuid = str(newnewid.uuid7())
+                cursor.execute(
+                    """
+                    INSERT INTO site_external_ids
+                    (uuid, site_uuid, target_system_uuid, external_id, created, last_updated)
+                    VALUES (%s, %s, %s, %s, NOW(), NOW())
+                """,
+                    (external_id_uuid, site_uuid, target_system_uuid, external_id),
+                )
+
+            self.connection.commit()
+
+    def get_performers_all(self, name_filter: str | None = None) -> pl.DataFrame:
         """Get all performers across all sites, with optional name filtering.
 
         Args:
@@ -688,7 +827,7 @@ class ClientCultureExtractor:
 
             return pl.DataFrame(performers, schema=schema)
 
-    def get_performers(self, site_uuid: str, name_filter: str = None) -> pl.DataFrame:
+    def get_performers(self, site_uuid: str, name_filter: str | None = None) -> pl.DataFrame:
         """Get all performers for a given site UUID, with optional name filtering.
 
         Args:
