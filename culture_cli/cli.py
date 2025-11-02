@@ -1,0 +1,42 @@
+"""Main CLI application for Culture operations."""
+
+import typer
+
+from culture_cli.commands import sync
+
+
+app = typer.Typer(
+    name="culture",
+    help="Unified CLI for culture data management and synchronization",
+    add_completion=True,
+)
+
+# Register sync command
+app.command("sync")(sync.sync_scene)
+
+
+def version_callback(value: bool) -> None:
+    """Show version information."""
+    if value:
+        from culture_cli import __version__
+
+        typer.echo(f"culture version {__version__}")
+        raise typer.Exit()
+
+
+@app.callback()
+def main(
+    version: bool = typer.Option(
+        False,
+        "--version",
+        "-v",
+        help="Show version and exit",
+        callback=version_callback,
+        is_eager=True,
+    ),
+) -> None:
+    """Culture CLI - Unified tool for culture data operations."""
+
+
+if __name__ == "__main__":
+    app()

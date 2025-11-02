@@ -1,0 +1,435 @@
+"""Core sync engine for synchronizing data between systems."""
+
+from dataclasses import dataclass
+from typing import Any
+
+import polars as pl
+
+from libraries.client_culture_extractor import ClientCultureExtractor
+from libraries.client_stashapp import StashAppClient
+
+
+@dataclass
+class FieldDiff:
+    """Represents a difference in a single field."""
+
+    field_name: str
+    action: str  # "no_change" | "update" | "add" | "warning"
+    current_value: Any
+    new_value: Any
+    message: str
+
+
+@dataclass
+class PerformerDiff:
+    """Represents a performer matching status."""
+
+    ce_uuid: str
+    ce_name: str
+    status: str  # "matched" | "not_found"
+    stashapp_id: int | None
+    stashapp_name: str | None
+    message: str
+
+
+@dataclass
+class SyncPlan:
+    """Complete synchronization plan for a scene."""
+
+    ce_uuid: str
+    stashapp_id: int
+    ce_release_name: str
+    stashapp_title: str
+    field_diffs: list[FieldDiff]
+    performer_diffs: list[PerformerDiff]
+
+    @property
+    def has_changes(self) -> bool:
+        """Check if there are any changes to apply."""
+        return any(diff.action in ["update", "add"] for diff in self.field_diffs) or any(
+            diff.status == "matched" for diff in self.performer_diffs
+        )
+
+    @property
+    def has_warnings(self) -> bool:
+        """Check if there are any warnings."""
+        return any(diff.status == "not_found" for diff in self.performer_diffs)
+
+
+@dataclass
+class SyncResult:
+    """Result after applying sync."""
+
+    success: bool
+    message: str
+    fields_updated: list[str]
+    performers_linked: int
+    errors: list[str]
+
+
+class SyncEngine:
+    """Engine for synchronizing data between Culture Extractor and Stashapp."""
+
+    def __init__(self, ce_client: ClientCultureExtractor, stash_client: StashAppClient):
+        """Initialize the sync engine.
+
+        Args:
+            ce_client: Culture Extractor client
+            stash_client: Stashapp client
+        """
+        self.ce_client = ce_client
+        self.stash_client = stash_client
+
+    def fetch_ce_data(self, ce_uuid: str) -> dict:
+        """Fetch release and performer data from Culture Extractor.
+
+        Args:
+            ce_uuid: Culture Extractor release UUID
+
+        Returns:
+            Dictionary containing release and performer data
+        """
+        # Get release data
+        release_df = self.ce_client.get_release_by_uuid(ce_uuid)
+        if release_df.shape[0] == 0:
+            raise ValueError(f"Release with UUID '{ce_uuid}' not found in Culture Extractor")
+
+        release = release_df.to_dicts()[0]
+
+        # Get performers for this release
+        performers_df = self.ce_client.get_release_performers(ce_uuid)
+        performers = performers_df.to_dicts() if performers_df.shape[0] > 0 else []
+
+        return {
+            "release": release,
+            "performers": performers,
+        }
+
+    def fetch_stashapp_data(self, stashapp_id: int) -> dict:
+        """Fetch scene and performer data from Stashapp.
+
+        Args:
+            stashapp_id: Stashapp scene ID
+
+        Returns:
+            Dictionary containing scene and performer data
+        """
+        fragment = """
+            id
+            title
+            date
+            details
+            urls
+            performers {
+                id
+                name
+                stash_ids {
+                    endpoint
+                    stash_id
+                }
+            }
+            stash_ids {
+                endpoint
+                stash_id
+            }
+        """
+
+        scene = self.stash_client.stash.find_scene(stashapp_id, fragment=fragment)
+        if not scene:
+            raise ValueError(f"Scene with ID '{stashapp_id}' not found in Stashapp")
+
+        return scene
+
+    def compute_diff(self, ce_data: dict, stash_data: dict) -> SyncPlan:
+        """Compute differences between CE and Stashapp data.
+
+        Args:
+            ce_data: Culture Extractor data
+            stash_data: Stashapp data
+
+        Returns:
+            SyncPlan with all differences
+        """
+        ce_release = ce_data["release"]
+        ce_performers = ce_data["performers"]
+
+        field_diffs = []
+
+        # Compare title
+        ce_title = ce_release.get("ce_release_name") or ""
+        stash_title = stash_data.get("title") or ""
+        if ce_title != stash_title:
+            if not stash_title:
+                field_diffs.append(
+                    FieldDiff(
+                        field_name="title",
+                        action="add",
+                        current_value=stash_title,
+                        new_value=ce_title,
+                        message=f'Add title: "{ce_title}"',
+                    )
+                )
+            else:
+                field_diffs.append(
+                    FieldDiff(
+                        field_name="title",
+                        action="update",
+                        current_value=stash_title,
+                        new_value=ce_title,
+                        message=f'Update title: "{stash_title}" → "{ce_title}"',
+                    )
+                )
+        else:
+            field_diffs.append(
+                FieldDiff(
+                    field_name="title",
+                    action="no_change",
+                    current_value=stash_title,
+                    new_value=ce_title,
+                    message=f'Title unchanged: "{stash_title}"',
+                )
+            )
+
+        # Compare date
+        ce_date = str(ce_release.get("ce_release_date")) if ce_release.get("ce_release_date") else ""
+        stash_date = stash_data.get("date") or ""
+        if ce_date != stash_date:
+            if not stash_date:
+                field_diffs.append(
+                    FieldDiff(
+                        field_name="date",
+                        action="add",
+                        current_value=stash_date,
+                        new_value=ce_date,
+                        message=f"Add date: {ce_date}",
+                    )
+                )
+            else:
+                field_diffs.append(
+                    FieldDiff(
+                        field_name="date",
+                        action="update",
+                        current_value=stash_date,
+                        new_value=ce_date,
+                        message=f"Update date: {stash_date} → {ce_date}",
+                    )
+                )
+        else:
+            field_diffs.append(
+                FieldDiff(
+                    field_name="date",
+                    action="no_change",
+                    current_value=stash_date,
+                    new_value=ce_date,
+                    message=f"Date unchanged: {stash_date}",
+                )
+            )
+
+        # Compare description/details
+        ce_details = ce_release.get("ce_release_description") or ""
+        stash_details = stash_data.get("details") or ""
+        if ce_details != stash_details:
+            preview = ce_details[:50] + "..." if len(ce_details) > 50 else ce_details
+            if not stash_details:
+                field_diffs.append(
+                    FieldDiff(
+                        field_name="details",
+                        action="add",
+                        current_value=stash_details,
+                        new_value=ce_details,
+                        message=f'Add details: "{preview}"',
+                    )
+                )
+            else:
+                field_diffs.append(
+                    FieldDiff(
+                        field_name="details",
+                        action="update",
+                        current_value=stash_details,
+                        new_value=ce_details,
+                        message=f'Update details: "{preview}"',
+                    )
+                )
+        else:
+            field_diffs.append(
+                FieldDiff(
+                    field_name="details",
+                    action="no_change",
+                    current_value=stash_details,
+                    new_value=ce_details,
+                    message="Details unchanged",
+                )
+            )
+
+        # Compare URL
+        ce_url = ce_release.get("ce_release_url") or ""
+        stash_urls = stash_data.get("urls") or []
+        if ce_url and ce_url not in stash_urls:
+            field_diffs.append(
+                FieldDiff(
+                    field_name="url",
+                    action="add",
+                    current_value=stash_urls,
+                    new_value=ce_url,
+                    message=f"Add URL: {ce_url}",
+                )
+            )
+        else:
+            field_diffs.append(
+                FieldDiff(
+                    field_name="url",
+                    action="no_change",
+                    current_value=stash_urls,
+                    new_value=ce_url,
+                    message="URL already present" if ce_url else "No URL to add",
+                )
+            )
+
+        # Match performers
+        performer_diffs = self._match_performers(ce_performers, stash_data.get("performers", []))
+
+        return SyncPlan(
+            ce_uuid=ce_release["ce_release_uuid"],
+            stashapp_id=int(stash_data["id"]),
+            ce_release_name=ce_title,
+            stashapp_title=stash_title,
+            field_diffs=field_diffs,
+            performer_diffs=performer_diffs,
+        )
+
+    def _match_performers(self, ce_performers: list[dict], stash_performers: list[dict]) -> list[PerformerDiff]:
+        """Match CE performers with Stashapp performers.
+
+        Args:
+            ce_performers: List of CE performers
+            stash_performers: List of Stashapp performers
+
+        Returns:
+            List of PerformerDiff objects
+        """
+        performer_diffs = []
+
+        # Get all Stashapp performers for matching
+        all_stash_performers_df = self.stash_client.get_performers()
+        all_stash_performers = all_stash_performers_df.to_dicts() if all_stash_performers_df.shape[0] > 0 else []
+
+        for ce_performer in ce_performers:
+            ce_uuid = ce_performer["ce_performers_uuid"]
+            ce_name = ce_performer["ce_performers_name"]
+
+            # Look for matching performer in Stashapp by CE UUID in stash_ids
+            matched = False
+            for stash_performer in all_stash_performers:
+                for stash_id in stash_performer.get("stashapp_stash_ids", []):
+                    if (
+                        stash_id.get("endpoint") == "https://culture.extractor/graphql"
+                        and stash_id.get("stash_id") == ce_uuid
+                    ):
+                        performer_diffs.append(
+                            PerformerDiff(
+                                ce_uuid=ce_uuid,
+                                ce_name=ce_name,
+                                status="matched",
+                                stashapp_id=stash_performer["stashapp_id"],
+                                stashapp_name=stash_performer["stashapp_name"],
+                                message=f"Matched to Stashapp performer #{stash_performer['stashapp_id']} ({stash_performer['stashapp_name']})",
+                            )
+                        )
+                        matched = True
+                        break
+                if matched:
+                    break
+
+            if not matched:
+                performer_diffs.append(
+                    PerformerDiff(
+                        ce_uuid=ce_uuid,
+                        ce_name=ce_name,
+                        status="not_found",
+                        stashapp_id=None,
+                        stashapp_name=None,
+                        message=f"Performer '{ce_name}' not found in Stashapp (CE UUID: {ce_uuid})",
+                    )
+                )
+
+        return performer_diffs
+
+    def apply_sync(self, plan: SyncPlan) -> SyncResult:
+        """Apply the synchronization plan.
+
+        Args:
+            plan: SyncPlan to apply
+
+        Returns:
+            SyncResult with operation results
+        """
+        fields_updated = []
+        errors = []
+
+        try:
+            # Build update payload
+            update_data = {"id": plan.stashapp_id}
+
+            # Update title if changed
+            title_diff = next((d for d in plan.field_diffs if d.field_name == "title"), None)
+            if title_diff and title_diff.action in ["update", "add"]:
+                update_data["title"] = title_diff.new_value
+                fields_updated.append("title")
+
+            # Update date if changed
+            date_diff = next((d for d in plan.field_diffs if d.field_name == "date"), None)
+            if date_diff and date_diff.action in ["update", "add"]:
+                update_data["date"] = date_diff.new_value
+                fields_updated.append("date")
+
+            # Update details if changed
+            details_diff = next((d for d in plan.field_diffs if d.field_name == "details"), None)
+            if details_diff and details_diff.action in ["update", "add"]:
+                update_data["details"] = details_diff.new_value
+                fields_updated.append("details")
+
+            # Add URL if new
+            url_diff = next((d for d in plan.field_diffs if d.field_name == "url"), None)
+            if url_diff and url_diff.action == "add":
+                current_urls = url_diff.current_value if isinstance(url_diff.current_value, list) else []
+                new_urls = current_urls + [url_diff.new_value]
+                update_data["urls"] = new_urls
+                fields_updated.append("url")
+
+            # Update performer IDs
+            matched_performer_ids = [
+                p.stashapp_id for p in plan.performer_diffs if p.status == "matched" and p.stashapp_id
+            ]
+            if matched_performer_ids:
+                update_data["performer_ids"] = matched_performer_ids
+                fields_updated.append("performers")
+
+            # Add CE external ID to Stashapp scene stash_ids
+            update_data["stash_ids"] = [
+                {"endpoint": "https://culture.extractor/graphql", "stash_id": plan.ce_uuid}
+            ]
+
+            # Apply update to Stashapp
+            if fields_updated:  # Only update if there are actual changes
+                self.stash_client.stash.update_scene(update_data)
+
+            # Update CE database with Stashapp external ID
+            self.ce_client.set_release_external_id(plan.ce_uuid, "stashapp", str(plan.stashapp_id))
+
+            return SyncResult(
+                success=True,
+                message="Sync completed successfully",
+                fields_updated=fields_updated,
+                performers_linked=len(matched_performer_ids),
+                errors=errors,
+            )
+
+        except Exception as e:
+            errors.append(str(e))
+            return SyncResult(
+                success=False,
+                message=f"Sync failed: {e}",
+                fields_updated=fields_updated,
+                performers_linked=0,
+                errors=errors,
+            )
