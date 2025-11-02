@@ -1,7 +1,7 @@
 """Core sync engine for synchronizing data between systems."""
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Callable
 
 from libraries.client_culture_extractor import ClientCultureExtractor
 from libraries.client_stashapp import StashAppClient
@@ -231,7 +231,7 @@ class SyncEngine:
         field_name: str,
         current_value: Any,
         new_value: Any,
-        format_message: callable | None = None,
+        format_message: Callable | None = None,
     ) -> FieldDiff:
         """Create a FieldDiff for a single field comparison.
 

@@ -1007,6 +1007,97 @@ class ClientCultureExtractor:
 
             self.connection.commit()
 
+    def get_release_downloads(self, release_uuid: str) -> pl.DataFrame:
+        """Get all downloads for a specific release.
+
+        Args:
+            release_uuid: UUID of the release
+
+        Returns:
+            DataFrame containing downloads for the release
+        """
+        with self.connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT
+                    d.uuid AS download_uuid,
+                    d.downloaded_at,
+                    d.file_type,
+                    d.content_type,
+                    d.variant,
+                    d.available_file,
+                    d.original_filename,
+                    d.saved_filename,
+                    d.file_metadata
+                FROM downloads d
+                WHERE d.release_uuid = %s
+                ORDER BY d.downloaded_at DESC
+            """,
+                (release_uuid,),
+            )
+            downloads_rows = cursor.fetchall()
+
+            downloads = []
+            for row in downloads_rows:
+                # Parse available_file JSON if it's a string
+                available_file = row[5]
+                if isinstance(available_file, str):
+                    try:
+                        available_file = json.loads(available_file)
+                    except json.JSONDecodeError:
+                        available_file = None
+
+                # Parse file_metadata JSON if it's a string
+                file_metadata = row[8]
+                if isinstance(file_metadata, str):
+                    try:
+                        file_metadata = json.loads(file_metadata)
+                    except json.JSONDecodeError:
+                        file_metadata = {}
+
+                download_data = {
+                    "ce_downloads_uuid": str(row[0]),
+                    "ce_downloads_downloaded_at": row[1],
+                    "ce_downloads_file_type": row[2],
+                    "ce_downloads_content_type": row[3],
+                    "ce_downloads_variant": row[4],
+                    "ce_downloads_available_file": (
+                        json.dumps(available_file) if available_file else None
+                    ),
+                    "ce_downloads_original_filename": row[6],
+                    "ce_downloads_saved_filename": row[7],
+                    "ce_downloads_file_metadata": (
+                        json.dumps(file_metadata) if file_metadata else None
+                    ),
+                    "ce_downloads_hash_oshash": (
+                        file_metadata.get("oshash") if file_metadata else None
+                    ),
+                    "ce_downloads_hash_phash": (
+                        file_metadata.get("phash") if file_metadata else None
+                    ),
+                    "ce_downloads_hash_sha256": (
+                        file_metadata.get("sha256Sum") if file_metadata else None
+                    ),
+                }
+                downloads.append(download_data)
+
+            schema = {
+                "ce_downloads_uuid": pl.Utf8,
+                "ce_downloads_downloaded_at": pl.Datetime,
+                "ce_downloads_file_type": pl.Utf8,
+                "ce_downloads_content_type": pl.Utf8,
+                "ce_downloads_variant": pl.Utf8,
+                "ce_downloads_available_file": pl.Utf8,
+                "ce_downloads_original_filename": pl.Utf8,
+                "ce_downloads_saved_filename": pl.Utf8,
+                "ce_downloads_file_metadata": pl.Utf8,
+                "ce_downloads_hash_oshash": pl.Utf8,
+                "ce_downloads_hash_phash": pl.Utf8,
+                "ce_downloads_hash_sha256": pl.Utf8,
+            }
+
+            return pl.DataFrame(downloads, schema=schema)
+
     def get_release_external_ids(self, release_uuid: str) -> dict:
         """Get external IDs for a release from the release_external_ids table.
 

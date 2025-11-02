@@ -141,12 +141,16 @@ def show_release(
         # Get tags for this release
         tags_df = client.get_release_tags(uuid)
 
+        # Get downloads for this release
+        downloads_df = client.get_release_downloads(uuid)
+
         if json_output:
-            # Combine release data with external IDs, performers, and tags
+            # Combine release data with external IDs, performers, tags, and downloads
             release_dict = release_df.to_dicts()[0]
             release_dict["external_ids"] = external_ids
             release_dict["performers"] = performers_df.to_dicts() if performers_df.shape[0] > 0 else []
             release_dict["tags"] = tags_df.to_dicts() if tags_df.shape[0] > 0 else []
+            release_dict["downloads"] = downloads_df.to_dicts() if downloads_df.shape[0] > 0 else []
             print_json(release_dict)
         else:
             # Format as detailed view
@@ -191,6 +195,30 @@ def show_release(
                     )
 
                 console.print(tags_table)
+                print()
+
+            # Display downloads if any
+            if downloads_df.shape[0] > 0:
+                console = Console()
+                downloads_table = Table(
+                    title="Downloaded Files", show_header=True, header_style="bold magenta"
+                )
+                downloads_table.add_column("Filename", style="green")
+                downloads_table.add_column("File Type", style="cyan")
+                downloads_table.add_column("Content Type", style="yellow")
+                downloads_table.add_column("Variant", style="blue")
+                downloads_table.add_column("Downloaded At", style="white")
+
+                for download in downloads_df.iter_rows(named=True):
+                    downloads_table.add_row(
+                        download["ce_downloads_saved_filename"] or download["ce_downloads_original_filename"] or "N/A",
+                        download["ce_downloads_file_type"] or "N/A",
+                        download["ce_downloads_content_type"] or "N/A",
+                        download["ce_downloads_variant"] or "N/A",
+                        str(download["ce_downloads_downloaded_at"]) if download["ce_downloads_downloaded_at"] else "N/A",
+                    )
+
+                console.print(downloads_table)
                 print()
 
             print_success(f"Release details for {uuid}")
