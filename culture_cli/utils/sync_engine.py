@@ -182,7 +182,7 @@ class SyncEngine:
                 "details",
                 stash_details,
                 ce_details,
-                lambda action, curr, new: {
+                lambda action, _curr, new: {
                     "add": f'Add details: "{new[:50]}{"..." if len(new) > 50 else ""}"',
                     "update": f'Update details: "{new[:50]}{"..." if len(new) > 50 else ""}"',
                     "no_change": "Details unchanged",
@@ -231,7 +231,7 @@ class SyncEngine:
         field_name: str,
         current_value: Any,
         new_value: Any,
-        format_message: callable = None,
+        format_message: callable | None = None,
     ) -> FieldDiff:
         """Create a FieldDiff for a single field comparison.
 
@@ -247,13 +247,25 @@ class SyncEngine:
         if new_value != current_value:
             if not current_value:
                 action = "add"
-                message = f"Add {field_name}: {new_value}" if not format_message else format_message("add", current_value, new_value)
+                message = (
+                    f"Add {field_name}: {new_value}"
+                    if not format_message
+                    else format_message("add", current_value, new_value)
+                )
             else:
                 action = "update"
-                message = f"Update {field_name}: {current_value} → {new_value}" if not format_message else format_message("update", current_value, new_value)
+                message = (
+                    f"Update {field_name}: {current_value} → {new_value}"
+                    if not format_message
+                    else format_message("update", current_value, new_value)
+                )
         else:
             action = "no_change"
-            message = f"{field_name.capitalize()} unchanged: {current_value}" if not format_message else format_message("no_change", current_value, new_value)
+            message = (
+                f"{field_name.capitalize()} unchanged: {current_value}"
+                if not format_message
+                else format_message("no_change", current_value, new_value)
+            )
 
         return FieldDiff(
             field_name=field_name,

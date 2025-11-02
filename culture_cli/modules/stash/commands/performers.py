@@ -40,14 +40,18 @@ def create_performers_table(df: pl.DataFrame) -> Table:
 
 @app.command("list")
 def list_performers(
-    name: str | None = typer.Option(None, "--name", "-n", help="Filter performers by name (case-insensitive partial match)"),
-    stashdb_id: str | None = typer.Option(None, "--stashdb-id", "-s", help="Filter performers by StashDB ID"),
-    tpdb_id: str | None = typer.Option(None, "--tpdb-id", "-t", help="Filter performers by ThePornDB ID"),
+    name: str | None = typer.Option(
+        None, "--name", "-n", help="Filter performers by name (case-insensitive)"
+    ),
+    stashdb_id: str | None = typer.Option(None, "--stashdb-id", "-s", help="Filter by StashDB ID"),
+    tpdb_id: str | None = typer.Option(None, "--tpdb-id", "-t", help="Filter by ThePornDB ID"),
     favorite: bool | None = typer.Option(None, "--favorite", "-f", help="Filter by favorite status"),
-    gender: str | None = typer.Option(None, "--gender", "-g", help="Filter by gender (MALE, FEMALE, TRANSGENDER_MALE, TRANSGENDER_FEMALE, NON_BINARY)"),
+    gender: str | None = typer.Option(
+        None, "--gender", "-g", help="Filter by gender (MALE, FEMALE, TRANSGENDER_MALE, etc.)"
+    ),
     json_output: bool = typer.Option(False, "--json", help="Output results as JSON"),
     limit: int | None = typer.Option(None, "--limit", "-l", help="Limit number of results"),
-    prefix: str = typer.Option("", "--prefix", "-p", help="Environment variable prefix for Stashapp connection"),
+    prefix: str = typer.Option("", "--prefix", "-p", help="Env var prefix for Stashapp connection"),
 ) -> None:
     """List performers from Stashapp with optional filters.
 
