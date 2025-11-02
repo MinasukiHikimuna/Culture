@@ -1,0 +1,1 @@
+Remember to run ruff on all new code and fix errors. Fix them properly instead of suppressing.
