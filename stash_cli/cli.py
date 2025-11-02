@@ -1,7 +1,7 @@
 """Main CLI application for Stashapp operations."""
 
 import typer
-from stash_cli.commands import performers
+from stash_cli.commands import performers, scenes
 
 app = typer.Typer(
     name="stash-cli",
@@ -11,6 +11,7 @@ app = typer.Typer(
 
 # Register command groups
 app.add_typer(performers.app, name="performers", help="Manage and query performers")
+app.add_typer(scenes.app, name="scenes", help="Manage and query scenes")
 
 
 def version_callback(value: bool) -> None:

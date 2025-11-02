@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [project.scripts]
-ce = "ce_cli.main:app"
+ce = "ce_cli.cli:app"
 stash-cli = "stash_cli.cli:app"
 
 [build-system]
