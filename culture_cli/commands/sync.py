@@ -45,53 +45,11 @@ def sync_scene(
         culture sync --from culture-extractor --from-id <UUID> --to stashapp --to-id <ID> --apply
     """
     try:
-        # Validate source system
-        if from_system.lower() != "culture-extractor":
-            print_error(f"Unsupported source system: {from_system}")
-            print_info("Currently only 'culture-extractor' is supported as source")
-            raise typer.Exit(code=1)
-
-        # Validate target system
-        if to_system.lower() != "stashapp":
-            print_error(f"Unsupported target system: {to_system}")
-            print_info("Currently only 'stashapp' is supported as target")
-            raise typer.Exit(code=1)
-
-        # Build CE connection string from environment variables
-        user = os.environ.get("CE_DB_USERNAME")
-        pw = os.environ.get("CE_DB_PASSWORD")
-        host = os.environ.get("CE_DB_HOST")
-        port = os.environ.get("CE_DB_PORT")
-        db = os.environ.get("CE_DB_NAME")
-
-        missing = []
-        if not user:
-            missing.append("CE_DB_USERNAME")
-        if not pw:
-            missing.append("CE_DB_PASSWORD")
-        if not host:
-            missing.append("CE_DB_HOST")
-        if not port:
-            missing.append("CE_DB_PORT")
-        if not db:
-            missing.append("CE_DB_NAME")
-
-        if missing:
-            print_error(f"Missing required environment variables: {', '.join(missing)}")
-            print_info(f"Please set them in .env file at: {_REPO_ROOT / '.env'}")
-            raise typer.Exit(code=1)
-
-        ce_connection_string = f"dbname={db} user={user} password={pw} host={host} port={port}"
-
-        # Initialize clients
-        print_info("Connecting to Culture Extractor...")
-        ce_client = ClientCultureExtractor(ce_connection_string)
-
-        print_info("Connecting to Stashapp...")
-        stash_client = StashAppClient()
+        # Validate systems
+        _validate_systems(from_system, to_system)
 
         # Initialize sync engine
-        sync_engine = SyncEngine(ce_client, stash_client)
+        sync_engine = _initialize_sync_engine()
 
         # Fetch data from both systems
         print_info(f"Fetching data from Culture Extractor (UUID: {from_id})...")
@@ -135,3 +93,57 @@ def sync_scene(
         print_error(f"Unexpected error: {e}")
         print(traceback.format_exc())
         raise typer.Exit(code=1) from e
+
+
+def _validate_systems(from_system: str, to_system: str) -> None:
+    """Validate source and target systems."""
+    if from_system.lower() != "culture-extractor":
+        print_error(f"Unsupported source system: {from_system}")
+        print_info("Currently only 'culture-extractor' is supported as source")
+        raise typer.Exit(code=1)
+
+    if to_system.lower() != "stashapp":
+        print_error(f"Unsupported target system: {to_system}")
+        print_info("Currently only 'stashapp' is supported as target")
+        raise typer.Exit(code=1)
+
+
+def _get_ce_connection_string() -> str:
+    """Build CE connection string from environment variables."""
+    user = os.environ.get("CE_DB_USERNAME")
+    pw = os.environ.get("CE_DB_PASSWORD")
+    host = os.environ.get("CE_DB_HOST")
+    port = os.environ.get("CE_DB_PORT")
+    db = os.environ.get("CE_DB_NAME")
+
+    missing = []
+    if not user:
+        missing.append("CE_DB_USERNAME")
+    if not pw:
+        missing.append("CE_DB_PASSWORD")
+    if not host:
+        missing.append("CE_DB_HOST")
+    if not port:
+        missing.append("CE_DB_PORT")
+    if not db:
+        missing.append("CE_DB_NAME")
+
+    if missing:
+        print_error(f"Missing required environment variables: {', '.join(missing)}")
+        print_info(f"Please set them in .env file at: {_REPO_ROOT / '.env'}")
+        raise typer.Exit(code=1)
+
+    return f"dbname={db} user={user} password={pw} host={host} port={port}"
+
+
+def _initialize_sync_engine() -> SyncEngine:
+    """Initialize and return a configured SyncEngine."""
+    ce_connection_string = _get_ce_connection_string()
+
+    print_info("Connecting to Culture Extractor...")
+    ce_client = ClientCultureExtractor(ce_connection_string)
+
+    print_info("Connecting to Stashapp...")
+    stash_client = StashAppClient()
+
+    return SyncEngine(ce_client, stash_client)
