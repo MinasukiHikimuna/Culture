@@ -1,4 +1,4 @@
-"""Scene commands for stash-cli."""
+"""Scene commands for culture stash."""
 
 import sys
 import traceback
@@ -222,12 +222,12 @@ def find_scenes(
     """Find and list scenes in Stashapp with optional filters.
 
     Examples:
-        stash-cli scenes find --ce-id 01993924-76de-743c-b28b-6d9205dfa184
-        stash-cli scenes find --title "Beach Play"
-        stash-cli scenes find --id 35733
-        stash-cli scenes find --query "Braless Forever" --ce-only
-        stash-cli scenes find --query "Braless Forever" --ce-only --list
-        stash-cli scenes find --limit 10
+        culture stash scenes find --ce-id 01993924-76de-743c-b28b-6d9205dfa184
+        culture stash scenes find --title "Beach Play"
+        culture stash scenes find --id 35733
+        culture stash scenes find --query "Braless Forever" --ce-only
+        culture stash scenes find --query "Braless Forever" --ce-only --list
+        culture stash scenes find --limit 10
     """
     try:
         console.print("[blue]Connecting to Stashapp...[/blue]")

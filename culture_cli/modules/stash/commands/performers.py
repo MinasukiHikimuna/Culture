@@ -1,4 +1,4 @@
-"""Performer commands for stash-cli."""
+"""Performer commands for culture stash."""
 
 import base64
 import mimetypes
@@ -59,9 +59,9 @@ def list_performers(
     """List performers from Stashapp with optional filters.
 
     Examples:
-        stash-cli performers list --name "Jane"
-        stash-cli performers list --stashdb-id "abc123"
-        stash-cli performers list --favorite --gender FEMALE
+        culture stash performers list --name "Jane"
+        culture stash performers list --stashdb-id "abc123"
+        culture stash performers list --favorite --gender FEMALE
     """
     try:
         client = StashAppClient(prefix=prefix)
@@ -114,7 +114,7 @@ def show_performer(
     """Show detailed information about a specific performer.
 
     Example:
-        stash-cli performers show 123
+        culture stash performers show 123
     """
     try:
         client = StashAppClient(prefix=prefix)
@@ -189,11 +189,11 @@ def create_performer(
     Gender must be one of: MALE, FEMALE, TRANSGENDER_MALE, TRANSGENDER_FEMALE, INTERSEX, NON_BINARY
 
     Examples:
-        stash-cli performers create "Jane Doe"
-        stash-cli performers create "Jane Doe" --stashdb-id "abc123-def456-..."
-        stash-cli performers create "Jane Doe" --image "/path/to/profile.jpg"
-        stash-cli performers create "Jane Doe" --gender FEMALE --disambiguation "2000s"
-        stash-cli performers create "Jane Doe" --stashdb-id "abc123..." --ce-id "def456..." --image "profile.jpg"
+        culture stash performers create "Jane Doe"
+        culture stash performers create "Jane Doe" --stashdb-id "abc123-def456-..."
+        culture stash performers create "Jane Doe" --image "/path/to/profile.jpg"
+        culture stash performers create "Jane Doe" --gender FEMALE --disambiguation "2000s"
+        culture stash performers create "Jane Doe" --stashdb-id "abc123..." --ce-id "def456..." --image "profile.jpg"
     """
     try:
         # Validate gender if provided
@@ -244,7 +244,7 @@ def create_performer(
         )
         if image_data:
             success_msg += "Profile image: Uploaded\n"
-        success_msg += f"\nView details with: [cyan]stash-cli performers show {performer_id}[/cyan]"
+        success_msg += f"\nView details with: [cyan]culture stash performers show {performer_id}[/cyan]"
 
         console.print(
             Panel(
