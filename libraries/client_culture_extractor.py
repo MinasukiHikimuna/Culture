@@ -909,6 +909,101 @@ class ClientCultureExtractor:
 
             return pl.DataFrame(performers, schema=schema)
 
+    def get_performers_unmapped(
+        self, site_uuid: str, target_system_name: str = "stashapp", name_filter: str | None = None
+    ) -> pl.DataFrame:
+        """Get performers for a site that don't have mappings to an external system.
+
+        Args:
+            site_uuid: UUID of the site to get performers for
+            target_system_name: Name of the target system to check (default: 'stashapp')
+            name_filter: Optional case-insensitive substring to filter performer names
+
+        Returns:
+            DataFrame containing performers without external IDs for the target system
+        """
+        with self.connection.cursor() as cursor:
+            # Get site info to verify it exists
+            cursor.execute(
+                """
+                SELECT name, uuid
+                FROM sites
+                WHERE sites.uuid = %s
+            """,
+                (site_uuid,),
+            )
+            site_row = cursor.fetchone()
+            if not site_row:
+                return pl.DataFrame()
+            site_name = site_row[0]
+
+            # Build query with optional name filter
+            if name_filter:
+                query = """
+                    SELECT DISTINCT
+                        p.uuid AS ce_performers_uuid,
+                        p.short_name AS ce_performers_short_name,
+                        p.name AS ce_performers_name,
+                        p.url AS ce_performers_url
+                    FROM performers p
+                    JOIN release_entity_site_performer_entity resp ON p.uuid = resp.performers_uuid
+                    JOIN releases r ON resp.releases_uuid = r.uuid
+                    WHERE r.site_uuid = %s
+                      AND (p.name ILIKE %s OR p.short_name ILIKE %s)
+                      AND NOT EXISTS (
+                          SELECT 1 FROM performer_external_ids pei
+                          JOIN target_systems ts ON pei.target_system_uuid = ts.uuid
+                          WHERE pei.performer_uuid = p.uuid AND ts.name = %s
+                      )
+                    ORDER BY p.name
+                """
+                params = (site_uuid, f"%{name_filter}%", f"%{name_filter}%", target_system_name)
+            else:
+                query = """
+                    SELECT DISTINCT
+                        p.uuid AS ce_performers_uuid,
+                        p.short_name AS ce_performers_short_name,
+                        p.name AS ce_performers_name,
+                        p.url AS ce_performers_url
+                    FROM performers p
+                    JOIN release_entity_site_performer_entity resp ON p.uuid = resp.performers_uuid
+                    JOIN releases r ON resp.releases_uuid = r.uuid
+                    WHERE r.site_uuid = %s
+                      AND NOT EXISTS (
+                          SELECT 1 FROM performer_external_ids pei
+                          JOIN target_systems ts ON pei.target_system_uuid = ts.uuid
+                          WHERE pei.performer_uuid = p.uuid AND ts.name = %s
+                      )
+                    ORDER BY p.name
+                """
+                params = (site_uuid, target_system_name)
+
+            cursor.execute(query, params)
+            performers_rows = cursor.fetchall()
+
+            performers = [
+                {
+                    "ce_site_uuid": str(site_uuid),
+                    "ce_site_name": site_name,
+                    "ce_performers_uuid": str(row[0]),
+                    "ce_performers_short_name": row[1],
+                    "ce_performers_name": row[2],
+                    "ce_performers_url": row[3],
+                }
+                for row in performers_rows
+            ]
+
+            schema = {
+                "ce_site_uuid": pl.Utf8,
+                "ce_site_name": pl.Utf8,
+                "ce_performers_uuid": pl.Utf8,
+                "ce_performers_short_name": pl.Utf8,
+                "ce_performers_name": pl.Utf8,
+                "ce_performers_url": pl.Utf8,
+            }
+
+            return pl.DataFrame(performers, schema=schema)
+
     def get_release_performers(self, release_uuid: str) -> pl.DataFrame:
         """Get all performers for a specific release.
 

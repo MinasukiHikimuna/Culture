@@ -209,6 +209,87 @@ def show_performer(
         raise typer.Exit(code=1) from e
 
 
+@performers_app.command("unmapped")
+def list_unmapped_performers(
+    site: Annotated[
+        str,
+        typer.Option("--site", "-s", help="Site to check (short name or UUID)"),
+    ],
+    target_system: Annotated[
+        str,
+        typer.Option("--target-system", "-t", help="Target system to check for mappings"),
+    ] = "stashapp",
+    name: Annotated[
+        str | None,
+        typer.Option("--name", "-n", help="Filter by performer name (case-insensitive)"),
+    ] = None,
+    limit: Annotated[
+        int | None,
+        typer.Option("--limit", "-l", help="Limit number of results"),
+    ] = None,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", "-j", help="Output as JSON instead of table"),
+    ] = False,
+) -> None:
+    """List performers from a site that aren't mapped to an external system.
+
+    Shows performers that don't have external IDs for the specified target system
+    (default: stashapp). Useful for identifying performers that still need to be
+    linked to external systems.
+
+    Examples:
+        ce performers unmapped --site meanawolf                        # List unmapped performers for Meana Wolf
+        ce performers unmapped -s meanawolf -t stashdb                 # Check for StashDB mappings
+        ce performers unmapped -s meanawolf -n "Jane"                  # Filter by name
+        ce performers unmapped -s meanawolf --limit 20                 # Limit results
+        ce performers unmapped -s meanawolf --json                     # JSON output
+    """
+    try:
+        client = config.get_client()
+
+        # Resolve site UUID
+        site_uuid, site_name = _resolve_site_uuid(client, site)
+
+        # Build filter message
+        filter_msg = f" matching '{name}'" if name else ""
+        print_info(f"Fetching performers from '{site_name}' without '{target_system}' mappings{filter_msg}...")
+
+        # Fetch unmapped performers
+        performers_df = client.get_performers_unmapped(
+            site_uuid, target_system_name=target_system, name_filter=name
+        )
+
+        # Check if any results were found
+        if performers_df.shape[0] == 0:
+            msg = f"No unmapped performers found for site '{site_name}'"
+            if name:
+                msg += f" matching '{name}'"
+            print_info(msg)
+            raise typer.Exit(code=0)
+
+        # Apply limit if specified
+        if limit and limit > 0:
+            performers_df = performers_df.head(limit)
+
+        # Display results
+        count = performers_df.shape[0]
+        if json_output:
+            print_json(performers_df)
+        else:
+            table = format_performers_table(performers_df, site_name)
+            print_table(table)
+            limit_msg = f" (showing first {limit})" if limit else ""
+            print_success(f"Found {count} unmapped performer(s){filter_msg}{limit_msg}")
+
+    except ValueError as e:
+        print_error(str(e))
+        raise typer.Exit(code=1) from e
+    except Exception as e:
+        print_error(f"Failed to fetch unmapped performers: {e}")
+        raise typer.Exit(code=1) from e
+
+
 @performers_app.command("link")
 def link_performer(
     uuid: Annotated[str, typer.Argument(help="Performer UUID to link")],
