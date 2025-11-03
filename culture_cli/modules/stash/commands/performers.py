@@ -1,6 +1,9 @@
 """Performer commands for stash-cli."""
 
+import base64
+import mimetypes
 import sys
+from pathlib import Path
 
 import polars as pl
 import typer
@@ -160,18 +163,46 @@ def show_performer(
 @app.command("create")
 def create_performer(
     name: str = typer.Argument(..., help="Performer name"),
-    stashdb_id: str | None = typer.Option(None, "--stashdb-id", "-s", help="StashDB performer ID (UUID)"),
-    ce_id: str | None = typer.Option(None, "--ce-id", "-c", help="Culture Extractor performer ID (UUID)"),
-    prefix: str = typer.Option("", "--prefix", "-p", help="Environment variable prefix for Stashapp connection"),
+    stashdb_id: str | None = typer.Option(
+        None, "--stashdb-id", "-s", help="StashDB performer ID (UUID)"
+    ),
+    ce_id: str | None = typer.Option(
+        None, "--ce-id", "-c", help="Culture Extractor performer ID (UUID)"
+    ),
+    image: str | None = typer.Option(None, "--image", "-i", help="Path to profile image file"),
+    disambiguation: str | None = typer.Option(
+        None, "--disambiguation", "-d", help="Disambiguation text (e.g., '1990s'/'Brazzers')"
+    ),
+    gender: str | None = typer.Option(
+        None,
+        "--gender",
+        "-g",
+        help="Gender: MALE, FEMALE, TRANSGENDER_MALE, TRANSGENDER_FEMALE, INTERSEX, NON_BINARY",
+    ),
+    prefix: str = typer.Option(
+        "", "--prefix", "-p", help="Environment variable prefix for Stashapp connection"
+    ),
 ) -> None:
-    """Create a new performer in Stashapp with optional external IDs.
+    """Create a new performer in Stashapp with optional external IDs and profile image.
+
+    The image will be base64 encoded and uploaded as part of the performer creation.
+    Gender must be one of: MALE, FEMALE, TRANSGENDER_MALE, TRANSGENDER_FEMALE, INTERSEX, NON_BINARY
 
     Examples:
         stash-cli performers create "Jane Doe"
         stash-cli performers create "Jane Doe" --stashdb-id "abc123-def456-..."
-        stash-cli performers create "Jane Doe" --stashdb-id "abc123..." --ce-id "def456..."
+        stash-cli performers create "Jane Doe" --image "/path/to/profile.jpg"
+        stash-cli performers create "Jane Doe" --gender FEMALE --disambiguation "2000s"
+        stash-cli performers create "Jane Doe" --stashdb-id "abc123..." --ce-id "def456..." --image "profile.jpg"
     """
     try:
+        # Validate gender if provided
+        valid_genders = ["MALE", "FEMALE", "TRANSGENDER_MALE", "TRANSGENDER_FEMALE", "INTERSEX", "NON_BINARY"]
+        if gender and gender not in valid_genders:
+            console.print(f"[red]Error: Invalid gender '{gender}'[/red]")
+            console.print(f"[yellow]Valid values: {', '.join(valid_genders)}[/yellow]")
+            sys.exit(1)
+
         client = StashAppClient(prefix=prefix)
 
         # Show what we're about to create
@@ -181,19 +212,43 @@ def create_performer(
             console.print(f"[green]StashDB ID:[/green] {stashdb_id}")
         if ce_id:
             console.print(f"[green]Culture Extractor ID:[/green] {ce_id}")
+        if image:
+            console.print(f"[green]Profile Image:[/green] {image}")
+        if disambiguation:
+            console.print(f"[green]Disambiguation:[/green] {disambiguation}")
+        if gender:
+            console.print(f"[green]Gender:[/green] {gender}")
+
+        # Process image if provided
+        image_data = None
+        if image:
+            image_data = _process_image_file(image)
 
         # Create the performer
         console.print("\n[blue]Creating performer in Stashapp...[/blue]")
-        result = client.create_performer(name=name, stashdb_id=stashdb_id, ce_id=ce_id)
+        result = client.create_performer(
+            name=name,
+            stashdb_id=stashdb_id,
+            ce_id=ce_id,
+            image=image_data,
+            disambiguation=disambiguation,
+            gender=gender,
+        )
 
         # Display success message
         performer_id = result.get("id")
+        success_msg = (
+            f"[bold green]Successfully created performer![/bold green]\n\n"
+            f"ID: {performer_id}\n"
+            f"Name: {result.get('name')}\n"
+        )
+        if image_data:
+            success_msg += "Profile image: Uploaded\n"
+        success_msg += f"\nView details with: [cyan]stash-cli performers show {performer_id}[/cyan]"
+
         console.print(
             Panel(
-                f"[bold green]Successfully created performer![/bold green]\n\n"
-                f"ID: {performer_id}\n"
-                f"Name: {result.get('name')}\n"
-                f"\nView details with: [cyan]stash-cli performers show {performer_id}[/cyan]",
+                success_msg,
                 title="Success",
                 border_style="green",
             )
@@ -202,6 +257,40 @@ def create_performer(
     except Exception as e:
         console.print(f"[red]Error creating performer: {e}[/red]")
         sys.exit(1)
+
+
+def _process_image_file(image_path: str) -> str:
+    """Process an image file and return base64 encoded data URL.
+
+    Args:
+        image_path: Path to the image file
+
+    Returns:
+        Base64 encoded data URL (e.g., "data:image/jpeg;base64,...")
+
+    Raises:
+        FileNotFoundError: If the image file doesn't exist
+        ValueError: If the file is not a valid image
+    """
+    path = Path(image_path)
+
+    if not path.exists():
+        raise FileNotFoundError(f"Image file not found: {image_path}")
+
+    if not path.is_file():
+        raise ValueError(f"Path is not a file: {image_path}")
+
+    # Read and encode the image
+    with path.open("rb") as img_file:
+        image_data = img_file.read()
+        base64_image = base64.b64encode(image_data).decode("utf-8")
+
+    # Detect MIME type
+    mime_type, _ = mimetypes.guess_type(str(path))
+    if not mime_type or not mime_type.startswith("image/"):
+        mime_type = "image/jpeg"  # Default fallback
+
+    return f"data:{mime_type};base64,{base64_image}"
 
 
 if __name__ == "__main__":

@@ -1130,14 +1130,24 @@ class StashAppClient:
         self.stash.update_studio({"id": studio_id, "stash_ids": new_stash_ids})
 
     def create_performer(
-        self, name: str, stashdb_id: str | None = None, ce_id: str | None = None
+        self,
+        name: str,
+        stashdb_id: str | None = None,
+        ce_id: str | None = None,
+        image: str | None = None,
+        disambiguation: str | None = None,
+        gender: str | None = None,
     ) -> dict:
-        """Create a new performer with optional external IDs.
+        """Create a new performer with optional external IDs, image, and attributes.
 
         Args:
             name: Performer name
             stashdb_id: StashDB UUID (optional)
             ce_id: Culture Extractor UUID (optional)
+            image: Base64 encoded data URL or image URL (optional)
+            disambiguation: Disambiguation text to differentiate performers with same name (optional)
+            gender: Gender of performer - valid values: MALE, FEMALE, TRANSGENDER_MALE,
+                   TRANSGENDER_FEMALE, INTERSEX, NON_BINARY (optional)
 
         Returns:
             Created performer data
@@ -1157,6 +1167,18 @@ class StashAppClient:
 
         if stash_ids:
             performer_data["stash_ids"] = stash_ids
+
+        # Add image if provided
+        if image:
+            performer_data["image"] = image
+
+        # Add disambiguation if provided
+        if disambiguation:
+            performer_data["disambiguation"] = disambiguation
+
+        # Add gender if provided
+        if gender:
+            performer_data["gender"] = gender
 
         return self.stash.create_performer(performer_data)
 
