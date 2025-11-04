@@ -22,6 +22,7 @@ public class CultureExtractorContext : DbContext, ICultureExtractorContext
     public DbSet<SubSiteExternalIdEntity> SubSiteExternalIds { get; set; }
     public DbSet<ReleaseExternalIdEntity> ReleaseExternalIds { get; set; }
     public DbSet<PerformerExternalIdEntity> PerformerExternalIds { get; set; }
+    public DbSet<TagExternalIdEntity> TagExternalIds { get; set; }
 
     // The following configures EF to create a Sqlite database file in the
     // special "local" folder for your platform.
@@ -125,6 +126,27 @@ public class CultureExtractorContext : DbContext, ICultureExtractorContext
         modelBuilder.Entity<PerformerExternalIdEntity>()
             .HasIndex(e => new { e.TargetSystemUuid, e.ExternalId })
             .IsUnique();
+
+        // Configure TagExternalId
+        modelBuilder.Entity<TagExternalIdEntity>()
+            .HasOne(e => e.Tag)
+            .WithMany(t => t.ExternalIds)
+            .HasForeignKey(e => e.TagUuid)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<TagExternalIdEntity>()
+            .HasOne(e => e.TargetSystem)
+            .WithMany()
+            .HasForeignKey(e => e.TargetSystemUuid)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<TagExternalIdEntity>()
+            .HasIndex(e => new { e.TagUuid, e.TargetSystemUuid })
+            .IsUnique();
+
+        modelBuilder.Entity<TagExternalIdEntity>()
+            .HasIndex(e => new { e.TargetSystemUuid, e.ExternalId })
+            .IsUnique();
     }
 }
 
@@ -177,6 +199,7 @@ public class SiteTagEntity
     public required SiteEntity Site { get; set; }
 
     public required ICollection<ReleaseEntity> Releases { get; set; }
+    public ICollection<TagExternalIdEntity>? ExternalIds { get; set; }
 }
 
 public class SitePerformerEntity
@@ -318,6 +341,23 @@ public class PerformerExternalIdEntity
 
     public required Guid PerformerUuid { get; set; }
     public required SitePerformerEntity Performer { get; set; }
+
+    public required Guid TargetSystemUuid { get; set; }
+    public required TargetSystemEntity TargetSystem { get; set; }
+}
+
+public class TagExternalIdEntity
+{
+    [Key]
+    public required Guid Uuid { get; set; }
+    public required string ExternalId { get; set; }
+    [Column(TypeName = "timestamp")]
+    public required DateTime Created { get; set; }
+    [Column(TypeName = "timestamp")]
+    public required DateTime LastUpdated { get; set; }
+
+    public required Guid TagUuid { get; set; }
+    public required SiteTagEntity Tag { get; set; }
 
     public required Guid TargetSystemUuid { get; set; }
     public required TargetSystemEntity TargetSystem { get; set; }
