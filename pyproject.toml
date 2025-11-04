@@ -13,6 +13,7 @@ dependencies = [
     "newnewid>=0.1.0",
     "stashapp-tools>=0.2.52",
     "numpy>=2.0.0",
+    "python-levenshtein>=0.27.3",
 ]
 
 [project.scripts]

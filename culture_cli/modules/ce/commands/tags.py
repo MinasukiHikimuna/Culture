@@ -1,8 +1,10 @@
 """Tags-related commands for the CLI."""
 
+import json
 from typing import Annotated
 
 import typer
+from rich.table import Table
 
 from culture_cli.modules.ce.utils.config import config
 from culture_cli.modules.ce.utils.formatters import (
@@ -13,6 +15,8 @@ from culture_cli.modules.ce.utils.formatters import (
     print_success,
     print_table,
 )
+from culture_cli.modules.ce.utils.tag_matcher import find_tag_matches
+from libraries.client_stashapp import StashAppClient
 
 
 # Create tags command group
@@ -159,3 +163,284 @@ def link_tag(
     except Exception as e:
         print_error(f"Failed to link tag: {e}")
         raise typer.Exit(code=1) from e
+
+
+@tags_app.command("match")
+def match_tags(
+    site: Annotated[
+        str,
+        typer.Option("--site", "-s", help="CE site to match tags from (short name or UUID)"),
+    ],
+    threshold: Annotated[
+        float,
+        typer.Option("--threshold", "-t", help="Minimum similarity ratio (0.0-1.0)"),
+    ] = 0.85,
+    max_distance: Annotated[
+        int | None,
+        typer.Option("--max-distance", "-d", help="Maximum Levenshtein distance"),
+    ] = None,
+    limit: Annotated[
+        int | None,
+        typer.Option("--limit", "-l", help="Limit number of results"),
+    ] = None,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", "-j", help="Output as JSON instead of table"),
+    ] = False,
+) -> None:
+    """Find potential tag matches between CE and Stashapp using Levenshtein distance.
+
+    This command compares tag names between Culture Extractor and Stashapp
+    using string similarity algorithms to find potential matches.
+
+    Examples:
+        ce tags match --site ellieidol                           # Find matches with default threshold (0.85)
+        ce tags match -s ellieidol -t 0.9                       # Higher threshold for more exact matches
+        ce tags match -s ellieidol -t 0.8 -d 3                  # Threshold + max distance filter
+        ce tags match -s ellieidol --limit 50 --json            # Limit results, output as JSON
+    """
+    try:
+        ce_client = config.get_client()
+        site_uuid, site_name = _resolve_site(ce_client, site)
+        ce_tags = _fetch_ce_tags(ce_client, site_uuid, site_name)
+        stashapp_tags = _fetch_stashapp_tags()
+        matches = _find_and_limit_matches(ce_tags, stashapp_tags, threshold, max_distance, limit)
+        _display_match_results(matches, site_name, limit, json_output)
+
+    except ValueError as e:
+        print_error(str(e))
+        raise typer.Exit(code=1) from e
+    except Exception as e:
+        print_error(f"Failed to match tags: {e}")
+        raise typer.Exit(code=1) from e
+
+
+def _resolve_site(ce_client, site: str) -> tuple[str, str]:
+    """Resolve site identifier to UUID and name."""
+    sites_df = ce_client.get_sites()
+    site_match = sites_df.filter(
+        (sites_df["ce_sites_short_name"] == site)
+        | (sites_df["ce_sites_uuid"] == site)
+        | (sites_df["ce_sites_name"] == site)
+    )
+
+    if site_match.shape[0] == 0:
+        print_error(f"Site '{site}' not found")
+        print_info("To see available sites, run: ce sites list")
+        raise typer.Exit(code=1)
+
+    return site_match["ce_sites_uuid"][0], site_match["ce_sites_name"][0]
+
+
+def _fetch_ce_tags(ce_client, site_uuid: str, site_name: str):
+    """Fetch CE tags for a site."""
+    print_info(f"Fetching tags from CE site '{site_name}'...")
+    ce_tags = ce_client.get_tags(site_uuid)
+
+    if ce_tags.shape[0] == 0:
+        print_info(f"No tags found for site '{site_name}'")
+        raise typer.Exit(code=0)
+
+    return ce_tags
+
+
+def _fetch_stashapp_tags():
+    """Fetch tags from Stashapp."""
+    print_info("Fetching tags from Stashapp...")
+    stashapp_client = StashAppClient()
+    stashapp_tags = stashapp_client.get_tags()
+
+    if stashapp_tags.shape[0] == 0:
+        print_info("No tags found in Stashapp")
+        raise typer.Exit(code=0)
+
+    return stashapp_tags
+
+
+def _find_and_limit_matches(ce_tags, stashapp_tags, threshold: float, max_distance: int | None, limit: int | None):
+    """Find tag matches and apply limit."""
+    print_info(f"Finding matches (threshold: {threshold})...")
+    matches = find_tag_matches(ce_tags, stashapp_tags, threshold=threshold, max_distance=max_distance)
+
+    if not matches:
+        print_info(f"No matches found with threshold {threshold}")
+        print_info("Try lowering the threshold with --threshold option")
+        raise typer.Exit(code=0)
+
+    if limit and limit > 0:
+        matches = matches[:limit]
+
+    return matches
+
+
+def _display_match_results(matches, site_name: str, limit: int | None, json_output: bool) -> None:
+    """Display match results as JSON or table."""
+    if json_output:
+        matches_dict = [
+            {
+                "ce_uuid": m.ce_uuid,
+                "ce_name": m.ce_name,
+                "stashapp_id": m.stashapp_id,
+                "stashapp_name": m.stashapp_name,
+                "stashdb_id": m.stashdb_id,
+                "distance": m.distance,
+                "similarity": round(m.similarity, 4),
+            }
+            for m in matches
+        ]
+        print(json.dumps(matches_dict, indent=2))
+    else:
+        table = Table(title=f"Tag Matches for {site_name}")
+        table.add_column("CE Tag", style="cyan")
+        table.add_column("Stashapp Tag", style="green")
+        table.add_column("Similarity", justify="right", style="yellow")
+        table.add_column("Distance", justify="right", style="magenta")
+        table.add_column("CE UUID", style="dim")
+        table.add_column("Stashapp ID", justify="right", style="dim")
+
+        for match in matches:
+            table.add_row(
+                match.ce_name,
+                match.stashapp_name,
+                f"{match.similarity:.2%}",
+                str(match.distance),
+                match.ce_uuid,
+                str(match.stashapp_id),
+            )
+
+        print_table(table)
+        limit_msg = f" (showing first {limit})" if limit else ""
+        print_success(f"Found {len(matches)} potential match(es){limit_msg}")
+        print_info("To link a tag, run: ce tags link <ce-uuid> --stashapp-id <id>")
+
+
+@tags_app.command("auto-link")
+def auto_link_tags(
+    site: Annotated[
+        str,
+        typer.Option("--site", "-s", help="CE site to auto-link tags from (short name or UUID)"),
+    ],
+    threshold: Annotated[
+        float,
+        typer.Option("--threshold", "-t", help="Minimum similarity ratio (0.0-1.0)"),
+    ] = 0.95,
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Show what would be linked without actually linking"),
+    ] = False,
+    skip_existing: Annotated[
+        bool,
+        typer.Option("--skip-existing", help="Skip tags that already have Stashapp links"),
+    ] = True,
+) -> None:
+    """Automatically link CE tags to Stashapp based on similarity matching.
+
+    This command will automatically create links between CE and Stashapp tags
+    when they have high similarity scores. Use a high threshold (0.95+) to
+    ensure accurate matches.
+
+    Examples:
+        ce tags auto-link --site ellieidol --dry-run              # Preview matches without linking
+        ce tags auto-link -s ellieidol -t 0.95                   # Link with 95% similarity threshold
+        ce tags auto-link -s ellieidol -t 0.98 --no-skip-existing  # Include already linked tags
+    """
+    try:
+        ce_client = config.get_client()
+        site_uuid, site_name = _resolve_site(ce_client, site)
+        ce_tags = _fetch_ce_tags(ce_client, site_uuid, site_name)
+        stashapp_tags = _fetch_stashapp_tags()
+        existing_links = _get_existing_links(ce_client, ce_tags, skip_existing)
+        matches_to_link = _find_best_matches(ce_tags, stashapp_tags, threshold, existing_links, skip_existing)
+        _display_auto_link_preview(matches_to_link, site_name, dry_run)
+        _perform_auto_link(ce_client, matches_to_link, existing_links, dry_run, skip_existing)
+
+    except ValueError as e:
+        print_error(str(e))
+        raise typer.Exit(code=1) from e
+    except Exception as e:
+        print_error(f"Failed to auto-link tags: {e}")
+        raise typer.Exit(code=1) from e
+
+
+def _get_existing_links(ce_client, ce_tags, skip_existing: bool) -> dict[str, str]:
+    """Get existing Stashapp links for CE tags."""
+    existing_links = {}
+    if skip_existing:
+        print_info("Checking for existing links...")
+        for row in ce_tags.iter_rows(named=True):
+            ce_uuid = row["ce_tags_uuid"]
+            external_ids = ce_client.get_tag_external_ids(ce_uuid)
+            if "stashapp" in external_ids:
+                existing_links[ce_uuid] = external_ids["stashapp"]
+    return existing_links
+
+
+def _find_best_matches(ce_tags, stashapp_tags, threshold: float, existing_links: dict, skip_existing: bool):
+    """Find and filter best matches for auto-linking."""
+    print_info(f"Finding matches (threshold: {threshold})...")
+    all_matches = find_tag_matches(ce_tags, stashapp_tags, threshold=threshold)
+
+    # Filter to best match per CE tag and skip existing links
+    best_matches = {}
+    for match in all_matches:
+        if skip_existing and match.ce_uuid in existing_links:
+            continue
+
+        if match.ce_uuid not in best_matches or match.similarity > best_matches[match.ce_uuid].similarity:
+            best_matches[match.ce_uuid] = match
+
+    matches_to_link = list(best_matches.values())
+
+    if not matches_to_link:
+        if skip_existing and existing_links:
+            print_info(
+                f"No new matches found. {len(existing_links)} tags already linked "
+                "(use --no-skip-existing to re-process)"
+            )
+        else:
+            print_info(f"No matches found with threshold {threshold}")
+            print_info("Try lowering the threshold with --threshold option")
+        raise typer.Exit(code=0)
+
+    return matches_to_link
+
+
+def _display_auto_link_preview(matches_to_link, site_name: str, dry_run: bool) -> None:
+    """Display preview table of tags to be linked."""
+    table = Table(title=f"Auto-Link Preview for {site_name}" + (" [DRY RUN]" if dry_run else ""))
+    table.add_column("CE Tag", style="cyan")
+    table.add_column("→", style="white")
+    table.add_column("Stashapp Tag", style="green")
+    table.add_column("Similarity", justify="right", style="yellow")
+
+    for match in matches_to_link:
+        table.add_row(
+            match.ce_name,
+            "→",
+            match.stashapp_name,
+            f"{match.similarity:.2%}",
+        )
+
+    print_table(table)
+
+
+def _perform_auto_link(ce_client, matches_to_link, existing_links: dict, dry_run: bool, skip_existing: bool) -> None:
+    """Perform the actual linking or show dry-run message."""
+    if dry_run:
+        print_info(f"[DRY RUN] Would link {len(matches_to_link)} tag(s)")
+        print_info("Remove --dry-run to perform actual linking")
+    else:
+        print_info(f"Linking {len(matches_to_link)} tag(s)...")
+        linked_count = 0
+        for match in matches_to_link:
+            try:
+                ce_client.set_tag_external_id(match.ce_uuid, "stashapp", str(match.stashapp_id))
+                if match.stashdb_id:
+                    ce_client.set_tag_external_id(match.ce_uuid, "stashdb", match.stashdb_id)
+                linked_count += 1
+            except Exception as e:
+                print_error(f"Failed to link '{match.ce_name}': {e}")
+
+        print_success(f"Successfully linked {linked_count} tag(s)")
+        if skip_existing and existing_links:
+            print_info(f"Skipped {len(existing_links)} already linked tag(s)")
