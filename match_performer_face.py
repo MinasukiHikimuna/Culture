@@ -71,13 +71,11 @@ def get_performer_image_path(performer: dict) -> Path | None:
     """
     performer_uuid = performer.get("ce_performers_uuid")
     if not performer_uuid:
-        console.print("[yellow]Debug: No performer UUID found[/yellow]")
         return None
 
     # Extract site name from performer URL
     # Example URL: https://www.lezkiss.com/pornstars/aislin-88.html
     performer_url = performer.get("ce_performers_url", "")
-    console.print(f"[dim]Debug: Performer URL = '{performer_url}'[/dim]")
     site_name = None
 
     if performer_url:
@@ -85,10 +83,8 @@ def get_performer_image_path(performer: dict) -> Path | None:
         match = re.search(r"https?://(?:www\.)?([^./]+)", performer_url)
         if match:
             site_name = match.group(1)
-            console.print(f"[dim]Debug: Extracted site name = '{site_name}'[/dim]")
 
     if not site_name:
-        console.print("[yellow]Debug: Could not extract site name from URL[/yellow]")
         return None
 
     # Try common image path patterns
@@ -494,8 +490,16 @@ def run_matching_workflow(  # noqa: PLR0915, PLR0912
     image_path = get_performer_image_path(ce_performer)
     if not image_path:
         console.print("[red]✗ Could not find performer image[/red]")
-        expected_path = f"/Volumes/Ripping/<site>/Performers/{performer_uuid}"
-        console.print(f"[yellow]Expected: {expected_path}/{performer_uuid}.jpg[/yellow]")
+        performer_url = ce_performer.get("ce_performers_url", "")
+        if performer_url:
+            # Extract site name for better error message
+            match = re.search(r"https?://(?:www\.)?([^./]+)", performer_url)
+            site_display = match.group(1).title() if match else "<site>"
+        else:
+            site_display = "<site>"
+        console.print(f"[yellow]Expected location: /Volumes/Ripping/{site_display}/Performers/{performer_uuid}/{performer_uuid}.jpg[/yellow]")  # noqa: E501
+        console.print("[dim]Note: The performer UUID in CE database may not match the filesystem UUID[/dim]")
+        console.print("[dim]Consider manually locating the image or linking the performer through Stashapp directly[/dim]")  # noqa: E501
         sys.exit(1)
     console.print(f"[green]✓ Found image: {image_path}[/green]")
 
