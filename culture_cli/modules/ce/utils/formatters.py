@@ -293,3 +293,40 @@ def format_performer_detail(performer_df: pl.DataFrame, external_ids: dict | Non
     console.print(Panel(detail_text, border_style="cyan"))
 
     return ""
+
+
+def format_tags_table(tags_df: pl.DataFrame, site_name: str | None = None) -> Table:
+    """Format tags dataframe as a Rich table.
+
+    Args:
+        tags_df: Polars DataFrame with tag information
+        site_name: Optional site name for table title
+
+    Returns:
+        Rich Table object ready for display
+    """
+    title = f"Tags from {site_name}" if site_name else "Tags"
+    table = Table(title=title, show_header=True, header_style="bold cyan", expand=False)
+
+    # Add columns
+    table.add_column("Name", style="green")
+    table.add_column("Short Name", style="yellow")
+    table.add_column("UUID", style="dim")
+
+    # Add rows
+    for row in tags_df.iter_rows(named=True):
+        tag_name = str(row.get("ce_tags_name", "")) or "-"
+        tag_short_name = str(row.get("ce_tags_short_name", "")) or "-"
+        tag_uuid = str(row.get("ce_tags_uuid", "")) or "-"
+
+        # Truncate long names
+        if tag_name != "-" and len(tag_name) > 40:
+            tag_name = tag_name[:37] + "..."
+
+        table.add_row(
+            tag_name,
+            tag_short_name,
+            tag_uuid,
+        )
+
+    return table

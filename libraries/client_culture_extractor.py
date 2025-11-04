@@ -756,6 +756,88 @@ class ClientCultureExtractor:
 
             self.connection.commit()
 
+    def get_tags(self, site_uuid: str, name_filter: str | None = None) -> pl.DataFrame:
+        """Get all tags for a given site UUID, with optional name filtering.
+
+        Args:
+            site_uuid: UUID of the site to get tags for
+            name_filter: Optional case-insensitive substring to filter tag names
+
+        Returns:
+            DataFrame containing all tags for the site
+        """
+        with self.connection.cursor() as cursor:
+            # Get site info to verify it exists
+            cursor.execute(
+                """
+                SELECT name, uuid
+                FROM sites
+                WHERE sites.uuid = %s
+            """,
+                (site_uuid,),
+            )
+            site_row = cursor.fetchone()
+            if not site_row:
+                return pl.DataFrame()
+            site_name = site_row[0]
+
+            # Build query with optional name filter
+            if name_filter:
+                query = """
+                    SELECT DISTINCT
+                        t.uuid AS ce_tags_uuid,
+                        t.short_name AS ce_tags_short_name,
+                        t.name AS ce_tags_name,
+                        t.url AS ce_tags_url
+                    FROM tags t
+                    JOIN release_entity_site_tag_entity rest ON t.uuid = rest.tags_uuid
+                    JOIN releases r ON rest.releases_uuid = r.uuid
+                    WHERE r.site_uuid = %s
+                      AND (t.name ILIKE %s OR t.short_name ILIKE %s)
+                    ORDER BY t.name
+                """
+                params = (site_uuid, f"%{name_filter}%", f"%{name_filter}%")
+            else:
+                query = """
+                    SELECT DISTINCT
+                        t.uuid AS ce_tags_uuid,
+                        t.short_name AS ce_tags_short_name,
+                        t.name AS ce_tags_name,
+                        t.url AS ce_tags_url
+                    FROM tags t
+                    JOIN release_entity_site_tag_entity rest ON t.uuid = rest.tags_uuid
+                    JOIN releases r ON rest.releases_uuid = r.uuid
+                    WHERE r.site_uuid = %s
+                    ORDER BY t.name
+                """
+                params = (site_uuid,)
+
+            cursor.execute(query, params)
+            tags_rows = cursor.fetchall()
+
+            tags = [
+                {
+                    "ce_site_uuid": str(site_uuid),
+                    "ce_site_name": site_name,
+                    "ce_tags_uuid": str(row[0]),
+                    "ce_tags_short_name": row[1],
+                    "ce_tags_name": row[2],
+                    "ce_tags_url": row[3],
+                }
+                for row in tags_rows
+            ]
+
+            schema = {
+                "ce_site_uuid": pl.Utf8,
+                "ce_site_name": pl.Utf8,
+                "ce_tags_uuid": pl.Utf8,
+                "ce_tags_short_name": pl.Utf8,
+                "ce_tags_name": pl.Utf8,
+                "ce_tags_url": pl.Utf8,
+            }
+
+            return pl.DataFrame(tags, schema=schema)
+
     def get_tag_by_uuid(self, tag_uuid: str) -> pl.DataFrame:
         """Get a specific tag by its UUID.
 
