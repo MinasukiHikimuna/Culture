@@ -40,6 +40,12 @@ def display_sync_plan(plan: SyncPlan, dry_run: bool = True) -> None:
         console.print(performer_table)
         console.print()
 
+    # Tag changes table
+    if plan.tag_diffs:
+        tag_table = _format_tag_diff_table(plan.tag_diffs)
+        console.print(tag_table)
+        console.print()
+
     # Summary
     _format_summary(plan, dry_run)
 
@@ -121,6 +127,41 @@ def _format_performer_diff_table(performer_diffs: list) -> Table:
     return table
 
 
+def _format_tag_diff_table(tag_diffs: list) -> Table:
+    """Format tag differences as a table.
+
+    Args:
+        tag_diffs: List of TagDiff objects
+
+    Returns:
+        Rich Table object
+    """
+    table = Table(title="Tag Matching", show_header=True, header_style="bold magenta", expand=False)
+    table.add_column("CE Tag", style="cyan", width=25)
+    table.add_column("Status", style="yellow", width=15)
+    table.add_column("Stashapp Match", style="white")
+
+    for diff in tag_diffs:
+        ce_tag_display = f"{diff.ce_name}\n[dim]{diff.ce_uuid[:8]}...[/dim]"
+
+        if diff.status == "matched":
+            status_display = "[green]✓ MATCHED[/green]"
+            stashapp_match = f"#{diff.stashapp_id} - {diff.stashapp_name}"
+            style = "white"
+        elif diff.status == "not_found":
+            status_display = "[yellow]⚠ NOT FOUND[/yellow]"
+            stashapp_match = "[dim]No matching tag in Stashapp[/dim]"
+            style = "yellow"
+        else:
+            status_display = diff.status
+            stashapp_match = "N/A"
+            style = "white"
+
+        table.add_row(ce_tag_display, status_display, stashapp_match, style=style)
+
+    return table
+
+
 def _format_summary(plan: SyncPlan, dry_run: bool) -> None:
     """Format and display the summary.
 
@@ -132,23 +173,36 @@ def _format_summary(plan: SyncPlan, dry_run: bool) -> None:
     field_changes = sum(1 for diff in plan.field_diffs if diff.action in ["update", "add"])
     performers_matched = sum(1 for diff in plan.performer_diffs if diff.status == "matched")
     performers_not_found = sum(1 for diff in plan.performer_diffs if diff.status == "not_found")
+    tags_matched = sum(1 for diff in plan.tag_diffs if diff.status == "matched")
+    tags_not_found = sum(1 for diff in plan.tag_diffs if diff.status == "not_found")
 
     # Display warnings if any
     if plan.has_warnings:
-        console.print(
-            f"[yellow]⚠  {performers_not_found} performer(s) not matched - will be skipped[/yellow]"
-        )
+        warnings = []
+        if performers_not_found:
+            warnings.append(f"{performers_not_found} performer(s) not matched")
+        if tags_not_found:
+            warnings.append(f"{tags_not_found} tag(s) not matched")
+        console.print(f"[yellow]⚠  {', '.join(warnings)} - will be skipped[/yellow]")
 
     # Display summary based on whether there are changes
     if plan.has_changes:
+        changes_parts = []
+        if field_changes:
+            changes_parts.append(f"{field_changes} field(s)")
+        if performers_matched:
+            changes_parts.append(f"{performers_matched} performer(s)")
+        if tags_matched:
+            changes_parts.append(f"{tags_matched} tag(s)")
+
+        changes_text = ", ".join(changes_parts)
+
         if dry_run:
-            console.print(
-                f"[green]✓ Ready to sync {field_changes} field(s) and {performers_matched} performer(s)[/green]"
-            )
+            console.print(f"[green]✓ Ready to sync {changes_text}[/green]")
             console.print()
             console.print("[cyan]Run with --apply to execute this sync.[/cyan]")
         else:
-            console.print(f"[green]Syncing {field_changes} field(s) and {performers_matched} performer(s)...[/green]")
+            console.print(f"[green]Syncing {changes_text}...[/green]")
     else:
         console.print("[green]✓ No changes needed - data is already in sync[/green]")
 

@@ -35,6 +35,18 @@ class PerformerDiff:
 
 
 @dataclass
+class TagDiff:
+    """Represents a tag matching status."""
+
+    ce_uuid: str
+    ce_name: str
+    status: str  # "matched" | "not_found"
+    stashapp_id: int | None
+    stashapp_name: str | None
+    message: str
+
+
+@dataclass
 class SyncPlan:
     """Complete synchronization plan for a scene."""
 
@@ -44,18 +56,23 @@ class SyncPlan:
     stashapp_title: str
     field_diffs: list[FieldDiff]
     performer_diffs: list[PerformerDiff]
+    tag_diffs: list[TagDiff]
 
     @property
     def has_changes(self) -> bool:
         """Check if there are any changes to apply."""
-        return any(diff.action in ["update", "add"] for diff in self.field_diffs) or any(
-            diff.status == "matched" for diff in self.performer_diffs
+        return (
+            any(diff.action in ["update", "add"] for diff in self.field_diffs)
+            or any(diff.status == "matched" for diff in self.performer_diffs)
+            or any(diff.status == "matched" for diff in self.tag_diffs)
         )
 
     @property
     def has_warnings(self) -> bool:
         """Check if there are any warnings."""
-        return any(diff.status == "not_found" for diff in self.performer_diffs)
+        return any(diff.status == "not_found" for diff in self.performer_diffs) or any(
+            diff.status == "not_found" for diff in self.tag_diffs
+        )
 
 
 @dataclass
@@ -109,6 +126,17 @@ class SyncEngine:
         performers_df = self.ce_client.get_release_performers(ce_uuid)
         performers = performers_df.to_dicts() if performers_df.shape[0] > 0 else []
 
+        # Get tags for this release
+        tags_df = self.ce_client.get_release_tags(ce_uuid)
+        tags = []
+        if tags_df.shape[0] > 0:
+            for tag_dict in tags_df.to_dicts():
+                tag_uuid = tag_dict["ce_tags_uuid"]
+                # Get external IDs for this tag
+                external_ids = self.ce_client.get_tag_external_ids(tag_uuid)
+                tag_dict["ce_tags_stashapp_id"] = external_ids.get("stashapp")
+                tags.append(tag_dict)
+
         # Get cover image if available
         downloads_df = self.ce_client.get_release_downloads(ce_uuid)
         cover_image_path = None
@@ -137,6 +165,7 @@ class SyncEngine:
         return {
             "release": release,
             "performers": performers,
+            "tags": tags,
             "cover_image_path": cover_image_path,
         }
 
@@ -332,6 +361,10 @@ class SyncEngine:
         # Match performers
         performer_diffs = self._match_performers(ce_performers)
 
+        # Match tags
+        ce_tags = ce_data.get("tags", [])
+        tag_diffs = self._match_tags(ce_tags)
+
         return SyncPlan(
             ce_uuid=ce_release["ce_release_uuid"],
             stashapp_id=int(stash_data["id"]),
@@ -339,6 +372,7 @@ class SyncEngine:
             stashapp_title=stash_title,
             field_diffs=field_diffs,
             performer_diffs=performer_diffs,
+            tag_diffs=tag_diffs,
         )
 
     def _create_field_diff(
@@ -433,6 +467,50 @@ class SyncEngine:
                 )
 
         return performer_diffs
+
+    def _match_tags(self, ce_tags: list[dict]) -> list[TagDiff]:
+        """Match CE tags with Stashapp tags.
+
+        Args:
+            ce_tags: List of CE tags with external IDs
+
+        Returns:
+            List of TagDiff objects
+        """
+        tag_diffs = []
+
+        for ce_tag in ce_tags:
+            ce_uuid = ce_tag["ce_tags_uuid"]
+            ce_name = ce_tag["ce_tags_name"]
+            ce_stashapp_id = ce_tag.get("ce_tags_stashapp_id")
+
+            # Check if CE already has a Stashapp ID for this tag
+            if ce_stashapp_id:
+                # CE already has the tag linked - use that ID
+                tag_diffs.append(
+                    TagDiff(
+                        ce_uuid=ce_uuid,
+                        ce_name=ce_name,
+                        status="matched",
+                        stashapp_id=int(ce_stashapp_id),
+                        stashapp_name=ce_name,  # We'll use the CE name since we trust the ID is correct
+                        message=f"Matched to Stashapp tag #{ce_stashapp_id} (via CE link)",
+                    )
+                )
+            else:
+                # No Stashapp ID in CE - tag not linked yet
+                tag_diffs.append(
+                    TagDiff(
+                        ce_uuid=ce_uuid,
+                        ce_name=ce_name,
+                        status="not_found",
+                        stashapp_id=None,
+                        stashapp_name=None,
+                        message=f"Tag '{ce_name}' not linked to Stashapp yet (CE UUID: {ce_uuid})",
+                    )
+                )
+
+        return tag_diffs
 
     def _process_cover_image(self, cover_path: Path) -> tuple[str | None, list[str]]:
         """Process cover image file and return base64 encoded data.
@@ -536,6 +614,14 @@ class SyncEngine:
             if matched_performer_ids:
                 update_data["performer_ids"] = matched_performer_ids
                 fields_updated.append("performers")
+
+            # Update tag IDs
+            matched_tag_ids = [
+                t.stashapp_id for t in plan.tag_diffs if t.status == "matched" and t.stashapp_id
+            ]
+            if matched_tag_ids:
+                update_data["tag_ids"] = matched_tag_ids
+                fields_updated.append("tags")
 
             # Add CE external ID to Stashapp scene stash_ids
             update_data["stash_ids"] = [
