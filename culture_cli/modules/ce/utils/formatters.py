@@ -206,7 +206,7 @@ def print_info(message: str) -> None:
     console.print(f"[bold blue]i[/bold blue] {message}")
 
 
-def format_performers_table(performers_df: pl.DataFrame, site_name: str | None = None) -> Table:
+def format_performers_table(performers_df: pl.DataFrame, site_name: str | None = None) -> Table:  # noqa: PLR0912
     """Format performers dataframe as a Rich table.
 
     Args:
@@ -219,6 +219,9 @@ def format_performers_table(performers_df: pl.DataFrame, site_name: str | None =
     # Check if this is a multi-site query by looking for ce_site_name column
     is_multi_site = "ce_site_name" in performers_df.columns
 
+    # Check if link status columns are present
+    has_link_status = "has_stashapp_link" in performers_df.columns and "has_stashdb_link" in performers_df.columns
+
     title = f"Performers from {site_name}" if site_name else "Performers (All Sites)"
     table = Table(title=title, show_header=True, header_style="bold cyan", expand=False)
 
@@ -227,6 +230,8 @@ def format_performers_table(performers_df: pl.DataFrame, site_name: str | None =
     if is_multi_site:
         table.add_column("Site", style="cyan")
     table.add_column("Short Name", style="yellow")
+    if has_link_status:
+        table.add_column("Links", style="magenta", justify="center")
     table.add_column("UUID", style="dim")
 
     # Add rows
@@ -239,15 +244,46 @@ def format_performers_table(performers_df: pl.DataFrame, site_name: str | None =
         if performer_name != "-" and len(performer_name) > 40:
             performer_name = performer_name[:37] + "..."
 
+        # Build link status indicator
+        link_status = ""
+        if has_link_status:
+            has_stashapp = row.get("has_stashapp_link", False)
+            has_stashdb = row.get("has_stashdb_link", False)
+
+            if has_stashapp and has_stashdb:
+                link_status = "SA+DB"  # Both linked
+            elif has_stashapp:
+                link_status = "SA"  # Stashapp only
+            elif has_stashdb:
+                link_status = "DB"  # StashDB only
+            else:
+                link_status = "-"  # Not linked
+
         if is_multi_site:
             site_display = str(row.get("ce_site_name", "")) or "-"
             if site_display != "-" and len(site_display) > 20:
                 site_display = site_display[:17] + "..."
 
+            if has_link_status:
+                table.add_row(
+                    performer_name,
+                    site_display,
+                    performer_short_name,
+                    link_status,
+                    performer_uuid,
+                )
+            else:
+                table.add_row(
+                    performer_name,
+                    site_display,
+                    performer_short_name,
+                    performer_uuid,
+                )
+        elif has_link_status:
             table.add_row(
                 performer_name,
-                site_display,
                 performer_short_name,
+                link_status,
                 performer_uuid,
             )
         else:

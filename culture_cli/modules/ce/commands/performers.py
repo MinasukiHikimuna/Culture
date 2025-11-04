@@ -3,6 +3,7 @@
 
 from typing import Annotated
 
+import polars as pl
 import typer
 
 from culture_cli.modules.ce.utils.config import config
@@ -35,6 +36,14 @@ def list_performers(
         int | None,
         typer.Option("--limit", "-l", help="Limit number of results (useful when querying all sites)"),
     ] = None,
+    only_linked: Annotated[
+        bool,
+        typer.Option("--only-linked", help="Show only performers linked to Stashapp/StashDB"),
+    ] = False,
+    only_unlinked: Annotated[
+        bool,
+        typer.Option("--only-unlinked", help="Show only performers not linked to Stashapp/StashDB"),
+    ] = False,
     json_output: Annotated[
         bool,
         typer.Option("--json", "-j", help="Output as JSON instead of table"),
@@ -51,8 +60,13 @@ def list_performers(
         ce performers list -s meanawolf -n "Jane"        # Filter by site and name
         ce performers list -n "Jane" --limit 20          # Limit results to 20
         ce performers list --site meanawolf --json       # JSON output
+        ce performers list --site meanawolf --only-unlinked  # Show unlinked performers only
     """
     try:
+        if only_linked and only_unlinked:
+            print_error("Cannot use both --only-linked and --only-unlinked")
+            raise typer.Exit(code=1)
+
         client = config.get_client()
 
         # Fetch performers based on filters
@@ -61,6 +75,30 @@ def list_performers(
         # Check if any results were found
         if performers_df.shape[0] == 0:
             msg = _build_not_found_message(site_name, name)
+            print_info(msg)
+            raise typer.Exit(code=0)
+
+        # Enrich with external link status
+        performers_df = _enrich_with_link_status(client, performers_df)
+
+        # Apply link status filters
+        if only_linked:
+            performers_df = performers_df.filter(
+                (performers_df["has_stashapp_link"]) | (performers_df["has_stashdb_link"])
+            )
+        elif only_unlinked:
+            performers_df = performers_df.filter(
+                (~performers_df["has_stashapp_link"]) & (~performers_df["has_stashdb_link"])
+            )
+
+        # Check again after filtering
+        if performers_df.shape[0] == 0:
+            link_filter = "linked" if only_linked else "unlinked" if only_unlinked else ""
+            msg = f"No {link_filter} performers found"
+            if site_name:
+                msg += f" for site '{site_name}'"
+            if name:
+                msg += f" matching '{name}'"
             print_info(msg)
             raise typer.Exit(code=0)
 
@@ -143,6 +181,37 @@ def _resolve_site_uuid(client, site: str) -> tuple[str, str]:
         raise ValueError(f"Site '{site}' not found")
 
     return site_match["ce_sites_uuid"][0], site_match["ce_sites_name"][0]
+
+
+def _enrich_with_link_status(client, performers_df: pl.DataFrame) -> pl.DataFrame:
+    """Enrich performers dataframe with external link status.
+
+    Args:
+        client: Culture Extractor client
+        performers_df: DataFrame with performer information
+
+    Returns:
+        DataFrame with added has_stashapp_link and has_stashdb_link columns
+    """
+    # Get all performer UUIDs
+    performer_uuids = performers_df["ce_performers_uuid"].to_list()
+
+    # Fetch external IDs for all performers
+    stashapp_links = []
+    stashdb_links = []
+
+    for uuid in performer_uuids:
+        external_ids = client.get_performer_external_ids(uuid)
+        stashapp_links.append("stashapp" in external_ids)
+        stashdb_links.append("stashdb" in external_ids)
+
+    # Add columns to dataframe
+    performers_df = performers_df.with_columns([
+        pl.Series("has_stashapp_link", stashapp_links),
+        pl.Series("has_stashdb_link", stashdb_links),
+    ])
+
+    return performers_df
 
 
 def _build_not_found_message(site_name: str | None, name: str | None) -> str:
