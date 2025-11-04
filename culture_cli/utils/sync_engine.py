@@ -57,6 +57,9 @@ class SyncPlan:
     field_diffs: list[FieldDiff]
     performer_diffs: list[PerformerDiff]
     tag_diffs: list[TagDiff]
+    existing_stashapp_performer_ids: list[int]
+    existing_stashapp_tag_ids: list[int]
+    existing_stashapp_stash_ids: list[dict]
 
     @property
     def has_changes(self) -> bool:
@@ -195,6 +198,10 @@ class SyncEngine:
                     endpoint
                     stash_id
                 }
+            }
+            tags {
+                id
+                name
             }
             stash_ids {
                 endpoint
@@ -365,6 +372,15 @@ class SyncEngine:
         ce_tags = ce_data.get("tags", [])
         tag_diffs = self._match_tags(ce_tags)
 
+        # Extract existing Stashapp data for merging
+        existing_performers = stash_data.get("performers", [])
+        existing_stashapp_performer_ids = [p["id"] for p in existing_performers]
+
+        existing_tags = stash_data.get("tags", [])
+        existing_stashapp_tag_ids = [t["id"] for t in existing_tags]
+
+        existing_stashapp_stash_ids = stash_data.get("stash_ids", [])
+
         return SyncPlan(
             ce_uuid=ce_release["ce_release_uuid"],
             stashapp_id=int(stash_data["id"]),
@@ -373,6 +389,9 @@ class SyncEngine:
             field_diffs=field_diffs,
             performer_diffs=performer_diffs,
             tag_diffs=tag_diffs,
+            existing_stashapp_performer_ids=existing_stashapp_performer_ids,
+            existing_stashapp_tag_ids=existing_stashapp_tag_ids,
+            existing_stashapp_stash_ids=existing_stashapp_stash_ids,
         )
 
     def _create_field_diff(
@@ -548,11 +567,12 @@ class SyncEngine:
             errors.append(f"Failed to process cover image: {e}")
             return None, errors
 
-    def apply_sync(self, plan: SyncPlan) -> SyncResult:
+    def apply_sync(self, plan: SyncPlan, overwrite: bool = False) -> SyncResult:
         """Apply the synchronization plan.
 
         Args:
             plan: SyncPlan to apply
+            overwrite: If True, overwrite existing values. If False (default), merge with existing values
 
         Returns:
             SyncResult with operation results
@@ -564,69 +584,20 @@ class SyncEngine:
             # Build update payload
             update_data = {"id": plan.stashapp_id}
 
-            # Update title if changed
-            title_diff = next((d for d in plan.field_diffs if d.field_name == "title"), None)
-            if title_diff and title_diff.action in ["update", "add"]:
-                update_data["title"] = title_diff.new_value
-                fields_updated.append("title")
+            # Update basic fields
+            self._apply_basic_field_updates(plan, update_data, fields_updated)
 
-            # Update date if changed
-            date_diff = next((d for d in plan.field_diffs if d.field_name == "date"), None)
-            if date_diff and date_diff.action in ["update", "add"]:
-                update_data["date"] = date_diff.new_value
-                fields_updated.append("date")
+            # Update cover image
+            self._apply_cover_image_update(plan, update_data, fields_updated, errors)
 
-            # Update details if changed
-            details_diff = next((d for d in plan.field_diffs if d.field_name == "details"), None)
-            if details_diff and details_diff.action in ["update", "add"]:
-                update_data["details"] = details_diff.new_value
-                fields_updated.append("details")
+            # Update performers and tags
+            matched_performer_ids = self._apply_performer_updates(
+                plan, update_data, fields_updated, overwrite
+            )
+            self._apply_tag_updates(plan, update_data, fields_updated, overwrite)
 
-            # Add URL if new
-            url_diff = next((d for d in plan.field_diffs if d.field_name == "url"), None)
-            if url_diff and url_diff.action == "add":
-                current_urls = url_diff.current_value if isinstance(url_diff.current_value, list) else []
-                new_urls = [*current_urls, url_diff.new_value]
-                update_data["urls"] = new_urls
-                fields_updated.append("url")
-
-            # Update cover image if available
-            cover_diff = next((d for d in plan.field_diffs if d.field_name == "cover_image"), None)
-            if cover_diff and cover_diff.action in ["update", "add"] and cover_diff.new_value:
-                cover_path = Path(cover_diff.new_value)
-                cover_image_base64, cover_errors = self._process_cover_image(cover_path)
-                errors.extend(cover_errors)
-
-                if cover_image_base64:
-                    update_data["cover_image"] = cover_image_base64
-                    fields_updated.append("cover_image")
-
-            # Update studio if changed
-            studio_diff = next((d for d in plan.field_diffs if d.field_name == "studio"), None)
-            if studio_diff and studio_diff.action in ["update", "add"]:
-                update_data["studio_id"] = studio_diff.new_value
-                fields_updated.append("studio")
-
-            # Update performer IDs
-            matched_performer_ids = [
-                p.stashapp_id for p in plan.performer_diffs if p.status == "matched" and p.stashapp_id
-            ]
-            if matched_performer_ids:
-                update_data["performer_ids"] = matched_performer_ids
-                fields_updated.append("performers")
-
-            # Update tag IDs
-            matched_tag_ids = [
-                t.stashapp_id for t in plan.tag_diffs if t.status == "matched" and t.stashapp_id
-            ]
-            if matched_tag_ids:
-                update_data["tag_ids"] = matched_tag_ids
-                fields_updated.append("tags")
-
-            # Add CE external ID to Stashapp scene stash_ids
-            update_data["stash_ids"] = [
-                {"endpoint": "https://culture.extractor/graphql", "stash_id": plan.ce_uuid}
-            ]
+            # Update stash_ids
+            self._apply_stash_ids_update(plan, update_data, overwrite)
 
             # Apply update to Stashapp
             if fields_updated:  # Only update if there are actual changes
@@ -652,3 +623,110 @@ class SyncEngine:
                 performers_linked=0,
                 errors=errors,
             )
+
+    def _apply_basic_field_updates(
+        self, plan: SyncPlan, update_data: dict, fields_updated: list[str]
+    ) -> None:
+        """Apply basic field updates (title, date, details, url, studio)."""
+        # Update title if changed
+        title_diff = next((d for d in plan.field_diffs if d.field_name == "title"), None)
+        if title_diff and title_diff.action in ["update", "add"]:
+            update_data["title"] = title_diff.new_value
+            fields_updated.append("title")
+
+        # Update date if changed
+        date_diff = next((d for d in plan.field_diffs if d.field_name == "date"), None)
+        if date_diff and date_diff.action in ["update", "add"]:
+            update_data["date"] = date_diff.new_value
+            fields_updated.append("date")
+
+        # Update details if changed
+        details_diff = next((d for d in plan.field_diffs if d.field_name == "details"), None)
+        if details_diff and details_diff.action in ["update", "add"]:
+            update_data["details"] = details_diff.new_value
+            fields_updated.append("details")
+
+        # Add URL if new
+        url_diff = next((d for d in plan.field_diffs if d.field_name == "url"), None)
+        if url_diff and url_diff.action == "add":
+            current_urls = url_diff.current_value if isinstance(url_diff.current_value, list) else []
+            new_urls = [*current_urls, url_diff.new_value]
+            update_data["urls"] = new_urls
+            fields_updated.append("url")
+
+        # Update studio if changed
+        studio_diff = next((d for d in plan.field_diffs if d.field_name == "studio"), None)
+        if studio_diff and studio_diff.action in ["update", "add"]:
+            update_data["studio_id"] = studio_diff.new_value
+            fields_updated.append("studio")
+
+    def _apply_cover_image_update(
+        self, plan: SyncPlan, update_data: dict, fields_updated: list[str], errors: list[str]
+    ) -> None:
+        """Apply cover image update."""
+        cover_diff = next((d for d in plan.field_diffs if d.field_name == "cover_image"), None)
+        if cover_diff and cover_diff.action in ["update", "add"] and cover_diff.new_value:
+            cover_path = Path(cover_diff.new_value)
+            cover_image_base64, cover_errors = self._process_cover_image(cover_path)
+            errors.extend(cover_errors)
+
+            if cover_image_base64:
+                update_data["cover_image"] = cover_image_base64
+                fields_updated.append("cover_image")
+
+    def _apply_performer_updates(
+        self, plan: SyncPlan, update_data: dict, fields_updated: list[str], overwrite: bool
+    ) -> list[int]:
+        """Apply performer updates and return matched performer IDs."""
+        matched_performer_ids = [
+            p.stashapp_id for p in plan.performer_diffs if p.status == "matched" and p.stashapp_id
+        ]
+
+        if matched_performer_ids or overwrite:
+            if overwrite:
+                final_performer_ids = matched_performer_ids
+            else:
+                final_performer_ids = list(
+                    set(plan.existing_stashapp_performer_ids + matched_performer_ids)
+                )
+
+            if final_performer_ids:
+                update_data["performer_ids"] = final_performer_ids
+                fields_updated.append("performers")
+
+        return matched_performer_ids
+
+    def _apply_tag_updates(
+        self, plan: SyncPlan, update_data: dict, fields_updated: list[str], overwrite: bool
+    ) -> None:
+        """Apply tag updates."""
+        matched_tag_ids = [
+            t.stashapp_id for t in plan.tag_diffs if t.status == "matched" and t.stashapp_id
+        ]
+
+        if matched_tag_ids or overwrite:
+            if overwrite:
+                final_tag_ids = matched_tag_ids
+            else:
+                final_tag_ids = list(set(plan.existing_stashapp_tag_ids + matched_tag_ids))
+
+            if final_tag_ids:
+                update_data["tag_ids"] = final_tag_ids
+                fields_updated.append("tags")
+
+    def _apply_stash_ids_update(self, plan: SyncPlan, update_data: dict, overwrite: bool) -> None:
+        """Apply stash_ids update."""
+        ce_stash_id = {"endpoint": "https://culture.extractor/graphql", "stash_id": plan.ce_uuid}
+
+        if overwrite:
+            update_data["stash_ids"] = [ce_stash_id]
+        else:
+            existing_stash_ids = [
+                sid
+                for sid in plan.existing_stashapp_stash_ids
+                if not (
+                    sid.get("endpoint") == ce_stash_id["endpoint"]
+                    and sid.get("stash_id") == ce_stash_id["stash_id"]
+                )
+            ]
+            update_data["stash_ids"] = [*existing_stash_ids, ce_stash_id]

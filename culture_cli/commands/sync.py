@@ -31,18 +31,27 @@ def sync_scene(
     to_system: Annotated[str, typer.Option("--to", help="Target system (stashapp)")],
     to_id: Annotated[int, typer.Option("--to-id", help="Target ID (Stashapp scene ID)")],
     apply: Annotated[bool, typer.Option("--apply", help="Apply changes (default is dry-run)")] = False,
+    overwrite: Annotated[
+        bool, typer.Option("--overwrite", help="Overwrite existing values instead of merging")
+    ] = False,
 ) -> None:
     """Synchronize metadata from Culture Extractor to Stashapp.
 
     By default, this command runs in dry-run mode and shows what changes would be made
     without actually applying them. Use --apply to execute the sync.
 
+    The sync will merge new data with existing data (e.g., adding new performers/tags to
+    existing ones). Use --overwrite to replace existing data completely instead.
+
     Examples:
         # Dry run (show changes without applying)
         culture sync --from culture-extractor --from-id <UUID> --to stashapp --to-id <ID>
 
-        # Apply changes
+        # Apply changes (merge with existing data)
         culture sync --from culture-extractor --from-id <UUID> --to stashapp --to-id <ID> --apply
+
+        # Apply changes (overwrite existing data)
+        culture sync --from culture-extractor --from-id <UUID> --to stashapp --to-id <ID> --apply --overwrite
     """
     try:
         # Validate systems
@@ -81,7 +90,7 @@ def sync_scene(
                 print_info("No changes to apply")
                 raise typer.Exit(code=0)
 
-            result = sync_engine.apply_sync(sync_plan)
+            result = sync_engine.apply_sync(sync_plan, overwrite=overwrite)
             display_sync_result(result)
 
             if not result.success:
