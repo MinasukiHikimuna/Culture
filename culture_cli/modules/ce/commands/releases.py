@@ -23,11 +23,57 @@ from culture_cli.modules.ce.utils.formatters import (
 releases_app = typer.Typer(help="Manage Culture Extractor releases")
 
 
+def _resolve_site_for_releases(client, site: str) -> tuple[str, str]:
+    """Resolve site identifier to UUID and name.
+
+    Returns:
+        Tuple of (site_uuid, site_name)
+    """
+    sites_df = client.get_sites()
+    site_match = sites_df.filter(
+        (sites_df["ce_sites_short_name"] == site)
+        | (sites_df["ce_sites_uuid"] == site)
+        | (sites_df["ce_sites_name"] == site)
+    )
+
+    if site_match.shape[0] == 0:
+        print_error(f"Site '{site}' not found")
+        print_info("To see available sites, run: ce sites list")
+        raise typer.Exit(code=1)
+
+    return site_match["ce_sites_uuid"][0], site_match["ce_sites_name"][0]
+
+
+def _resolve_tag_for_releases(client, site: str, site_uuid: str, site_name: str, tag: str) -> tuple[str, str]:
+    """Resolve tag identifier to UUID and name for a given site.
+
+    Returns:
+        Tuple of (tag_uuid, tag_name)
+    """
+    tags_df = client.get_tags(site_uuid)
+    tag_match = tags_df.filter(
+        (tags_df["ce_tags_name"] == tag)
+        | (tags_df["ce_tags_uuid"] == tag)
+        | (tags_df["ce_tags_short_name"] == tag)
+    )
+
+    if tag_match.shape[0] == 0:
+        print_error(f"Tag '{tag}' not found for site '{site_name}'")
+        print_info(f"To see available tags, run: ce tags list --site {site}")
+        raise typer.Exit(code=1)
+
+    return tag_match["ce_tags_uuid"][0], tag_match["ce_tags_name"][0]
+
+
 @releases_app.command("list")
 def list_releases(
     site: Annotated[
         str | None,
         typer.Option("--site", "-s", help="Filter by site (short name or UUID)"),
+    ] = None,
+    tag: Annotated[
+        str | None,
+        typer.Option("--tag", "-t", help="Filter by tag (tag name or UUID)"),
     ] = None,
     limit: Annotated[
         int | None,
@@ -43,61 +89,50 @@ def list_releases(
     A release represents a scene/content item regardless of whether it has been downloaded.
 
     Examples:
-        ce releases list --site meanawolf              # List all Meana Wolf releases
-        ce releases list --site meanawolf --limit 20   # Show first 20 releases
-        ce releases list --site meanawolf --json       # JSON output
+        ce releases list --site meanawolf                      # List all Meana Wolf releases
+        ce releases list --site meanawolf --limit 20           # Show first 20 releases
+        ce releases list --site meanawolf --tag "pov"          # Filter by tag
+        ce releases list --site meanawolf --json               # JSON output
     """
     try:
-        # Get Culture Extractor client
         client = config.get_client()
 
-        # If no site specified, show error
         if not site:
             print_error("Site filter is required. Use --site <site_name> or --site <uuid>")
             print_info("To see available sites, run: ce sites list")
             raise typer.Exit(code=1)
 
-        # Try to find site by short name or UUID
-        sites_df = client.get_sites()
+        site_uuid, site_name = _resolve_site_for_releases(client, site)
 
-        # Check if it's a UUID or short name
-        site_match = sites_df.filter(
-            (sites_df["ce_sites_short_name"] == site) |
-            (sites_df["ce_sites_uuid"] == site) |
-            (sites_df["ce_sites_name"] == site)
-        )
+        tag_uuid = None
+        tag_name = None
+        if tag:
+            tag_uuid, tag_name = _resolve_tag_for_releases(client, site, site_uuid, site_name, tag)
 
-        if site_match.shape[0] == 0:
-            print_error(f"Site '{site}' not found")
-            print_info("To see available sites, run: ce sites list")
-            raise typer.Exit(code=1)
+        filter_msg = f" with tag '{tag_name}'" if tag_name else ""
+        print_info(f"Fetching releases from '{site_name}'{filter_msg}...")
 
-        site_uuid = site_match["ce_sites_uuid"][0]
-        site_name = site_match["ce_sites_name"][0]
-
-        print_info(f"Fetching releases from '{site_name}'...")
-
-        # Fetch releases for the site
-        releases_df = client.get_releases(site_uuid)
+        releases_df = client.get_releases(site_uuid, tag_uuid=tag_uuid)
 
         if releases_df.shape[0] == 0:
-            print_info(f"No releases found for site '{site_name}'")
+            msg = f"No releases found for site '{site_name}'"
+            if tag_name:
+                msg += f" with tag '{tag_name}'"
+            print_info(msg)
             raise typer.Exit(code=0)
 
-        # Apply limit if specified
         if limit and limit > 0:
             releases_df = releases_df.head(limit)
 
-        # Display results
         count = releases_df.shape[0]
         if json_output:
             print_json(releases_df)
         else:
             table = format_releases_table(releases_df, site_name)
             print_table(table)
-
             limit_msg = f" (showing first {limit})" if limit else ""
-            print_success(f"Found {count} release(s){limit_msg}")
+            filter_desc = f" with tag '{tag_name}'" if tag_name else ""
+            print_success(f"Found {count} release(s){filter_desc}{limit_msg}")
 
     except ValueError as e:
         print_error(str(e))

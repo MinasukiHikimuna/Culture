@@ -116,11 +116,12 @@ class ClientCultureExtractor:
 
             return pl.DataFrame(sub_sites, schema=schema)
 
-    def get_releases(self, site_uuid: str) -> pl.DataFrame:
-        """Get all releases for a given site UUID.
+    def get_releases(self, site_uuid: str, tag_uuid: str | None = None) -> pl.DataFrame:
+        """Get all releases for a given site UUID, optionally filtered by tag.
 
         Args:
             site_uuid: UUID of the site to get releases for
+            tag_uuid: Optional tag UUID to filter releases by
 
         Returns:
             DataFrame containing all releases for the site
@@ -139,6 +140,21 @@ class ClientCultureExtractor:
             if not site_row:
                 return pl.DataFrame()
             site_name = site_row[0]
+
+            if tag_uuid:
+                # Filter releases by tag
+                return self._get_releases_by_query(
+                    cursor,
+                    """WHERE site_uuid = %s
+                       AND uuid IN (
+                           SELECT releases_uuid
+                           FROM release_entity_site_tag_entity
+                           WHERE tags_uuid = %s
+                       )""",
+                    (site_uuid, tag_uuid),
+                    site_name=site_name,
+                    site_uuid=site_uuid,
+                )
 
             return self._get_releases_by_query(
                 cursor,
