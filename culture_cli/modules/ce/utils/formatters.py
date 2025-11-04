@@ -311,6 +311,8 @@ def format_tags_table(tags_df: pl.DataFrame, site_name: str | None = None) -> Ta
     # Add columns
     table.add_column("Name", style="green")
     table.add_column("Short Name", style="yellow")
+    table.add_column("Stashapp", style="cyan", justify="center")
+    table.add_column("StashDB", style="cyan", justify="center")
     table.add_column("UUID", style="dim")
 
     # Add rows
@@ -318,14 +320,22 @@ def format_tags_table(tags_df: pl.DataFrame, site_name: str | None = None) -> Ta
         tag_name = str(row.get("ce_tags_name", "")) or "-"
         tag_short_name = str(row.get("ce_tags_short_name", "")) or "-"
         tag_uuid = str(row.get("ce_tags_uuid", "")) or "-"
+        stashapp_id = row.get("ce_tags_stashapp_id")
+        stashdb_id = row.get("ce_tags_stashdb_id")
 
         # Truncate long names
         if tag_name != "-" and len(tag_name) > 40:
             tag_name = tag_name[:37] + "..."
 
+        # Display link status with checkmark or x
+        stashapp_status = "✓" if stashapp_id else "✗"
+        stashdb_status = "✓" if stashdb_id else "✗"
+
         table.add_row(
             tag_name,
             tag_short_name,
+            stashapp_status,
+            stashdb_status,
             tag_uuid,
         )
 

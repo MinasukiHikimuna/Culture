@@ -37,6 +37,10 @@ def list_tags(
         int | None,
         typer.Option("--limit", "-l", help="Limit number of results"),
     ] = None,
+    unlinked_only: Annotated[
+        bool,
+        typer.Option("--unlinked-only", "-u", help="Show only tags without Stashapp links"),
+    ] = False,
     json_output: Annotated[
         bool,
         typer.Option("--json", "-j", help="Output as JSON instead of table"),
@@ -45,11 +49,13 @@ def list_tags(
     """List tags from a specific site in the Culture Extractor database.
 
     Use --name to filter by tag name. Tags are retrieved from releases in the site.
+    Use --unlinked-only to show only tags that don't have Stashapp links.
 
     Examples:
         ce tags list --site meanawolf                    # List all tags from Meana Wolf
         ce tags list -s meanawolf -n "pov"               # Filter by name
         ce tags list -s meanawolf --limit 20             # Limit results to 20
+        ce tags list -s meanawolf --unlinked-only        # Show only unlinked tags
         ce tags list --site meanawolf --json             # JSON output
     """
     try:
@@ -83,6 +89,13 @@ def list_tags(
                 msg += f" matching '{name}'"
             print_info(msg)
             raise typer.Exit(code=0)
+
+        # Filter for unlinked tags if requested
+        if unlinked_only:
+            tags_df = tags_df.filter(tags_df["ce_tags_stashapp_id"].is_null())
+            if tags_df.shape[0] == 0:
+                print_info(f"All tags from '{site_name}' are linked to Stashapp")
+                raise typer.Exit(code=0)
 
         # Apply limit if specified
         if limit and limit > 0:

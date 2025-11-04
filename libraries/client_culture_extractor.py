@@ -831,17 +831,24 @@ class ClientCultureExtractor:
             cursor.execute(query, params)
             tags_rows = cursor.fetchall()
 
-            tags = [
-                {
-                    "ce_site_uuid": str(site_uuid),
-                    "ce_site_name": site_name,
-                    "ce_tags_uuid": str(row[0]),
-                    "ce_tags_short_name": row[1],
-                    "ce_tags_name": row[2],
-                    "ce_tags_url": row[3],
-                }
-                for row in tags_rows
-            ]
+            tags = []
+            for row in tags_rows:
+                tag_uuid = str(row[0])
+                # Get external IDs for this tag
+                external_ids = self.get_tag_external_ids(tag_uuid)
+
+                tags.append(
+                    {
+                        "ce_site_uuid": str(site_uuid),
+                        "ce_site_name": site_name,
+                        "ce_tags_uuid": tag_uuid,
+                        "ce_tags_short_name": row[1],
+                        "ce_tags_name": row[2],
+                        "ce_tags_url": row[3],
+                        "ce_tags_stashapp_id": external_ids.get("stashapp"),
+                        "ce_tags_stashdb_id": external_ids.get("stashdb"),
+                    }
+                )
 
             schema = {
                 "ce_site_uuid": pl.Utf8,
@@ -850,6 +857,8 @@ class ClientCultureExtractor:
                 "ce_tags_short_name": pl.Utf8,
                 "ce_tags_name": pl.Utf8,
                 "ce_tags_url": pl.Utf8,
+                "ce_tags_stashapp_id": pl.Utf8,
+                "ce_tags_stashdb_id": pl.Utf8,
             }
 
             return pl.DataFrame(tags, schema=schema)
