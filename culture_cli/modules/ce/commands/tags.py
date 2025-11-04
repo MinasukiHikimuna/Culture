@@ -422,7 +422,10 @@ def _display_match_results(matches, site_name: str, limit: int | None, json_outp
         print_table(table)
         limit_msg = f" (showing first {limit})" if limit else ""
         print_success(f"Found {len(matches)} potential match(es){limit_msg}")
-        print_info("To link a tag, run: ce tags link <ce-uuid> --stashapp-id <id>")
+        print_info("\nLink commands (copy and paste the ones you want):")
+        for match in matches:
+            print(f"uv run culture ce tags link {match.ce_uuid} --stashapp-id {match.stashapp_id}")
+        print()
 
 
 @tags_app.command("auto-link")
