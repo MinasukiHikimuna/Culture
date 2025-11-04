@@ -165,6 +165,89 @@ def link_tag(
         raise typer.Exit(code=1) from e
 
 
+@tags_app.command("unlinked")
+def list_unlinked_tags(
+    site: Annotated[
+        str,
+        typer.Option("--site", "-s", help="CE site to check (short name or UUID)"),
+    ],
+    limit: Annotated[
+        int | None,
+        typer.Option("--limit", "-l", help="Limit number of results"),
+    ] = None,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", "-j", help="Output as JSON instead of table"),
+    ] = False,
+) -> None:
+    """List CE tags that are not linked to Stashapp.
+
+    This command shows which tags from a site don't have Stashapp links,
+    helping you identify tags that need manual linking or lower thresholds.
+
+    Examples:
+        ce tags unlinked --site ellieidol                    # List all unlinked tags
+        ce tags unlinked -s ellieidol --limit 50             # Limit results
+        ce tags unlinked --site ellieidol --json             # Output as JSON
+    """
+    try:
+        ce_client = config.get_client()
+        site_uuid, site_name = _resolve_site(ce_client, site)
+        ce_tags = _fetch_ce_tags(ce_client, site_uuid, site_name)
+
+        print_info("Checking for unlinked tags...")
+        unlinked_tags = []
+
+        for row in ce_tags.iter_rows(named=True):
+            ce_uuid = row["ce_tags_uuid"]
+            ce_name = row["ce_tags_name"]
+            external_ids = ce_client.get_tag_external_ids(ce_uuid)
+
+            if "stashapp" not in external_ids:
+                unlinked_tags.append({"uuid": ce_uuid, "name": ce_name})
+
+        if not unlinked_tags:
+            print_success(f"All tags from '{site_name}' are linked to Stashapp!")
+            raise typer.Exit(code=0)
+
+        # Apply limit if specified
+        if limit and limit > 0:
+            unlinked_tags = unlinked_tags[:limit]
+
+        # Display results
+        if json_output:
+            print(json.dumps(unlinked_tags, indent=2))
+        else:
+            table = Table(title=f"Unlinked Tags from {site_name}")
+            table.add_column("Tag Name", style="cyan")
+            table.add_column("UUID", style="dim")
+
+            for tag in unlinked_tags:
+                table.add_row(tag["name"], tag["uuid"])
+
+            print_table(table)
+            limit_msg = f" (showing first {limit})" if limit else ""
+            total_tags = ce_tags.shape[0]
+            unlinked_count = len(unlinked_tags) if not limit else sum(
+                1
+                for row in ce_tags.iter_rows(named=True)
+                if "stashapp" not in ce_client.get_tag_external_ids(row["ce_tags_uuid"])
+            )
+            linked_count = total_tags - unlinked_count
+            print_info(
+                f"Found {unlinked_count} unlinked tag(s) out of {total_tags} total "
+                f"({linked_count} linked, {(linked_count/total_tags)*100:.1f}% coverage){limit_msg}"
+            )
+            print_info("To find potential matches, run: ce tags match --site <site> -t <threshold>")
+
+    except ValueError as e:
+        print_error(str(e))
+        raise typer.Exit(code=1) from e
+    except Exception as e:
+        print_error(f"Failed to list unlinked tags: {e}")
+        raise typer.Exit(code=1) from e
+
+
 @tags_app.command("match")
 def match_tags(
     site: Annotated[
