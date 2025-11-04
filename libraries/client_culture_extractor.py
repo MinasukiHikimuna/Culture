@@ -756,6 +756,144 @@ class ClientCultureExtractor:
 
             self.connection.commit()
 
+    def get_tag_by_uuid(self, tag_uuid: str) -> pl.DataFrame:
+        """Get a specific tag by its UUID.
+
+        Args:
+            tag_uuid: UUID of the tag to get
+
+        Returns:
+            DataFrame containing the tag data
+        """
+        with self.connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT
+                    uuid AS ce_tags_uuid,
+                    short_name AS ce_tags_short_name,
+                    name AS ce_tags_name,
+                    url AS ce_tags_url
+                FROM tags
+                WHERE uuid = %s
+            """,
+                (tag_uuid,),
+            )
+            tag_row = cursor.fetchone()
+            if not tag_row:
+                return pl.DataFrame()
+
+            tag_data = {
+                "ce_tags_uuid": str(tag_row[0]),
+                "ce_tags_short_name": tag_row[1],
+                "ce_tags_name": tag_row[2],
+                "ce_tags_url": tag_row[3],
+            }
+
+            schema = {
+                "ce_tags_uuid": pl.Utf8,
+                "ce_tags_short_name": pl.Utf8,
+                "ce_tags_name": pl.Utf8,
+                "ce_tags_url": pl.Utf8,
+            }
+
+            return pl.DataFrame([tag_data], schema=schema)
+
+    def get_tag_external_ids(self, tag_uuid: str) -> dict:
+        """Get external IDs for a tag from the tag_external_ids table.
+
+        Args:
+            tag_uuid: UUID of the tag
+
+        Returns:
+            Dictionary containing external IDs by target system name
+        """
+        with self.connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT ts.name, tei.external_id
+                FROM tag_external_ids tei
+                JOIN target_systems ts ON tei.target_system_uuid = ts.uuid
+                WHERE tei.tag_uuid = %s
+            """,
+                (tag_uuid,),
+            )
+            results = cursor.fetchall()
+
+            # Return as dictionary with target system name as key
+            return {row[0]: row[1] for row in results}
+
+    def set_tag_external_id(
+        self, tag_uuid: str, target_system_name: str, external_id: str
+    ) -> None:
+        """Set an external ID for a tag in the tag_external_ids table.
+
+        Args:
+            tag_uuid: UUID of the tag
+            target_system_name: Name of the target system (e.g., 'stashapp', 'stashdb')
+            external_id: The external ID value (as string)
+        """
+        with self.connection.cursor() as cursor:
+            # Verify tag exists
+            cursor.execute(
+                "SELECT uuid FROM tags WHERE uuid = %s", (tag_uuid,)
+            )
+            if not cursor.fetchone():
+                raise ValueError(f"Tag with UUID {tag_uuid} does not exist")
+
+            # Get or create target system
+            cursor.execute(
+                "SELECT uuid FROM target_systems WHERE name = %s",
+                (target_system_name,),
+            )
+            target_system_row = cursor.fetchone()
+
+            if target_system_row:
+                target_system_uuid = target_system_row[0]
+            else:
+                # Create new target system
+                target_system_uuid = str(newnewid.uuid7())
+                cursor.execute(
+                    """
+                    INSERT INTO target_systems (uuid, name, description, created, last_updated)
+                    VALUES (%s, %s, %s, NOW(), NOW())
+                """,
+                    (target_system_uuid, target_system_name, f"External system: {target_system_name}"),
+                )
+
+            # Check if external ID already exists for this tag and target system
+            cursor.execute(
+                """
+                SELECT uuid FROM tag_external_ids
+                WHERE tag_uuid = %s AND target_system_uuid = %s
+            """,
+                (tag_uuid, target_system_uuid),
+            )
+            existing_row = cursor.fetchone()
+
+            if existing_row:
+                # Update existing
+                cursor.execute(
+                    """
+                    UPDATE tag_external_ids
+                    SET external_id = %s, last_updated = NOW()
+                    WHERE uuid = %s
+                """,
+                    (external_id, existing_row[0]),
+                )
+            else:
+                # Insert new
+                external_id_uuid = str(newnewid.uuid7())
+                cursor.execute(
+                    """
+                    INSERT INTO tag_external_ids
+                    (uuid, tag_uuid, target_system_uuid, external_id, created, last_updated)
+                    VALUES (%s, %s, %s, %s, NOW(), NOW())
+                """,
+                    (external_id_uuid, tag_uuid, target_system_uuid, external_id),
+                )
+
+            self.connection.commit()
+
     def get_performers_all(self, name_filter: str | None = None) -> pl.DataFrame:
         """Get all performers across all sites, with optional name filtering.
 
