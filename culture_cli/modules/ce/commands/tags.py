@@ -3,6 +3,7 @@
 import json
 from typing import Annotated
 
+import polars as pl
 import typer
 from rich.table import Table
 
@@ -37,9 +38,13 @@ def list_tags(
         int | None,
         typer.Option("--limit", "-l", help="Limit number of results"),
     ] = None,
-    unlinked_only: Annotated[
+    only_linked: Annotated[
         bool,
-        typer.Option("--unlinked-only", "-u", help="Show only tags without Stashapp links"),
+        typer.Option("--only-linked", help="Show only tags linked to Stashapp/StashDB"),
+    ] = False,
+    only_unlinked: Annotated[
+        bool,
+        typer.Option("--only-unlinked", help="Show only tags not linked to Stashapp/StashDB"),
     ] = False,
     json_output: Annotated[
         bool,
@@ -49,67 +54,38 @@ def list_tags(
     """List tags from a specific site in the Culture Extractor database.
 
     Use --name to filter by tag name. Tags are retrieved from releases in the site.
-    Use --unlinked-only to show only tags that don't have Stashapp links.
+    Use --only-unlinked to show only tags that don't have Stashapp links.
+    Use --only-linked to show only tags that have Stashapp links.
 
     Examples:
         ce tags list --site meanawolf                    # List all tags from Meana Wolf
         ce tags list -s meanawolf -n "pov"               # Filter by name
         ce tags list -s meanawolf --limit 20             # Limit results to 20
-        ce tags list -s meanawolf --unlinked-only        # Show only unlinked tags
+        ce tags list -s meanawolf --only-unlinked        # Show only unlinked tags
+        ce tags list -s meanawolf --only-linked          # Show only linked tags
         ce tags list --site meanawolf --json             # JSON output
     """
     try:
-        client = config.get_client()
-
-        # Resolve site UUID
-        sites_df = client.get_sites()
-        site_match = sites_df.filter(
-            (sites_df["ce_sites_short_name"] == site)
-            | (sites_df["ce_sites_uuid"] == site)
-            | (sites_df["ce_sites_name"] == site)
-        )
-
-        if site_match.shape[0] == 0:
-            print_error(f"Site '{site}' not found")
-            print_info("To see available sites, run: ce sites list")
+        if only_linked and only_unlinked:
+            print_error("Cannot use both --only-linked and --only-unlinked")
             raise typer.Exit(code=1)
 
-        site_uuid = site_match["ce_sites_uuid"][0]
-        site_name = site_match["ce_sites_name"][0]
+        client = config.get_client()
+        site_uuid, site_name = _resolve_site_for_list(client, site)
 
         filter_msg = f" matching '{name}'" if name else ""
         print_info(f"Fetching tags from '{site_name}'{filter_msg}...")
 
-        # Fetch tags for the site
         tags_df = client.get_tags(site_uuid, name_filter=name)
+        _check_tags_found(tags_df, site_name, name)
 
-        if tags_df.shape[0] == 0:
-            msg = f"No tags found for site '{site_name}'"
-            if name:
-                msg += f" matching '{name}'"
-            print_info(msg)
-            raise typer.Exit(code=0)
+        tags_df = _apply_link_filters(client, tags_df, only_linked, only_unlinked)
+        _check_filtered_tags_found(tags_df, site_name, name, only_linked, only_unlinked)
 
-        # Filter for unlinked tags if requested
-        if unlinked_only:
-            tags_df = tags_df.filter(tags_df["ce_tags_stashapp_id"].is_null())
-            if tags_df.shape[0] == 0:
-                print_info(f"All tags from '{site_name}' are linked to Stashapp")
-                raise typer.Exit(code=0)
-
-        # Apply limit if specified
         if limit and limit > 0:
             tags_df = tags_df.head(limit)
 
-        # Display results
-        count = tags_df.shape[0]
-        if json_output:
-            print_json(tags_df)
-        else:
-            table = format_tags_table(tags_df, site_name)
-            print_table(table)
-            limit_msg = f" (showing first {limit})" if limit else ""
-            print_success(f"Found {count} tag(s){filter_msg}{limit_msg}")
+        _display_tags(tags_df, site_name, json_output, filter_msg, limit)
 
     except ValueError as e:
         print_error(str(e))
@@ -117,6 +93,88 @@ def list_tags(
     except Exception as e:
         print_error(f"Failed to fetch tags: {e}")
         raise typer.Exit(code=1) from e
+
+
+def _resolve_site_for_list(client, site: str) -> tuple[str, str]:
+    """Resolve site identifier to UUID and name for list command."""
+    sites_df = client.get_sites()
+    site_match = sites_df.filter(
+        (sites_df["ce_sites_short_name"] == site)
+        | (sites_df["ce_sites_uuid"] == site)
+        | (sites_df["ce_sites_name"] == site)
+    )
+
+    if site_match.shape[0] == 0:
+        print_error(f"Site '{site}' not found")
+        print_info("To see available sites, run: ce sites list")
+        raise typer.Exit(code=1)
+
+    return site_match["ce_sites_uuid"][0], site_match["ce_sites_name"][0]
+
+
+def _check_tags_found(tags_df, site_name: str, name: str | None) -> None:
+    """Check if any tags were found and exit if not."""
+    if tags_df.shape[0] == 0:
+        msg = f"No tags found for site '{site_name}'"
+        if name:
+            msg += f" matching '{name}'"
+        print_info(msg)
+        raise typer.Exit(code=0)
+
+
+def _apply_link_filters(client, tags_df, only_linked: bool, only_unlinked: bool):
+    """Apply link status filters to tags dataframe."""
+    if not only_linked and not only_unlinked:
+        return tags_df
+
+    tag_uuids = tags_df["ce_tags_uuid"].to_list()
+    stashapp_links = []
+    stashdb_links = []
+
+    for uuid in tag_uuids:
+        external_ids = client.get_tag_external_ids(uuid)
+        stashapp_links.append("stashapp" in external_ids)
+        stashdb_links.append("stashdb" in external_ids)
+
+    tags_df = tags_df.with_columns([
+        pl.Series("has_stashapp_link", stashapp_links),
+        pl.Series("has_stashdb_link", stashdb_links),
+    ])
+
+    if only_linked:
+        return tags_df.filter(
+            (tags_df["has_stashapp_link"]) | (tags_df["has_stashdb_link"])
+        )
+    return tags_df.filter(
+        (~tags_df["has_stashapp_link"]) & (~tags_df["has_stashdb_link"])
+    )
+
+
+def _check_filtered_tags_found(
+    tags_df, site_name: str, name: str | None, only_linked: bool, only_unlinked: bool
+) -> None:
+    """Check if any tags remain after filtering and exit if not."""
+    if tags_df.shape[0] == 0:
+        link_filter = "linked" if only_linked else "unlinked" if only_unlinked else ""
+        msg = f"No {link_filter} tags found for site '{site_name}'"
+        if name:
+            msg += f" matching '{name}'"
+        print_info(msg)
+        raise typer.Exit(code=0)
+
+
+def _display_tags(
+    tags_df, site_name: str, json_output: bool, filter_msg: str, limit: int | None
+) -> None:
+    """Display tags in table or JSON format."""
+    count = tags_df.shape[0]
+    if json_output:
+        print_json(tags_df)
+    else:
+        table = format_tags_table(tags_df, site_name)
+        print_table(table)
+        limit_msg = f" (showing first {limit})" if limit else ""
+        print_success(f"Found {count} tag(s){filter_msg}{limit_msg}")
 
 
 @tags_app.command("link")

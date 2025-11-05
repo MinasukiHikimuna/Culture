@@ -2,6 +2,7 @@
 
 from typing import Annotated
 
+import polars as pl
 import typer
 
 from culture_cli.modules.ce.utils.config import config
@@ -21,6 +22,14 @@ sites_app = typer.Typer(help="Manage Culture Extractor sites")
 
 @sites_app.command("list")
 def list_sites(
+    only_linked: Annotated[
+        bool,
+        typer.Option("--only-linked", help="Show only sites linked to Stashapp/StashDB"),
+    ] = False,
+    only_unlinked: Annotated[
+        bool,
+        typer.Option("--only-unlinked", help="Show only sites not linked to Stashapp/StashDB"),
+    ] = False,
     json_output: Annotated[
         bool,
         typer.Option("--json", "-j", help="Output as JSON instead of table"),
@@ -32,13 +41,53 @@ def list_sites(
         ce sites list              # Display as a table
         ce sites list --json       # Display as JSON
         ce sites list -j           # Short form for JSON output
+        ce sites list --only-linked     # Show only linked sites
+        ce sites list --only-unlinked   # Show only unlinked sites
     """
     try:
+        if only_linked and only_unlinked:
+            print_error("Cannot use both --only-linked and --only-unlinked")
+            raise typer.Exit(code=1)
+
         # Get Culture Extractor client
         client = config.get_client()
 
         # Fetch all sites
         sites_df = client.get_sites()
+
+        # Apply link status filters if requested
+        if only_linked or only_unlinked:
+            site_uuids = sites_df["ce_sites_uuid"].to_list()
+            stashapp_links = []
+            stashdb_links = []
+
+            for uuid in site_uuids:
+                external_ids = client.get_site_external_ids(uuid)
+                stashapp_links.append("stashapp" in external_ids)
+                stashdb_links.append("stashdb" in external_ids)
+
+            # Add link status columns
+            sites_df = sites_df.with_columns([
+                pl.Series("has_stashapp_link", stashapp_links),
+                pl.Series("has_stashdb_link", stashdb_links),
+            ])
+
+            # Filter based on link status
+            if only_linked:
+                sites_df = sites_df.filter(
+                    (sites_df["has_stashapp_link"]) | (sites_df["has_stashdb_link"])
+                )
+            elif only_unlinked:
+                sites_df = sites_df.filter(
+                    (~sites_df["has_stashapp_link"]) & (~sites_df["has_stashdb_link"])
+                )
+
+        # Check if any results remain after filtering
+        if sites_df.shape[0] == 0:
+            link_filter = "linked" if only_linked else "unlinked" if only_unlinked else ""
+            msg = f"No {link_filter} sites found" if link_filter else "No sites found"
+            print_info(msg)
+            raise typer.Exit(code=0)
 
         # Display results
         count = sites_df.shape[0]
