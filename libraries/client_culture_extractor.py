@@ -116,12 +116,18 @@ class ClientCultureExtractor:
 
             return pl.DataFrame(sub_sites, schema=schema)
 
-    def get_releases(self, site_uuid: str, tag_uuid: str | None = None) -> pl.DataFrame:
-        """Get all releases for a given site UUID, optionally filtered by tag.
+    def get_releases(
+        self,
+        site_uuid: str,
+        tag_uuid: str | None = None,
+        performer_uuid: str | None = None,
+    ) -> pl.DataFrame:
+        """Get all releases for a given site UUID, optionally filtered by tag and/or performer.
 
         Args:
             site_uuid: UUID of the site to get releases for
             tag_uuid: Optional tag UUID to filter releases by
+            performer_uuid: Optional performer UUID to filter releases by
 
         Returns:
             DataFrame containing all releases for the site
@@ -141,8 +147,29 @@ class ClientCultureExtractor:
                 return pl.DataFrame()
             site_name = site_row[0]
 
+            # Build WHERE clause based on filters
+            if tag_uuid and performer_uuid:
+                # Filter by both tag and performer
+                return self._get_releases_by_query(
+                    cursor,
+                    """WHERE site_uuid = %s
+                       AND uuid IN (
+                           SELECT releases_uuid
+                           FROM release_entity_site_tag_entity
+                           WHERE tags_uuid = %s
+                       )
+                       AND uuid IN (
+                           SELECT releases_uuid
+                           FROM release_entity_site_performer_entity
+                           WHERE performers_uuid = %s
+                       )""",
+                    (site_uuid, tag_uuid, performer_uuid),
+                    site_name=site_name,
+                    site_uuid=site_uuid,
+                )
+
             if tag_uuid:
-                # Filter releases by tag
+                # Filter releases by tag only
                 return self._get_releases_by_query(
                     cursor,
                     """WHERE site_uuid = %s
@@ -152,6 +179,21 @@ class ClientCultureExtractor:
                            WHERE tags_uuid = %s
                        )""",
                     (site_uuid, tag_uuid),
+                    site_name=site_name,
+                    site_uuid=site_uuid,
+                )
+
+            if performer_uuid:
+                # Filter releases by performer only
+                return self._get_releases_by_query(
+                    cursor,
+                    """WHERE site_uuid = %s
+                       AND uuid IN (
+                           SELECT releases_uuid
+                           FROM release_entity_site_performer_entity
+                           WHERE performers_uuid = %s
+                       )""",
+                    (site_uuid, performer_uuid),
                     site_name=site_name,
                     site_uuid=site_uuid,
                 )

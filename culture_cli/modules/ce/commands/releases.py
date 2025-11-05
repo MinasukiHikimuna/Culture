@@ -65,6 +65,29 @@ def _resolve_tag_for_releases(client, site: str, site_uuid: str, site_name: str,
     return tag_match["ce_tags_uuid"][0], tag_match["ce_tags_name"][0]
 
 
+def _resolve_performer_for_releases(
+    client, site: str, site_uuid: str, site_name: str, performer: str
+) -> tuple[str, str]:
+    """Resolve performer identifier to UUID and name for a given site.
+
+    Returns:
+        Tuple of (performer_uuid, performer_name)
+    """
+    performers_df = client.get_performers(site_uuid)
+    performer_match = performers_df.filter(
+        (performers_df["ce_performers_name"] == performer)
+        | (performers_df["ce_performers_uuid"] == performer)
+        | (performers_df["ce_performers_short_name"] == performer)
+    )
+
+    if performer_match.shape[0] == 0:
+        print_error(f"Performer '{performer}' not found for site '{site_name}'")
+        print_info(f"To see available performers, run: ce performers list --site {site}")
+        raise typer.Exit(code=1)
+
+    return performer_match["ce_performers_uuid"][0], performer_match["ce_performers_name"][0]
+
+
 @releases_app.command("list")
 def list_releases(
     site: Annotated[
@@ -74,6 +97,10 @@ def list_releases(
     tag: Annotated[
         str | None,
         typer.Option("--tag", "-t", help="Filter by tag (tag name or UUID)"),
+    ] = None,
+    performer: Annotated[
+        str | None,
+        typer.Option("--performer", "-p", help="Filter by performer (performer name or UUID)"),
     ] = None,
     limit: Annotated[
         int | None,
@@ -92,6 +119,7 @@ def list_releases(
         ce releases list --site meanawolf                      # List all Meana Wolf releases
         ce releases list --site meanawolf --limit 20           # Show first 20 releases
         ce releases list --site meanawolf --tag "pov"          # Filter by tag
+        ce releases list --site meanawolf --performer "name"   # Filter by performer
         ce releases list --site meanawolf --json               # JSON output
     """
     try:
@@ -109,15 +137,27 @@ def list_releases(
         if tag:
             tag_uuid, tag_name = _resolve_tag_for_releases(client, site, site_uuid, site_name, tag)
 
-        filter_msg = f" with tag '{tag_name}'" if tag_name else ""
+        performer_uuid = None
+        performer_name = None
+        if performer:
+            performer_uuid, performer_name = _resolve_performer_for_releases(
+                client, site, site_uuid, site_name, performer
+            )
+
+        filter_parts = []
+        if tag_name:
+            filter_parts.append(f"tag '{tag_name}'")
+        if performer_name:
+            filter_parts.append(f"performer '{performer_name}'")
+        filter_msg = f" with {' and '.join(filter_parts)}" if filter_parts else ""
         print_info(f"Fetching releases from '{site_name}'{filter_msg}...")
 
-        releases_df = client.get_releases(site_uuid, tag_uuid=tag_uuid)
+        releases_df = client.get_releases(site_uuid, tag_uuid=tag_uuid, performer_uuid=performer_uuid)
 
         if releases_df.shape[0] == 0:
             msg = f"No releases found for site '{site_name}'"
-            if tag_name:
-                msg += f" with tag '{tag_name}'"
+            if filter_msg:
+                msg += filter_msg
             print_info(msg)
             raise typer.Exit(code=0)
 
@@ -131,8 +171,7 @@ def list_releases(
             table = format_releases_table(releases_df, site_name)
             print_table(table)
             limit_msg = f" (showing first {limit})" if limit else ""
-            filter_desc = f" with tag '{tag_name}'" if tag_name else ""
-            print_success(f"Found {count} release(s){filter_desc}{limit_msg}")
+            print_success(f"Found {count} release(s){filter_msg}{limit_msg}")
 
     except ValueError as e:
         print_error(str(e))
