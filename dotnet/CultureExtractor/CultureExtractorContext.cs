@@ -60,10 +60,6 @@ public class CultureExtractorContext : DbContext, ICultureExtractorContext
             .HasIndex(e => new { e.SiteUuid, e.TargetSystemUuid })
             .IsUnique();
 
-        modelBuilder.Entity<SiteExternalIdEntity>()
-            .HasIndex(e => new { e.TargetSystemUuid, e.ExternalId })
-            .IsUnique();
-
         // Configure SubSiteExternalId
         modelBuilder.Entity<SubSiteExternalIdEntity>()
             .HasOne(e => e.SubSite)
@@ -79,10 +75,6 @@ public class CultureExtractorContext : DbContext, ICultureExtractorContext
 
         modelBuilder.Entity<SubSiteExternalIdEntity>()
             .HasIndex(e => new { e.SubSiteUuid, e.TargetSystemUuid })
-            .IsUnique();
-
-        modelBuilder.Entity<SubSiteExternalIdEntity>()
-            .HasIndex(e => new { e.TargetSystemUuid, e.ExternalId })
             .IsUnique();
 
         // Configure ReleaseExternalId
@@ -102,10 +94,6 @@ public class CultureExtractorContext : DbContext, ICultureExtractorContext
             .HasIndex(e => new { e.ReleaseUuid, e.TargetSystemUuid })
             .IsUnique();
 
-        modelBuilder.Entity<ReleaseExternalIdEntity>()
-            .HasIndex(e => new { e.TargetSystemUuid, e.ExternalId })
-            .IsUnique();
-
         // Configure PerformerExternalId
         modelBuilder.Entity<PerformerExternalIdEntity>()
             .HasOne(e => e.Performer)
@@ -123,10 +111,6 @@ public class CultureExtractorContext : DbContext, ICultureExtractorContext
             .HasIndex(e => new { e.PerformerUuid, e.TargetSystemUuid })
             .IsUnique();
 
-        modelBuilder.Entity<PerformerExternalIdEntity>()
-            .HasIndex(e => new { e.TargetSystemUuid, e.ExternalId })
-            .IsUnique();
-
         // Configure TagExternalId
         modelBuilder.Entity<TagExternalIdEntity>()
             .HasOne(e => e.Tag)
@@ -142,10 +126,6 @@ public class CultureExtractorContext : DbContext, ICultureExtractorContext
 
         modelBuilder.Entity<TagExternalIdEntity>()
             .HasIndex(e => new { e.TagUuid, e.TargetSystemUuid })
-            .IsUnique();
-
-        modelBuilder.Entity<TagExternalIdEntity>()
-            .HasIndex(e => new { e.TargetSystemUuid, e.ExternalId })
             .IsUnique();
     }
 }
