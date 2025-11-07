@@ -1,10 +1,11 @@
 import os
+
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 
 # Load environment variables from the correct path
 # Don't touch this! This works! You will break it!
-load_dotenv("H:\Git\scrapytickling\scrapy\cultureextractorscrapy\spiders\.env")
+load_dotenv(r"H:\Git\scrapytickling\scrapy\cultureextractorscrapy\spiders\.env")
 
 # Get connection string from environment variable
 connection_string = os.getenv("CONNECTION_STRING")
@@ -20,8 +21,8 @@ with engine.connect() as conn:
     print("\nAvailable Tables:")
     table_query = text(
         """
-        SELECT table_name 
-        FROM information_schema.tables 
+        SELECT table_name
+        FROM information_schema.tables
         WHERE table_schema = 'public'
     """
     )
@@ -32,8 +33,8 @@ with engine.connect() as conn:
     print("\nLezKiss Site Info:")
     site_query = text(
         """
-        SELECT uuid, short_name, name 
-        FROM sites 
+        SELECT uuid, short_name, name
+        FROM sites
         WHERE short_name = 'lezkiss'
     """
     )
@@ -48,8 +49,8 @@ with engine.connect() as conn:
     print("\nLezKiss Releases:")
     releases_query = text(
         """
-        SELECT uuid, short_name, name, release_date 
-        FROM releases 
+        SELECT uuid, short_name, name, release_date
+        FROM releases
         WHERE site_uuid = :site_uuid
         LIMIT 5
     """
@@ -64,13 +65,13 @@ with engine.connect() as conn:
     junction_query = text(
         """
         SELECT EXISTS (
-            SELECT FROM information_schema.tables 
-            WHERE table_schema = 'public' 
+            SELECT FROM information_schema.tables
+            WHERE table_schema = 'public'
             AND table_name = 'release_entity_site_performer_entity'
         ) as has_performers,
         EXISTS (
-            SELECT FROM information_schema.tables 
-            WHERE table_schema = 'public' 
+            SELECT FROM information_schema.tables
+            WHERE table_schema = 'public'
             AND table_name = 'release_entity_site_tag_entity'
         ) as has_tags
         """
@@ -111,8 +112,8 @@ with engine.connect() as conn:
     print("\nJunction table structures:")
     structure_query = text(
         """
-        SELECT column_name, data_type 
-        FROM information_schema.columns 
+        SELECT column_name, data_type
+        FROM information_schema.columns
         WHERE table_name = 'release_entity_site_performer_entity'
         """
     )
@@ -123,8 +124,8 @@ with engine.connect() as conn:
 
     structure_query = text(
         """
-        SELECT column_name, data_type 
-        FROM information_schema.columns 
+        SELECT column_name, data_type
+        FROM information_schema.columns
         WHERE table_name = 'release_entity_site_tag_entity'
         """
     )
@@ -193,22 +194,20 @@ with engine.connect() as conn:
     site = site_result.fetchone()
 
     if site:
-        print(f"\nSite Info:")
+        print("\nSite Info:")
         print(f"UUID: {site.uuid}")
         print(f"Name: {site.name}")
 
         # Get the specific release we just created
         release_uuid = "0195882c-cb47-7479-9492-81870e0ef7a4"
         release_result = conn.execute(
-            text(
-                "SELECT uuid, short_name, name, created FROM releases WHERE uuid = :uuid"
-            ),
+            text("SELECT uuid, short_name, name, created FROM releases WHERE uuid = :uuid"),
             {"uuid": release_uuid},
         )
         release = release_result.fetchone()
 
         if release:
-            print(f"\nRelease Info:")
+            print("\nRelease Info:")
             print(f"UUID: {release.uuid}")
             print(f"Name: {release.name}")
             print(f"Created: {release.created}")
@@ -217,9 +216,9 @@ with engine.connect() as conn:
             downloads_result = conn.execute(
                 text(
                     """
-                    SELECT uuid, saved_filename, file_type, content_type, variant, 
+                    SELECT uuid, saved_filename, file_type, content_type, variant,
                            downloaded_at, file_metadata
-                    FROM downloads 
+                    FROM downloads
                     WHERE release_uuid = :release_uuid
                     ORDER BY downloaded_at
                 """
