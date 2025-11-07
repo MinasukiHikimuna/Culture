@@ -311,7 +311,7 @@ public class VixenRipper : IYieldingScraper
             .ToList();
 
         var performers = dataFindOneVideo.modelsSlugged
-            .Select(m => new SitePerformer(m.slugged, m.name, $"{site.Url}/performers/{m.slugged}"))
+            .Select(m => new SitePerformer(m.slugged, m.name, $"{site.Url}/performers/{m.slugged}", "{}"))
             .ToList();
 
         var tags = dataFindOneVideo.categories

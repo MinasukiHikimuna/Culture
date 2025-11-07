@@ -394,7 +394,7 @@ public class AyloRipper : IYieldingScraper
 
             var performers = movieDetails.actors.Where(a => a.gender == "female").ToList()
                 .Concat(movieDetails.actors.Where(a => a.gender != "female").ToList())
-                .Select(m => new SitePerformer(m.id.ToString(), m.name, string.Empty))
+                .Select(m => new SitePerformer(m.id.ToString(), m.name, string.Empty, "{}"))
                 .ToList();
 
             var tags = movieDetails.tags

@@ -551,7 +551,7 @@ public class NubileFilmsRipper : IYieldingScraper
 
 
             var castName = await castElement.TextContentAsync();
-            performers.Add(new SitePerformer(match.Groups["id"].Value, castName, castUrl));
+            performers.Add(new SitePerformer(match.Groups["id"].Value, castName, castUrl, "{}"));
         }
         return performers.AsReadOnly();
     }

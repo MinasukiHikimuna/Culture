@@ -254,7 +254,7 @@ public class AdultPrimeRipper : IYieldingScraper
                 var nameRaw = await performerElement.TextContentAsync();
                 var name = nameRaw.Trim();
                 var shortName = name.Replace(" ", "+");
-                performers.Add(new SitePerformer(shortName, name, performerUrl));
+                performers.Add(new SitePerformer(shortName, name, performerUrl, "{}"));
             }
         }
 

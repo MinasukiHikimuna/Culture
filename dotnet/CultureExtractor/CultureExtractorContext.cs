@@ -189,6 +189,8 @@ public class SitePerformerEntity
     public string? ShortName { get; set; }
     public required string Name { get; set; }
     public string? Url { get; set; }
+    [Column(TypeName = "json")]
+    public required string JsonDocument { get; set; }
     public required Guid SiteUuid { get; set; }
     public required SiteEntity Site { get; set; }
 

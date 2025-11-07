@@ -109,7 +109,7 @@ public class WankzRipper : ISubSiteScraper
         {
             var name = await performerElement.GetAttributeAsync("content");
             var shortName = name.ToLower().Replace(" ", "-");
-            performers.Add(new SitePerformer(shortName, name, $"/{shortName}"));
+            performers.Add(new SitePerformer(shortName, name, $"/{shortName}", "{}"));
         }
 
         // read script element with type application/ld+json

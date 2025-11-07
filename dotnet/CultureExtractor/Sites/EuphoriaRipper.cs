@@ -310,7 +310,7 @@ public class EuphoriaRipper : IYieldingScraper
             var castUrl = await performerElement.GetAttributeAsync("href");
             var castId = castUrl.Substring(castUrl.LastIndexOf("/") + 1);
             var castName = await performerElement.TextContentAsync();
-            performers.Add(new SitePerformer(castId, castName, castUrl));
+            performers.Add(new SitePerformer(castId, castName, castUrl, "{}"));
         }
 
         return performers;

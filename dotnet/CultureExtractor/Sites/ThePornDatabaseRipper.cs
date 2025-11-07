@@ -75,7 +75,7 @@ public class ThePornDatabaseRipper : IYieldingScraper
                     scene.url,
                     scene.description,
                     scene.duration ?? -1,
-                    scene.performers.Select(p => new SitePerformer(p.id, p.name, $"{site.Url}/performers/{p.id}")),
+                    scene.performers.Select(p => new SitePerformer(p.id, p.name, $"{site.Url}/performers/{p.id}", "{}")),
                     scene.tags.Select(t => new SiteTag(t.id.ToString(), t.name, string.Empty)),
                     new List<IAvailableFile>(),
                     JsonSerializer.Serialize(scene),

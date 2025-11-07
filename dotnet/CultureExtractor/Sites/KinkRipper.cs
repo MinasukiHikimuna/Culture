@@ -138,7 +138,7 @@ public class KinkRipper : ISiteScraper, ISubSiteScraper
             // parse number 5235 from url like /model/5235/Princess-Donna-Dolore
             var shortName = performerUrl.Split("/").Reverse().Skip(1).First();
 
-            performers.Add(new SitePerformer(shortName, name, performerUrl));
+            performers.Add(new SitePerformer(shortName, name, performerUrl, "{}"));
         }
 
         var descriptionRaw = await page.Locator("span.description-text").TextContentAsync();

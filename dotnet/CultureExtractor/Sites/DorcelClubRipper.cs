@@ -162,7 +162,7 @@ public class DorcelClubRipper : IYieldingScraper
             var performerUrl = await performerElement.GetAttributeAsync("href");
             var shortName = performerUrl.Replace("/en/pornstar/", "");
             var name = await performerElement.TextContentAsync();
-            performers.Add(new SitePerformer(shortName, name, performerUrl));
+            performers.Add(new SitePerformer(shortName, name, performerUrl, "{}"));
         }
 
         var fullTextLocator = releasePage.Locator("div.content-description > div.content-text > span.full");

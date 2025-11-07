@@ -130,7 +130,7 @@ public class HentaiedRipper : ISiteScraper
             var castUrl = await castElement.GetAttributeAsync("href");
             var castId = castUrl.Replace($"{site.Url}/tag/", "").Replace("/", "");
             var castName = await castElement.TextContentAsync();
-            performers.Add(new SitePerformer(castId, castName, castUrl));
+            performers.Add(new SitePerformer(castId, castName, castUrl, "{}"));
         }
 
         var descriptionRaw = await page.Locator("div#fullstory").TextContentAsync();

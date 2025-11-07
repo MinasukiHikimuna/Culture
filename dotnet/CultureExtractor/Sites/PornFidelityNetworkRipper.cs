@@ -173,7 +173,7 @@ public class PornFidelityNetworkRipper : IYieldingScraper
             var performerUrl = await performerElement.GetAttributeAsync("href");
             var shortName = performerUrl.Substring(performerUrl.LastIndexOf("/") + 1);
             var name = await performerElement.TextContentAsync();
-            performers.Add(new SitePerformer(shortName, name, performerUrl));
+            performers.Add(new SitePerformer(shortName, name, performerUrl, "{}"));
         }
 
         var chapters = new List<Chapter>();
@@ -733,7 +733,7 @@ public class PornFidelityNetworkRipper : IYieldingScraper
             var castUrl = await castElement.GetAttributeAsync("href");
             var castId = castUrl.Substring(castUrl.LastIndexOf("/") + 1);
             var castName = await castElement.TextContentAsync();
-            performers.Add(new SitePerformer(castId, castName, castUrl));
+            performers.Add(new SitePerformer(castId, castName, castUrl, "{}"));
         }
         return performers.AsReadOnly();
     }

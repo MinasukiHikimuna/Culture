@@ -632,7 +632,7 @@ public class WowNetworkRipper : IYieldingScraper
             var castUrl = await castElement.GetAttributeAsync("href");
             var castId = castUrl.Substring(castUrl.LastIndexOf("/girl/") + "/girl/".Length);
             var castName = await castElement.TextContentAsync();
-            performers.Add(new SitePerformer(castId, castName, castUrl));
+            performers.Add(new SitePerformer(castId, castName, castUrl, "{}"));
         }
         return performers.AsReadOnly();
     }

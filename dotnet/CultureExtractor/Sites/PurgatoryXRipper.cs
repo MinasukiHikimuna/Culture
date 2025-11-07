@@ -104,7 +104,7 @@ public class PurgatoryXRipper : ISiteScraper
             var performerNameElement = await performerElement.QuerySelectorAsync("h5");
             var nameRaw = await performerNameElement.TextContentAsync();
             var name = nameRaw.Replace("\n", "").Trim();
-            performers.Add(new SitePerformer(shortName, name, performerUrl));
+            performers.Add(new SitePerformer(shortName, name, performerUrl, "{}"));
         }
 
         var description = await page.Locator("div.description > p").TextContentAsync();

@@ -282,7 +282,7 @@ public class CzechVRNetworkRipper : ISiteScraper
 
             var castId = castUrl.Replace("model-", "");
             var castName = await castElement.TextContentAsync();
-            performers.Add(new SitePerformer(castId, castName, castUrl));
+            performers.Add(new SitePerformer(castId, castName, castUrl, "{}"));
         }
         return performers.AsReadOnly();
     }

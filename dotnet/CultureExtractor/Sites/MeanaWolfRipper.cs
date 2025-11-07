@@ -627,12 +627,12 @@ public class MeanaWolfRipper : IYieldingScraper
     {
         var castElements = await page.Locator("body > div.bodyArea.topSpace > div.trailerArea > div.videoContent > ul > li:nth-child(4) > a").ElementHandlesAsync();
         var performers = new List<SitePerformer>();
-        performers.Add(new SitePerformer("meanawolf", "Meana Wolf", "https://meanawolf.com/models/MeanaWolf.html"));
+        performers.Add(new SitePerformer("meanawolf", "Meana Wolf", "https://meanawolf.com/models/MeanaWolf.html", "{}"));
         foreach (var castElement in castElements)
         {
             var castUrl = await castElement.GetAttributeAsync("href");
             var castName = await castElement.TextContentAsync();
-            var performer = new SitePerformer(castName.ToLower().Replace(" ", "-"), castName, castUrl);
+            var performer = new SitePerformer(castName.ToLower().Replace(" ", "-"), castName, castUrl, "{}");
 
             // Check if performer with the same id already exists in the list
             if (!performers.Any(p => p.ShortName == performer.ShortName))

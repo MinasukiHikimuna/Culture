@@ -126,7 +126,7 @@ public class NubilesPornRipper : ISiteScraper
             var performerUrl = await performerElement.GetAttributeAsync("href");
             var shortName = performerUrl.Replace("/model/profile/", "");
             var name = await performerElement.TextContentAsync();
-            performers.Add(new SitePerformer(shortName, name, performerUrl));
+            performers.Add(new SitePerformer(shortName, name, performerUrl, "{}"));
         }
 
         var elementHandles = await page.Locator("div.content-pane-description p").ElementHandlesAsync();

@@ -295,6 +295,7 @@ public class Repository : IRepository
                 Name = p.Name,
                 ShortName = p.ShortName,
                 Url = p.Url,
+                JsonDocument = p.JsonDocument,
                 SiteUuid = siteEntity.Uuid,
                 Site = siteEntity,
                 Releases = new List<ReleaseEntity>()
@@ -431,7 +432,8 @@ public class Repository : IRepository
         return new SitePerformer(
             performerEntity.ShortName ?? performerEntity.Name,
             performerEntity.Name,
-            performerEntity.Url ?? string.Empty);
+            performerEntity.Url ?? string.Empty,
+            performerEntity.JsonDocument);
     }
 
     private static SiteTag Convert(SiteTagEntity siteTagEntity)

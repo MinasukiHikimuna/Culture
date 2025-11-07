@@ -137,7 +137,7 @@ public class DirtyWordsRipper : IYieldingScraper
             var performerName = performerRaw.Replace("\t", " ").Replace("\n", "").Trim();
             var performerUrl = await performerContainer.GetAttributeAsync("href");
             var performerShortName = performerUrl.Split('/').Last();
-            var performers = new List<SitePerformer> { new SitePerformer(performerShortName, performerName, performerUrl) };
+            var performers = new List<SitePerformer> { new SitePerformer(performerShortName, performerName, performerUrl, "{}") };
 
 
             var tagsContainer = await postContainer.QuerySelectorAsync("div.right");

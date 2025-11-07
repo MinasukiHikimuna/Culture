@@ -122,7 +122,7 @@ public class AdultTimeRipper : ISiteScraper
             var shortName = $"{performer.url_name}/{performer.actor_id}";
             var performerUrl = $"/en/pornstar/view/{shortName}";
             var name = performer.name;
-            performers.Add(new SitePerformer(shortName, name, performerUrl));
+            performers.Add(new SitePerformer(shortName, name, performerUrl, "{}"));
         }
 
         var tags = new List<SiteTag>();

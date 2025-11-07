@@ -253,7 +253,7 @@ public class MetArtNetworkRipper : IYieldingScraper
         var performers = galleryDetails.models.Where(a => a.gender == "female").ToList()
             .Concat(galleryDetails.models.Where(a => a.gender != "female").ToList())
             .Select(m =>
-                new SitePerformer(m.path[(m.path.LastIndexOf("/", StringComparison.Ordinal) + 1)..], m.name, m.path))
+                new SitePerformer(m.path[(m.path.LastIndexOf("/", StringComparison.Ordinal) + 1)..], m.name, m.path, "{}"))
             .ToList();
 
         var tags = galleryDetails.tags
@@ -472,7 +472,7 @@ public class MetArtNetworkRipper : IYieldingScraper
         var performers = movieDetails.models.Where(a => a.gender == "female").ToList()
             .Concat(movieDetails.models.Where(a => a.gender != "female").ToList())
             .Select(m =>
-                new SitePerformer(m.path[(m.path.LastIndexOf("/", StringComparison.Ordinal) + 1)..], m.name, m.path))
+                new SitePerformer(m.path[(m.path.LastIndexOf("/", StringComparison.Ordinal) + 1)..], m.name, m.path, "{}"))
             .ToList();
 
         var tags = movieDetails.tags

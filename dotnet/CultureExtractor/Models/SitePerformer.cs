@@ -3,4 +3,5 @@ namespace CultureExtractor.Models;
 public record SitePerformer(
     string ShortName,
     string Name,
-    string Url);
+    string Url,
+    string JsonDocument);

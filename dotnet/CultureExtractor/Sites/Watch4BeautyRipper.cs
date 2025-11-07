@@ -222,7 +222,7 @@ public class Watch4BeautyRipper : IYieldingScraper
         }
 
         var performers = issues.Length == 1 
-            ? issues[0].Models.Select(m => new SitePerformer(m.model_id.ToString(), m.model_nickname, $"{site.Url}/models/{m.model_simple_nickname}")).ToList()
+            ? issues[0].Models.Select(m => new SitePerformer(m.model_id.ToString(), m.model_nickname, $"{site.Url}/models/{m.model_simple_nickname}", "{}")).ToList()
             : new List<SitePerformer>();
 
         var baseCoverUrl = "https://mh-c75c2d6726.watch4beauty.com/production/" + releaseDate.ToString("yyyyMMdd");

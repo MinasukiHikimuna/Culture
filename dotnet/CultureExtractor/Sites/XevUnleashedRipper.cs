@@ -114,7 +114,7 @@ public class XevUnleashedRipper : ISiteScraper
         var titleRaw = await page.Locator("div.title_bar span").TextContentAsync();
         var title = titleRaw.Replace("\n", "").Trim();
 
-        var performers = new List<SitePerformer>() { new SitePerformer("xev", "Xev Bellringer", "")};
+        var performers = new List<SitePerformer>() { new SitePerformer("xev", "Xev Bellringer", "", "{}")};
 
         var descriptionRaw = await page.Locator("span.update_description").TextContentAsync();
         string description = descriptionRaw.Trim();

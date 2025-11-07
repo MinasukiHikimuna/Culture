@@ -119,7 +119,7 @@ public class NewSensationsRipper : ISiteScraper
             var performerUrl = await performerElement.GetAttributeAsync("href");
             var shortName = performerUrl.Replace("sets.php?id=", "");
             var name = await performerElement.TextContentAsync();
-            performers.Add(new SitePerformer(shortName, name, performerUrl));
+            performers.Add(new SitePerformer(shortName, name, performerUrl, "{}"));
         }
 
         string descriptionRaw = await page.Locator("div.indLeft > div.description > p").TextContentAsync();
