@@ -1,35 +1,34 @@
-import os
 import json
+import os
+from datetime import UTC, datetime
+from urllib.parse import parse_qs, urlparse
+
 import newnewid
-from datetime import datetime, timezone
 from dotenv import load_dotenv
-import scrapy
+from itemadapter import ItemAdapter
 from scrapy.exceptions import CloseSpider
-from cultureextractorscrapy.spiders.database import (
-    get_site_item,
-    get_or_create_performer,
-    get_or_create_tag,
-    get_existing_releases_with_status,
-    get_or_create_sub_site,
-)
+
+import scrapy
 from cultureextractorscrapy.items import (
+    AvailableFileEncoder,
     AvailableGalleryZipFile,
     AvailableImageFile,
     AvailableVideoFile,
-    AvailableFileEncoder,
-    ReleaseItem,
     DirectDownloadItem,
-    SubSiteItem,
+    ReleaseItem,
+)
+from cultureextractorscrapy.spiders.database import (
+    get_existing_releases_with_status,
+    get_or_create_performer,
+    get_or_create_sub_site,
+    get_or_create_tag,
+    get_site_item,
 )
 from cultureextractorscrapy.utils import (
+    get_log_filename,
     parse_resolution_height,
     parse_resolution_width,
-    get_log_filename,
 )
-from itemadapter import ItemAdapter
-from urllib.parse import parse_qs, urlparse
-import uuid
-import re
 
 load_dotenv()
 
@@ -397,8 +396,8 @@ class SexyHubSpider(scrapy.Spider):
             "url": f"https://site-ma.sexyhub.com/scene/{release_data['id']}",
             "description": release_data.get("description", ""),
             "duration": 0,  # Duration not provided in API
-            "created": datetime.now(tz=timezone.utc).astimezone(),
-            "last_updated": datetime.now(tz=timezone.utc).astimezone(),
+            "created": datetime.now(tz=UTC).astimezone(),
+            "last_updated": datetime.now(tz=UTC).astimezone(),
             "performers": performers,
             "tags": tags,
             "available_files": available_files,
@@ -440,7 +439,7 @@ class SexyHubSpider(scrapy.Spider):
     def handle_401_response(self, response):
         """Handle 401 response."""
         self.logger.error(
-            f"Received 401 Unauthorized response. Authentication failed. Stopping spider."
+            "Received 401 Unauthorized response. Authentication failed. Stopping spider."
         )
         raise CloseSpider("authentication_failed")
 

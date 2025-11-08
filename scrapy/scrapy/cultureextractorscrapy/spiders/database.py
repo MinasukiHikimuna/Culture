@@ -1,30 +1,30 @@
+import json
+import os
+
+import newnewid
+from dotenv import load_dotenv
 from sqlalchemy import (
+    JSON,
+    UUID,
+    Column,
     Date,
     DateTime,
     Float,
     ForeignKey,
-    create_engine,
-    Column,
     String,
-    Integer,
-    UUID,
-    JSON,
     Table,
+    create_engine,
 )
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
-from dotenv import load_dotenv
-import os
+from sqlalchemy.orm.exc import NoResultFound
+
 from cultureextractorscrapy.items import (
     SiteItem,
     SitePerformerItem,
     SiteTagItem,
     SubSiteItem,
 )  # Make sure to import SiteItem and SubSiteItem
-import newnewid
-from sqlalchemy.orm.exc import NoResultFound
-import json
-import uuid
 
 load_dotenv()
 

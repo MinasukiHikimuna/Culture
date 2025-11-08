@@ -1,24 +1,23 @@
-import os
 import json
+import os
+from datetime import UTC, datetime
+
 import newnewid
-from datetime import datetime, timezone
 from dotenv import load_dotenv
+
 import scrapy
-from cultureextractorscrapy.spiders.database import (
-    get_site_item,
-    get_existing_release_short_names,
-    get_or_create_performer,
-    get_or_create_tag,
-)
 from cultureextractorscrapy.items import (
+    AvailableFileEncoder,
     AvailableGalleryZipFile,
     AvailableImageFile,
     AvailableVideoFile,
-    AvailableVttFile,
-    AvailableFileEncoder,
-    available_file_decoder,
     ReleaseItem,
-    SiteItem,
+)
+from cultureextractorscrapy.spiders.database import (
+    get_existing_release_short_names,
+    get_or_create_performer,
+    get_or_create_tag,
+    get_site_item,
 )
 from cultureextractorscrapy.utils import parse_resolution_height, parse_resolution_width
 
@@ -248,11 +247,11 @@ class TicklingSpider(scrapy.Spider):
             description=description,
             duration=0,
             created=(
-                datetime.now(tz=timezone.utc).astimezone()
+                datetime.now(tz=UTC).astimezone()
                 if not existing_release_id
                 else None
             ),
-            last_updated=datetime.now(tz=timezone.utc).astimezone(),
+            last_updated=datetime.now(tz=UTC).astimezone(),
             performers=performers,
             tags=tags,
             available_files=json.dumps(available_files, cls=AvailableFileEncoder),

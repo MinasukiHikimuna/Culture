@@ -1,8 +1,8 @@
-import re
 import logging
-import sys
-import shutil
 import os
+import re
+import shutil
+import sys
 
 
 class WindowsSafeFormatter(logging.Formatter):
@@ -104,6 +104,7 @@ def parse_resolution_height(resolution_string):
 def get_log_filename(spider_name):
     import datetime
     import os
+
     from scrapy.utils.project import get_project_settings
 
     settings = get_project_settings()
@@ -154,15 +155,15 @@ def check_available_disk_space(target_path, min_free_gb=50):
     try:
         # Ensure the directory exists to get accurate disk space
         os.makedirs(target_path, exist_ok=True)
-        
+
         # Get disk usage statistics
         total, used, free = shutil.disk_usage(target_path)
-        
+
         # Convert bytes to gigabytes
         free_gb = free / (1024 ** 3)
-        
+
         return free_gb >= min_free_gb, free_gb
-        
+
     except Exception as e:
         logging.error(f"Error checking disk space for {target_path}: {e}")
         # Return False to be safe if we can't check disk space

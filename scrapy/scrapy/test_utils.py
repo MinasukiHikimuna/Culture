@@ -1,5 +1,7 @@
 import unittest
-from cultureextractorscrapy.utils import parse_resolution_width, parse_resolution_height
+
+from cultureextractorscrapy.utils import parse_resolution_height, parse_resolution_width
+
 
 class TestParseResolutionWidth(unittest.TestCase):
 
@@ -26,7 +28,7 @@ class TestParseResolutionWidth(unittest.TestCase):
 
     def test_parse_resolution_width_single_number(self):
         self.assertEqual(parse_resolution_width("1920"), -1)
-        
+
     def test_parse_resolution_width_1080p(self):
         self.assertEqual(parse_resolution_width("1080p"), 1920)
 

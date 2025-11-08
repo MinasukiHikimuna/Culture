@@ -1,27 +1,28 @@
-import os
 import json
-import newnewid
-import time
+import os
 import re
-from datetime import datetime, timezone
-from dotenv import load_dotenv
+from datetime import UTC, datetime
 from urllib.parse import urlencode
+
+import newnewid
+from dotenv import load_dotenv
+from itemadapter import ItemAdapter
+
 import scrapy
-from cultureextractorscrapy.spiders.database import (
-    get_site_item,
-    get_existing_releases_with_status,
-    get_or_create_sub_site,
-)
 from cultureextractorscrapy.items import (
-    ReleaseItem,
-    DirectDownloadItem,
-    AvailableImageFile,
-    AvailableVideoFile,
     AvailableAudioFile,
     AvailableFileEncoder,
+    AvailableImageFile,
+    AvailableVideoFile,
+    DirectDownloadItem,
+    ReleaseItem,
+)
+from cultureextractorscrapy.spiders.database import (
+    get_existing_releases_with_status,
+    get_or_create_sub_site,
+    get_site_item,
 )
 from cultureextractorscrapy.utils import get_log_filename
-from itemadapter import ItemAdapter
 
 load_dotenv()
 
@@ -592,8 +593,8 @@ class PatreonSpider(scrapy.Spider):
                 url=post_url,
                 description=content[:500] if content else "",  # Truncate description
                 duration=0,  # Posts don't have duration
-                created=datetime.now(tz=timezone.utc).astimezone(),
-                last_updated=datetime.now(tz=timezone.utc).astimezone(),
+                created=datetime.now(tz=UTC).astimezone(),
+                last_updated=datetime.now(tz=UTC).astimezone(),
                 performers=[],  # Patreon posts don't have performers in the traditional sense
                 tags=[],  # We could extract tags from content later
                 available_files=json.dumps(available_files, cls=AvailableFileEncoder),
@@ -663,7 +664,6 @@ class PatreonSpider(scrapy.Spider):
 
         def extract_unique_hash_from_url(url):
             """Extract unique hash from Patreon media URL."""
-            import re
 
             # Look for the hash pattern in Patreon URLs: /post/POST_ID/HASH/
             match = re.search(r"/post/\d+/([a-f0-9]{32})/", url)
@@ -1091,8 +1091,8 @@ class PatreonSpider(scrapy.Spider):
             Dict with audio metadata (duration, bitrate, sample_rate, channels, codec)
         """
         try:
-            import subprocess
             import json
+            import subprocess
 
             # Run ffprobe to get audio metadata
             cmd = [
@@ -1178,7 +1178,7 @@ class PatreonSpider(scrapy.Spider):
 
             return hash_sha256.hexdigest()
 
-        except (IOError, OSError) as e:
+        except OSError as e:
             self.logger.warning(f"Could not calculate hash for {file_path}: {e}")
             return None
 

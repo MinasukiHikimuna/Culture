@@ -1,30 +1,30 @@
-import os
 import json
+import os
+from datetime import UTC, datetime
+from urllib.parse import parse_qs, urlparse
+
 import newnewid
-from datetime import datetime, timezone
 from dotenv import load_dotenv
+from itemadapter import ItemAdapter
+
 import scrapy
-from cultureextractorscrapy.spiders.database import (
-    get_site_item,
-    get_or_create_performer,
-    get_or_create_tag,
-    get_existing_releases_with_status,
-)
 from cultureextractorscrapy.items import (
+    AvailableFileEncoder,
     AvailableGalleryZipFile,
     AvailableImageFile,
     AvailableVideoFile,
-    AvailableFileEncoder,
-    ReleaseItem,
     DirectDownloadItem,
+    ReleaseItem,
+)
+from cultureextractorscrapy.spiders.database import (
+    get_existing_releases_with_status,
+    get_or_create_performer,
+    get_or_create_tag,
+    get_site_item,
 )
 from cultureextractorscrapy.utils import (
-    parse_resolution_height,
-    parse_resolution_width,
     get_log_filename,
 )
-from itemadapter import ItemAdapter
-from urllib.parse import parse_qs, urlparse
 
 load_dotenv()
 
@@ -433,8 +433,8 @@ class LezKissSpider(scrapy.Spider):
             url=response.url,
             description="",
             duration=duration_seconds,
-            created=datetime.now(tz=timezone.utc).astimezone(),
-            last_updated=datetime.now(tz=timezone.utc).astimezone(),
+            created=datetime.now(tz=UTC).astimezone(),
+            last_updated=datetime.now(tz=UTC).astimezone(),
             performers=performers,
             tags=tags,
             available_files=json.dumps(available_files, cls=AvailableFileEncoder),
@@ -583,8 +583,8 @@ class LezKissSpider(scrapy.Spider):
                 url=response.url,
                 description="",
                 duration=0,
-                created=datetime.now(tz=timezone.utc).astimezone(),
-                last_updated=datetime.now(tz=timezone.utc).astimezone(),
+                created=datetime.now(tz=UTC).astimezone(),
+                last_updated=datetime.now(tz=UTC).astimezone(),
                 performers=performers,
                 tags=tags,
                 available_files=json.dumps(available_files, cls=AvailableFileEncoder),
@@ -626,8 +626,8 @@ class LezKissSpider(scrapy.Spider):
                 url=response.url,
                 description=meta["description"],
                 duration=meta["duration"],
-                created=datetime.now(tz=timezone.utc).astimezone(),
-                last_updated=datetime.now(tz=timezone.utc).astimezone(),
+                created=datetime.now(tz=UTC).astimezone(),
+                last_updated=datetime.now(tz=UTC).astimezone(),
                 performers=meta["performers"],
                 tags=meta["tags"],
                 available_files=json.dumps(available_files, cls=AvailableFileEncoder),
@@ -667,8 +667,8 @@ class LezKissSpider(scrapy.Spider):
                 url=response.url,
                 description=meta["description"],
                 duration=meta["duration"],
-                created=datetime.now(tz=timezone.utc).astimezone(),
-                last_updated=datetime.now(tz=timezone.utc).astimezone(),
+                created=datetime.now(tz=UTC).astimezone(),
+                last_updated=datetime.now(tz=UTC).astimezone(),
                 performers=meta["performers"],
                 tags=meta["tags"],
                 available_files=json.dumps(available_files, cls=AvailableFileEncoder),
