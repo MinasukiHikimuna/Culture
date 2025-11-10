@@ -485,10 +485,10 @@ class PatreonSpider(scrapy.Spider):
                 available_files = existing_release["available_files"]
                 downloaded_files = existing_release["downloaded_files"]
 
-                needed_files = set(
+                needed_files = {
                     (f["file_type"], f["content_type"], f["variant"])
                     for f in available_files
-                )
+                }
 
                 if not needed_files.issubset(downloaded_files):
                     # We have missing files - yield DirectDownloadItems
@@ -609,8 +609,7 @@ class PatreonSpider(scrapy.Spider):
             yield release_item
 
             # Then yield all DirectDownloadItems
-            for download_item in download_items:
-                yield download_item
+            yield from download_items
 
             self.logger.info(
                 f"Processed post {external_id} with {len(available_files)} media files for subsite '{sub_site.name}'"
