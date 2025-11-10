@@ -3,10 +3,12 @@
 # See documentation in:
 # https://docs.scrapy.org/en/latest/topics/items.html
 
-from datetime import datetime
-import scrapy
 import uuid
+from abc import ABC
 from dataclasses import dataclass
+from datetime import datetime
+
+import scrapy
 
 
 @dataclass
@@ -64,11 +66,6 @@ class ReleaseItem:
     sub_site: SubSiteItem = None  # Optional field for subsite object
 
 
-from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from typing import Optional
-
-
 class IAvailableFile(ABC):
     file_type: str
     content_type: str
@@ -82,9 +79,9 @@ class AvailableGalleryZipFile(IAvailableFile):
     content_type: str
     variant: str
     url: str
-    resolution_width: Optional[int] = None
-    resolution_height: Optional[int] = None
-    file_size: Optional[float] = None
+    resolution_width: int | None = None
+    resolution_height: int | None = None
+    file_size: float | None = None
 
 
 @dataclass
@@ -93,9 +90,9 @@ class AvailableImageFile(IAvailableFile):
     content_type: str
     variant: str
     url: str
-    resolution_width: Optional[int] = None
-    resolution_height: Optional[int] = None
-    file_size: Optional[float] = None
+    resolution_width: int | None = None
+    resolution_height: int | None = None
+    file_size: float | None = None
 
 
 @dataclass
@@ -104,11 +101,11 @@ class AvailableVideoFile(IAvailableFile):
     content_type: str
     variant: str
     url: str
-    resolution_width: Optional[int] = None
-    resolution_height: Optional[int] = None
-    file_size: Optional[float] = None
-    fps: Optional[float] = None
-    codec: Optional[str] = None
+    resolution_width: int | None = None
+    resolution_height: int | None = None
+    file_size: float | None = None
+    fps: float | None = None
+    codec: str | None = None
 
 
 @dataclass
@@ -117,13 +114,13 @@ class AvailableAudioFile(IAvailableFile):
     content_type: str
     variant: str
     url: str
-    file_size: Optional[float] = None
-    duration: Optional[float] = None  # Duration in seconds
-    bitrate: Optional[int] = None  # Bitrate in kbps
-    sample_rate: Optional[int] = None  # Sample rate in Hz
-    channels: Optional[int] = None  # Number of audio channels
-    codec: Optional[str] = None  # Audio codec (mp3, aac, ogg, etc.)
-    sha256_hash: Optional[str] = None  # SHA-256 hash for integrity checking
+    file_size: float | None = None
+    duration: float | None = None  # Duration in seconds
+    bitrate: int | None = None  # Bitrate in kbps
+    sample_rate: int | None = None  # Sample rate in Hz
+    channels: int | None = None  # Number of audio channels
+    codec: str | None = None  # Audio codec (mp3, aac, ogg, etc.)
+    sha256_hash: str | None = None  # SHA-256 hash for integrity checking
 
 
 @dataclass
