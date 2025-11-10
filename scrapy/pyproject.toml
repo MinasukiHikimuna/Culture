@@ -3,7 +3,7 @@ name = "culture-extractor-scrapy"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 dependencies = [
     "newnewid>=0.5.0",
     "psycopg2-binary>=2.9.10",
@@ -18,8 +18,8 @@ dev = [
 ]
 
 [tool.ruff]
-# Target Python 3.12+
-target-version = "py312"
+# Target Python 3.14+
+target-version = "py314"
 
 # Line length
 line-length = 100
