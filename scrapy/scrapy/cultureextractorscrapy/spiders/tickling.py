@@ -86,9 +86,6 @@ class TicklingSpider(scrapy.Spider):
     def parse_update(self, response):
         studio_slug = response.url.split("/")[-3]
         movie_slug = response.url.split("/")[-2]
-        studio_name = response.css(
-            f"div#main-content ul.menu li a.{studio_slug}::attr(title)"
-        ).get()
         movie_name = response.css("h1.title::text").get()
 
         # Check if this release already exists
