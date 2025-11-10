@@ -84,7 +84,6 @@ class TicklingSpider(scrapy.Spider):
             )
 
     def parse_update(self, response):
-        studio_slug = response.url.split("/")[-3]
         movie_slug = response.url.split("/")[-2]
         movie_name = response.css("h1.title::text").get()
 

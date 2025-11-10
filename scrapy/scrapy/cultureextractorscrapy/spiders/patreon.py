@@ -643,25 +643,6 @@ class PatreonSpider(scrapy.Spider):
         seen_urls = set()  # Track URLs to avoid duplicates
         url_to_hash = {}  # Map URLs to their unique hashes
 
-        post_id = post.get("id", "unknown")
-        attributes = post.get("attributes", {})
-        title = attributes.get("title", "")
-        campaign_name = campaign.get("vanity", campaign.get("name", "unknown"))
-
-        # Extract date for filename
-        published_at = attributes.get("published_at", "")
-        post_date = "unknown"
-        if published_at:
-            try:
-                if isinstance(published_at, str):
-                    if "T" in published_at:
-                        dt = datetime.fromisoformat(published_at.replace("Z", "+00:00"))
-                    else:
-                        dt = datetime.fromisoformat(published_at)
-                    post_date = dt.strftime("%Y-%m-%d")
-            except (ValueError, TypeError):
-                post_date = str(published_at)[:10] if published_at else "unknown"
-
         def extract_unique_hash_from_url(url):
             """Extract unique hash from Patreon media URL."""
 

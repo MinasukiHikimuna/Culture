@@ -216,7 +216,6 @@ class HegreSpider(scrapy.Spider):
         tag_elements = response.css('div.approved-tags a.tag')
         for tag_element in tag_elements:
             tag_name = tag_element.css('::text').get()
-            tag_id = tag_element.css('::attr(data-id)').get()
             tag_short_name = tag_name.lower().replace(' ', '-')
             tag_url = f"{base_url}{tag_element.css('::attr(href)').get()}"
 
@@ -505,7 +504,6 @@ class HegreSpider(scrapy.Spider):
         tag_elements = response.css('div.approved-tags a.tag')
         for tag_element in tag_elements:
             tag_name = tag_element.css('::text').get()
-            tag_id = tag_element.css('::attr(data-id)').get()
             tag_short_name = tag_name.lower().replace(' ', '-')
             tag_url = f"{base_url}{tag_element.css('::attr(href)').get()}"
 
@@ -629,8 +627,7 @@ class HegreSpider(scrapy.Spider):
         yield release_item
 
         # Now yield all the DirectDownloadItems
-        for download_item in download_items:
-            yield download_item
+        yield from download_items
 
     def extract_movie_post_data(self, post):
         """Extract metadata from a post element on the movie list page."""
