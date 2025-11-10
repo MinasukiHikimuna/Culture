@@ -10,7 +10,6 @@ dependencies = [
     "polars>=1.19.0",
     "psycopg[binary]>=3.2.5",
     "python-dotenv>=1.0.1",
-    "newnewid>=0.1.0",
     "stashapp-tools>=0.2.52",
     "numpy>=2.0.0",
     "python-levenshtein>=0.27.3",

@@ -1,6 +1,6 @@
 import json
+import uuid
 
-import newnewid
 import polars as pl
 import psycopg
 
@@ -624,7 +624,7 @@ class ClientCultureExtractor:
             str: The UUID of the created site
         """
         with self.connection.cursor() as cursor:
-            site_uuid = str(newnewid.uuid7())
+            site_uuid = str(uuid.uuid7())
             cursor.execute(
                 """
                 INSERT INTO sites (uuid, short_name, name, url, username, password)
@@ -656,7 +656,7 @@ class ClientCultureExtractor:
             if not cursor.fetchone():
                 raise ValueError(f"Site with UUID {site_uuid} does not exist")
 
-            sub_site_uuid = str(newnewid.uuid7())
+            sub_site_uuid = str(uuid.uuid7())
             # Ensure json_document is never None
             json_doc = {} if json_document is None else json_document
             cursor.execute(
@@ -771,7 +771,7 @@ class ClientCultureExtractor:
                 target_system_uuid = target_system_row[0]
             else:
                 # Create new target system
-                target_system_uuid = str(newnewid.uuid7())
+                target_system_uuid = str(uuid.uuid7())
                 cursor.execute(
                     """
                     INSERT INTO target_systems (uuid, name, description, created, last_updated)
@@ -802,7 +802,7 @@ class ClientCultureExtractor:
                 )
             else:
                 # Insert new
-                external_id_uuid = str(newnewid.uuid7())
+                external_id_uuid = str(uuid.uuid7())
                 cursor.execute(
                     """
                     INSERT INTO site_external_ids
@@ -1000,7 +1000,7 @@ class ClientCultureExtractor:
                 target_system_uuid = target_system_row[0]
             else:
                 # Create new target system
-                target_system_uuid = str(newnewid.uuid7())
+                target_system_uuid = str(uuid.uuid7())
                 cursor.execute(
                     """
                     INSERT INTO target_systems (uuid, name, description, created, last_updated)
@@ -1031,7 +1031,7 @@ class ClientCultureExtractor:
                 )
             else:
                 # Insert new
-                external_id_uuid = str(newnewid.uuid7())
+                external_id_uuid = str(uuid.uuid7())
                 cursor.execute(
                     """
                     INSERT INTO tag_external_ids
@@ -1485,7 +1485,7 @@ class ClientCultureExtractor:
                 target_system_uuid = target_system_row[0]
             else:
                 # Create new target system
-                target_system_uuid = str(newnewid.uuid7())
+                target_system_uuid = str(uuid.uuid7())
                 cursor.execute(
                     """
                     INSERT INTO target_systems (uuid, name, description, created, last_updated)
@@ -1516,7 +1516,7 @@ class ClientCultureExtractor:
                 )
             else:
                 # Insert new
-                external_id_uuid = str(newnewid.uuid7())
+                external_id_uuid = str(uuid.uuid7())
                 cursor.execute(
                     """
                     INSERT INTO performer_external_ids
@@ -1672,7 +1672,7 @@ class ClientCultureExtractor:
                 target_system_uuid = target_system_row[0]
             else:
                 # Create new target system
-                target_system_uuid = str(newnewid.uuid7())
+                target_system_uuid = str(uuid.uuid7())
                 cursor.execute(
                     """
                     INSERT INTO target_systems (uuid, name, description, created, last_updated)
@@ -1703,7 +1703,7 @@ class ClientCultureExtractor:
                 )
             else:
                 # Insert new
-                external_id_uuid = str(newnewid.uuid7())
+                external_id_uuid = str(uuid.uuid7())
                 cursor.execute(
                     """
                     INSERT INTO release_external_ids
