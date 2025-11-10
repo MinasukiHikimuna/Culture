@@ -144,11 +144,11 @@ def get_log_filename(spider_name):
 def check_available_disk_space(target_path, min_free_gb=50):
     """
     Check if there's at least min_free_gb of free space available on the target drive.
-    
+
     Args:
         target_path (str): Path to check disk space for
         min_free_gb (int): Minimum required free space in gigabytes (default: 50GB)
-        
+
     Returns:
         tuple: (bool, float) - (has_enough_space, available_gb)
     """
