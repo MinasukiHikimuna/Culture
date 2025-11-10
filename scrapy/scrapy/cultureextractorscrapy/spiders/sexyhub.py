@@ -239,10 +239,10 @@ class SexyHubSpider(scrapy.Spider):
                 available_files = existing_release["available_files"]
                 downloaded_files = existing_release["downloaded_files"]
 
-                needed_files = set(
+                needed_files = {
                     (f["file_type"], f["content_type"], f["variant"])
                     for f in available_files
-                )
+                }
 
                 if not needed_files.issubset(downloaded_files):
                     # We have missing files - yield DirectDownloadItems
@@ -533,8 +533,7 @@ class SexyHubSpider(scrapy.Spider):
 
         # If no gallery, yield the release item here
         yield self._create_release_item(release_meta)
-        for download_item in download_items:
-            yield download_item
+        yield from download_items
 
     def parse_gallery_detail(self, response):
         """Parse the gallery details and yield the final release item with all files."""
@@ -581,8 +580,7 @@ class SexyHubSpider(scrapy.Spider):
 
         # This is always the final step, yield the complete release item
         yield self._create_release_item(release_meta)
-        for download_item in download_items:
-            yield download_item
+        yield from download_items
 
     def _create_release_item(self, release_meta):
         """Helper method to create a ReleaseItem from metadata."""

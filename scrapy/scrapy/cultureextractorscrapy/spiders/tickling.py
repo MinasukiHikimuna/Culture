@@ -124,10 +124,7 @@ class TicklingSpider(scrapy.Spider):
             .get()
             .strip()
         )
-        if duration_raw:
-            duration_text = duration_raw.replace("Time:", "").strip()
-        else:
-            duration_text = None
+        duration_text = duration_raw.replace("Time:", "").strip() if duration_raw else None
 
         # Extract performers
         performers = []
