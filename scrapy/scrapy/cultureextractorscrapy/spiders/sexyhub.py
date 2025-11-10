@@ -109,12 +109,12 @@ class SexyHubSpider(scrapy.Spider):
     site_short_name = "sexyhub"
 
     def __init__(self, *args, **kwargs):
-        super(SexyHubSpider, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.handle_httpstatus_list = [401]  # Add 401 to handled status codes
 
     @classmethod
     def from_crawler(cls, crawler, *args, **kwargs):
-        spider = super(SexyHubSpider, cls).from_crawler(crawler, *args, **kwargs)
+        spider = super().from_crawler(crawler, *args, **kwargs)
 
         # Set the log file using the spider name
         crawler.settings.set("LOG_FILE", get_log_filename(spider.name))

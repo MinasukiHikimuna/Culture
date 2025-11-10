@@ -35,7 +35,7 @@ class TicklingSpider(scrapy.Spider):
 
     @classmethod
     def from_crawler(cls, crawler, *args, **kwargs):
-        spider = super(TicklingSpider, cls).from_crawler(crawler, *args, **kwargs)
+        spider = super().from_crawler(crawler, *args, **kwargs)
         site_item = get_site_item(spider.site_short_name)
         if site_item is None:
             raise ValueError(

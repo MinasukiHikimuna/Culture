@@ -46,11 +46,11 @@ class LezKissSpider(scrapy.Spider):
     site_short_name = "lezkiss"
 
     def __init__(self, *args, **kwargs):
-        super(LezKissSpider, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     @classmethod
     def from_crawler(cls, crawler, *args, **kwargs):
-        spider = super(LezKissSpider, cls).from_crawler(crawler, *args, **kwargs)
+        spider = super().from_crawler(crawler, *args, **kwargs)
 
         # Set the log file using the spider name
         crawler.settings.set("LOG_FILE", get_log_filename(spider.name))

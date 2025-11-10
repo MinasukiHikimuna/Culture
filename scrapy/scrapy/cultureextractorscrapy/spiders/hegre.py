@@ -41,7 +41,7 @@ class HegreSpider(scrapy.Spider):
 
     @classmethod
     def from_crawler(cls, crawler, *args, **kwargs):
-        spider = super(HegreSpider, cls).from_crawler(crawler, *args, **kwargs)
+        spider = super().from_crawler(crawler, *args, **kwargs)
 
         # Set the log file using the spider name
         crawler.settings.set('LOG_FILE', get_log_filename(spider.name))
