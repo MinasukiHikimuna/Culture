@@ -3,6 +3,7 @@
 # See documentation in:
 # https://docs.scrapy.org/en/latest/topics/items.html
 
+import json
 import uuid
 from abc import ABC
 from dataclasses import dataclass
@@ -131,16 +132,13 @@ class AvailableVttFile(IAvailableFile):
     url: str
 
 
-import json
-from typing import Union
-
-AvailableFileType = Union[
-    AvailableGalleryZipFile,
-    AvailableImageFile,
-    AvailableVideoFile,
-    AvailableAudioFile,
-    AvailableVttFile,
-]
+AvailableFileType = (
+    AvailableGalleryZipFile
+    | AvailableImageFile
+    | AvailableVideoFile
+    | AvailableAudioFile
+    | AvailableVttFile
+)
 
 
 class AvailableFileEncoder(json.JSONEncoder):
