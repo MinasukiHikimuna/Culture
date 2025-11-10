@@ -196,7 +196,7 @@ class SexyHubSpider(scrapy.Spider):
             self.logger.error(f"Response headers: {failure.value.response.headers}")
             try:
                 self.logger.error(f"Response body: {failure.value.response.text}")
-            except:
+            except Exception:
                 self.logger.error("Could not read response body")
         if failure.value.status == 401:
             self.logger.error(
