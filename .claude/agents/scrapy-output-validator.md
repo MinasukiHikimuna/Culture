@@ -53,12 +53,22 @@ Your core responsibilities:
 **Operational Guidelines**:
 - Use path CultureExtractor/scrapy/scrapy
 - Use `uv run` to execute Python/Scrapy commands as per project standards
+- **IMPORTANT**: Run scrapers with JSON output using `-o output.json` flag for structured data analysis
+- Use `jq` to parse and analyze JSON output instead of parsing text logs
 - If the scraper fails to run, provide detailed error messages and stack traces
 - Compare output against the expected schema if available
 - Be particularly vigilant about metadata fields vs file content fields
 - Consider the PostgreSQL database schema requirements when validating structure
 - If output is written to files, verify file integrity and content
 - Never dismiss anomalies as "probably fine" - every inconsistency matters
+
+**JSON Output Analysis**:
+When scrapers yield items (not just print), use JSON output:
+1. Run: `uv run scrapy crawl <spider_name> -o output.json`
+2. Parse with jq for field analysis: `jq '.[0] | keys' output.json`
+3. Check completeness: `jq 'map(select(.field_name == null)) | length' output.json`
+4. Statistical analysis: `jq 'group_by(.field_name) | map({key: .[0].field_name, count: length})' output.json`
+5. For spiders still in print/validation mode, analyze text output as usual
 
 **Output Format**:
 Provide a structured report with:
