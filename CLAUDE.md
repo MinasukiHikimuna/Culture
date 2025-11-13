@@ -9,3 +9,9 @@
 - If a login page is encountered, let user handle the login.
 - Prefer small commits i.e. first implementing just scraping a single list page and printing out the output, commit and then proceed.
 - Use uv to run Python code.
+
+# Agents
+
+- playwright-site-inspector to inspect the target sites.
+- scrapy-output-validator should be used whenever scraper code is changed to check if the output is right.
+- code-reviewer needs to be used before committing anything.
