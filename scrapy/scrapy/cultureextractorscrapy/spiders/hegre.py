@@ -113,10 +113,10 @@ class HegreSpider(scrapy.Spider):
                 available_files = existing_release['available_files']
                 downloaded_files = existing_release['downloaded_files']
 
-                needed_files = set(
+                needed_files = {
                     (f['file_type'], f['content_type'], f['variant'])
                     for f in available_files
-                )
+                }
 
                 if not needed_files.issubset(downloaded_files):
                     # We have missing files - yield DirectDownloadItems
@@ -352,10 +352,10 @@ class HegreSpider(scrapy.Spider):
                 available_files = existing_release['available_files']
                 downloaded_files = existing_release['downloaded_files']
 
-                needed_files = set(
+                needed_files = {
                     (f['file_type'], f['content_type'], f['variant'])
                     for f in available_files
-                )
+                }
 
                 if not needed_files.issubset(downloaded_files):
                     # We have missing files - yield DirectDownloadItems

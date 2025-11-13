@@ -642,6 +642,8 @@ class PatreonSpider(scrapy.Spider):
         seen_urls = set()  # Track URLs to avoid duplicates
         url_to_hash = {}  # Map URLs to their unique hashes
 
+        attributes = post.get("attributes", {})
+
         def extract_unique_hash_from_url(url):
             """Extract unique hash from Patreon media URL."""
 
