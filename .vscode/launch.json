@@ -31,7 +31,7 @@
                 "--loglevel",
                 "DEBUG",
             ],
-            "cwd": "${workspaceFolder}/scrapy/scrapy",
+            "cwd": "${workspaceFolder}/scrapy",
             "console": "integratedTerminal"
         }
     ]

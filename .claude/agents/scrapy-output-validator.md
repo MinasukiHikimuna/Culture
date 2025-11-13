@@ -51,7 +51,6 @@ Your core responsibilities:
    - Validity (proper data types and formats)
 
 **Operational Guidelines**:
-- Use path CultureExtractor/scrapy/scrapy
 - Use `uv run` to execute Python/Scrapy commands as per project standards
 - **IMPORTANT**: Run scrapers with JSON output using `-o output.json` flag for structured data analysis
 - Use `jq` to parse and analyze JSON output instead of parsing text logs
