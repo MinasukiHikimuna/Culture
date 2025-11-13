@@ -21,9 +21,12 @@ load_dotenv()
 
 cookies_json = os.getenv("ANGELSLOVE_COOKIES")
 if cookies_json:
-    cookies = json.loads(cookies_json)
+    # Parse browser-format cookies and convert to scrapy format
+    browser_cookies = json.loads(cookies_json)
+    # Convert to dictionary format that scrapy expects
+    cookies = {cookie['name']: cookie['value'] for cookie in browser_cookies}
 else:
-    cookies = []
+    cookies = {}
 
 base_url = "https://angels.love"
 
