@@ -150,7 +150,7 @@ class AngelsLoveSpider(scrapy.Spider):
             download_url = button.css("::attr(data-href)").get()
             # Get file size from sibling div.info
             file_size = button.xpath("following-sibling::div[@class='info']/text()").get()
-            # Check if premium content
+            # Check if this is the highest quality/best version (marked as premium)
             button_classes = button.css("::attr(class)").get() or ""
             is_premium = "download-button-premium" in button_classes
 
@@ -224,7 +224,7 @@ class AngelsLoveSpider(scrapy.Spider):
             if not file_size:
                 # For galleries with wrapper, try parent's sibling
                 file_size = button.xpath("../following-sibling::div[@class='info']/text()").get()
-            # Check if premium content
+            # Check if this is the highest quality/best version (marked as premium)
             button_classes = button.css("::attr(class)").get() or ""
             is_premium = "download-button-premium" in button_classes
 
