@@ -1,9 +1,9 @@
 import json
 import os
 
+import scrapy
 from dotenv import load_dotenv
 
-import scrapy
 from cultureextractorscrapy.spiders.database import (
     get_existing_releases_with_status,
     get_site_item,
@@ -142,15 +142,27 @@ class AngelsLoveSpider(scrapy.Spider):
         likes_count = response.css(".likes-count .count::text").get()
 
         # Extract download options (videos have multiple resolutions)
-        download_formats = response.css(".download-button .format-name::text").getall()
+        download_buttons = response.css("div.download-button")
+        download_files = []
 
-        # Extract file sizes (matching MB or GB patterns)
-        file_sizes_raw = response.css("div.download-button-wrapper *::text").getall()
-        file_sizes = [
-            text.strip()
-            for text in file_sizes_raw
-            if text.strip() and ("MB" in text or "GB" in text)
-        ]
+        for button in download_buttons:
+            format_name = button.css("div.format-name::text").get()
+            download_url = button.css("::attr(data-href)").get()
+            # Get file size from sibling div.info
+            file_size = button.xpath("following-sibling::div[@class='info']/text()").get()
+            # Check if premium content
+            button_classes = button.css("::attr(class)").get() or ""
+            is_premium = "download-button-premium" in button_classes
+
+            if format_name and download_url:
+                download_files.append(
+                    {
+                        "format": format_name.strip(),
+                        "url": download_url.strip(),
+                        "size": file_size.strip() if file_size else None,
+                        "is_premium": is_premium,
+                    }
+                )
 
         # Extract duration (always present for video content)
         duration = response.css(".video-duration .count::text").get()
@@ -168,8 +180,11 @@ class AngelsLoveSpider(scrapy.Spider):
         print(f"Tags: {', '.join(tags) if tags else 'N/A'}")
         print(f"Likes Count: {likes_count if likes_count else 'N/A'}")
         print(f"Duration: {duration}")
-        print(f"Download Formats: {', '.join(download_formats) if download_formats else 'N/A'}")
-        print(f"File Sizes: {', '.join(file_sizes) if file_sizes else 'N/A'}")
+        print("\nDownload Files:")
+        for df in download_files:
+            premium_marker = " [PREMIUM]" if df["is_premium"] else ""
+            print(f"  - {df['format']}: {df['size']}{premium_marker}")
+            print(f"    URL: {df['url']}")
         print(f"{'=' * 80}\n")
 
         # TODO: Create ReleaseItem and yield when ready for database updates
@@ -198,15 +213,30 @@ class AngelsLoveSpider(scrapy.Spider):
         likes_count = response.css(".likes-count .count::text").get()
 
         # Extract download options (galleries have different size options)
-        download_formats = response.css(".download-button .format-name::text").getall()
+        download_buttons = response.css("div.download-button")
+        download_files = []
 
-        # Extract file sizes (matching MB or GB patterns)
-        file_sizes_raw = response.css("div.download-button-wrapper *::text").getall()
-        file_sizes = [
-            text.strip()
-            for text in file_sizes_raw
-            if text.strip() and ("MB" in text or "GB" in text)
-        ]
+        for button in download_buttons:
+            format_name = button.css("div.format-name::text").get()
+            download_url = button.css("::attr(data-href)").get()
+            # Get file size from sibling div.info (or parent's sibling for galleries)
+            file_size = button.xpath("following-sibling::div[@class='info']/text()").get()
+            if not file_size:
+                # For galleries with wrapper, try parent's sibling
+                file_size = button.xpath("../following-sibling::div[@class='info']/text()").get()
+            # Check if premium content
+            button_classes = button.css("::attr(class)").get() or ""
+            is_premium = "download-button-premium" in button_classes
+
+            if format_name and download_url:
+                download_files.append(
+                    {
+                        "format": format_name.strip(),
+                        "url": download_url.strip(),
+                        "size": file_size.strip() if file_size else None,
+                        "is_premium": is_premium,
+                    }
+                )
 
         # Print all extracted data for validation
         print(f"\n{'=' * 80}")
@@ -221,8 +251,11 @@ class AngelsLoveSpider(scrapy.Spider):
         print(f"Tags: {', '.join(tags) if tags else 'N/A'}")
         print(f"Likes Count: {likes_count if likes_count else 'N/A'}")
         print(f"Images Count: {images_count}")
-        print(f"Download Formats: {', '.join(download_formats) if download_formats else 'N/A'}")
-        print(f"File Sizes: {', '.join(file_sizes) if file_sizes else 'N/A'}")
+        print("\nDownload Files:")
+        for df in download_files:
+            premium_marker = " [PREMIUM]" if df["is_premium"] else ""
+            print(f"  - {df['format']}: {df['size']}{premium_marker}")
+            print(f"    URL: {df['url']}")
         print(f"{'=' * 80}\n")
 
         # TODO: Create ReleaseItem and yield when ready for database updates
