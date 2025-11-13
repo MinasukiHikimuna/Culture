@@ -88,30 +88,29 @@ class AngelsLoveSpider(scrapy.Spider):
                 performers = item.css(".metadata .models a::text").getall()
                 performer_urls = item.css(".metadata .models a::attr(href)").getall()
 
-                # Extract date (not available on list page - will get from detail page)
-                date_text = item.css(".metadata .release-date .date::text").get()
-
                 # Extract thumbnail
                 thumbnail = item.css(".elastic-content-tile img.thumb::attr(src)").get()
 
-                # Check if content has play overlay (indicates video/media content)
-                has_play_overlay = item.css(".content-tile-play").get() is not None
+                # Check content type by hover image:
+                # Videos: /static/images/members/play-button-hover-ab70d572a3.png
+                # Galleries: /static/svg/members/photo-tile-overlay-hover-6cd82fe9c7.svg
+                hover_img = item.css("img.hover::attr(src)").get()
+                is_video = hover_img and "play-button-hover" in hover_img if hover_img else False
 
                 self.logger.info(f"Found release: {external_id} - {title}")
 
-                # Yield request to parse detail page
+                # Yield request to appropriate detail page parser based on content type
+                callback = self.parse_video_detail if is_video else self.parse_gallery_detail
                 yield scrapy.Request(
                     url=f"{base_url}{item_link}",
-                    callback=self.parse_detail_page,
+                    callback=callback,
                     cookies=cookies,
                     meta={
                         "external_id": external_id,
                         "title": title,
                         "performers": performers,
                         "performer_urls": performer_urls,
-                        "date_text": date_text,
                         "thumbnail": thumbnail,
-                        "has_play_overlay": has_play_overlay,
                     },
                 )
 
@@ -122,18 +121,16 @@ class AngelsLoveSpider(scrapy.Spider):
 
         self.logger.info(f"Finished processing movies page {page_num}")
 
-    def parse_detail_page(self, response):
-        """Parse a content detail page to extract additional metadata."""
+    def parse_video_detail(self, response):
+        """Parse a video detail page to extract additional metadata."""
         # Get metadata from list page
         external_id = response.meta["external_id"]
         title = response.meta["title"]
         performers = response.meta["performers"]
         performer_urls = response.meta["performer_urls"]
-        date_text = response.meta["date_text"]
         thumbnail = response.meta["thumbnail"]
-        has_play_overlay = response.meta["has_play_overlay"]
 
-        self.logger.info(f"Parsing detail page: {external_id} - {title}")
+        self.logger.info(f"Parsing video detail page: {external_id} - {title}")
 
         # Extract tags
         tags = response.css('a[href*="/members/home/watchall/"]::text').getall()
@@ -141,13 +138,10 @@ class AngelsLoveSpider(scrapy.Spider):
         # Extract release date from detail page
         detail_date = response.css(".metadata .release-date .date::text").get()
 
-        # Extract photo/image count (only present for galleries)
-        images_count = response.css(".images-count .count::text").get()
-
         # Extract likes count (not important - optional field)
         likes_count = response.css(".likes-count .count::text").get()
 
-        # Extract download options
+        # Extract download options (videos have multiple resolutions)
         download_formats = response.css(".download-button .format-name::text").getall()
 
         # Extract file sizes (matching MB or GB patterns)
@@ -158,31 +152,77 @@ class AngelsLoveSpider(scrapy.Spider):
             if text.strip() and ("MB" in text or "GB" in text)
         ]
 
-        # Description is not available on this site
-        description = None
-
-        # Extract duration (only present for video content)
+        # Extract duration (always present for video content)
         duration = response.css(".video-duration .count::text").get()
 
         # Print all extracted data for validation
         print(f"\n{'=' * 80}")
-        print(f"DETAIL PAGE: {external_id}")
+        print(f"VIDEO: {external_id}")
         print(f"{'=' * 80}")
         print(f"Title: {title}")
         print(f"URL: {response.url}")
         print(f"Performers: {', '.join(performers) if performers else 'N/A'}")
         print(f"Performer URLs: {', '.join(performer_urls) if performer_urls else 'N/A'}")
-        print(f"Date (list page): {date_text}")
         print(f"Date (detail page): {detail_date}")
         print(f"Thumbnail: {thumbnail}")
-        print(f"Has Play Overlay: {has_play_overlay}")
         print(f"Tags: {', '.join(tags) if tags else 'N/A'}")
-        print(f"Images Count: {images_count}")
-        print(f"Likes Count: {likes_count}")
+        print(f"Likes Count: {likes_count if likes_count else 'N/A'}")
+        print(f"Duration: {duration}")
         print(f"Download Formats: {', '.join(download_formats) if download_formats else 'N/A'}")
         print(f"File Sizes: {', '.join(file_sizes) if file_sizes else 'N/A'}")
-        print(f"Description: {description if description else 'N/A'}")
-        print(f"Duration: {duration if duration else 'N/A'}")
+        print(f"{'=' * 80}\n")
+
+        # TODO: Create ReleaseItem and yield when ready for database updates
+
+    def parse_gallery_detail(self, response):
+        """Parse a gallery detail page to extract additional metadata."""
+        # Get metadata from list page
+        external_id = response.meta["external_id"]
+        title = response.meta["title"]
+        performers = response.meta["performers"]
+        performer_urls = response.meta["performer_urls"]
+        thumbnail = response.meta["thumbnail"]
+
+        self.logger.info(f"Parsing gallery detail page: {external_id} - {title}")
+
+        # Extract tags
+        tags = response.css('a[href*="/members/home/watchall/"]::text').getall()
+
+        # Extract release date from detail page
+        detail_date = response.css(".metadata .release-date .date::text").get()
+
+        # Extract photo/image count (always present for galleries)
+        images_count = response.css(".images-count .count::text").get()
+
+        # Extract likes count (not important - optional field)
+        likes_count = response.css(".likes-count .count::text").get()
+
+        # Extract download options (galleries have different size options)
+        download_formats = response.css(".download-button .format-name::text").getall()
+
+        # Extract file sizes (matching MB or GB patterns)
+        file_sizes_raw = response.css("div.download-button-wrapper *::text").getall()
+        file_sizes = [
+            text.strip()
+            for text in file_sizes_raw
+            if text.strip() and ("MB" in text or "GB" in text)
+        ]
+
+        # Print all extracted data for validation
+        print(f"\n{'=' * 80}")
+        print(f"GALLERY: {external_id}")
+        print(f"{'=' * 80}")
+        print(f"Title: {title}")
+        print(f"URL: {response.url}")
+        print(f"Performers: {', '.join(performers) if performers else 'N/A'}")
+        print(f"Performer URLs: {', '.join(performer_urls) if performer_urls else 'N/A'}")
+        print(f"Date (detail page): {detail_date}")
+        print(f"Thumbnail: {thumbnail}")
+        print(f"Tags: {', '.join(tags) if tags else 'N/A'}")
+        print(f"Likes Count: {likes_count if likes_count else 'N/A'}")
+        print(f"Images Count: {images_count}")
+        print(f"Download Formats: {', '.join(download_formats) if download_formats else 'N/A'}")
+        print(f"File Sizes: {', '.join(file_sizes) if file_sizes else 'N/A'}")
         print(f"{'=' * 80}\n")
 
         # TODO: Create ReleaseItem and yield when ready for database updates
