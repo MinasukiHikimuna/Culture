@@ -1397,18 +1397,21 @@ class ClientCultureExtractor:
             performer_uuid: UUID of the performer to get
 
         Returns:
-            DataFrame containing the performer data
+            DataFrame containing the performer data including site information
         """
         with self.connection.cursor() as cursor:
             cursor.execute(
                 """
                 SELECT
-                    uuid AS ce_performers_uuid,
-                    short_name AS ce_performers_short_name,
-                    name AS ce_performers_name,
-                    url AS ce_performers_url
-                FROM performers
-                WHERE uuid = %s
+                    p.uuid AS ce_performers_uuid,
+                    p.short_name AS ce_performers_short_name,
+                    p.name AS ce_performers_name,
+                    p.url AS ce_performers_url,
+                    s.short_name AS ce_sites_short_name,
+                    s.name AS ce_sites_name
+                FROM performers p
+                LEFT JOIN sites s ON p.site_uuid = s.uuid
+                WHERE p.uuid = %s
             """,
                 (performer_uuid,),
             )
@@ -1421,6 +1424,8 @@ class ClientCultureExtractor:
                 "ce_performers_short_name": performer_row[1],
                 "ce_performers_name": performer_row[2],
                 "ce_performers_url": performer_row[3],
+                "ce_sites_short_name": performer_row[4],
+                "ce_sites_name": performer_row[5],
             }
 
             schema = {
@@ -1428,6 +1433,8 @@ class ClientCultureExtractor:
                 "ce_performers_short_name": pl.Utf8,
                 "ce_performers_name": pl.Utf8,
                 "ce_performers_url": pl.Utf8,
+                "ce_sites_short_name": pl.Utf8,
+                "ce_sites_name": pl.Utf8,
             }
 
             return pl.DataFrame([performer_data], schema=schema)

@@ -16,7 +16,6 @@ Usage:
 """
 
 import argparse
-import re
 import subprocess
 import sys
 import tempfile
@@ -60,58 +59,51 @@ def get_ce_performer(client: ClientCultureExtractor, performer_uuid: str) -> dic
         return None
 
 
-def get_performer_image_path(performer: dict) -> Path | None:
+def get_performer_image_path(performer: dict) -> tuple[Path | None, str | None]:
     """Get the image path for a performer.
 
     Args:
         performer: Performer dictionary from CE database
 
     Returns:
-        Path to the performer's image file or None if not found
+        Tuple of (Path to the performer's image file or None if not found,
+                 Site name from database or None)
     """
     performer_uuid = performer.get("ce_performers_uuid")
     if not performer_uuid:
-        return None
+        return None, None
 
-    # Extract site name from performer URL
-    # Example URL: https://www.lezkiss.com/pornstars/aislin-88.html
-    performer_url = performer.get("ce_performers_url", "")
-    site_name = None
-
-    if performer_url:
-        # Extract domain from URL (e.g., "lezkiss.com" -> "lezkiss")
-        match = re.search(r"https?://(?:www\.)?([^./]+)", performer_url)
-        if match:
-            site_name = match.group(1)
+    # Get site name from database
+    site_name = performer.get("ce_sites_name")
 
     if not site_name:
-        return None
+        return None, None
 
     # Try common image path patterns
     # Based on your example: /Volumes/Ripping/LezKiss/Performers/{uuid}/{uuid}.jpg
     possible_paths = [
+        # Exact case from database (e.g., angels.love)
+        Path(f"/Volumes/Ripping/{site_name}/Performers/{performer_uuid}/{performer_uuid}.jpg"),
         # Title case (LezKiss)
         Path(f"/Volumes/Ripping/{site_name.title()}/Performers/{performer_uuid}/{performer_uuid}.jpg"),
         # All caps (LEZKISS)
         Path(f"/Volumes/Ripping/{site_name.upper()}/Performers/{performer_uuid}/{performer_uuid}.jpg"),
         # Lowercase (lezkiss)  # noqa: ERA001
         Path(f"/Volumes/Ripping/{site_name.lower()}/Performers/{performer_uuid}/{performer_uuid}.jpg"),
-        # Original case
-        Path(f"/Volumes/Ripping/{site_name}/Performers/{performer_uuid}/{performer_uuid}.jpg"),
     ]
 
     for path in possible_paths:
         if path.exists():
-            return path
+            return path, site_name
 
     # If image path is directly in the database
     image_path = performer.get("ce_performers_image_path")
     if image_path:
         path = Path(image_path)
         if path.exists():
-            return path
+            return path, site_name
 
-    return None
+    return None, site_name
 
 
 def run_face_recognition(image_path: Path, threshold: float = 0.5, max_results: int = 3) -> dict:
@@ -487,16 +479,10 @@ def run_matching_workflow(  # noqa: PLR0915, PLR0912
 
     # Step 2: Get performer image
     console.print("\n[bold]Step 2: Locating performer image[/bold]")
-    image_path = get_performer_image_path(ce_performer)
+    image_path, site_name = get_performer_image_path(ce_performer)
     if not image_path:
         console.print("[red]✗ Could not find performer image[/red]")
-        performer_url = ce_performer.get("ce_performers_url", "")
-        if performer_url:
-            # Extract site name for better error message
-            match = re.search(r"https?://(?:www\.)?([^./]+)", performer_url)
-            site_display = match.group(1).title() if match else "<site>"
-        else:
-            site_display = "<site>"
+        site_display = site_name.title() if site_name else "<site>"
         console.print(f"[yellow]Expected location: /Volumes/Ripping/{site_display}/Performers/{performer_uuid}/{performer_uuid}.jpg[/yellow]")  # noqa: E501
         console.print("[dim]Note: The performer UUID in CE database may not match the filesystem UUID[/dim]")
         console.print("[dim]Consider manually locating the image or linking the performer through Stashapp directly[/dim]")  # noqa: E501
