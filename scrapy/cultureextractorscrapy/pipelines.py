@@ -11,12 +11,11 @@ from datetime import datetime
 from urllib.parse import urlparse
 
 import newnewid
+from scrapy import Request
 
 # useful for handling different item types with a single interface
 from scrapy.pipelines.files import FilesPipeline
 from twisted.internet import defer
-
-from scrapy import Request
 
 from .items import (
     DirectDownloadItem,
@@ -242,6 +241,8 @@ class BaseDownloadPipeline:
                     file_extension = ""  # No extension for other types
             # Create filename in the specified format
             if file_info["file_type"] == "video":
+                # Include variant to prevent overwriting when multiple quality versions exist
+                variant_part = f" [{file_info['variant']}]" if file_info.get("variant") else ""
                 # Only include resolution if both width and height are present and not None
                 if file_info.get("resolution_width") and file_info.get("resolution_height"):
                     resolution_part = (
@@ -249,7 +250,7 @@ class BaseDownloadPipeline:
                     )
                 else:
                     resolution_part = ""
-                filename = f"{formatted_site_name} - {release_date} - {release_short_name} - {release_name}{resolution_part} - {release_id}{file_extension}"
+                filename = f"{formatted_site_name} - {release_date} - {release_short_name} - {release_name}{resolution_part}{variant_part} - {release_id}{file_extension}"
             else:
                 filename = f"{formatted_site_name} - {release_date} - {release_short_name} - {release_name} - {file_info['variant']} - {release_id}{file_extension}"
             # Sanitize each component separately to maintain structure
@@ -392,9 +393,7 @@ class BaseDownloadPipeline:
                 file_path,
             ]
 
-            result = subprocess.run(
-                ffprobe_command, capture_output=True, text=True, timeout=60
-            )
+            result = subprocess.run(ffprobe_command, capture_output=True, text=True, timeout=60)
 
             if result.returncode == 0:
                 ffprobe_data = json_lib.loads(result.stdout)
@@ -781,8 +780,10 @@ class M3u8DownloadPipeline(BaseDownloadPipeline):
                 )
                 try:
                     process.kill()
-                except Exception:
-                    pass
+                except Exception as e:
+                    spider.logger.debug(
+                        "[M3u8DownloadPipeline] Failed to kill timed-out process: %s", e
+                    )
             except FileNotFoundError:
                 spider.logger.error(
                     "[M3u8DownloadPipeline] yt-dlp not found in PATH. Please install yt-dlp."

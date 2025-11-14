@@ -1,11 +1,24 @@
 import json
 import os
+from datetime import UTC, datetime
 
+import newnewid
 import scrapy
 from dotenv import load_dotenv
+from itemadapter import ItemAdapter
 
+from cultureextractorscrapy.items import (
+    AvailableFileEncoder,
+    AvailableGalleryZipFile,
+    AvailableImageFile,
+    AvailableVideoFile,
+    DirectDownloadItem,
+    ReleaseItem,
+)
 from cultureextractorscrapy.spiders.database import (
     get_existing_releases_with_status,
+    get_or_create_performer,
+    get_or_create_tag,
     get_site_item,
 )
 from cultureextractorscrapy.utils import (
@@ -28,7 +41,13 @@ base_url = "https://angels.love"
 
 class AngelsLoveSpider(scrapy.Spider):
     name = "angelslove"
-    allowed_domains = ["angels.love"]
+    allowed_domains = [
+        "angels.love",
+        "dd-thumbs.wowgirls.com",
+        "dd-photo.wowgirls.com",
+        "dd-video.wowgirls.com",
+        "dd-vthumbs.wowgirls.com",
+    ]
     start_urls = [base_url]
     site_short_name = "angelslove"
 
@@ -121,6 +140,33 @@ class AngelsLoveSpider(scrapy.Spider):
 
         self.logger.info(f"Finished processing movies page {page_num}")
 
+    def _create_performer_items(self, performers, performer_urls):
+        """Create performer items from names and URLs."""
+        performer_items = []
+        for i, performer_name in enumerate(performers):
+            performer_url = performer_urls[i] if i < len(performer_urls) else None
+            performer_short_name = performer_url.split("/")[-1] if performer_url else None
+            full_url = f"{base_url}{performer_url}" if performer_url else None
+
+            # Create or get performer from database
+            performer = get_or_create_performer(
+                self.site.id, performer_short_name, performer_name.strip(), full_url
+            )
+            performer_items.append(performer)
+        return performer_items
+
+    def _create_tag_items(self, tags):
+        """Create tag items from tag names."""
+        tag_items = []
+        for tag_name in tags:
+            # Tags don't have URLs on this site, use name as short_name
+            tag_short_name = tag_name.lower().replace(" ", "-")
+
+            # Create or get tag from database
+            tag = get_or_create_tag(self.site.id, tag_short_name, tag_name.strip(), None)
+            tag_items.append(tag)
+        return tag_items
+
     def parse_video_detail(self, response):
         """Parse a video detail page to extract additional metadata."""
         # Get metadata from list page
@@ -136,7 +182,16 @@ class AngelsLoveSpider(scrapy.Spider):
         tags = response.css('a[href*="/members/home/watchall/"]::text').getall()
 
         # Extract release date from detail page
-        detail_date = response.css(".metadata .release-date .date::text").get()
+        detail_date_str = response.css(".metadata .release-date .date::text").get()
+
+        # Parse date to ISO format (from "Nov 13, 2025" to "2025-11-13")
+        detail_date = None
+        if detail_date_str:
+            try:
+                parsed_date = datetime.strptime(detail_date_str, "%b %d, %Y").date()
+                detail_date = parsed_date.isoformat()
+            except ValueError:
+                self.logger.warning(f"Could not parse date: {detail_date_str}")
 
         # Extract likes count (not important - optional field)
         likes_count = response.css(".likes-count .count::text").get()
@@ -150,9 +205,6 @@ class AngelsLoveSpider(scrapy.Spider):
             download_url = button.css("::attr(data-href)").get()
             # Get file size from sibling div.info
             file_size = button.xpath("following-sibling::div[@class='info']/text()").get()
-            # Check if this is the highest quality/best version (marked as premium)
-            button_classes = button.css("::attr(class)").get() or ""
-            is_premium = "download-button-premium" in button_classes
 
             if format_name and download_url:
                 download_files.append(
@@ -160,34 +212,116 @@ class AngelsLoveSpider(scrapy.Spider):
                         "format": format_name.strip(),
                         "url": download_url.strip(),
                         "size": file_size.strip() if file_size else None,
-                        "is_premium": is_premium,
                     }
                 )
 
         # Extract duration (always present for video content)
-        duration = response.css(".video-duration .count::text").get()
+        duration_str = response.css(".video-duration .count::text").get()
 
-        # Print all extracted data for validation
-        print(f"\n{'=' * 80}")
-        print(f"VIDEO: {external_id}")
-        print(f"{'=' * 80}")
-        print(f"Title: {title}")
-        print(f"URL: {response.url}")
-        print(f"Performers: {', '.join(performers) if performers else 'N/A'}")
-        print(f"Performer URLs: {', '.join(performer_urls) if performer_urls else 'N/A'}")
-        print(f"Date (detail page): {detail_date}")
-        print(f"Thumbnail: {thumbnail}")
-        print(f"Tags: {', '.join(tags) if tags else 'N/A'}")
-        print(f"Likes Count: {likes_count if likes_count else 'N/A'}")
-        print(f"Duration: {duration}")
-        print("\nDownload Files:")
-        for df in download_files:
-            premium_marker = " [PREMIUM]" if df["is_premium"] else ""
-            print(f"  - {df['format']}: {df['size']}{premium_marker}")
-            print(f"    URL: {df['url']}")
-        print(f"{'=' * 80}\n")
+        # Parse duration to seconds (format: MM:SS or HH:MM:SS)
+        duration_seconds = 0
+        if duration_str:
+            parts = duration_str.split(":")
+            if len(parts) == 2:  # MM:SS
+                duration_seconds = int(parts[0]) * 60 + int(parts[1])
+            elif len(parts) == 3:  # HH:MM:SS
+                duration_seconds = int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
 
-        # TODO: Create ReleaseItem and yield when ready for database updates
+        # Create performer and tag items
+        performer_items = self._create_performer_items(performers, performer_urls)
+        tag_items = self._create_tag_items(tags)
+
+        # Check if this release already exists
+        existing_release = self.existing_releases.get(external_id)
+        release_id = existing_release["uuid"] if existing_release else newnewid.uuid7()
+
+        # Create available files list and download items
+        available_files = []
+        download_items = []
+
+        # Add thumbnail as cover image
+        if thumbnail:
+            cover_file = AvailableImageFile(
+                file_type="image",
+                content_type="cover",
+                variant="thumbnail",
+                url=thumbnail,
+            )
+            available_files.append(cover_file)
+            download_items.append(
+                DirectDownloadItem(
+                    release_id=str(release_id),
+                    file_info=ItemAdapter(cover_file).asdict(),
+                    url=cover_file.url,
+                )
+            )
+
+        # Add only the highest quality video (last in list) to available_files for download
+        # Full list of all formats is kept in json_document's download_files
+        if download_files:
+            # Last item in download_files list is the highest quality
+            df = download_files[-1]
+            video_file = AvailableVideoFile(
+                file_type="video",
+                content_type="video",
+                variant=df["format"],
+                url=df["url"],
+                file_size=None,  # Size is in string format like "4.91GB", would need parsing
+            )
+            available_files.append(video_file)
+            download_items.append(
+                DirectDownloadItem(
+                    release_id=str(release_id),
+                    file_info=ItemAdapter(video_file).asdict(),
+                    url=video_file.url,
+                )
+            )
+
+        if existing_release:
+            self.logger.info(
+                f"Release ID={release_id} short_name={external_id} already exists. Updating existing release."
+            )
+        else:
+            self.logger.info(f"Creating new release ID={release_id} short_name={external_id}.")
+
+        # Create post data for json_document (convert items to dicts)
+        post_data = {
+            "external_id": external_id,
+            "title": title,
+            "performers": [
+                {"name": p.name, "short_name": p.short_name, "url": p.url} for p in performer_items
+            ],
+            "tags": [{"name": t.name, "short_name": t.short_name, "url": t.url} for t in tag_items],
+            "release_date": detail_date,
+            "thumbnail": thumbnail,
+            "duration": duration_str,
+            "likes_count": likes_count,
+            "download_files": download_files,
+        }
+
+        # First yield the ReleaseItem to ensure it's saved to database
+        release_item = ReleaseItem(
+            id=release_id,
+            release_date=detail_date,
+            short_name=external_id,
+            name=title,
+            url=response.url,
+            description="",
+            duration=duration_seconds,
+            created=datetime.now(tz=UTC).astimezone(),
+            last_updated=datetime.now(tz=UTC).astimezone(),
+            performers=performer_items,
+            tags=tag_items,
+            available_files=json.dumps(available_files, cls=AvailableFileEncoder),
+            json_document=json.dumps(post_data),
+            site_uuid=self.site.id,
+            site=self.site,
+        )
+
+        yield release_item
+
+        # Now yield all the DirectDownloadItems
+        yield from download_items
 
     def parse_gallery_detail(self, response):
         """Parse a gallery detail page to extract additional metadata."""
@@ -204,7 +338,16 @@ class AngelsLoveSpider(scrapy.Spider):
         tags = response.css('a[href*="/members/home/watchall/"]::text').getall()
 
         # Extract release date from detail page
-        detail_date = response.css(".metadata .release-date .date::text").get()
+        detail_date_str = response.css(".metadata .release-date .date::text").get()
+
+        # Parse date to ISO format (from "Nov 13, 2025" to "2025-11-13")
+        detail_date = None
+        if detail_date_str:
+            try:
+                parsed_date = datetime.strptime(detail_date_str, "%b %d, %Y").date()
+                detail_date = parsed_date.isoformat()
+            except ValueError:
+                self.logger.warning(f"Could not parse date: {detail_date_str}")
 
         # Extract photo/image count (always present for galleries)
         images_count = response.css(".images-count .count::text").get()
@@ -224,9 +367,6 @@ class AngelsLoveSpider(scrapy.Spider):
             if not file_size:
                 # For galleries with wrapper, try parent's sibling
                 file_size = button.xpath("../following-sibling::div[@class='info']/text()").get()
-            # Check if this is the highest quality/best version (marked as premium)
-            button_classes = button.css("::attr(class)").get() or ""
-            is_premium = "download-button-premium" in button_classes
 
             if format_name and download_url:
                 download_files.append(
@@ -234,28 +374,101 @@ class AngelsLoveSpider(scrapy.Spider):
                         "format": format_name.strip(),
                         "url": download_url.strip(),
                         "size": file_size.strip() if file_size else None,
-                        "is_premium": is_premium,
                     }
                 )
 
-        # Print all extracted data for validation
-        print(f"\n{'=' * 80}")
-        print(f"GALLERY: {external_id}")
-        print(f"{'=' * 80}")
-        print(f"Title: {title}")
-        print(f"URL: {response.url}")
-        print(f"Performers: {', '.join(performers) if performers else 'N/A'}")
-        print(f"Performer URLs: {', '.join(performer_urls) if performer_urls else 'N/A'}")
-        print(f"Date (detail page): {detail_date}")
-        print(f"Thumbnail: {thumbnail}")
-        print(f"Tags: {', '.join(tags) if tags else 'N/A'}")
-        print(f"Likes Count: {likes_count if likes_count else 'N/A'}")
-        print(f"Images Count: {images_count}")
-        print("\nDownload Files:")
-        for df in download_files:
-            premium_marker = " [PREMIUM]" if df["is_premium"] else ""
-            print(f"  - {df['format']}: {df['size']}{premium_marker}")
-            print(f"    URL: {df['url']}")
-        print(f"{'=' * 80}\n")
+        # Create performer and tag items
+        performer_items = self._create_performer_items(performers, performer_urls)
+        tag_items = self._create_tag_items(tags)
 
-        # TODO: Create ReleaseItem and yield when ready for database updates
+        # Check if this release already exists
+        existing_release = self.existing_releases.get(external_id)
+        release_id = existing_release["uuid"] if existing_release else newnewid.uuid7()
+
+        # Create available files list and download items
+        available_files = []
+        download_items = []
+
+        # Add thumbnail as cover image
+        if thumbnail:
+            cover_file = AvailableImageFile(
+                file_type="image",
+                content_type="cover",
+                variant="thumbnail",
+                url=thumbnail,
+            )
+            available_files.append(cover_file)
+            download_items.append(
+                DirectDownloadItem(
+                    release_id=str(release_id),
+                    file_info=ItemAdapter(cover_file).asdict(),
+                    url=cover_file.url,
+                )
+            )
+
+        # Add only the highest quality gallery (last in list) to available_files for download
+        # Full list of all formats is kept in json_document's download_files
+        if download_files:
+            # Last item in download_files list is the highest quality
+            df = download_files[-1]
+            gallery_file = AvailableGalleryZipFile(
+                file_type="zip",
+                content_type="gallery",
+                variant=df["format"],
+                url=df["url"],
+                file_size=None,  # Size is in string format like "164.83MB", would need parsing
+            )
+            available_files.append(gallery_file)
+            download_items.append(
+                DirectDownloadItem(
+                    release_id=str(release_id),
+                    file_info=ItemAdapter(gallery_file).asdict(),
+                    url=gallery_file.url,
+                )
+            )
+
+        if existing_release:
+            self.logger.info(
+                f"Release ID={release_id} short_name={external_id} already exists. Updating existing release."
+            )
+        else:
+            self.logger.info(f"Creating new release ID={release_id} short_name={external_id}.")
+
+        # Create post data for json_document (convert items to dicts)
+        post_data = {
+            "external_id": external_id,
+            "title": title,
+            "performers": [
+                {"name": p.name, "short_name": p.short_name, "url": p.url} for p in performer_items
+            ],
+            "tags": [{"name": t.name, "short_name": t.short_name, "url": t.url} for t in tag_items],
+            "release_date": detail_date,
+            "thumbnail": thumbnail,
+            "images_count": images_count,
+            "likes_count": likes_count,
+            "download_files": download_files,
+        }
+
+        # First yield the ReleaseItem to ensure it's saved to database
+        release_item = ReleaseItem(
+            id=release_id,
+            release_date=detail_date,
+            short_name=external_id,
+            name=title,
+            url=response.url,
+            description="",
+            duration=0,  # Galleries don't have duration
+            created=datetime.now(tz=UTC).astimezone(),
+            last_updated=datetime.now(tz=UTC).astimezone(),
+            performers=performer_items,
+            tags=tag_items,
+            available_files=json.dumps(available_files, cls=AvailableFileEncoder),
+            json_document=json.dumps(post_data),
+            site_uuid=self.site.id,
+            site=self.site,
+        )
+
+        yield release_item
+
+        # Now yield all the DirectDownloadItems
+        yield from download_items
