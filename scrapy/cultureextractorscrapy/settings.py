@@ -21,7 +21,7 @@ ROBOTSTXT_OBEY = False
 
 # Configure maximum concurrent requests performed by Scrapy (default: 16)
 CONCURRENT_REQUESTS = 1
-DOWNLOAD_TIMEOUT = 3600
+DOWNLOAD_TIMEOUT = 1800
 
 # Configure a delay for requests for the same website (default: 0)
 # See https://docs.scrapy.org/en/latest/topics/settings.html#download-delay
@@ -113,7 +113,7 @@ DOWNLOAD_MAXSIZE = 0  # Disable size limit
 DOWNLOAD_WARNSIZE = 0  # Disable size warning
 
 # You might also want to adjust these settings
-DOWNLOAD_FAIL_ON_DATALOSS = False
+DOWNLOAD_FAIL_ON_DATALOSS = True
 RETRY_TIMES = 5  # Number of retries for failed downloads
 RETRY_HTTP_CODES = [
     500,
