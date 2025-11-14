@@ -67,6 +67,13 @@ class ReleaseItem:
     sub_site: SubSiteItem = None  # Optional field for subsite object
 
 
+@dataclass
+class PerformerItem:
+    """Item for scraping performer information with images."""
+    performer: SitePerformerItem
+    image_urls: list[dict]  # List of {"url": "...", "type": "profile"|"banner"|"gallery"}
+
+
 class IAvailableFile(ABC):
     file_type: str
     content_type: str

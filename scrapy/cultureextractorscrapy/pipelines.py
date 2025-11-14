@@ -21,6 +21,7 @@ from .items import (
     DirectDownloadItem,
     DownloadedFileItem,
     M3u8DownloadItem,
+    PerformerItem,
     ReleaseAndDownloadsItem,
     ReleaseItem,
 )
@@ -1039,3 +1040,107 @@ class FfmpegDownloadPipeline(BaseDownloadPipeline):
         except Exception as e:
             spider.logger.error("[FfmpegDownloadPipeline] ffmpeg download error: %s", str(e))
             return False
+
+
+class PerformerImagePipeline:
+    """Pipeline to download performer images directly to disk.
+
+    Downloads images to: /Volumes/Ripping/{SiteName}/Performers/{performer_uuid}/
+
+    Respects FORCE_UPDATE setting:
+    - False (default): Only download if file doesn't exist
+    - True: Re-download all images, overwriting existing files
+    """
+
+    def __init__(self, files_store):
+        self.files_store = files_store
+        self.logger = logging.getLogger(self.__class__.__name__)
+
+    @classmethod
+    def from_crawler(cls, crawler):
+        files_store = crawler.settings.get("FILES_STORE", "/Volumes/Ripping/")
+        return cls(files_store)
+
+    def process_item(self, item, spider):
+        if not isinstance(item, PerformerItem):
+            return item
+
+        performer = item.performer
+        performer_uuid = str(performer.id)
+        site_name = spider.site.name
+
+        # Get force_update setting from spider
+        force_update = getattr(spider, "force_update", False)
+
+        # Create base path for this performer
+        performer_dir = os.path.join(self.files_store, site_name, "Performers", performer_uuid)
+        os.makedirs(performer_dir, exist_ok=True)
+
+        self.logger.info(
+            f"[PerformerImagePipeline] Processing {performer.name} ({performer_uuid})"
+        )
+
+        # Download each image
+        for idx, img_info in enumerate(item.image_urls):
+            url = img_info["url"]
+            img_type = img_info.get("type", "profile")
+
+            # Determine filename based on type
+            if img_type == "profile" and idx == 0:
+                # Main profile image uses performer UUID
+                ext = self._get_extension(url)
+                filename = f"{performer_uuid}{ext}"
+            elif img_type == "profile-alt":
+                # Alternative profile image
+                ext = self._get_extension(url)
+                filename = f"{performer_uuid}-alt{ext}"
+            else:
+                # Other images get numbered
+                ext = self._get_extension(url)
+                filename = f"{performer_uuid}-{idx + 1}{ext}"
+
+            filepath = os.path.join(performer_dir, filename)
+
+            # Check if file exists (unless force_update is True)
+            if not force_update and os.path.exists(filepath):
+                self.logger.info(
+                    f"[PerformerImagePipeline] Skipping {filename} (already exists)"
+                )
+                continue
+
+            # Download the image
+            try:
+                self._download_image(url, filepath, spider)
+                self.logger.info(
+                    f"[PerformerImagePipeline] Downloaded {filename} from {url}"
+                )
+            except Exception as e:
+                self.logger.error(
+                    f"[PerformerImagePipeline] Failed to download {filename}: {e}"
+                )
+
+        return item
+
+    def _get_extension(self, url):
+        """Extract file extension from URL."""
+        parsed = urlparse(url)
+        path = parsed.path
+        # Remove query parameters
+        path = path.split("?")[0]
+        ext = os.path.splitext(path)[1]
+        return ext if ext else ".jpg"
+
+    def _download_image(self, url, filepath, spider):
+        """Download an image from URL to filepath."""
+        import requests
+
+        # Use cookies if available from spider
+        cookies = {}
+        if hasattr(spider, "cookies"):
+            cookies = spider.cookies
+
+        response = requests.get(url, cookies=cookies, timeout=30)
+        response.raise_for_status()
+
+        with open(filepath, "wb") as f:
+            f.write(response.content)

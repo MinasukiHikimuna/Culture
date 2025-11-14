@@ -64,6 +64,7 @@ DOWNLOAD_TIMEOUT = 1800
 # Configure item pipelines
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
 ITEM_PIPELINES = {
+    "cultureextractorscrapy.pipelines.PerformerImagePipeline": 200,
     "cultureextractorscrapy.pipelines.M3u8DownloadPipeline": 250,
     "cultureextractorscrapy.pipelines.AvailableFilesPipeline": 300,
     "cultureextractorscrapy.pipelines.PostgresPipeline": 400,

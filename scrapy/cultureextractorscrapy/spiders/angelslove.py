@@ -13,6 +13,7 @@ from cultureextractorscrapy.items import (
     AvailableImageFile,
     AvailableVideoFile,
     DirectDownloadItem,
+    PerformerItem,
     ReleaseItem,
 )
 from cultureextractorscrapy.spiders.database import (
@@ -51,6 +52,17 @@ class AngelsLoveSpider(scrapy.Spider):
     start_urls = [base_url]
     site_short_name = "angelslove"
 
+    def __init__(self, mode='releases', *args, **kwargs):
+        """Initialize spider with mode parameter.
+
+        Args:
+            mode: 'releases' (default), 'performers', or 'all'
+        """
+        super().__init__(*args, **kwargs)
+        self.mode = mode
+        if mode not in ['releases', 'performers', 'all']:
+            raise ValueError(f"Invalid mode: {mode}. Must be 'releases', 'performers', or 'all'")
+
     @classmethod
     def from_crawler(cls, crawler, *args, **kwargs):
         spider = super().from_crawler(crawler, *args, **kwargs)
@@ -73,13 +85,24 @@ class AngelsLoveSpider(scrapy.Spider):
         return spider
 
     def parse(self, response):
-        # Request movies first, then photos
-        yield scrapy.Request(
-            url=f"{base_url}/members/content?page=1",
-            callback=self.parse_movies_page,
-            cookies=cookies,
-            meta={"page": 1, "content_type": "all"},
-        )
+        # Route based on mode
+        if self.mode in ['releases', 'all']:
+            # Request movies first, then photos
+            yield scrapy.Request(
+                url=f"{base_url}/members/content?page=1",
+                callback=self.parse_movies_page,
+                cookies=cookies,
+                meta={"page": 1, "content_type": "all"},
+            )
+
+        if self.mode in ['performers', 'all']:
+            # Request performers listing
+            yield scrapy.Request(
+                url=f"{base_url}/members/girls?page=1",
+                callback=self.parse_performers_page,
+                cookies=cookies,
+                meta={"page": 1},
+            )
 
     def parse_movies_page(self, response):
         """Parse a page of movies."""
@@ -472,3 +495,108 @@ class AngelsLoveSpider(scrapy.Spider):
 
         # Now yield all the DirectDownloadItems
         yield from download_items
+
+    def parse_performers_page(self, response):
+        """Parse a page of performers/models."""
+        page_num = response.meta.get("page", 1)
+        self.logger.info(f"Parsing performers page {page_num}: {response.url}")
+
+        # Extract all performer cards from the grid
+        performer_cards = response.css('a[href*="/members/model/"]')
+
+        self.logger.info(f"Found {len(performer_cards)} performers on page {page_num}")
+
+        for card in performer_cards:
+            # Extract performer data from the card
+            performer_url = card.css("::attr(href)").get()
+            performer_name = card.css(".content-tile-title::text").get()
+            performer_image = card.css("img.thumb::attr(src)").get()
+            performer_id = card.css(".elastic-model-tile::attr(data-id)").get()
+
+            if performer_url and performer_name:
+                # Extract slug from URL (e.g., /members/model/cherry-crush -> cherry-crush)
+                performer_slug = performer_url.split("/")[-1]
+
+                self.logger.info(f"Found performer: {performer_name} (ID: {performer_id}, slug: {performer_slug})")
+
+                # Request the performer detail page
+                yield scrapy.Request(
+                    url=f"{base_url}{performer_url}",
+                    callback=self.parse_performer_detail,
+                    cookies=cookies,
+                    meta={
+                        "performer_name": performer_name,
+                        "performer_slug": performer_slug,
+                        "performer_id": performer_id,
+                        "list_image": performer_image,
+                    },
+                )
+
+        # Handle pagination - extract next page if available
+        page_options = response.css(".page-selector-select option::attr(data-href)").getall()
+        if page_options:
+            # Check if there's a next page
+            current_page_index = page_num - 1
+            if current_page_index + 1 < len(page_options):
+                next_page_url = page_options[current_page_index + 1]
+                self.logger.info(f"Found next page: {next_page_url}")
+                yield scrapy.Request(
+                    url=f"{base_url}{next_page_url}",
+                    callback=self.parse_performers_page,
+                    cookies=cookies,
+                    meta={"page": page_num + 1},
+                )
+
+        self.logger.info(f"Finished processing performers page {page_num}")
+
+    def parse_performer_detail(self, response):
+        """Parse a performer detail page to extract images and metadata."""
+        performer_name = response.meta["performer_name"]
+        performer_slug = response.meta["performer_slug"]
+        list_image = response.meta["list_image"]
+
+        self.logger.info(f"Parsing performer detail page: {performer_slug} - {performer_name}")
+
+        # Extract profile images - we want both left (main) and right (alternative) images
+        # Image URL pattern: https://dd-models.wowgirls.com/{modelId}/{left|right}_960x1440.jpg
+        profile_images = response.css(f'img[alt*="{performer_name}"]::attr(src)').getall()
+
+        # Filter for left and right images
+        left_image = None
+        right_image = None
+        for img_url in profile_images:
+            if "left_" in img_url:
+                left_image = img_url
+            elif "right_" in img_url:
+                right_image = img_url
+
+        # If we didn't find left image in detail page, use the one from list view
+        if not left_image and list_image:
+            left_image = list_image
+
+        # Create or get performer from database
+        performer = get_or_create_performer(
+            self.site.id,
+            performer_slug,  # Use slug as short_name
+            performer_name,
+            response.url,
+        )
+
+        # Build image URLs list - left (main) image first, then right (alternative)
+        image_urls = []
+        if left_image:
+            image_urls.append({"url": left_image, "type": "profile"})
+        if right_image:
+            image_urls.append({"url": right_image, "type": "profile-alt"})
+
+        # Create PerformerItem
+        performer_item = PerformerItem(
+            performer=performer,
+            image_urls=image_urls,
+        )
+
+        self.logger.info(
+            f"Created performer item for {performer_name} with {len(image_urls)} images"
+        )
+
+        yield performer_item
