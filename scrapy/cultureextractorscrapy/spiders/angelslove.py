@@ -90,7 +90,7 @@ class AngelsLoveSpider(scrapy.Spider):
             # Request movies first, then photos
             yield scrapy.Request(
                 url=f"{base_url}/members/content?page=1",
-                callback=self.parse_movies_page,
+                callback=self.parse_list_page,
                 cookies=cookies,
                 meta={"page": 1, "content_type": "all"},
             )
@@ -104,7 +104,7 @@ class AngelsLoveSpider(scrapy.Spider):
                 meta={"page": 1},
             )
 
-    def parse_movies_page(self, response):
+    def parse_list_page(self, response):
         """Parse a page of movies."""
         page_num = response.meta.get("page", 1)
         self.logger.info(f"Parsing movies page {page_num}: {response.url}")
