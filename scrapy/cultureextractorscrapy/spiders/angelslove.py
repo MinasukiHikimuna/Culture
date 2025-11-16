@@ -156,11 +156,6 @@ class AngelsLoveSpider(scrapy.Spider):
                     },
                 )
 
-        # Check if there's a next page - looking at the pagination
-        # For the first run, just process page 1
-        if page_num == 1:
-            self.logger.info("Finished processing movies page 1 (stopping here for initial test)")
-
         self.logger.info(f"Finished processing movies page {page_num}")
 
     def _create_performer_items(self, performers, performer_urls):
