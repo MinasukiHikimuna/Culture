@@ -52,7 +52,7 @@ class AngelsLoveSpider(scrapy.Spider):
     start_urls = [base_url]
     site_short_name = "angelslove"
 
-    def __init__(self, mode='releases', *args, **kwargs):
+    def __init__(self, mode="releases", *args, **kwargs):
         """Initialize spider with mode parameter.
 
         Args:
@@ -60,7 +60,7 @@ class AngelsLoveSpider(scrapy.Spider):
         """
         super().__init__(*args, **kwargs)
         self.mode = mode
-        if mode not in ['releases', 'performers', 'all']:
+        if mode not in ["releases", "performers", "all"]:
             raise ValueError(f"Invalid mode: {mode}. Must be 'releases', 'performers', or 'all'")
 
     @classmethod
@@ -86,7 +86,7 @@ class AngelsLoveSpider(scrapy.Spider):
 
     def parse(self, response):
         # Route based on mode
-        if self.mode in ['releases', 'all']:
+        if self.mode in ["releases", "all"]:
             # Request movies first, then photos
             yield scrapy.Request(
                 url=f"{base_url}/members/content?page=1",
@@ -95,7 +95,7 @@ class AngelsLoveSpider(scrapy.Spider):
                 meta={"page": 1, "content_type": "all"},
             )
 
-        if self.mode in ['performers', 'all']:
+        if self.mode in ["performers", "all"]:
             # Request performers listing
             yield scrapy.Request(
                 url=f"{base_url}/members/girls?page=1",
@@ -154,6 +154,21 @@ class AngelsLoveSpider(scrapy.Spider):
                         "performer_urls": performer_urls,
                         "thumbnail": thumbnail,
                     },
+                )
+
+        # Handle pagination - extract next page if available
+        page_options = response.css(".page-selector-select option::attr(data-href)").getall()
+        if page_options:
+            # Check if there's a next page
+            current_page_index = page_num - 1
+            if current_page_index + 1 < len(page_options):
+                next_page_url = page_options[current_page_index + 1]
+                self.logger.info(f"Found next page: {next_page_url}")
+                yield scrapy.Request(
+                    url=f"{base_url}{next_page_url}",
+                    callback=self.parse_list_page,
+                    cookies=cookies,
+                    meta={"page": page_num + 1, "content_type": "all"},
                 )
 
         self.logger.info(f"Finished processing movies page {page_num}")
@@ -512,7 +527,9 @@ class AngelsLoveSpider(scrapy.Spider):
                 # Extract slug from URL (e.g., /members/model/cherry-crush -> cherry-crush)
                 performer_slug = performer_url.split("/")[-1]
 
-                self.logger.info(f"Found performer: {performer_name} (ID: {performer_id}, slug: {performer_slug})")
+                self.logger.info(
+                    f"Found performer: {performer_name} (ID: {performer_id}, slug: {performer_slug})"
+                )
 
                 # Request the performer detail page
                 yield scrapy.Request(
