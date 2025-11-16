@@ -101,6 +101,10 @@ AUTOTHROTTLE_TARGET_CONCURRENCY = 1.0
 TWISTED_REACTOR = "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
 FEED_EXPORT_ENCODING = "utf-8"
 
+# Use system DNS resolver instead of Twisted's default resolver
+# This fixes DNS lookup issues with certain domains like dd-vthumbs.wowgirls.com
+DNS_RESOLVER = "scrapy.resolver.CachingThreadedResolver"
+
 FILES_STORE = "/Volumes/Ripping/"
 
 MEDIA_ALLOW_REDIRECTS = True
