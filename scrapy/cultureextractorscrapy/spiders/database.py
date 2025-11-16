@@ -75,9 +75,7 @@ class Release(Base):
     site = relationship("Site", back_populates="releases")
     sub_site = relationship("SubSite", back_populates="releases")
     downloads = relationship("DownloadedFile", back_populates="release")
-    performers = relationship(
-        "Performer", secondary=release_performer, back_populates="releases"
-    )
+    performers = relationship("Performer", secondary=release_performer, back_populates="releases")
     tags = relationship("Tag", secondary=release_tag, back_populates="releases")
 
 
@@ -164,9 +162,7 @@ def save_release(release):
 def get_existing_release_short_names(site_uuid):
     session = get_session()
     releases = (
-        session.query(Release.short_name, Release.uuid)
-        .filter(Release.site_uuid == site_uuid)
-        .all()
+        session.query(Release.short_name, Release.uuid).filter(Release.site_uuid == site_uuid).all()
     )
     result = {r.short_name: r.uuid for r in releases}
     session.close()
@@ -178,9 +174,7 @@ def get_site_item(site_short_name):
     site = session.query(Site).filter_by(short_name=site_short_name).first()
     session.close()
     if site:
-        return SiteItem(
-            id=site.uuid, short_name=site.short_name, name=site.name, url=site.url
-        )
+        return SiteItem(id=site.uuid, short_name=site.short_name, name=site.name, url=site.url)
     return None
 
 
@@ -188,9 +182,7 @@ def get_or_create_performer(site_uuid, short_name, name, url):
     session = get_session()
     try:
         performer = (
-            session.query(Performer)
-            .filter_by(site_uuid=site_uuid, short_name=short_name)
-            .one()
+            session.query(Performer).filter_by(site_uuid=site_uuid, short_name=short_name).one()
         )
     except NoResultFound:
         performer = Performer(
@@ -202,26 +194,22 @@ def get_or_create_performer(site_uuid, short_name, name, url):
         )
         session.add(performer)
         session.commit()
-    finally:
-        site_performer_item = SitePerformerItem(
-            id=performer.uuid,
-            short_name=performer.short_name,
-            name=performer.name,
-            url=performer.url,
-            site_uuid=performer.site_uuid,
-        )
-        session.close()
-        return site_performer_item
+
+    site_performer_item = SitePerformerItem(
+        id=performer.uuid,
+        short_name=performer.short_name,
+        name=performer.name,
+        url=performer.url,
+        site_uuid=performer.site_uuid,
+    )
+    session.close()
+    return site_performer_item
 
 
 def get_or_create_tag(site_uuid, short_name, name, url):
     session = get_session()
     try:
-        tag = (
-            session.query(Tag)
-            .filter_by(site_uuid=site_uuid, short_name=short_name)
-            .one()
-        )
+        tag = session.query(Tag).filter_by(site_uuid=site_uuid, short_name=short_name).one()
     except NoResultFound:
         tag = Tag(
             uuid=newnewid.uuid7(),
@@ -232,16 +220,16 @@ def get_or_create_tag(site_uuid, short_name, name, url):
         )
         session.add(tag)
         session.commit()
-    finally:
-        site_tag_item = SiteTagItem(
-            id=tag.uuid,
-            short_name=tag.short_name,
-            name=tag.name,
-            url=tag.url,
-            site_uuid=tag.site_uuid,
-        )
-        session.close()
-        return site_tag_item
+
+    site_tag_item = SiteTagItem(
+        id=tag.uuid,
+        short_name=tag.short_name,
+        name=tag.name,
+        url=tag.url,
+        site_uuid=tag.site_uuid,
+    )
+    session.close()
+    return site_tag_item
 
 
 def get_existing_releases_with_status(site_uuid):
@@ -275,9 +263,7 @@ def get_existing_releases_with_status(site_uuid):
             }
 
         if r.file_type and r.content_type and r.variant:
-            result[r.short_name]["downloaded_files"].add(
-                (r.file_type, r.content_type, r.variant)
-            )
+            result[r.short_name]["downloaded_files"].add((r.file_type, r.content_type, r.variant))
 
     session.close()
     return result
