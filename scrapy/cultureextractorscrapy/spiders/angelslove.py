@@ -207,9 +207,25 @@ class AngelsLoveSpider(scrapy.Spider):
         title = response.meta["title"]
         performers = response.meta["performers"]
         performer_urls = response.meta["performer_urls"]
-        thumbnail = response.meta["thumbnail"]
+        list_thumbnail = response.meta["thumbnail"]
 
         self.logger.info(f"Parsing video detail page: {external_id} - {title}")
+
+        # Extract high-quality preview image from video player
+        # The JW Player uses a background-image CSS property on .jw-preview element
+        poster_style = response.css(".jw-preview::attr(style)").get()
+        thumbnail = None
+        if poster_style:
+            # Extract URL from background-image: url("...")
+            match = re.search(r'url\(["\']?([^"\'()]+)["\']?\)', poster_style)
+            if match:
+                thumbnail = match.group(1)
+                self.logger.info(f"Found high-quality preview image: {thumbnail}")
+
+        # Fallback to list thumbnail if we couldn't extract the video player poster
+        if not thumbnail:
+            thumbnail = list_thumbnail
+            self.logger.warning("Could not extract video player poster, using list thumbnail")
 
         # Extract tags
         tags = response.css('a[href*="/members/home/watchall/"]::text').getall()
