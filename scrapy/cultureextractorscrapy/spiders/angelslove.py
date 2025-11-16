@@ -7,6 +7,7 @@ import newnewid
 import scrapy
 from dotenv import load_dotenv
 from itemadapter import ItemAdapter
+from scrapy.exceptions import CloseSpider
 
 from cultureextractorscrapy.items import (
     AvailableFileEncoder,
@@ -214,6 +215,13 @@ class AngelsLoveSpider(scrapy.Spider):
 
         self.logger.info(f"Parsing video detail page: {external_id} - {title}")
 
+        # Check if we've been redirected to login page
+        if "/login" in response.url:
+            raise CloseSpider(
+                f"Session expired: Redirected to login page for {external_id}. "
+                "Please update the ANGELSLOVE_COOKIES environment variable with fresh cookies."
+            )
+
         # Extract high-quality preview image from video player
         # The JW Player uses a background-image CSS property on .jw-preview element
         poster_style = response.css(".jw-preview::attr(style)").get()
@@ -244,6 +252,14 @@ class AngelsLoveSpider(scrapy.Spider):
                 detail_date = parsed_date.isoformat()
             except ValueError:
                 self.logger.warning(f"Could not parse date: {detail_date_str}")
+
+        # If we couldn't extract a release date, skip this release
+        if not detail_date:
+            self.logger.error(
+                f"No release date found for video {external_id}. Skipping this release. "
+                "This might indicate a page structure change or missing data."
+            )
+            return
 
         # Extract likes count (not important - optional field)
         likes_count = response.css(".likes-count .count::text").get()
@@ -386,6 +402,13 @@ class AngelsLoveSpider(scrapy.Spider):
 
         self.logger.info(f"Parsing gallery detail page: {external_id} - {title}")
 
+        # Check if we've been redirected to login page
+        if "/login" in response.url:
+            raise CloseSpider(
+                f"Session expired: Redirected to login page for {external_id}. "
+                "Please update the ANGELSLOVE_COOKIES environment variable with fresh cookies."
+            )
+
         # Extract tags
         tags = response.css('a[href*="/members/home/watchall/"]::text').getall()
 
@@ -400,6 +423,14 @@ class AngelsLoveSpider(scrapy.Spider):
                 detail_date = parsed_date.isoformat()
             except ValueError:
                 self.logger.warning(f"Could not parse date: {detail_date_str}")
+
+        # If we couldn't extract a release date, skip this release
+        if not detail_date:
+            self.logger.error(
+                f"No release date found for gallery {external_id}. Skipping this release. "
+                "This might indicate a page structure change or missing data."
+            )
+            return
 
         # Extract photo/image count (always present for galleries)
         images_count = response.css(".images-count .count::text").get()
