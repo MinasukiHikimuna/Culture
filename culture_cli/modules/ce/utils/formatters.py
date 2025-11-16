@@ -21,7 +21,7 @@ if sys.platform == "win32":
         sys.stdout = codecs.getwriter("utf-8")(sys.stdout.detach())
         sys.stderr = codecs.getwriter("utf-8")(sys.stderr.detach())
 
-console = Console()
+console = Console(stderr=True)
 
 
 def format_releases_table(releases_df: pl.DataFrame, site_name: str | None = None) -> Table:
