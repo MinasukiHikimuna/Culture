@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from datetime import UTC, datetime
 
 import newnewid
@@ -157,6 +158,7 @@ class AngelsLoveSpider(scrapy.Spider):
                 )
 
         # Handle pagination - extract next page if available
+        # Give pagination requests lower priority so they're processed after all releases on current page
         page_options = response.css(".page-selector-select option::attr(data-href)").getall()
         if page_options:
             # Check if there's a next page
@@ -169,6 +171,7 @@ class AngelsLoveSpider(scrapy.Spider):
                     callback=self.parse_list_page,
                     cookies=cookies,
                     meta={"page": page_num + 1, "content_type": "all"},
+                    priority=-page_num,  # Lower priority for pagination (higher page numbers = lower priority)
                 )
 
         self.logger.info(f"Finished processing movies page {page_num}")
@@ -561,6 +564,7 @@ class AngelsLoveSpider(scrapy.Spider):
                 )
 
         # Handle pagination - extract next page if available
+        # Give pagination requests lower priority so they're processed after all performers on current page
         page_options = response.css(".page-selector-select option::attr(data-href)").getall()
         if page_options:
             # Check if there's a next page
@@ -573,6 +577,7 @@ class AngelsLoveSpider(scrapy.Spider):
                     callback=self.parse_performers_page,
                     cookies=cookies,
                     meta={"page": page_num + 1},
+                    priority=-page_num,  # Lower priority for pagination (higher page numbers = lower priority)
                 )
 
         self.logger.info(f"Finished processing performers page {page_num}")

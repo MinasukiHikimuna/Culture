@@ -23,6 +23,12 @@ ROBOTSTXT_OBEY = False
 CONCURRENT_REQUESTS = 1
 DOWNLOAD_TIMEOUT = 1800
 
+# Use LIFO (depth-first) instead of default priority queue (breadth-first)
+# This ensures we complete one release at a time instead of crawling all pages first
+DEPTH_PRIORITY = 1
+SCHEDULER_DISK_QUEUE = "scrapy.squeues.PickleLifoDiskQueue"
+SCHEDULER_MEMORY_QUEUE = "scrapy.squeues.LifoMemoryQueue"
+
 # Configure a delay for requests for the same website (default: 0)
 # See https://docs.scrapy.org/en/latest/topics/settings.html#download-delay
 # See also autothrottle settings and docs
