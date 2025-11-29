@@ -206,6 +206,15 @@ def print_info(message: str) -> None:
     console.print(f"[bold blue]i[/bold blue] {message}")
 
 
+def print_warning(message: str) -> None:
+    """Print a warning message to console.
+
+    Args:
+        message: Warning message to display
+    """
+    console.print(f"[bold yellow]Warning:[/bold yellow] {message}")
+
+
 def format_performers_table(performers_df: pl.DataFrame, site_name: str | None = None) -> Table:  # noqa: PLR0912
     """Format performers dataframe as a Rich table.
 

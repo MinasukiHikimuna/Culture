@@ -1721,3 +1721,77 @@ class ClientCultureExtractor:
                 )
 
             self.connection.commit()
+
+    def delete_release(self, release_uuid: str) -> dict:
+        """Delete a release and all associated records from the database.
+
+        Args:
+            release_uuid: UUID of the release to delete
+
+        Returns:
+            Dictionary containing deletion details (site_name, release_name, files_deleted)
+
+        Raises:
+            ValueError: If release does not exist
+        """
+        with self.connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT r.uuid, r.name, s.name as site_name
+                FROM releases r
+                JOIN sites s ON r.site_uuid = s.uuid
+                WHERE r.uuid = %s
+                """,
+                (release_uuid,),
+            )
+            release_row = cursor.fetchone()
+            if not release_row:
+                raise ValueError(f"Release with UUID {release_uuid} does not exist")
+
+            release_name = release_row[1]
+            site_name = release_row[2]
+
+            downloads = self._get_download_files_for_deletion(cursor, release_uuid)
+            self._delete_release_related_records(cursor, release_uuid)
+            self.connection.commit()
+
+            return {
+                "site_name": site_name,
+                "release_name": release_name,
+                "downloads": downloads,
+            }
+
+    def _get_download_files_for_deletion(self, cursor, release_uuid: str) -> list[dict]:
+        """Get download file information before deletion."""
+        cursor.execute(
+            """
+            SELECT saved_filename
+            FROM downloads
+            WHERE release_uuid = %s
+            """,
+            (release_uuid,),
+        )
+        return [{"saved_filename": row[0]} for row in cursor.fetchall()]
+
+    def _delete_release_related_records(self, cursor, release_uuid: str) -> None:
+        """Delete all records related to a release in the correct order."""
+        cursor.execute(
+            "DELETE FROM downloads WHERE release_uuid = %s",
+            (release_uuid,),
+        )
+        cursor.execute(
+            "DELETE FROM release_entity_site_tag_entity WHERE releases_uuid = %s",
+            (release_uuid,),
+        )
+        cursor.execute(
+            "DELETE FROM release_entity_site_performer_entity WHERE releases_uuid = %s",
+            (release_uuid,),
+        )
+        cursor.execute(
+            "DELETE FROM release_external_ids WHERE release_uuid = %s",
+            (release_uuid,),
+        )
+        cursor.execute(
+            "DELETE FROM releases WHERE uuid = %s",
+            (release_uuid,),
+        )

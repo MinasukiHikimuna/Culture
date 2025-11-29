@@ -1,6 +1,8 @@
 """Releases-related commands for the CLI."""
 
-
+import os
+import shutil
+from pathlib import Path
 from typing import Annotated
 
 import typer
@@ -16,6 +18,7 @@ from culture_cli.modules.ce.utils.formatters import (
     print_json,
     print_success,
     print_table,
+    print_warning,
 )
 
 
@@ -381,3 +384,84 @@ def link_release(
     except Exception as e:
         print_error(f"Failed to link release: {e}")
         raise typer.Exit(code=1) from e
+
+
+@releases_app.command("delete")
+def delete_release(
+    release_uuid: Annotated[str, typer.Argument(help="Release UUID to delete")],
+    yes: Annotated[
+        bool,
+        typer.Option("--yes", "-y", help="Skip confirmation prompt"),
+    ] = False,
+) -> None:
+    """Delete a release from the Culture Extractor database.
+
+    This will permanently delete the release record and all associated data
+    (downloads, tags, performers links, external IDs) from the database.
+    If CE_METADATA_BASE_PATH is configured, downloaded files will also be deleted.
+
+    Examples:
+        ce releases delete 018f1477-f285-726b-9136-21956e3e8b92
+        ce releases delete 018f1477-f285-726b-9136-21956e3e8b92 --yes
+    """
+    try:
+        client = config.get_client()
+
+        release_df = client.get_release_by_uuid(release_uuid)
+        if release_df.shape[0] == 0:
+            print_error(f"Release with UUID '{release_uuid}' not found")
+            raise typer.Exit(code=1)
+
+        release_name = release_df["ce_release_name"][0]
+        site_name = release_df["ce_site_name"][0]
+
+        if not yes:
+            confirmed = _confirm_release_deletion(release_name, site_name, release_uuid)
+            if not confirmed:
+                print_info("Deletion cancelled")
+                raise typer.Exit(code=0)
+
+        result = client.delete_release(release_uuid)
+
+        files_deleted = _delete_release_files(result["site_name"], release_uuid, result["downloads"])
+
+        _print_deletion_summary(result, files_deleted)
+
+    except ValueError as e:
+        print_error(str(e))
+        raise typer.Exit(code=1) from e
+    except Exception as e:
+        print_error(f"Failed to delete release: {e}")
+        raise typer.Exit(code=1) from e
+
+
+def _confirm_release_deletion(release_name: str, site_name: str, release_uuid: str) -> bool:
+    """Prompt user to confirm release deletion."""
+    print_warning(f"You are about to delete release '{release_name}' from '{site_name}'")
+    print_info(f"UUID: {release_uuid}")
+    print_info("This will permanently delete the release and all associated data.")
+    return typer.confirm("Are you sure you want to proceed?")
+
+
+def _delete_release_files(site_name: str, release_uuid: str, downloads: list[dict]) -> int:
+    """Delete files from the file system if metadata path is configured."""
+    metadata_base_path = os.environ.get("CE_METADATA_BASE_PATH")
+    if not metadata_base_path or not downloads:
+        return 0
+
+    release_dir = Path(metadata_base_path) / site_name / "Metadata" / release_uuid
+    if not release_dir.exists():
+        return 0
+
+    files_deleted = sum(1 for _ in release_dir.iterdir() if _.is_file())
+    shutil.rmtree(release_dir)
+    return files_deleted
+
+
+def _print_deletion_summary(result: dict, files_deleted: int) -> None:
+    """Print summary of what was deleted."""
+    print_success(f"Deleted release '{result['release_name']}' from '{result['site_name']}'")
+    if result["downloads"]:
+        print_info(f"Removed {len(result['downloads'])} download record(s) from database")
+    if files_deleted > 0:
+        print_info(f"Deleted {files_deleted} file(s) from disk")
