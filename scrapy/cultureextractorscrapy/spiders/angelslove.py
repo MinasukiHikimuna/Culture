@@ -143,6 +143,15 @@ class AngelsLoveSpider(scrapy.Spider):
 
                 self.logger.info(f"Found release: {external_id} - {title}")
 
+                # Check if this release already exists
+                existing_release = self.existing_releases.get(external_id)
+                if existing_release and not self.force_update:
+                    self.logger.info(
+                        f"Skipping existing release: {external_id} - {title} "
+                        f"(use FORCE_UPDATE=1 to update existing releases)"
+                    )
+                    continue
+
                 # Yield request to appropriate detail page parser based on content type
                 callback = self.parse_video_detail if is_video else self.parse_gallery_detail
                 yield scrapy.Request(
