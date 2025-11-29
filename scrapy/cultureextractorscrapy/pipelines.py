@@ -1042,6 +1042,194 @@ class FfmpegDownloadPipeline(BaseDownloadPipeline):
             return False
 
 
+class Aria2DownloadPipeline(BaseDownloadPipeline):
+    """Pipeline for downloading files using aria2c with multi-connection support.
+
+    This pipeline provides faster downloads for large files by using aria2c's
+    multi-connection capabilities, resume support, and better error handling.
+    """
+
+    def __init__(self, store_uri, settings=None):
+        super().__init__(store_uri, settings)
+        self.logger = logging.getLogger(self.__class__.__name__)
+        # Default aria2c settings
+        self.max_connections = 16
+        self.split = 16
+        self.min_split_size = "1M"
+        self.max_retries = 3
+        self.timeout = 60
+
+    @classmethod
+    def from_crawler(cls, crawler):
+        return cls(crawler.settings["FILES_STORE"], settings=crawler.settings)
+
+    def process_item(self, item, spider):
+        if isinstance(item, DirectDownloadItem):
+            self.logger.info(
+                "[Aria2DownloadPipeline] Processing DirectDownloadItem for URL: %s",
+                item["url"],
+            )
+
+            file_path = self.get_file_path(item["release_id"], item["file_info"])
+            full_path = os.path.join(self.store_uri, file_path)
+
+            self.logger.info("[Aria2DownloadPipeline] Full file path: %s", full_path)
+
+            if self.file_exists_check(file_path):
+                self.logger.info(
+                    "[Aria2DownloadPipeline] File already exists, skipping download: %s",
+                    full_path,
+                )
+                return self.create_downloaded_item_from_path(item, file_path, spider)
+
+            # Check disk space before downloading
+            has_space, available_gb = check_available_disk_space(self.store_uri)
+            if not has_space:
+                self.logger.error(
+                    "[Aria2DownloadPipeline] Insufficient disk space (%.2fGB available, 50GB required). Skipping download: %s",
+                    available_gb,
+                    full_path,
+                )
+                from scrapy.exceptions import DropItem
+
+                raise DropItem(
+                    f"Insufficient disk space: {available_gb:.2f}GB available, 50GB required"
+                )
+
+            self.logger.info(
+                "[Aria2DownloadPipeline] Starting download with aria2c (%.2fGB available): %s",
+                available_gb,
+                full_path,
+            )
+
+            # Download with aria2c
+            success = self.download_with_aria2(item["url"], full_path, spider)
+
+            if success:
+                self.logger.info(
+                    "[Aria2DownloadPipeline] Download completed successfully: %s",
+                    full_path,
+                )
+                return self.create_downloaded_item_from_path(item, file_path, spider)
+            else:
+                self.logger.error("[Aria2DownloadPipeline] Download failed: %s", item["url"])
+                from scrapy.exceptions import DropItem
+
+                raise DropItem(f"aria2c download failed: {item['url']}")
+
+        return item
+
+    def download_with_aria2(self, url, output_path, spider):
+        """Download file using aria2c with multi-connection support"""
+        try:
+            # Ensure the directory exists
+            os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+            # Get cookies from spider if available
+            cookie_header = None
+            if hasattr(spider, 'cookies') and spider.cookies:
+                # Convert cookies dict to header format
+                cookie_pairs = [f"{name}={value}" for name, value in spider.cookies.items()]
+                cookie_header = "; ".join(cookie_pairs)
+
+            # Build aria2c command
+            cmd = [
+                "aria2c",
+                "--console-log-level=notice",  # Show important messages
+                "--summary-interval=5",  # Show progress summary every 5 seconds
+                "--user-agent", self.settings.get("USER_AGENT", "Mozilla/5.0"),
+                "--max-connection-per-server", str(self.max_connections),
+                "--split", str(self.split),
+                "--min-split-size", self.min_split_size,
+                "--continue=true",
+                "--max-tries", str(self.max_retries),
+                "--retry-wait", "3",
+                "--timeout", str(self.timeout),
+                "--allow-overwrite=false",
+                "--auto-file-renaming=false",
+                "--dir", os.path.dirname(output_path),
+                "--out", os.path.basename(output_path),
+            ]
+
+            # Add cookie header if available
+            if cookie_header:
+                cmd.extend(["--header", f"Cookie: {cookie_header}"])
+
+            # Add referer header based on URL domain
+            from urllib.parse import urlparse
+            parsed_url = urlparse(url)
+            referer = f"{parsed_url.scheme}://{parsed_url.netloc}/"
+            cmd.extend(["--header", f"Referer: {referer}"])
+
+            # Add the URL as the last argument
+            cmd.append(url)
+
+            self.logger.info(
+                "[Aria2DownloadPipeline] Running aria2c command: %s",
+                " ".join(cmd),
+            )
+
+            # Run aria2c with real-time output streaming
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,  # Redirect stderr to stdout
+                text=True,
+                bufsize=1,  # Line buffered
+                universal_newlines=True,
+            )
+
+            # Stream output in real-time
+            while True:
+                output = process.stdout.readline()
+                if output == "" and process.poll() is not None:
+                    break
+                if output:
+                    # Log aria2c output (strip trailing whitespace)
+                    line = output.rstrip()
+                    if line:  # Only log non-empty lines
+                        self.logger.info("[aria2c] %s", line)
+
+            # Wait for process to complete
+            return_code = process.wait()
+
+            if return_code == 0 and os.path.exists(output_path):
+                file_size = os.path.getsize(output_path)
+                self.logger.info(
+                    "[Aria2DownloadPipeline] Download successful: %s (%.1f MB)",
+                    output_path,
+                    file_size / (1024 * 1024),
+                )
+                return True
+            else:
+                self.logger.error(
+                    "[Aria2DownloadPipeline] aria2c failed with return code %s",
+                    return_code,
+                )
+
+                # Clean up partial file if exists
+                if os.path.exists(output_path):
+                    try:
+                        os.remove(output_path)
+                        self.logger.info("[Aria2DownloadPipeline] Cleaned up partial file")
+                    except OSError:
+                        pass
+
+                return False
+
+        except subprocess.TimeoutExpired:
+            self.logger.error("[Aria2DownloadPipeline] aria2c download timed out for: %s", url)
+            return False
+        except FileNotFoundError:
+            self.logger.error(
+                "[Aria2DownloadPipeline] aria2c not found in PATH. Please install aria2."
+            )
+            return False
+        except Exception as e:
+            self.logger.error("[Aria2DownloadPipeline] aria2c download error: %s", str(e))
+            return False
+
+
 class PerformerImagePipeline:
     """Pipeline to download performer images directly to disk.
 

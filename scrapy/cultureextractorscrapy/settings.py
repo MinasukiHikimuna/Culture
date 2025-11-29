@@ -72,7 +72,7 @@ SCHEDULER_MEMORY_QUEUE = "scrapy.squeues.LifoMemoryQueue"
 ITEM_PIPELINES = {
     "cultureextractorscrapy.pipelines.PerformerImagePipeline": 200,
     "cultureextractorscrapy.pipelines.M3u8DownloadPipeline": 250,
-    "cultureextractorscrapy.pipelines.AvailableFilesPipeline": 300,
+    "cultureextractorscrapy.pipelines.Aria2DownloadPipeline": 300,  # Using aria2c for faster downloads
     "cultureextractorscrapy.pipelines.PostgresPipeline": 400,
 }
 
