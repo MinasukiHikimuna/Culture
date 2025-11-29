@@ -30,40 +30,73 @@ from cultureextractorscrapy.utils import (
 
 load_dotenv()
 
-cookies_json = os.getenv("ANGELSLOVE_COOKIES")
-if cookies_json:
-    # Parse browser-format cookies and convert to scrapy format
-    browser_cookies = json.loads(cookies_json)
-    # Convert to dictionary format that scrapy expects
-    cookies = {cookie["name"]: cookie["value"] for cookie in browser_cookies}
-else:
-    cookies = {}
+# Site configurations for the WowGirls network sites
+SITE_CONFIGS = {
+    "angelslove": {
+        "base_url": "https://angels.love",
+        "cookie_env_var": "ANGELSLOVE_COOKIES",
+        "site_short_name": "angelslove",
+        "allowed_domains": [
+            "angels.love",
+            "dd-thumbs.wowgirls.com",
+            "dd-photo.wowgirls.com",
+            "dd-video.wowgirls.com",
+            "dd-vthumbs.wowgirls.com",
+        ],
+    },
+    "sensuallove": {
+        "base_url": "https://sensual.love",
+        "cookie_env_var": "SENSUALLOVE_COOKIES",
+        "site_short_name": "sensuallove",
+        "allowed_domains": [
+            "sensual.love",
+            "dd-thumbs.wowgirls.com",
+            "dd-photo.wowgirls.com",
+            "dd-video.wowgirls.com",
+            "dd-vthumbs.wowgirls.com",
+        ],
+    },
+}
 
-base_url = "https://angels.love"
+
+def get_cookies_for_site(site_key):
+    """Load cookies from environment variable for the specified site."""
+    config = SITE_CONFIGS.get(site_key, SITE_CONFIGS["angelslove"])
+    cookies_json = os.getenv(config["cookie_env_var"])
+    if cookies_json:
+        browser_cookies = json.loads(cookies_json)
+        return {cookie["name"]: cookie["value"] for cookie in browser_cookies}
+    return {}
 
 
 class AngelsLoveSpider(scrapy.Spider):
     name = "angelslove"
-    allowed_domains = [
-        "angels.love",
-        "dd-thumbs.wowgirls.com",
-        "dd-photo.wowgirls.com",
-        "dd-video.wowgirls.com",
-        "dd-vthumbs.wowgirls.com",
-    ]
-    start_urls = [base_url]
-    site_short_name = "angelslove"
 
-    def __init__(self, mode="releases", *args, **kwargs):
-        """Initialize spider with mode parameter.
+    def __init__(self, mode="releases", site="angelslove", *args, **kwargs):
+        """Initialize spider with mode and site parameters.
 
         Args:
             mode: 'releases' (default), 'performers', or 'all'
+            site: 'angelslove' (default) or 'sensuallove'
         """
         super().__init__(*args, **kwargs)
         self.mode = mode
         if mode not in ["releases", "performers", "all"]:
             raise ValueError(f"Invalid mode: {mode}. Must be 'releases', 'performers', or 'all'")
+
+        # Load site-specific configuration
+        if site not in SITE_CONFIGS:
+            raise ValueError(
+                f"Invalid site: {site}. Must be one of: {', '.join(SITE_CONFIGS.keys())}"
+            )
+
+        self.site_key = site
+        self.site_config = SITE_CONFIGS[site]
+        self.base_url = self.site_config["base_url"]
+        self.site_short_name = self.site_config["site_short_name"]
+        self.allowed_domains = self.site_config["allowed_domains"]
+        self.start_urls = [self.base_url]
+        self.cookies = get_cookies_for_site(site)
 
     @classmethod
     def from_crawler(cls, crawler, *args, **kwargs):
@@ -91,18 +124,18 @@ class AngelsLoveSpider(scrapy.Spider):
         if self.mode in ["releases", "all"]:
             # Request movies first, then photos
             yield scrapy.Request(
-                url=f"{base_url}/members/content?page=1",
+                url=f"{self.base_url}/members/content?page=1",
                 callback=self.parse_list_page,
-                cookies=cookies,
+                cookies=self.cookies,
                 meta={"page": 1, "content_type": "all"},
             )
 
         if self.mode in ["performers", "all"]:
             # Request performers listing
             yield scrapy.Request(
-                url=f"{base_url}/members/girls?page=1",
+                url=f"{self.base_url}/members/girls?page=1",
                 callback=self.parse_performers_page,
-                cookies=cookies,
+                cookies=self.cookies,
                 meta={"page": 1},
             )
 
@@ -155,9 +188,9 @@ class AngelsLoveSpider(scrapy.Spider):
                 # Yield request to appropriate detail page parser based on content type
                 callback = self.parse_video_detail if is_video else self.parse_gallery_detail
                 yield scrapy.Request(
-                    url=f"{base_url}{item_link}",
+                    url=f"{self.base_url}{item_link}",
                     callback=callback,
-                    cookies=cookies,
+                    cookies=self.cookies,
                     meta={
                         "external_id": external_id,
                         "title": title,
@@ -177,9 +210,9 @@ class AngelsLoveSpider(scrapy.Spider):
                 next_page_url = page_options[current_page_index + 1]
                 self.logger.info(f"Found next page: {next_page_url}")
                 yield scrapy.Request(
-                    url=f"{base_url}{next_page_url}",
+                    url=f"{self.base_url}{next_page_url}",
                     callback=self.parse_list_page,
-                    cookies=cookies,
+                    cookies=self.cookies,
                     meta={"page": page_num + 1, "content_type": "all"},
                     priority=-page_num,  # Lower priority for pagination (higher page numbers = lower priority)
                 )
@@ -192,7 +225,7 @@ class AngelsLoveSpider(scrapy.Spider):
         for i, performer_name in enumerate(performers):
             performer_url = performer_urls[i] if i < len(performer_urls) else None
             performer_short_name = performer_url.split("/")[-1] if performer_url else None
-            full_url = f"{base_url}{performer_url}" if performer_url else None
+            full_url = f"{self.base_url}{performer_url}" if performer_url else None
 
             # Create or get performer from database
             performer = get_or_create_performer(
@@ -228,7 +261,7 @@ class AngelsLoveSpider(scrapy.Spider):
         if "/login" in response.url:
             raise CloseSpider(
                 f"Session expired: Redirected to login page for {external_id}. "
-                "Please update the ANGELSLOVE_COOKIES environment variable with fresh cookies."
+                f"Please update the {self.site_config['cookie_env_var']} environment variable with fresh cookies."
             )
 
         # Extract high-quality preview image from video player
@@ -415,7 +448,7 @@ class AngelsLoveSpider(scrapy.Spider):
         if "/login" in response.url:
             raise CloseSpider(
                 f"Session expired: Redirected to login page for {external_id}. "
-                "Please update the ANGELSLOVE_COOKIES environment variable with fresh cookies."
+                f"Please update the {self.site_config['cookie_env_var']} environment variable with fresh cookies."
             )
 
         # Extract tags
@@ -592,9 +625,9 @@ class AngelsLoveSpider(scrapy.Spider):
 
                 # Request the performer detail page
                 yield scrapy.Request(
-                    url=f"{base_url}{performer_url}",
+                    url=f"{self.base_url}{performer_url}",
                     callback=self.parse_performer_detail,
-                    cookies=cookies,
+                    cookies=self.cookies,
                     meta={
                         "performer_name": performer_name,
                         "performer_slug": performer_slug,
@@ -613,9 +646,9 @@ class AngelsLoveSpider(scrapy.Spider):
                 next_page_url = page_options[current_page_index + 1]
                 self.logger.info(f"Found next page: {next_page_url}")
                 yield scrapy.Request(
-                    url=f"{base_url}{next_page_url}",
+                    url=f"{self.base_url}{next_page_url}",
                     callback=self.parse_performers_page,
-                    cookies=cookies,
+                    cookies=self.cookies,
                     meta={"page": page_num + 1},
                     priority=-page_num,  # Lower priority for pagination (higher page numbers = lower priority)
                 )
