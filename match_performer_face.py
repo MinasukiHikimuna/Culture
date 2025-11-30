@@ -16,6 +16,7 @@ Usage:
 """
 
 import argparse
+import os
 import subprocess
 import sys
 import tempfile
@@ -24,6 +25,7 @@ import time
 import traceback
 from contextlib import suppress
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import requests
 from rich.console import Console
@@ -31,9 +33,13 @@ from rich.panel import Panel
 from rich.table import Table
 
 from culture_cli.modules.ce.utils.config import config
-from libraries.client_culture_extractor import ClientCultureExtractor
 from libraries.client_stashapp import StashAppClient
+from libraries.StashDbClient import StashDbClient
 from stashface_api_client import StashfaceAPIClient
+
+
+if TYPE_CHECKING:
+    from libraries.client_culture_extractor import ClientCultureExtractor
 
 
 console = Console()
@@ -199,6 +205,413 @@ def lookup_stashapp_performer(stashapp_client: StashAppClient, stashdb_id: str) 
     except Exception as e:
         console.print(f"[red]Error looking up Stashapp performer: {e}[/red]")
         return None
+
+
+def search_stashapp_performers(
+    stashapp_client: StashAppClient, query: str
+) -> list[dict]:
+    """Search for performers in Stashapp by name or ID.
+
+    Args:
+        stashapp_client: Stashapp client
+        query: Search query (name or numeric ID)
+
+    Returns:
+        List of matching performer dictionaries
+    """
+    try:
+        df = stashapp_client.get_performers()
+
+        # Check if query is a numeric ID
+        if query.isdigit():
+            performer_df = df.filter(df["stashapp_id"] == int(query))
+        else:
+            # Search by name (case-insensitive contains)
+            performer_df = df.filter(
+                df["stashapp_name"].str.to_lowercase().str.contains(query.lower())
+            )
+
+        return performer_df.to_dicts()
+    except Exception as e:
+        console.print(f"[red]Error searching Stashapp performers: {e}[/red]")
+        return []
+
+
+def search_stashdb_performers(query: str) -> list[dict]:
+    """Search for performers in StashDB by name or ID.
+
+    Args:
+        query: Search query (name or UUID)
+
+    Returns:
+        List of matching performer dictionaries with id, name, and image_url
+    """
+    endpoint = os.getenv("STASHDB_ENDPOINT", "https://stashdb.org/graphql")
+    api_key = os.getenv("STASHDB_API_KEY", "")
+    stashdb_client = StashDbClient(endpoint, api_key)
+
+    # Check if query looks like a UUID
+    is_uuid = len(query) == 36 and query.count("-") == 4
+
+    if is_uuid:
+        # Query by ID
+        gql_query = """
+            query FindPerformer($id: ID!) {
+                findPerformer(id: $id) {
+                    id
+                    name
+                    disambiguation
+                    country
+                    images {
+                        id
+                        url
+                    }
+                }
+            }
+        """
+        result = stashdb_client._gql_query(gql_query, {"id": query})
+        if result and result.get("data", {}).get("findPerformer"):
+            performer = result["data"]["findPerformer"]
+            images = performer.get("images", [])
+            return [{
+                "id": performer["id"],
+                "name": performer["name"],
+                "disambiguation": performer.get("disambiguation"),
+                "country": performer.get("country"),
+                "image_url": images[0]["url"] if images else None,
+            }]
+        return []
+
+    # Search by name
+    gql_query = """
+        query SearchPerformers($term: String!) {
+            searchPerformer(term: $term, limit: 10) {
+                id
+                name
+                disambiguation
+                country
+                images {
+                    id
+                    url
+                }
+            }
+        }
+    """
+    result = stashdb_client._gql_query(gql_query, {"term": query})
+    if result and result.get("data", {}).get("searchPerformer"):
+        performers = result["data"]["searchPerformer"]
+        return [
+            {
+                "id": p["id"],
+                "name": p["name"],
+                "disambiguation": p.get("disambiguation"),
+                "country": p.get("country"),
+                "image_url": p["images"][0]["url"] if p.get("images") else None,
+            }
+            for p in performers
+        ]
+    return []
+
+
+def get_stashapp_performer_image_url(stashapp_client: StashAppClient, performer_id: int) -> str | None:
+    """Get the image URL for a Stashapp performer.
+
+    Args:
+        stashapp_client: Stashapp client
+        performer_id: Stashapp performer ID
+
+    Returns:
+        Image URL or None if not found
+    """
+    try:
+        performer = stashapp_client.stash.find_performer(
+            performer_id,
+            fragment="id name image_path",
+        )
+        if performer and performer.get("image_path"):
+            # Build full URL from stash endpoint
+            scheme = os.getenv("STASHAPP_SCHEME", "https")
+            host = os.getenv("STASHAPP_HOST", "localhost")
+            port = os.getenv("STASHAPP_PORT", "9999")
+            api_key = os.getenv("STASHAPP_API_KEY", "")
+
+            base_url = f"{scheme}://{host}:{port}{performer['image_path']}"
+
+            # Add API key to URL if available
+            if api_key:
+                separator = "&" if "?" in base_url else "?"
+                return f"{base_url}{separator}apikey={api_key}"
+            return base_url
+        return None
+    except Exception as e:
+        console.print(f"[red]Error getting Stashapp performer image: {e}[/red]")
+        return None
+
+
+def display_manual_search_results(  # noqa: PLR0912, PLR0915
+    performers: list[dict],
+    source: str,
+    console: Console,
+    stashapp_client: StashAppClient | None = None,
+    show_image: bool = False,
+    ce_image_path: Path | None = None,
+) -> dict | None:
+    """Display manual search results and let user select one.
+
+    Args:
+        performers: List of performer dictionaries from search
+        source: Source name ("stashapp" or "stashdb")
+        console: Rich console for output
+        stashapp_client: Stashapp client (needed for stashapp image URLs)
+        show_image: Whether to display images for comparison
+        ce_image_path: Path to CE performer image for comparison
+
+    Returns:
+        Selected performer dict or None if cancelled
+    """
+    if not performers:
+        console.print(f"[yellow]No performers found in {source}[/yellow]")
+        return None
+
+    table = Table(title=f"{source.upper()} Search Results", show_header=True)
+    table.add_column("#", style="cyan", width=3)
+    table.add_column("Name", style="green")
+
+    if source == "stashdb":
+        table.add_column("Disambiguation", style="dim")
+        table.add_column("Country", style="yellow")
+        table.add_column("ID", style="blue")
+
+        for i, p in enumerate(performers, 1):
+            table.add_row(
+                str(i),
+                p.get("name", "Unknown"),
+                p.get("disambiguation") or "",
+                p.get("country") or "?",
+                p.get("id", "N/A"),
+            )
+    else:  # stashapp
+        table.add_column("Gender", style="yellow")
+        table.add_column("ID", style="blue")
+        table.add_column("StashDB ID", style="magenta")
+
+        for i, p in enumerate(performers, 1):
+            table.add_row(
+                str(i),
+                p.get("stashapp_name", "Unknown"),
+                p.get("stashapp_gender") or "?",
+                str(p.get("stashapp_id", "N/A")),
+                p.get("stashapp_stashdb_id") or "N/A",
+            )
+
+    console.print(table)
+
+    # Show CE image once if available
+    if show_image and ce_image_path and ce_image_path.exists():
+        console.print("\n[bold cyan]CE Performer Image:[/bold cyan]")
+        display_image_viu(ce_image_path, width=40)
+
+    while True:
+        try:
+            choice = console.input(
+                f"[cyan]Select performer (1-{len(performers)}, 'v' to view image, 0 to cancel): [/cyan]"
+            ).strip().lower()
+
+            if choice == "0":
+                return None
+
+            if choice == "v" and show_image:
+                # Ask which performer to view
+                view_choice = console.input(
+                    f"[cyan]View image for performer (1-{len(performers)}): [/cyan]"
+                ).strip()
+                if view_choice.isdigit():
+                    view_num = int(view_choice)
+                    if 1 <= view_num <= len(performers):
+                        performer = performers[view_num - 1]
+                        image_url = None
+
+                        if source == "stashdb":
+                            image_url = performer.get("image_url")
+                        elif source == "stashapp" and stashapp_client:
+                            image_url = get_stashapp_performer_image_url(
+                                stashapp_client, performer.get("stashapp_id")
+                            )
+
+                        if image_url:
+                            temp_path = download_stashdb_image(image_url)
+                            if temp_path:
+                                name = performer.get("name") or performer.get("stashapp_name", "Unknown")
+                                console.print(f"\n[bold cyan]{name}:[/bold cyan]")
+                                display_image_viu(temp_path, width=40)
+                                temp_path.unlink(missing_ok=True)
+                        else:
+                            console.print("[yellow]No image available for this performer[/yellow]")
+                continue
+
+            if choice.isdigit():
+                choice_num = int(choice)
+                if 1 <= choice_num <= len(performers):
+                    return performers[choice_num - 1]
+
+            console.print(f"[red]Please enter 1-{len(performers)}, 'v' to view image, or 0 to cancel[/red]")
+        except KeyboardInterrupt:
+            console.print("\n[yellow]Cancelled.[/yellow]")
+            return None
+
+
+def prompt_manual_search(console: Console) -> tuple[str, str] | None:
+    """Prompt user for manual search parameters.
+
+    Args:
+        console: Rich console for output
+
+    Returns:
+        Tuple of (source, query) or None if cancelled
+    """
+    console.print("\n[bold cyan]Manual Search[/bold cyan]")
+    console.print("  1. StashDB")
+    console.print("  2. Stashapp")
+    console.print("  [dim]q. Cancel[/dim]")
+
+    # Ask for source
+    while True:
+        try:
+            source_input = console.input("[cyan]Select source: [/cyan]").strip().lower()
+            if source_input in ("q", "quit", "exit"):
+                return None
+            if source_input == "1":
+                source = "stashdb"
+                break
+            if source_input == "2":
+                source = "stashapp"
+                break
+            console.print("[yellow]Please enter 1, 2, or 'q' to cancel[/yellow]")
+        except (EOFError, KeyboardInterrupt):
+            console.print("\n[yellow]Cancelled.[/yellow]")
+            return None
+
+    # Ask for search query
+    try:
+        query = console.input("[cyan]Search query (name or ID): [/cyan]").strip()
+        if not query or query.lower() in ("q", "quit", "exit"):
+            return None
+    except (EOFError, KeyboardInterrupt):
+        console.print("\n[yellow]Cancelled.[/yellow]")
+        return None
+
+    return source, query
+
+
+def run_manual_search_workflow(  # noqa: PLR0912, PLR0915
+    ce_performer: dict,
+    ce_client: ClientCultureExtractor,
+    stashapp_client: StashAppClient,
+    source: str,
+    query: str,
+    image_path: Path | None,
+    show_image: bool,
+) -> bool:
+    """Run the manual search workflow to link a performer.
+
+    Args:
+        ce_performer: CE performer dictionary
+        ce_client: Culture Extractor client
+        stashapp_client: Stashapp client
+        source: Source to search ("stashapp" or "stashdb")
+        query: Search query (name or ID)
+        image_path: Path to CE performer image for comparison
+        show_image: Whether to display images
+
+    Returns:
+        True if performer was linked, False otherwise
+    """
+    console.print(f"\n[bold]Searching {source.upper()} for: {query}[/bold]")
+
+    if source == "stashapp":
+        performers = search_stashapp_performers(stashapp_client, query)
+    else:
+        performers = search_stashdb_performers(query)
+
+    selected = display_manual_search_results(
+        performers,
+        source,
+        console,
+        stashapp_client=stashapp_client,
+        show_image=show_image,
+        ce_image_path=image_path,
+    )
+    if not selected:
+        return False
+
+    stashapp_id = None
+    stashdb_id = None
+    match_image_url = None
+
+    if source == "stashapp":
+        stashapp_id = selected.get("stashapp_id")
+        stashdb_id = selected.get("stashapp_stashdb_id")
+        match_image_url = get_stashapp_performer_image_url(stashapp_client, stashapp_id)
+        match_name = selected.get("stashapp_name", "Unknown")
+    else:
+        stashdb_id = selected.get("id")
+        match_image_url = selected.get("image_url")
+        match_name = selected.get("name", "Unknown")
+        # Look up in Stashapp by StashDB ID
+        if stashdb_id:
+            stashapp_performer = lookup_stashapp_performer(stashapp_client, stashdb_id)
+            if stashapp_performer:
+                stashapp_id = stashapp_performer.get("stashapp_id")
+                console.print(f"[green]✓ Also found in Stashapp: ID {stashapp_id}[/green]")
+
+    # Display comparison if images are available
+    if show_image:
+        console.print("\n[bold cyan]Visual Comparison:[/bold cyan]")
+
+        if image_path and image_path.exists():
+            display_image_viu(image_path, width=40, label="CE Performer Image")
+
+        if match_image_url:
+            console.print()
+            match_image_path = download_stashdb_image(match_image_url)
+            if match_image_path:
+                display_image_viu(match_image_path, width=40, label=f"Match: {match_name}")
+                match_image_path.unlink(missing_ok=True)
+
+    # Display summary
+    panel_content = []
+    panel_content.append("[bold cyan]Culture Extractor Performer:[/bold cyan]")
+    panel_content.append(f"  Name: {ce_performer.get('ce_performers_name', 'Unknown')}")
+    panel_content.append(f"  UUID: {ce_performer.get('ce_performers_uuid', 'N/A')}")
+    panel_content.append("\n[bold green]Selected Match:[/bold green]")
+    panel_content.append(f"  Name: {match_name}")
+    if stashdb_id:
+        panel_content.append(f"  StashDB ID: {stashdb_id}")
+    if stashapp_id:
+        panel_content.append(f"  Stashapp ID: {stashapp_id}")
+
+    console.print(Panel("\n".join(panel_content), title="Proposed Manual Link", border_style="green"))
+
+    # Confirm
+    while True:
+        try:
+            response = input("\033[1;36mLink this performer? (y/n): \033[0m").strip().lower()
+            if response in ("y", "yes"):
+                break
+            if response in ("n", "no"):
+                console.print("[yellow]Cancelled. No changes made.[/yellow]")
+                return False
+            print("\033[33mPlease enter 'y' or 'n'\033[0m")
+        except (EOFError, KeyboardInterrupt):
+            console.print("\n[yellow]Cancelled.[/yellow]")
+            return False
+
+    # Link the performer
+    ce_performer_uuid = ce_performer.get("ce_performers_uuid")
+    link_performer(ce_client, ce_performer_uuid, stashapp_id, stashdb_id)
+
+    console.print("\n[bold green]✅ Successfully linked performer![/bold green]")
+    return True
 
 
 def display_image_viu(image_path: Path, width: int = 40, label: str = ""):
@@ -377,7 +790,7 @@ def link_performer(
         raise
 
 
-def select_match(matches: list[dict], console: Console) -> dict | None:
+def select_match(matches: list[dict], console: Console) -> dict | str | None:
     """Select a match from the list, handling single or multiple matches.
 
     Args:
@@ -385,31 +798,28 @@ def select_match(matches: list[dict], console: Console) -> dict | None:
         console: Rich console for output
 
     Returns:
-        Selected match or None if cancelled
+        Selected match dict, "manual" for manual search, or None if skipped
     """
-    if len(matches) == 1:
-        selected_match = matches[0]
-        console.print(
-            f"[cyan]Auto-selecting only match: {selected_match.get('name', 'Unknown')}[/cyan]"
-        )
-        return selected_match
-
-    console.print("[yellow]Multiple matches found. Please select one:[/yellow]")
+    console.print("[yellow]Select a match:[/yellow]")
     for i, match in enumerate(matches, 1):
         console.print(f"  {i}. {match.get('name', 'Unknown')} ({match.get('confidence', 0)}%)")
+    console.print("  [dim]m. Manual search[/dim]")
+    console.print("  [dim]s. Skip[/dim]")
 
     while True:
         try:
-            choice = console.input(f"[cyan]Enter choice (1-{len(matches)}, 0 to skip): [/cyan]")
-            choice_num = int(choice)
-            if choice_num == 0:
-                console.print("[yellow]Skipping. Exiting.[/yellow]")
+            choice = console.input("[cyan]Enter choice: [/cyan]").strip().lower()
+            if choice == "s":
                 return None
-            if 1 <= choice_num <= len(matches):
-                return matches[choice_num - 1]
-            console.print(f"[red]Please enter a number between 0 and {len(matches)}[/red]")
-        except (ValueError, KeyboardInterrupt):
-            console.print("\n[yellow]Cancelled. Exiting.[/yellow]")
+            if choice == "m":
+                return "manual"
+            if choice.isdigit():
+                choice_num = int(choice)
+                if 1 <= choice_num <= len(matches):
+                    return matches[choice_num - 1]
+            console.print(f"[red]Please enter 1-{len(matches)}, 'm' for manual, or 's' to skip[/red]")
+        except KeyboardInterrupt:
+            console.print("\n[yellow]Cancelled.[/yellow]")
             return None
 
 
@@ -425,6 +835,55 @@ def extract_stashdb_id_from_url(performer_url: str | None) -> str | None:
     if not performer_url:
         return None
     return performer_url.split("/")[-1]
+
+
+def offer_manual_search(
+    ce_performer: dict,
+    ce_client: ClientCultureExtractor,
+    stashapp_client: StashAppClient,
+    image_path: Path | None,
+    show_image: bool,
+) -> bool:
+    """Offer the user to do a manual search.
+
+    Args:
+        ce_performer: CE performer dictionary
+        ce_client: Culture Extractor client
+        stashapp_client: Stashapp client
+        image_path: Path to CE performer image
+        show_image: Whether to display images
+
+    Returns:
+        True if performer was linked via manual search, False otherwise
+    """
+    while True:
+        try:
+            response = console.input(
+                "[cyan]Would you like to search manually? (y/n): [/cyan]"
+            ).strip().lower()
+            if response in ("n", "no"):
+                return False
+            if response in ("y", "yes"):
+                break
+            console.print("[yellow]Please enter 'y' or 'n'[/yellow]")
+        except (EOFError, KeyboardInterrupt):
+            console.print("\n[yellow]Cancelled.[/yellow]")
+            return False
+
+    search_params = prompt_manual_search(console)
+    if not search_params:
+        return False
+
+    source, query = search_params
+    return run_manual_search_workflow(
+        ce_performer,
+        ce_client,
+        stashapp_client,
+        source,
+        query,
+        image_path,
+        show_image,
+    )
 
 
 def run_matching_workflow(  # noqa: PLR0915, PLR0912
@@ -485,7 +944,10 @@ def run_matching_workflow(  # noqa: PLR0915, PLR0912
         site_display = site_name.title() if site_name else "<site>"
         console.print(f"[yellow]Expected location: /Volumes/Ripping/{site_display}/Performers/{performer_uuid}/{performer_uuid}.jpg[/yellow]")  # noqa: E501
         console.print("[dim]Note: The performer UUID in CE database may not match the filesystem UUID[/dim]")
-        console.print("[dim]Consider manually locating the image or linking the performer through Stashapp directly[/dim]")  # noqa: E501
+
+        # Offer manual search as fallback
+        if offer_manual_search(ce_performer, ce_client, stashapp_client, None, show_image):
+            return
         sys.exit(1)
     console.print(f"[green]✓ Found image: {image_path}[/green]")
 
@@ -497,12 +959,26 @@ def run_matching_workflow(  # noqa: PLR0915, PLR0912
     console.print("\n[bold]Step 4: Face recognition results[/bold]")
     matches = display_face_matches(face_results)
     if not matches:
-        console.print("[yellow]No matches found. Exiting.[/yellow]")
+        console.print("[yellow]No matches found from face recognition.[/yellow]")
+        # Offer manual search as fallback
+        if offer_manual_search(ce_performer, ce_client, stashapp_client, image_path, show_image):
+            return
         sys.exit(0)
 
     console.print("\n[bold]Step 5: Select match[/bold]")
     selected_match = select_match(matches, console)
+    if selected_match == "manual":
+        # User chose manual search
+        search_params = prompt_manual_search(console)
+        if search_params:
+            source, query = search_params
+            if run_manual_search_workflow(
+                ce_performer, ce_client, stashapp_client, source, query, image_path, show_image
+            ):
+                return
+        sys.exit(0)
     if not selected_match:
+        # User skipped
         sys.exit(0)
 
     # Step 6: Look up in Stashapp
@@ -573,7 +1049,11 @@ def run_matching_workflow(  # noqa: PLR0915, PLR0912
                 sys.exit(0)
 
     if not should_approve:
-        console.print("[yellow]Cancelled. No changes made.[/yellow]")
+        console.print("[yellow]Match rejected.[/yellow]")
+        # Offer manual search as fallback
+        if offer_manual_search(ce_performer, ce_client, stashapp_client, image_path, show_image):
+            return
+        console.print("[yellow]No changes made.[/yellow]")
         sys.exit(0)
 
     # Step 8: Link the performer
