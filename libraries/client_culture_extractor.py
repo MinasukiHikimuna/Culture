@@ -1148,9 +1148,7 @@ class ClientCultureExtractor:
                         p.name AS ce_performers_name,
                         p.url AS ce_performers_url
                     FROM performers p
-                    JOIN release_entity_site_performer_entity resp ON p.uuid = resp.performers_uuid
-                    JOIN releases r ON resp.releases_uuid = r.uuid
-                    WHERE r.site_uuid = %s
+                    WHERE p.site_uuid = %s
                       AND (p.name ILIKE %s OR p.short_name ILIKE %s)
                     ORDER BY p.name
                 """
@@ -1163,9 +1161,7 @@ class ClientCultureExtractor:
                         p.name AS ce_performers_name,
                         p.url AS ce_performers_url
                     FROM performers p
-                    JOIN release_entity_site_performer_entity resp ON p.uuid = resp.performers_uuid
-                    JOIN releases r ON resp.releases_uuid = r.uuid
-                    WHERE r.site_uuid = %s
+                    WHERE p.site_uuid = %s
                     ORDER BY p.name
                 """
                 params = (site_uuid,)
@@ -1233,9 +1229,7 @@ class ClientCultureExtractor:
                         p.name AS ce_performers_name,
                         p.url AS ce_performers_url
                     FROM performers p
-                    JOIN release_entity_site_performer_entity resp ON p.uuid = resp.performers_uuid
-                    JOIN releases r ON resp.releases_uuid = r.uuid
-                    WHERE r.site_uuid = %s
+                    WHERE p.site_uuid = %s
                       AND (p.name ILIKE %s OR p.short_name ILIKE %s)
                       AND NOT EXISTS (
                           SELECT 1 FROM performer_external_ids pei
@@ -1253,9 +1247,7 @@ class ClientCultureExtractor:
                         p.name AS ce_performers_name,
                         p.url AS ce_performers_url
                     FROM performers p
-                    JOIN release_entity_site_performer_entity resp ON p.uuid = resp.performers_uuid
-                    JOIN releases r ON resp.releases_uuid = r.uuid
-                    WHERE r.site_uuid = %s
+                    WHERE p.site_uuid = %s
                       AND NOT EXISTS (
                           SELECT 1 FROM performer_external_ids pei
                           JOIN target_systems ts ON pei.target_system_uuid = ts.uuid
