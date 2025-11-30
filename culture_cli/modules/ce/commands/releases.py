@@ -109,6 +109,10 @@ def list_releases(
         int | None,
         typer.Option("--limit", "-l", help="Limit number of results (default: all)"),
     ] = None,
+    desc: Annotated[
+        bool,
+        typer.Option("--desc", "-d", help="Sort by release date descending (newest first)"),
+    ] = False,
     json_output: Annotated[
         bool,
         typer.Option("--json", "-j", help="Output as JSON instead of table"),
@@ -117,10 +121,12 @@ def list_releases(
     """List releases from the Culture Extractor database.
 
     A release represents a scene/content item regardless of whether it has been downloaded.
+    Results are sorted by release date ascending (oldest first) by default.
 
     Examples:
         ce releases list --site meanawolf                      # List all Meana Wolf releases
         ce releases list --site meanawolf --limit 20           # Show first 20 releases
+        ce releases list --site meanawolf --desc               # Sort newest first
         ce releases list --site meanawolf --tag "pov"          # Filter by tag
         ce releases list --site meanawolf --performer "name"   # Filter by performer
         ce releases list --site meanawolf --json               # JSON output
@@ -163,6 +169,8 @@ def list_releases(
                 msg += filter_msg
             print_info(msg)
             raise typer.Exit(code=0)
+
+        releases_df = releases_df.sort("ce_release_date", descending=desc, nulls_last=True)
 
         if limit and limit > 0:
             releases_df = releases_df.head(limit)
