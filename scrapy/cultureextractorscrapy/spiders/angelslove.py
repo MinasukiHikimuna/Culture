@@ -56,6 +56,18 @@ SITE_CONFIGS = {
             "dd-vthumbs.wowgirls.com",
         ],
     },
+    "ultrafilms": {
+        "base_url": "https://ultrafilms.com",
+        "cookie_env_var": "ULTRAFILMS_COOKIES",
+        "site_short_name": "ultrafilms",
+        "allowed_domains": [
+            "ultrafilms.com",
+            "dd-thumbs.wowgirls.com",
+            "dd-photo.wowgirls.com",
+            "dd-video.wowgirls.com",
+            "dd-vthumbs.wowgirls.com",
+        ],
+    },
 }
 
 
@@ -349,6 +361,9 @@ class AngelsLoveSpider(scrapy.Spider):
         available_files = []
         download_items = []
 
+        # Get already downloaded files for this release (if any)
+        downloaded_files = existing_release["downloaded_files"] if existing_release else set()
+
         # Add thumbnail as cover image
         if thumbnail:
             cover_file = AvailableImageFile(
@@ -358,13 +373,17 @@ class AngelsLoveSpider(scrapy.Spider):
                 url=thumbnail,
             )
             available_files.append(cover_file)
-            download_items.append(
-                DirectDownloadItem(
-                    release_id=str(release_id),
-                    file_info=ItemAdapter(cover_file).asdict(),
-                    url=cover_file.url,
+            # Only add to download items if not already downloaded
+            if (cover_file.file_type, cover_file.content_type, cover_file.variant) not in downloaded_files:
+                download_items.append(
+                    DirectDownloadItem(
+                        release_id=str(release_id),
+                        file_info=ItemAdapter(cover_file).asdict(),
+                        url=cover_file.url,
+                    )
                 )
-            )
+            else:
+                self.logger.info(f"Skipping already downloaded file: {cover_file.variant} ({cover_file.file_type}/{cover_file.content_type})")
 
         # Add only the highest quality video (last in list) to available_files for download
         # Full list of all formats is kept in json_document's download_files
@@ -379,13 +398,17 @@ class AngelsLoveSpider(scrapy.Spider):
                 file_size=None,  # Size is in string format like "4.91GB", would need parsing
             )
             available_files.append(video_file)
-            download_items.append(
-                DirectDownloadItem(
-                    release_id=str(release_id),
-                    file_info=ItemAdapter(video_file).asdict(),
-                    url=video_file.url,
+            # Only add to download items if not already downloaded
+            if (video_file.file_type, video_file.content_type, video_file.variant) not in downloaded_files:
+                download_items.append(
+                    DirectDownloadItem(
+                        release_id=str(release_id),
+                        file_info=ItemAdapter(video_file).asdict(),
+                        url=video_file.url,
+                    )
                 )
-            )
+            else:
+                self.logger.info(f"Skipping already downloaded file: {video_file.variant} ({video_file.file_type}/{video_file.content_type})")
 
         if existing_release:
             self.logger.info(
@@ -514,6 +537,9 @@ class AngelsLoveSpider(scrapy.Spider):
         available_files = []
         download_items = []
 
+        # Get already downloaded files for this release (if any)
+        downloaded_files = existing_release["downloaded_files"] if existing_release else set()
+
         # Add thumbnail as cover image
         if thumbnail:
             cover_file = AvailableImageFile(
@@ -523,13 +549,17 @@ class AngelsLoveSpider(scrapy.Spider):
                 url=thumbnail,
             )
             available_files.append(cover_file)
-            download_items.append(
-                DirectDownloadItem(
-                    release_id=str(release_id),
-                    file_info=ItemAdapter(cover_file).asdict(),
-                    url=cover_file.url,
+            # Only add to download items if not already downloaded
+            if (cover_file.file_type, cover_file.content_type, cover_file.variant) not in downloaded_files:
+                download_items.append(
+                    DirectDownloadItem(
+                        release_id=str(release_id),
+                        file_info=ItemAdapter(cover_file).asdict(),
+                        url=cover_file.url,
+                    )
                 )
-            )
+            else:
+                self.logger.info(f"Skipping already downloaded file: {cover_file.variant} ({cover_file.file_type}/{cover_file.content_type})")
 
         # Add only the highest quality gallery (last in list) to available_files for download
         # Full list of all formats is kept in json_document's download_files
@@ -544,13 +574,17 @@ class AngelsLoveSpider(scrapy.Spider):
                 file_size=None,  # Size is in string format like "164.83MB", would need parsing
             )
             available_files.append(gallery_file)
-            download_items.append(
-                DirectDownloadItem(
-                    release_id=str(release_id),
-                    file_info=ItemAdapter(gallery_file).asdict(),
-                    url=gallery_file.url,
+            # Only add to download items if not already downloaded
+            if (gallery_file.file_type, gallery_file.content_type, gallery_file.variant) not in downloaded_files:
+                download_items.append(
+                    DirectDownloadItem(
+                        release_id=str(release_id),
+                        file_info=ItemAdapter(gallery_file).asdict(),
+                        url=gallery_file.url,
+                    )
                 )
-            )
+            else:
+                self.logger.info(f"Skipping already downloaded file: {gallery_file.variant} ({gallery_file.file_type}/{gallery_file.content_type})")
 
         if existing_release:
             self.logger.info(
