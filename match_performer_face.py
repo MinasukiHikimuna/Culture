@@ -614,6 +614,37 @@ def run_manual_search_workflow(  # noqa: PLR0912, PLR0915
     return True
 
 
+def reset_terminal():
+    """Reset terminal state after viu display.
+
+    viu can leave the terminal in alternate screen or with modified input settings.
+    This function resets terminal state and flushes input buffers.
+    """
+    # Reset terminal state
+    subprocess.run(["stty", "sane"], check=False, capture_output=True)
+
+    # Save and restore terminal settings to clear any buffered input
+    try:
+        fd = sys.stdin.fileno()
+        old_settings = termios.tcgetattr(fd)
+
+        # Flush input buffer
+        termios.tcflush(fd, termios.TCIFLUSH)
+
+        # Restore settings
+        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+    except Exception:
+        # If terminal manipulation fails, just continue
+        pass
+
+    # Give terminal time to settle
+    time.sleep(0.1)
+
+    # Flush all output buffers
+    sys.stdout.flush()
+    sys.stderr.flush()
+
+
 def display_image_viu(image_path: Path, width: int = 40, label: str = ""):
     """Display an image using viu.
 
@@ -646,6 +677,9 @@ def display_image_viu(image_path: Path, width: int = 40, label: str = ""):
     except Exception as e:
         console.print(f"[yellow]Could not display image: {e}[/yellow]")
         console.print(f"[dim]Image: {image_path}[/dim]")
+    finally:
+        # Always reset terminal after viu display
+        reset_terminal()
 
 
 def download_stashdb_image(image_url: str) -> Path | None:
@@ -1005,34 +1039,6 @@ def run_matching_workflow(  # noqa: PLR0915, PLR0912
     if should_approve:
         console.print("\n[green]Auto-approving (100% confidence match)[/green]")
     else:
-        # Reset terminal state after viu display
-        # viu can leave the terminal in alternate screen or with modified input settings
-        subprocess.run(["stty", "sane"], check=False, capture_output=True)
-
-        # Save and restore terminal settings to clear any buffered input
-        try:
-            fd = sys.stdin.fileno()
-            old_settings = termios.tcgetattr(fd)
-
-            # Flush input buffer
-            termios.tcflush(fd, termios.TCIFLUSH)
-
-            # Restore settings
-            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-        except Exception:
-            # If terminal manipulation fails, just continue
-            pass
-
-        # Give terminal time to settle
-        time.sleep(0.1)
-
-        # Flush all output buffers
-        sys.stdout.flush()
-        sys.stderr.flush()
-
-        # Print newline to ensure we're on a clean line
-        print()
-
         # Simple yes/no prompt that accepts y/Y/n/N
         while True:
             try:
