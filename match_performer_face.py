@@ -591,13 +591,18 @@ def main():
         epilog="""
 Examples:
   python match_performer_face.py 01958935-af28-73a6-8f67-e272112f8e3b
+  python match_performer_face.py uuid1 uuid2 uuid3
   python match_performer_face.py 01958935-af28-73a6-8f67-e272112f8e3b --threshold 0.8
   python match_performer_face.py 01958935-af28-73a6-8f67-e272112f8e3b --auto-approve
   python match_performer_face.py 01958935-af28-73a6-8f67-e272112f8e3b --show-image
         """,
     )
 
-    parser.add_argument("performer_uuid", help="Culture Extractor performer UUID")
+    parser.add_argument(
+        "performer_uuids",
+        nargs="+",
+        help="One or more Culture Extractor performer UUIDs",
+    )
     parser.add_argument(
         "--threshold",
         type=float,
@@ -633,22 +638,42 @@ Examples:
         console.print("[red]Error: Threshold must be between 0.0 and 1.0[/red]")
         sys.exit(1)
 
-    try:
-        run_matching_workflow(
-            args.performer_uuid,
-            args.threshold,
-            args.max_results,
-            args.auto_approve,
-            args.show_image,
-            args.force,
-        )
-    except KeyboardInterrupt:
-        console.print("\n[yellow]Cancelled by user. Exiting.[/yellow]")
-        sys.exit(130)
-    except Exception as e:
-        console.print(f"\n[red]Fatal error: {e}[/red]")
-        traceback.print_exc()
-        sys.exit(1)
+    total = len(args.performer_uuids)
+    for i, performer_uuid in enumerate(args.performer_uuids, 1):
+        if total > 1:
+            console.print(f"\n[bold blue]{'=' * 60}[/bold blue]")
+            console.print(f"[bold blue]Processing performer {i}/{total}: {performer_uuid}[/bold blue]")
+            console.print(f"[bold blue]{'=' * 60}[/bold blue]")
+
+        try:
+            run_matching_workflow(
+                performer_uuid,
+                args.threshold,
+                args.max_results,
+                args.auto_approve,
+                args.show_image,
+                args.force,
+            )
+        except KeyboardInterrupt:
+            console.print("\n[yellow]Cancelled by user. Exiting.[/yellow]")
+            sys.exit(130)
+        except SystemExit:
+            # Allow sys.exit() calls from workflow to pass through for single UUID
+            # For multiple UUIDs, continue to next performer
+            if total == 1:
+                raise
+            console.print("[yellow]Moving to next performer...[/yellow]")
+            continue
+        except Exception as e:
+            console.print(f"\n[red]Error processing {performer_uuid}: {e}[/red]")
+            traceback.print_exc()
+            if total == 1:
+                sys.exit(1)
+            console.print("[yellow]Moving to next performer...[/yellow]")
+            continue
+
+    if total > 1:
+        console.print(f"\n[bold green]Finished processing {total} performers.[/bold green]")
 
 
 if __name__ == "__main__":
