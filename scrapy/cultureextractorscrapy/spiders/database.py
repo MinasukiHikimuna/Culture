@@ -1,5 +1,6 @@
 import json
 import os
+import threading
 
 import newnewid
 from dotenv import load_dotenv
@@ -134,15 +135,41 @@ class SubSite(Base):
     releases = relationship("Release", back_populates="sub_site")
 
 
+# Create a single shared engine with connection pooling (thread-safe)
+_engine = None
+_engine_lock = threading.Lock()
+
+
 def get_engine():
-    db_url = os.getenv("CONNECTION_STRING")
-    return create_engine(db_url)
+    global _engine
+    if _engine is None:
+        with _engine_lock:
+            # Double-check pattern for thread safety
+            if _engine is None:
+                db_url = os.getenv("CONNECTION_STRING")
+                _engine = create_engine(
+                    db_url,
+                    pool_size=5,
+                    max_overflow=10,
+                    pool_pre_ping=True,
+                    pool_recycle=3600,
+                )
+    return _engine
+
+
+# Create a single sessionmaker bound to the shared engine (thread-safe)
+_Session = None
+_session_lock = threading.Lock()
 
 
 def get_session():
-    engine = get_engine()
-    Session = sessionmaker(bind=engine)
-    return Session()
+    global _Session
+    if _Session is None:
+        with _session_lock:
+            # Double-check pattern for thread safety
+            if _Session is None:
+                _Session = sessionmaker(bind=get_engine())
+    return _Session()
 
 
 def get_sites():
