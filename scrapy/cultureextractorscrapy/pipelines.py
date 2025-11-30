@@ -565,7 +565,9 @@ class M3u8DownloadPipeline(BaseDownloadPipeline):
 
             if self.file_exists_check(file_path):
                 spider.logger.info("[M3u8DownloadPipeline] File already exists: %s", file_path)
-                return self.create_downloaded_item_from_path(item, file_path, spider)
+                # Don't create a new DownloadedFileItem - just return the original item
+                # This prevents duplicate records in the downloaded_files table
+                return item
 
             # Check disk space before downloading
             has_space, available_gb = check_available_disk_space(self.store_uri)
@@ -915,7 +917,9 @@ class FfmpegDownloadPipeline(BaseDownloadPipeline):
 
             if self.file_exists_check(file_path):
                 spider.logger.info("[FfmpegDownloadPipeline] File already exists: %s", file_path)
-                return self.create_downloaded_item_from_path(item, file_path, spider)
+                # Don't create a new DownloadedFileItem - just return the original item
+                # This prevents duplicate records in the downloaded_files table
+                return item
 
             # Check disk space before downloading
             has_space, available_gb = check_available_disk_space(self.store_uri)
@@ -1080,7 +1084,9 @@ class Aria2DownloadPipeline(BaseDownloadPipeline):
                     "[Aria2DownloadPipeline] File already exists, skipping download: %s",
                     full_path,
                 )
-                return self.create_downloaded_item_from_path(item, file_path, spider)
+                # Don't create a new DownloadedFileItem - just return the original item
+                # This prevents duplicate records in the downloaded_files table
+                return item
 
             # Check disk space before downloading
             has_space, available_gb = check_available_disk_space(self.store_uri)
@@ -1127,7 +1133,7 @@ class Aria2DownloadPipeline(BaseDownloadPipeline):
 
             # Get cookies from spider if available
             cookie_header = None
-            if hasattr(spider, 'cookies') and spider.cookies:
+            if hasattr(spider, "cookies") and spider.cookies:
                 # Convert cookies dict to header format
                 cookie_pairs = [f"{name}={value}" for name, value in spider.cookies.items()]
                 cookie_header = "; ".join(cookie_pairs)
@@ -1137,18 +1143,27 @@ class Aria2DownloadPipeline(BaseDownloadPipeline):
                 "aria2c",
                 "--console-log-level=notice",  # Show important messages
                 "--summary-interval=5",  # Show progress summary every 5 seconds
-                "--user-agent", self.settings.get("USER_AGENT", "Mozilla/5.0"),
-                "--max-connection-per-server", str(self.max_connections),
-                "--split", str(self.split),
-                "--min-split-size", self.min_split_size,
+                "--user-agent",
+                self.settings.get("USER_AGENT", "Mozilla/5.0"),
+                "--max-connection-per-server",
+                str(self.max_connections),
+                "--split",
+                str(self.split),
+                "--min-split-size",
+                self.min_split_size,
                 "--continue=true",
-                "--max-tries", str(self.max_retries),
-                "--retry-wait", "3",
-                "--timeout", str(self.timeout),
+                "--max-tries",
+                str(self.max_retries),
+                "--retry-wait",
+                "3",
+                "--timeout",
+                str(self.timeout),
                 "--allow-overwrite=false",
                 "--auto-file-renaming=false",
-                "--dir", os.path.dirname(output_path),
-                "--out", os.path.basename(output_path),
+                "--dir",
+                os.path.dirname(output_path),
+                "--out",
+                os.path.basename(output_path),
             ]
 
             # Add cookie header if available
@@ -1157,6 +1172,7 @@ class Aria2DownloadPipeline(BaseDownloadPipeline):
 
             # Add referer header based on URL domain
             from urllib.parse import urlparse
+
             parsed_url = urlparse(url)
             referer = f"{parsed_url.scheme}://{parsed_url.netloc}/"
             cmd.extend(["--header", f"Referer: {referer}"])
@@ -1264,9 +1280,7 @@ class PerformerImagePipeline:
         performer_dir = os.path.join(self.files_store, site_name, "Performers", performer_uuid)
         os.makedirs(performer_dir, exist_ok=True)
 
-        self.logger.info(
-            f"[PerformerImagePipeline] Processing {performer.name} ({performer_uuid})"
-        )
+        self.logger.info(f"[PerformerImagePipeline] Processing {performer.name} ({performer_uuid})")
 
         # Download each image
         for idx, img_info in enumerate(item.image_urls):
@@ -1291,21 +1305,15 @@ class PerformerImagePipeline:
 
             # Check if file exists (unless force_update is True)
             if not force_update and os.path.exists(filepath):
-                self.logger.info(
-                    f"[PerformerImagePipeline] Skipping {filename} (already exists)"
-                )
+                self.logger.info(f"[PerformerImagePipeline] Skipping {filename} (already exists)")
                 continue
 
             # Download the image
             try:
                 self._download_image(url, filepath, spider)
-                self.logger.info(
-                    f"[PerformerImagePipeline] Downloaded {filename} from {url}"
-                )
+                self.logger.info(f"[PerformerImagePipeline] Downloaded {filename} from {url}")
             except Exception as e:
-                self.logger.error(
-                    f"[PerformerImagePipeline] Failed to download {filename}: {e}"
-                )
+                self.logger.error(f"[PerformerImagePipeline] Failed to download {filename}: {e}")
 
         return item
 
