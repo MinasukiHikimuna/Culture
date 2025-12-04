@@ -84,15 +84,17 @@ def get_cookies_for_site(site_key):
 class AngelsLoveSpider(scrapy.Spider):
     name = "angelslove"
 
-    def __init__(self, mode="releases", site="angelslove", *args, **kwargs):
+    def __init__(self, mode="releases", site="angelslove", scan_all=False, *args, **kwargs):
         """Initialize spider with mode and site parameters.
 
         Args:
             mode: 'releases' (default), 'performers', or 'all'
             site: 'angelslove' (default) or 'sensuallove'
+            scan_all: If True, scan ALL pages looking for new releases (don't stop early)
         """
         super().__init__(*args, **kwargs)
         self.mode = mode
+        self.scan_all = scan_all in (True, "True", "true", "1", 1)
         if mode not in ["releases", "performers", "all"]:
             raise ValueError(f"Invalid mode: {mode}. Must be 'releases', 'performers', or 'all'")
 
@@ -152,14 +154,19 @@ class AngelsLoveSpider(scrapy.Spider):
             )
 
     def parse_list_page(self, response):
-        """Parse a page of movies."""
+        """Parse a page of releases."""
         page_num = response.meta.get("page", 1)
-        self.logger.info(f"Parsing movies page {page_num}: {response.url}")
 
         # Extract all content items from the grid
-        content_items = response.css("div.content-view-grid div.content-grid-item-wrapper")
+        # Note: Page has 3 grids (lg/md/mob for responsive). We only want the desktop (lg) one.
+        content_items = response.css(".content-view-lg div.content-grid-item-wrapper")
 
-        self.logger.info(f"Found {len(content_items)} content items on movies page {page_num}")
+        # Track counts for this page
+        new_releases_count = 0
+        existing_releases_count = 0
+
+        # Collect release info for summary log
+        release_lines = []
 
         for item in content_items:
             # Extract the URL and external ID from the link
@@ -185,17 +192,20 @@ class AngelsLoveSpider(scrapy.Spider):
                 # Galleries: /static/svg/members/photo-tile-overlay-hover-6cd82fe9c7.svg
                 hover_img = item.css("img.hover::attr(src)").get()
                 is_video = hover_img and "play-button-hover" in hover_img if hover_img else False
-
-                self.logger.info(f"Found release: {external_id} - {title}")
+                content_type = "scene" if is_video else "gallery"
 
                 # Check if this release already exists
                 existing_release = self.existing_releases.get(external_id)
+                performers_str = ", ".join(performers) if performers else "Unknown"
+
                 if existing_release and not self.force_update:
-                    self.logger.info(
-                        f"Skipping existing release: {external_id} - {title} "
-                        f"(use FORCE_UPDATE=1 to update existing releases)"
-                    )
+                    existing_releases_count += 1
+                    release_lines.append(f"  [EXISTS] {title} ({performers_str}) [{content_type}]")
                     continue
+
+                # This is a new release
+                new_releases_count += 1
+                release_lines.append(f"  [NEW]    {title} ({performers_str}) [{content_type}]")
 
                 # Yield request to appropriate detail page parser based on content type
                 callback = self.parse_video_detail if is_video else self.parse_gallery_detail
@@ -212,6 +222,13 @@ class AngelsLoveSpider(scrapy.Spider):
                     },
                 )
 
+        # Log page summary with all releases
+        releases_detail = "\n".join(release_lines) if release_lines else "  (no releases found)"
+        self.logger.info(
+            f"Page {page_num}: {new_releases_count} new, {existing_releases_count} existing "
+            f"({len(content_items)} total)\n{releases_detail}"
+        )
+
         # Handle pagination - extract next page if available
         # Give pagination requests lower priority so they're processed after all releases on current page
         page_options = response.css(".page-selector-select option::attr(data-href)").getall()
@@ -219,6 +236,15 @@ class AngelsLoveSpider(scrapy.Spider):
             # Check if there's a next page
             current_page_index = page_num - 1
             if current_page_index + 1 < len(page_options):
+                # Early stopping logic: if scan_all is False and entire page was existing releases,
+                # stop pagination (assumes releases are ordered by date, newest first)
+                if not self.scan_all and new_releases_count == 0 and existing_releases_count > 0:
+                    self.logger.info(
+                        f"Stopping: all releases on page {page_num} already exist. "
+                        f"Use -a scan_all=1 to scan all pages."
+                    )
+                    return
+
                 next_page_url = page_options[current_page_index + 1]
                 self.logger.info(f"Found next page: {next_page_url}")
                 yield scrapy.Request(
@@ -374,7 +400,11 @@ class AngelsLoveSpider(scrapy.Spider):
             )
             available_files.append(cover_file)
             # Only add to download items if not already downloaded
-            if (cover_file.file_type, cover_file.content_type, cover_file.variant) not in downloaded_files:
+            if (
+                cover_file.file_type,
+                cover_file.content_type,
+                cover_file.variant,
+            ) not in downloaded_files:
                 download_items.append(
                     DirectDownloadItem(
                         release_id=str(release_id),
@@ -383,7 +413,9 @@ class AngelsLoveSpider(scrapy.Spider):
                     )
                 )
             else:
-                self.logger.info(f"Skipping already downloaded file: {cover_file.variant} ({cover_file.file_type}/{cover_file.content_type})")
+                self.logger.info(
+                    f"Skipping already downloaded file: {cover_file.variant} ({cover_file.file_type}/{cover_file.content_type})"
+                )
 
         # Add only the highest quality video (last in list) to available_files for download
         # Full list of all formats is kept in json_document's download_files
@@ -399,7 +431,11 @@ class AngelsLoveSpider(scrapy.Spider):
             )
             available_files.append(video_file)
             # Only add to download items if not already downloaded
-            if (video_file.file_type, video_file.content_type, video_file.variant) not in downloaded_files:
+            if (
+                video_file.file_type,
+                video_file.content_type,
+                video_file.variant,
+            ) not in downloaded_files:
                 download_items.append(
                     DirectDownloadItem(
                         release_id=str(release_id),
@@ -408,7 +444,9 @@ class AngelsLoveSpider(scrapy.Spider):
                     )
                 )
             else:
-                self.logger.info(f"Skipping already downloaded file: {video_file.variant} ({video_file.file_type}/{video_file.content_type})")
+                self.logger.info(
+                    f"Skipping already downloaded file: {video_file.variant} ({video_file.file_type}/{video_file.content_type})"
+                )
 
         if existing_release:
             self.logger.info(
@@ -550,7 +588,11 @@ class AngelsLoveSpider(scrapy.Spider):
             )
             available_files.append(cover_file)
             # Only add to download items if not already downloaded
-            if (cover_file.file_type, cover_file.content_type, cover_file.variant) not in downloaded_files:
+            if (
+                cover_file.file_type,
+                cover_file.content_type,
+                cover_file.variant,
+            ) not in downloaded_files:
                 download_items.append(
                     DirectDownloadItem(
                         release_id=str(release_id),
@@ -559,7 +601,9 @@ class AngelsLoveSpider(scrapy.Spider):
                     )
                 )
             else:
-                self.logger.info(f"Skipping already downloaded file: {cover_file.variant} ({cover_file.file_type}/{cover_file.content_type})")
+                self.logger.info(
+                    f"Skipping already downloaded file: {cover_file.variant} ({cover_file.file_type}/{cover_file.content_type})"
+                )
 
         # Add only the highest quality gallery (last in list) to available_files for download
         # Full list of all formats is kept in json_document's download_files
@@ -575,7 +619,11 @@ class AngelsLoveSpider(scrapy.Spider):
             )
             available_files.append(gallery_file)
             # Only add to download items if not already downloaded
-            if (gallery_file.file_type, gallery_file.content_type, gallery_file.variant) not in downloaded_files:
+            if (
+                gallery_file.file_type,
+                gallery_file.content_type,
+                gallery_file.variant,
+            ) not in downloaded_files:
                 download_items.append(
                     DirectDownloadItem(
                         release_id=str(release_id),
@@ -584,7 +632,9 @@ class AngelsLoveSpider(scrapy.Spider):
                     )
                 )
             else:
-                self.logger.info(f"Skipping already downloaded file: {gallery_file.variant} ({gallery_file.file_type}/{gallery_file.content_type})")
+                self.logger.info(
+                    f"Skipping already downloaded file: {gallery_file.variant} ({gallery_file.file_type}/{gallery_file.content_type})"
+                )
 
         if existing_release:
             self.logger.info(
