@@ -44,6 +44,7 @@ class WowGirlsSpider(scrapy.Spider):
     name = "wowgirls"
     allowed_domains = [
         "venus.wowgirls.com",
+        "auth.wowgirls.com",  # Needed to detect login redirects
         "content-video2.wowgirls.com",
         "content-photo2.wowgirls.com",
         "content-vthumbs2.wowgirls.com",
