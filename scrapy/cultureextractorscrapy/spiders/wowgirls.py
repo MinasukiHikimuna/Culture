@@ -91,18 +91,21 @@ class WowGirlsSpider(scrapy.Spider):
     def parse(self, response):
         # Route based on mode
         if self.mode in ["releases", "all"]:
-            # Request films first, then galleries
-            yield scrapy.Request(
-                url=f"{self.base_url}/films/",
-                callback=self.parse_films_list,
+            # Use /updates/ endpoint with site filter for WowGirls only (site=32)
+            # This ensures we only scrape WowGirls content, not AllFineGirls or WowPorn
+            # First, we need to set up the site filter by toggling on site=32
+            yield scrapy.FormRequest(
+                url=f"{self.base_url}/updates/cf",
+                formdata={
+                    "__operation": "toggle",
+                    "__state": "sites=32",
+                },
+                callback=self.parse_updates_list,
                 cookies=self.cookies,
-                meta={"page": 1},
-            )
-            yield scrapy.Request(
-                url=f"{self.base_url}/galleries/",
-                callback=self.parse_galleries_list,
-                cookies=self.cookies,
-                meta={"page": 1},
+                headers={
+                    "X-Requested-With": "XMLHttpRequest",
+                },
+                meta={"page": 1, "site_filter_set": True},
             )
 
         if self.mode in ["performers", "all"]:
@@ -112,6 +115,127 @@ class WowGirlsSpider(scrapy.Spider):
                 callback=self.parse_performers_page,
                 cookies=self.cookies,
                 meta={"page": 1},
+            )
+
+    def parse_updates_list(self, response):
+        """Parse the updates list page (combined films and galleries, filtered by site)."""
+        page_num = response.meta.get("page", 1)
+
+        # Check if we've been redirected to login page
+        if "/login" in response.url or "auth.wowgirls.com" in response.url:
+            raise CloseSpider(
+                "Session expired: Redirected to login page. "
+                "Please update the WOWGIRLS_COOKIES environment variable with fresh cookies."
+            )
+
+        # Extract all content items (both films and galleries)
+        content_items = response.css("div.content_item")
+
+        # Track counts for this page
+        new_releases_count = 0
+        existing_releases_count = 0
+        release_lines = []
+
+        for item in content_items:
+            # Determine if it's a film or gallery based on class
+            is_film = "ct_video" in (item.css("::attr(class)").get() or "")
+            is_gallery = "ct_photo" in (item.css("::attr(class)").get() or "")
+
+            if is_film:
+                item_link = item.css('a[href*="/film/"]')
+                item_url = item_link.css("::attr(href)").get()
+                if not item_url:
+                    continue
+                match = re.match(r"/film/(\w+)/", item_url)
+                content_type = "film"
+            elif is_gallery:
+                item_link = item.css('a[href*="/gallery/"]')
+                item_url = item_link.css("::attr(href)").get()
+                if not item_url:
+                    continue
+                match = re.match(r"/gallery/(\w+)/", item_url)
+                content_type = "gallery"
+            else:
+                continue
+
+            if not match:
+                continue
+            short_name = match.group(1)
+
+            # Extract title from the title link
+            title_link = item.css("a.title")
+            title = title_link.css("::text").get()
+            if title:
+                title = title.strip()
+            else:
+                # Fallback to image alt
+                title = item.css("img::attr(alt)").get() or short_name
+
+            # Check if this release already exists
+            existing_release = self.existing_releases.get(short_name)
+
+            if existing_release and not self.force_update:
+                existing_releases_count += 1
+                release_lines.append(f"  [EXISTS] {title} [{content_type}]")
+                continue
+
+            # This is a new release
+            new_releases_count += 1
+            release_lines.append(f"  [NEW]    {title} [{content_type}]")
+
+            # Request detail page with appropriate callback
+            if is_film:
+                yield scrapy.Request(
+                    url=f"{self.base_url}{item_url}",
+                    callback=self.parse_film_detail,
+                    cookies=self.cookies,
+                    meta={
+                        "short_name": short_name,
+                        "title": title,
+                    },
+                )
+            else:
+                yield scrapy.Request(
+                    url=f"{self.base_url}{item_url}",
+                    callback=self.parse_gallery_detail,
+                    cookies=self.cookies,
+                    meta={
+                        "short_name": short_name,
+                        "title": title,
+                    },
+                )
+
+        # Log page summary
+        releases_detail = "\n".join(release_lines) if release_lines else "  (no releases found)"
+        self.logger.info(
+            f"Updates page {page_num}: {new_releases_count} new, {existing_releases_count} existing\n{releases_detail}"
+        )
+
+        # Handle pagination
+        next_page = self._get_next_page(response, page_num)
+        if next_page:
+            # Early stopping logic
+            if not self.scan_all and new_releases_count == 0 and existing_releases_count > 0:
+                self.logger.info(
+                    f"Stopping updates: all releases on page {page_num} already exist. "
+                    f"Use -a scan_all=1 to scan all pages."
+                )
+                return
+
+            # Use /updates/cf endpoint for pagination (site filter is maintained in session)
+            yield scrapy.FormRequest(
+                url=f"{self.base_url}/updates/cf",
+                formdata={
+                    "__operation": "modify",
+                    "__state": f"paginator.page={next_page}",
+                },
+                callback=self.parse_updates_list,
+                cookies=self.cookies,
+                headers={
+                    "X-Requested-With": "XMLHttpRequest",
+                },
+                meta={"page": next_page},
+                priority=-page_num,
             )
 
     def parse_films_list(self, response):
@@ -503,7 +627,12 @@ class WowGirlsSpider(scrapy.Spider):
             available_files.append(video_file)
 
         # Add only the highest quality video for download
-        if download_files:
+        # TEMPORARY: Only download if this release has NO video downloads at all
+        has_any_video_download = any(
+            ft == "video" for (ft, ct, v) in downloaded_files
+        )
+
+        if download_files and not has_any_video_download:
             # Sort by resolution (width * height) descending, prefer H.265
             sorted_downloads = sorted(
                 download_files,
@@ -536,6 +665,8 @@ class WowGirlsSpider(scrapy.Spider):
                         url=video_file.url,
                     )
                 )
+        elif has_any_video_download:
+            self.logger.info(f"Skipping video download for {short_name} - already has video downloads")
 
         # Create post data for json_document
         post_data = {
@@ -691,8 +822,13 @@ class WowGirlsSpider(scrapy.Spider):
             available_files.append(gallery_file)
 
         # Add only the highest quality (Original) for download
+        # TEMPORARY: Only download if this release has NO gallery/zip downloads at all
+        has_any_gallery_download = any(
+            ft == "zip" for (ft, ct, v) in downloaded_files
+        )
+
         original_download = next((df for df in download_files if df["variant"] == "Original"), None)
-        if original_download:
+        if original_download and not has_any_gallery_download:
             gallery_file = AvailableGalleryZipFile(
                 file_type="zip",
                 content_type="gallery",
@@ -714,6 +850,8 @@ class WowGirlsSpider(scrapy.Spider):
                         url=gallery_file.url,
                     )
                 )
+        elif has_any_gallery_download:
+            self.logger.info(f"Skipping gallery download for {short_name} - already has gallery downloads")
 
         # Create post data for json_document
         post_data = {
