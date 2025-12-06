@@ -1283,6 +1283,67 @@ class ClientCultureExtractor:
 
             return pl.DataFrame(performers, schema=schema)
 
+    def get_performers_with_cross_site_releases(self) -> pl.DataFrame:
+        """Find performers linked to releases from sites different from their own.
+
+        This is a data quality check - performers should only be linked to releases
+        from the same site they belong to.
+
+        Returns:
+            DataFrame with performer info, their site, and the mismatched release/site info
+        """
+        with self.connection.cursor() as cursor:
+            query = """
+                SELECT DISTINCT
+                    p.uuid AS performer_uuid,
+                    p.name AS performer_name,
+                    p.short_name AS performer_short_name,
+                    ps.uuid AS performer_site_uuid,
+                    ps.name AS performer_site_name,
+                    r.uuid AS release_uuid,
+                    r.name AS release_name,
+                    rs.uuid AS release_site_uuid,
+                    rs.name AS release_site_name
+                FROM performers p
+                JOIN sites ps ON p.site_uuid = ps.uuid
+                JOIN release_entity_site_performer_entity resp ON p.uuid = resp.performers_uuid
+                JOIN releases r ON resp.releases_uuid = r.uuid
+                JOIN sites rs ON r.site_uuid = rs.uuid
+                WHERE p.site_uuid != r.site_uuid
+                ORDER BY ps.name, p.name, rs.name
+            """
+            cursor.execute(query)
+            rows = cursor.fetchall()
+
+            results = [
+                {
+                    "performer_uuid": str(row[0]),
+                    "performer_name": row[1],
+                    "performer_short_name": row[2],
+                    "performer_site_uuid": str(row[3]),
+                    "performer_site_name": row[4],
+                    "release_uuid": str(row[5]),
+                    "release_name": row[6],
+                    "release_site_uuid": str(row[7]),
+                    "release_site_name": row[8],
+                }
+                for row in rows
+            ]
+
+            schema = {
+                "performer_uuid": pl.Utf8,
+                "performer_name": pl.Utf8,
+                "performer_short_name": pl.Utf8,
+                "performer_site_uuid": pl.Utf8,
+                "performer_site_name": pl.Utf8,
+                "release_uuid": pl.Utf8,
+                "release_name": pl.Utf8,
+                "release_site_uuid": pl.Utf8,
+                "release_site_name": pl.Utf8,
+            }
+
+            return pl.DataFrame(results, schema=schema)
+
     def get_release_performers(self, release_uuid: str) -> pl.DataFrame:
         """Get all performers for a specific release.
 
