@@ -238,6 +238,8 @@ class BaseDownloadPipeline:
                     file_extension = ".mp4"  # Default to .mp4 for video files
                 elif file_info["file_type"] == "image":
                     file_extension = ".jpg"  # Default to .jpg for image files
+                elif file_info["file_type"] == "zip":
+                    file_extension = ".zip"  # Default to .zip for gallery zip files
                 else:
                     file_extension = ""  # No extension for other types
             # Create filename in the specified format
