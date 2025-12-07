@@ -1,0 +1,618 @@
+[
+    {
+        "stashapp_id": 26708,
+        "stashapp_title": "",
+        "stashapp_details": "",
+        "stashapp_date": null,
+        "stashapp_urls": [],
+        "stashapp_created_at": "2024-11-25 07:31:27",
+        "stashapp_updated_at": "2024-11-25 07:43:43",
+        "stashapp_performers": [],
+        "stashapp_studio": null,
+        "stashapp_files": [
+            {
+                "id": 565577,
+                "path": "X:\\Culture\\Videos\\Sites\\Femjoy\\Femjoy - 2012-05-25 - Dance - 1280x720 - 019287f4-f04a-7219-a3af-a3a0e77c0187.mp4",
+                "basename": "Femjoy - 2012-05-25 - Dance - 1280x720 - 019287f4-f04a-7219-a3af-a3a0e77c0187.mp4",
+                "size": 136878571,
+                "duration": "PT304.13S",
+                "fingerprints": [
+                    {
+                        "type": "oshash",
+                        "value": "114da6adad5229bc"
+                    },
+                    {
+                        "type": "phash",
+                        "value": "c58de7b649c5a44c"
+                    },
+                    {
+                        "type": "sha256",
+                        "value": "642cfb47f55a3a7afe9c3d219445fd3eaab808bf488a7e0be2baff90512ac43f"
+                    },
+                    {
+                        "type": "xxhash",
+                        "value": "df00003d4e4a78c3"
+                    }
+                ]
+            }
+        ],
+        "stashapp_primary_file_path": "X:\\Culture\\Videos\\Sites\\Femjoy\\Femjoy - 2012-05-25 - Dance - 1280x720 - 019287f4-f04a-7219-a3af-a3a0e77c0187.mp4",
+        "stashapp_primary_file_basename": "Femjoy - 2012-05-25 - Dance - 1280x720 - 019287f4-f04a-7219-a3af-a3a0e77c0187.mp4",
+        "stashapp_primary_file_oshash": "114da6adad5229bc",
+        "stashapp_primary_file_phash": "c58de7b649c5a44c",
+        "stashapp_primary_file_xxhash": "df00003d4e4a78c3",
+        "stashapp_primary_file_duration": "PT304.13S",
+        "stashapp_tags": [],
+        "stashapp_organized": false,
+        "stashapp_interactive": false,
+        "stashapp_play_duration": 0,
+        "stashapp_play_count": 0,
+        "stashapp_o_counter": 0,
+        "stashapp_stash_ids": [],
+        "stashapp_stashdb_id": null,
+        "stashapp_tpdb_id": null,
+        "stashapp_ce_id": null,
+        "ce_downloads_site_uuid": "019283a1-e6d7-767c-98dd-0fd1b1dd83ac",
+        "ce_downloads_site_name": "Femjoy",
+        "ce_downloads_sub_site_name": null,
+        "ce_downloads_release_uuid": "019287f4-f04a-7219-a3af-a3a0e77c0187",
+        "ce_downloads_release_date": "2012-05-25",
+        "ce_downloads_release_short_name": "10360",
+        "ce_downloads_release_name": "Dance",
+        "ce_downloads_release_url": "https://www.femjoy.com/post/10360",
+        "ce_downloads_release_description": "",
+        "ce_downloads_release_created": "2024-10-13 22:17:09.458489",
+        "ce_downloads_release_last_updated": "2024-10-14 04:57:31.786819",
+        "ce_downloads_release_available_files": "[{\"file_type\": \"video\", \"content_type\": \"scene\", \"variant\": \"1280x720-mp4\", \"url\": \"https: //c75600be0a.mjedge.net/hw/assets/studios/andrejlupin/videos/16082016094428/simona_dance_FEMJOY_1280x720_QT.mp4?cd=attachment&filename=SIMONA_AndrejLupin_10360_1280x720_mp4.mp4&expire=1728889048&token=b023bd4b04ad0b100005750d8e528d82\", \"resolution_width\": 1280, \"resolution_height\": 720, \"file_size\": null, \"fps\": null, \"codec\": null, \"__type__\": \"AvailableVideoFile\"}, {\"file_type\": \"video\", \"content_type\": \"scene\", \"variant\": \"640x360-mp4\", \"url\": \"https://c75600be0a.mjedge.net/hw/assets/studios/andrejlupin/videos/16082016094428/simona_dance_FEMJOY_640x360_QT.mp4?cd=attachment&filename=SIMONA_AndrejLupin_10360_640x360_mp4.mp4&expire=1728889048&token=1573192c4a59687e3078a7c3d3ffc0b7\", \"resolution_width\": 640, \"resolution_height\": 360, \"file_size\": null, \"fps\": null, \"codec\": null, \"__type__\": \"AvailableVideoFile\"}, {\"file_type\": \"video\", \"content_type\": \"scene\", \"variant\": \"480x270-m4v\", \"url\": \"https://c75600be0a.mjedge.net/hw/assets/studios/andrejlupin/videos/16082016094428/simona_dance_FEMJOY_480x270_IPOD.m4v?cd=attachment&filename=SIMONA_AndrejLupin_10360_480x270_m4v.m4v&expire=1728889048&token=ca72b6740865e95505fa15c603ce48d8\", \"resolution_width\": 480, \"resolution_height\": 270, \"file_size\": null, \"fps\": null, \"codec\": null, \"__type__\": \"AvailableVideoFile\"}, {\"file_type\": \"video\", \"content_type\": \"scene\", \"variant\": \"368x208-mp4\", \"url\": \"https://c75600be0a.mjedge.net/hw/assets/studios/andrejlupin/videos/16082016094428/simona_dance_FEMJOY_368x208_PSP.mp4?cd=attachment&filename=SIMONA_AndrejLupin_10360_368x208_mp4.mp4&expire=1728889048&token=05b6c716adb059769aa7dac4ba130a35\", \"resolution_width\": 368, \"resolution_height\": 208, \"file_size\": null, \"fps\": null, \"codec\": null, \"__type__\": \"AvailableVideoFile\"}, {\"file_type\": \"video\", \"content_type\": \"scene\", \"variant\": \"320x180_ipod\", \"url\": \"https://c75600be0a.mjedge.net/hw/assets/studios/andrejlupin/videos/16082016094428/simona_dance_FEMJOY_320x180_IPOD.m4v?cd=attachment&filename=SIMONA_AndrejLupin_10360_320x180_ipod.m4v&expire=1728889048&token=092c7d668ae3aaafb3a1286773c628d0\", \"resolution_width\": 320, \"resolution_height\": 180, \"file_size\": null, \"fps\": null, \"codec\": null, \"__type__\": \"AvailableVideoFile\"}, {\"file_type\": \"image\", \"content_type\": \"cover\", \"variant\": \"\", \"url\": \"https://c761afdd6a.mjedge.net/hw/assets/studios/andrejlupin/videos/16082016094428/7591476083024_nosidebar.jpg\", \"resolution_width\": null, \"resolution_height\": null, \"file_size\": null, \"__type__\": \"AvailableImageFile\"}]",
+        "ce_downloads_release_json_document": "{\"external_id\": \"10360\", \"title\": \"Dance\", \"cover_url\": \"https://c761afdd6a.mjedge.net/hw/assets/studios/andrejlupin/videos/16082016094428/7591476083024_nosidebar.jpg\", \"release_date\": \"2012-05-25\", \"duration\": 305, \"models\": [{\"name\": \"Simona\", \"short_name\": \"simona\", \"url\": \"/models/simona\"}], \"director\": {\"name\": \"Andrej Lupin\", \"short_name\": \"fj_andrejlupin\", \"url\": \"/director/fj_andrejlupin\"}}",
+        "ce_downloads_uuid": "01928963-9f8a-736e-b5bd-980107ab7f0d",
+        "ce_downloads_downloaded_at": "2024-10-14 07:57:40.490738",
+        "ce_downloads_file_type": "video",
+        "ce_downloads_content_type": "scene",
+        "ce_downloads_variant": "1280x720-mp4",
+        "ce_downloads_available_file": "{\"file_type\": \"video\", \"content_type\": \"scene\", \"variant\": \"1280x720-mp4\", \"url\": \"https://c75600be0a.mjedge.net/hw/assets/studios/andrejlupin/videos/16082016094428/simona_dance_FEMJOY_1280x720_QT.mp4?cd=attachment&filename=SIMONA_AndrejLupin_10360_1280x720_mp4.mp4&expire=1728889048&token=b023bd4b04ad0b100005750d8e528d82\", \"resolution_width\": 1280, \"resolution_height\": 720, \"file_size\": null, \"fps\": null, \"codec\": null, \"__type__\": \"AvailableVideoFile\"}",
+        "ce_downloads_original_filename": "simona_dance_FEMJOY_1280x720_QT.mp4",
+        "ce_downloads_saved_filename": "Femjoy - 2012-05-25 - Dance - 1280x720 - 019287f4-f04a-7219-a3af-a3a0e77c0187.mp4",
+        "ce_downloads_file_metadata": "{\"$type\": \"VideoHashes\", \"duration\": 304, \"phash\": \"c58de7b649c5a44c\", \"oshash\": \"114da6adad5229bc\", \"md5\": \"771ece4b5a4f9d568d7b7b9162e72f12\"}",
+        "ce_downloads_performers": [
+            {
+                "uuid": "541d562a-edaa-43c8-9bb1-344ae9c6161d",
+                "short_name": "simona",
+                "name": "Simona",
+                "url": "/models/simona"
+            }
+        ],
+        "ce_downloads_tags": [],
+        "ce_downloads_hash_oshash": "114da6adad5229bc",
+        "ce_downloads_hash_phash": "c58de7b649c5a44c",
+        "ce_downloads_hash_sha256": null,
+        "queried_phash": "c58de7b649c5a44c",
+        "id": "a0d25e1f-106f-423b-87ce-d1bfe8fa8d6a",
+        "title": "Dance",
+        "code": "10842",
+        "duration": "PT304S",
+        "date": "2012-05-25",
+        "urls": [
+            {
+                "url": "https://www.femjoy.com/post/10360",
+                "type": "STUDIO"
+            }
+        ],
+        "images": [
+            {
+                "id": "37abe1fd-feed-4adf-91f8-94fb775b9ee7",
+                "url": "https://stashdb.org/images/37abe1fd-feed-4adf-91f8-94fb775b9ee7",
+                "width": 850,
+                "height": 463
+            }
+        ],
+        "studio": {
+            "id": "e3dba97c-2c0c-4402-b1ed-cbf97717faee",
+            "name": "Femjoy",
+            "urls": [
+                {
+                    "url": "https://femjoy.com/",
+                    "type": "HOME"
+                },
+                {
+                    "url": "https://twitter.com/femjoy",
+                    "type": "TWITTER"
+                },
+                {
+                    "url": "https://www.data18.com/studios/femjoy",
+                    "type": "DATA18"
+                },
+                {
+                    "url": "https://www.indexxx.com/websites/228/femjoy/",
+                    "type": "INDEXXX"
+                }
+            ],
+            "images": [
+                {
+                    "id": "10b37717-a416-4718-a5d3-e759ce0e9c12",
+                    "url": "https://stashdb.org/images/10b37717-a416-4718-a5d3-e759ce0e9c12",
+                    "width": -1,
+                    "height": -1
+                }
+            ],
+            "parent": null
+        },
+        "tags": [
+            {
+                "name": "Solo Female",
+                "id": "c19e2d4f-913d-4681-a323-c26e32d990bc"
+            }
+        ],
+        "performers": [
+            {
+                "as": "Simona",
+                "performer": {
+                    "id": "97695d2a-4ec4-4349-8402-c171ebb9e220",
+                    "name": "Silvie Deluxe",
+                    "disambiguation": null,
+                    "aliases": [
+                        "Elance A",
+                        "Silvie",
+                        "Silvie B",
+                        "Silvie De Lux",
+                        "Silvie Delux",
+                        "Silvy DeLuxe",
+                        "Sylvia Deluxe",
+                        "Sylvie Deluxe"
+                    ],
+                    "gender": "FEMALE",
+                    "merged_ids": [
+                        "4d2b92e2-d57d-435a-bf26-f9c73b32289b",
+                        "c5a593cd-a0d1-459e-9280-962f97cf5409",
+                        "6c07b66f-a910-4d03-a8bb-e63016051f75",
+                        "3a789493-89e6-466c-b835-5ba3fec41527",
+                        "79dd826c-6d48-47e4-81c4-62d0c04fdd25",
+                        "e5b3fc4a-c85a-426a-be64-c65280d3d05e"
+                    ],
+                    "urls": [
+                        {
+                            "url": "https://www.boobpedia.com/boobs/Silvie_Delux",
+                            "type": "BOOBPEDIA"
+                        },
+                        {
+                            "url": "https://www.iafd.com/person.rme/perfid=silviedelux/gender=f/silvie-de-lux.htm",
+                            "type": "IAFD"
+                        },
+                        {
+                            "url": "https://www.indexxx.com/m/silvie-deluxe",
+                            "type": "INDEXXX"
+                        },
+                        {
+                            "url": "https://www.thenude.com/Elance%20A_14570.htm",
+                            "type": "THENUDE"
+                        }
+                    ],
+                    "images": [
+                        {
+                            "id": "28819001-ebfe-435a-ba50-3d569f495a73",
+                            "url": "https://stashdb.org/images/28819001-ebfe-435a-ba50-3d569f495a73",
+                            "width": 852,
+                            "height": 1280
+                        },
+                        {
+                            "id": "ca1ce3ed-0b4e-4645-996b-b450463a28ab",
+                            "url": "https://stashdb.org/images/ca1ce3ed-0b4e-4645-996b-b450463a28ab",
+                            "width": 852,
+                            "height": 1280
+                        },
+                        {
+                            "id": "7c8e0432-5dbf-44fa-affe-9d92e2cafdac",
+                            "url": "https://stashdb.org/images/7c8e0432-5dbf-44fa-affe-9d92e2cafdac",
+                            "width": 800,
+                            "height": 1280
+                        },
+                        {
+                            "id": "419e6b86-8df6-4bde-8ac3-54a090267800",
+                            "url": "https://stashdb.org/images/419e6b86-8df6-4bde-8ac3-54a090267800",
+                            "width": 800,
+                            "height": 1200
+                        },
+                        {
+                            "id": "91ef69e3-dde3-4a40-82d4-781286c05768",
+                            "url": "https://stashdb.org/images/91ef69e3-dde3-4a40-82d4-781286c05768",
+                            "width": 800,
+                            "height": 1200
+                        },
+                        {
+                            "id": "c521ad50-382f-4197-b642-a40c5d3f4713",
+                            "url": "https://stashdb.org/images/c521ad50-382f-4197-b642-a40c5d3f4713",
+                            "width": 682,
+                            "height": 1024
+                        },
+                        {
+                            "id": "41865613-bb82-484b-8ecf-2c9a04ba3413",
+                            "url": "https://stashdb.org/images/41865613-bb82-484b-8ecf-2c9a04ba3413",
+                            "width": 532,
+                            "height": 800
+                        },
+                        {
+                            "id": "2f8071ec-f9f2-4de2-9b97-5fa4a12691c8",
+                            "url": "https://stashdb.org/images/2f8071ec-f9f2-4de2-9b97-5fa4a12691c8",
+                            "width": 531,
+                            "height": 800
+                        },
+                        {
+                            "id": "b7a03a00-ac3a-4024-a0c7-1a1d2d5a9cd9",
+                            "url": "https://stashdb.org/images/b7a03a00-ac3a-4024-a0c7-1a1d2d5a9cd9",
+                            "width": 532,
+                            "height": 800
+                        },
+                        {
+                            "id": "c2d51c5e-7096-42f4-a660-dcbcf5351a81",
+                            "url": "https://stashdb.org/images/c2d51c5e-7096-42f4-a660-dcbcf5351a81",
+                            "width": 375,
+                            "height": 500
+                        },
+                        {
+                            "id": "1c1e8396-6b60-42f5-b8c0-8333b3592b56",
+                            "url": "https://stashdb.org/images/1c1e8396-6b60-42f5-b8c0-8333b3592b56",
+                            "width": 247,
+                            "height": 409
+                        },
+                        {
+                            "id": "3a821f0c-dbc9-4dae-a8f7-2aaba0c63db3",
+                            "url": "https://stashdb.org/images/3a821f0c-dbc9-4dae-a8f7-2aaba0c63db3",
+                            "width": 229,
+                            "height": 345
+                        },
+                        {
+                            "id": "c81018ae-a811-4ed4-b9a8-5897abf75e31",
+                            "url": "https://stashdb.org/images/c81018ae-a811-4ed4-b9a8-5897abf75e31",
+                            "width": 229,
+                            "height": 345
+                        },
+                        {
+                            "id": "a02e9708-46da-4c88-9d85-af1aa73e6755",
+                            "url": "https://stashdb.org/images/a02e9708-46da-4c88-9d85-af1aa73e6755",
+                            "width": 229,
+                            "height": 345
+                        },
+                        {
+                            "id": "bac49387-efba-499c-9357-b291d1f71d18",
+                            "url": "https://stashdb.org/images/bac49387-efba-499c-9357-b291d1f71d18",
+                            "width": 200,
+                            "height": 300
+                        }
+                    ],
+                    "birth_date": "1988-12-17",
+                    "ethnicity": "CAUCASIAN",
+                    "country": "CZ",
+                    "eye_color": "BLUE",
+                    "hair_color": "BRUNETTE",
+                    "height": 175,
+                    "measurements": {
+                        "band_size": "34",
+                        "cup_size": "C",
+                        "waist": "24",
+                        "hip": "34"
+                    },
+                    "breast_type": "NATURAL",
+                    "career_start_year": 2009,
+                    "career_end_year": 2018,
+                    "tattoos": [
+                        {
+                            "location": "Tribal on lower back",
+                            "description": null
+                        }
+                    ],
+                    "piercings": [
+                        {
+                            "location": "navel",
+                            "description": null
+                        },
+                        {
+                            "location": "Tongue",
+                            "description": null
+                        }
+                    ]
+                }
+            }
+        ],
+        "fingerprints": [
+            {
+                "algorithm": "PHASH",
+                "hash": "c58de7b649c5a44c",
+                "duration": 304
+            },
+            {
+                "algorithm": "OSHASH",
+                "hash": "114da6adad5229bc",
+                "duration": 304
+            },
+            {
+                "algorithm": "OSHASH",
+                "hash": "9d0277532e85d84f",
+                "duration": 304
+            },
+            {
+                "algorithm": "MD5",
+                "hash": "771ece4b5a4f9d568d7b7b9162e72f12",
+                "duration": 304
+            },
+            {
+                "algorithm": "OSHASH",
+                "hash": "a3dd3aa803141f80",
+                "duration": 304
+            },
+            {
+                "algorithm": "OSHASH",
+                "hash": "b1e5157b52ae93fd",
+                "duration": 304
+            },
+            {
+                "algorithm": "PHASH",
+                "hash": "c58de7b449c5b44c",
+                "duration": 304
+            }
+        ],
+        "queried_phash_right": "c58de7b649c5a44c",
+        "id_right": "a0d25e1f-106f-423b-87ce-d1bfe8fa8d6a",
+        "title_right": "Dance",
+        "code_right": "10842",
+        "duration_right": "PT304S",
+        "date_right": "2012-05-25",
+        "urls_right": [
+            {
+                "url": "https://www.femjoy.com/post/10360",
+                "type": "STUDIO"
+            }
+        ],
+        "images_right": [
+            {
+                "id": "37abe1fd-feed-4adf-91f8-94fb775b9ee7",
+                "url": "https://stashdb.org/images/37abe1fd-feed-4adf-91f8-94fb775b9ee7",
+                "width": 850,
+                "height": 463
+            }
+        ],
+        "studio_right": {
+            "id": "e3dba97c-2c0c-4402-b1ed-cbf97717faee",
+            "name": "Femjoy",
+            "urls": [
+                {
+                    "url": "https://femjoy.com/",
+                    "type": "HOME"
+                },
+                {
+                    "url": "https://twitter.com/femjoy",
+                    "type": "TWITTER"
+                },
+                {
+                    "url": "https://www.data18.com/studios/femjoy",
+                    "type": "DATA18"
+                },
+                {
+                    "url": "https://www.indexxx.com/websites/228/femjoy/",
+                    "type": "INDEXXX"
+                }
+            ],
+            "images": [
+                {
+                    "id": "10b37717-a416-4718-a5d3-e759ce0e9c12",
+                    "url": "https://stashdb.org/images/10b37717-a416-4718-a5d3-e759ce0e9c12",
+                    "width": -1,
+                    "height": -1
+                }
+            ],
+            "parent": null
+        },
+        "tags_right": [
+            {
+                "name": "Solo Female",
+                "id": "c19e2d4f-913d-4681-a323-c26e32d990bc"
+            }
+        ],
+        "performers_right": [
+            {
+                "as": "Simona",
+                "performer": {
+                    "id": "97695d2a-4ec4-4349-8402-c171ebb9e220",
+                    "name": "Silvie Deluxe",
+                    "disambiguation": null,
+                    "aliases": [
+                        "Elance A",
+                        "Silvie",
+                        "Silvie B",
+                        "Silvie De Lux",
+                        "Silvie Delux",
+                        "Silvy DeLuxe",
+                        "Sylvia Deluxe",
+                        "Sylvie Deluxe"
+                    ],
+                    "gender": "FEMALE",
+                    "merged_ids": [
+                        "4d2b92e2-d57d-435a-bf26-f9c73b32289b",
+                        "c5a593cd-a0d1-459e-9280-962f97cf5409",
+                        "6c07b66f-a910-4d03-a8bb-e63016051f75",
+                        "3a789493-89e6-466c-b835-5ba3fec41527",
+                        "79dd826c-6d48-47e4-81c4-62d0c04fdd25",
+                        "e5b3fc4a-c85a-426a-be64-c65280d3d05e"
+                    ],
+                    "urls": [
+                        {
+                            "url": "https://www.boobpedia.com/boobs/Silvie_Delux",
+                            "type": "BOOBPEDIA"
+                        },
+                        {
+                            "url": "https://www.iafd.com/person.rme/perfid=silviedelux/gender=f/silvie-de-lux.htm",
+                            "type": "IAFD"
+                        },
+                        {
+                            "url": "https://www.indexxx.com/m/silvie-deluxe",
+                            "type": "INDEXXX"
+                        },
+                        {
+                            "url": "https://www.thenude.com/Elance%20A_14570.htm",
+                            "type": "THENUDE"
+                        }
+                    ],
+                    "images": [
+                        {
+                            "id": "28819001-ebfe-435a-ba50-3d569f495a73",
+                            "url": "https://stashdb.org/images/28819001-ebfe-435a-ba50-3d569f495a73",
+                            "width": 852,
+                            "height": 1280
+                        },
+                        {
+                            "id": "ca1ce3ed-0b4e-4645-996b-b450463a28ab",
+                            "url": "https://stashdb.org/images/ca1ce3ed-0b4e-4645-996b-b450463a28ab",
+                            "width": 852,
+                            "height": 1280
+                        },
+                        {
+                            "id": "7c8e0432-5dbf-44fa-affe-9d92e2cafdac",
+                            "url": "https://stashdb.org/images/7c8e0432-5dbf-44fa-affe-9d92e2cafdac",
+                            "width": 800,
+                            "height": 1280
+                        },
+                        {
+                            "id": "419e6b86-8df6-4bde-8ac3-54a090267800",
+                            "url": "https://stashdb.org/images/419e6b86-8df6-4bde-8ac3-54a090267800",
+                            "width": 800,
+                            "height": 1200
+                        },
+                        {
+                            "id": "91ef69e3-dde3-4a40-82d4-781286c05768",
+                            "url": "https://stashdb.org/images/91ef69e3-dde3-4a40-82d4-781286c05768",
+                            "width": 800,
+                            "height": 1200
+                        },
+                        {
+                            "id": "c521ad50-382f-4197-b642-a40c5d3f4713",
+                            "url": "https://stashdb.org/images/c521ad50-382f-4197-b642-a40c5d3f4713",
+                            "width": 682,
+                            "height": 1024
+                        },
+                        {
+                            "id": "41865613-bb82-484b-8ecf-2c9a04ba3413",
+                            "url": "https://stashdb.org/images/41865613-bb82-484b-8ecf-2c9a04ba3413",
+                            "width": 532,
+                            "height": 800
+                        },
+                        {
+                            "id": "2f8071ec-f9f2-4de2-9b97-5fa4a12691c8",
+                            "url": "https://stashdb.org/images/2f8071ec-f9f2-4de2-9b97-5fa4a12691c8",
+                            "width": 531,
+                            "height": 800
+                        },
+                        {
+                            "id": "b7a03a00-ac3a-4024-a0c7-1a1d2d5a9cd9",
+                            "url": "https://stashdb.org/images/b7a03a00-ac3a-4024-a0c7-1a1d2d5a9cd9",
+                            "width": 532,
+                            "height": 800
+                        },
+                        {
+                            "id": "c2d51c5e-7096-42f4-a660-dcbcf5351a81",
+                            "url": "https://stashdb.org/images/c2d51c5e-7096-42f4-a660-dcbcf5351a81",
+                            "width": 375,
+                            "height": 500
+                        },
+                        {
+                            "id": "1c1e8396-6b60-42f5-b8c0-8333b3592b56",
+                            "url": "https://stashdb.org/images/1c1e8396-6b60-42f5-b8c0-8333b3592b56",
+                            "width": 247,
+                            "height": 409
+                        },
+                        {
+                            "id": "3a821f0c-dbc9-4dae-a8f7-2aaba0c63db3",
+                            "url": "https://stashdb.org/images/3a821f0c-dbc9-4dae-a8f7-2aaba0c63db3",
+                            "width": 229,
+                            "height": 345
+                        },
+                        {
+                            "id": "c81018ae-a811-4ed4-b9a8-5897abf75e31",
+                            "url": "https://stashdb.org/images/c81018ae-a811-4ed4-b9a8-5897abf75e31",
+                            "width": 229,
+                            "height": 345
+                        },
+                        {
+                            "id": "a02e9708-46da-4c88-9d85-af1aa73e6755",
+                            "url": "https://stashdb.org/images/a02e9708-46da-4c88-9d85-af1aa73e6755",
+                            "width": 229,
+                            "height": 345
+                        },
+                        {
+                            "id": "bac49387-efba-499c-9357-b291d1f71d18",
+                            "url": "https://stashdb.org/images/bac49387-efba-499c-9357-b291d1f71d18",
+                            "width": 200,
+                            "height": 300
+                        }
+                    ],
+                    "birth_date": "1988-12-17",
+                    "ethnicity": "CAUCASIAN",
+                    "country": "CZ",
+                    "eye_color": "BLUE",
+                    "hair_color": "BRUNETTE",
+                    "height": 175,
+                    "measurements": {
+                        "band_size": "34",
+                        "cup_size": "C",
+                        "waist": "24",
+                        "hip": "34"
+                    },
+                    "breast_type": "NATURAL",
+                    "career_start_year": 2009,
+                    "career_end_year": 2018,
+                    "tattoos": [
+                        {
+                            "location": "Tribal on lower back",
+                            "description": null
+                        }
+                    ],
+                    "piercings": [
+                        {
+                            "location": "navel",
+                            "description": null
+                        },
+                        {
+                            "location": "Tongue",
+                            "description": null
+                        }
+                    ]
+                }
+            }
+        ],
+        "fingerprints_right": [
+            {
+                "algorithm": "PHASH",
+                "hash": "c58de7b649c5a44c",
+                "duration": 304
+            },
+            {
+                "algorithm": "OSHASH",
+                "hash": "114da6adad5229bc",
+                "duration": 304
+            },
+            {
+                "algorithm": "OSHASH",
+                "hash": "9d0277532e85d84f",
+                "duration": 304
+            },
+            {
+                "algorithm": "MD5",
+                "hash": "771ece4b5a4f9d568d7b7b9162e72f12",
+                "duration": 304
+            },
+            {
+                "algorithm": "OSHASH",
+                "hash": "a3dd3aa803141f80",
+                "duration": 304
+            },
+            {
+                "algorithm": "OSHASH",
+                "hash": "b1e5157b52ae93fd",
+                "duration": 304
+            },
+            {
+                "algorithm": "PHASH",
+                "hash": "c58de7b449c5b44c",
+                "duration": 304
+            }
+        ]
+    }
+]

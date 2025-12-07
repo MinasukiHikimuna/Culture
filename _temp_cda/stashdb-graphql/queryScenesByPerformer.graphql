@@ -1,0 +1,25 @@
+query QueryScenes {
+  queryScenes(
+    input: {
+      performers: {
+        value: ["df3febe9-2c0d-4cca-a824-fa8b3340bc56"]
+        modifier: INCLUDES_ALL
+      }
+    }
+  ) {
+    count
+    scenes {
+      id
+      title
+      details
+      date
+      release_date
+      duration
+      director
+      code
+      deleted
+      created
+      updated
+    }
+  }
+}

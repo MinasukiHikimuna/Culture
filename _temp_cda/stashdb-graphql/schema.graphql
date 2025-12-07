@@ -1,0 +1,1632 @@
+"""
+The @defer directive may be specified on a fragment spread to imply
+de-prioritization, that causes the fragment to be omitted in the initial
+response, and delivered as a subsequent response afterward. A query with @defer
+directive will cause the request to potentially return multiple responses, where
+non-deferred data is delivered in the initial response and data deferred
+delivered in a subsequent response. @include and @skip take precedence over @defer.
+"""
+directive @defer(if: Boolean = true, label: String) on FRAGMENT_SPREAD | INLINE_FRAGMENT
+
+directive @hasRole(role: RoleEnum!) on FIELD_DEFINITION
+
+directive @isUserOwner on FIELD_DEFINITION
+
+"""
+The @specifiedBy built-in directive is used within the type system definition
+language to provide a scalar specification URL for specifying the behavior of
+custom scalar types.
+"""
+directive @specifiedBy(url: String!) on SCALAR
+
+input ActivateNewUserInput {
+  name: String!
+  email: String!
+  activation_key: String!
+  password: String!
+}
+
+input ApplyEditInput {
+  id: ID!
+}
+
+type BodyModification {
+  location: String!
+  description: String
+}
+
+input BodyModificationCriterionInput {
+  location: String
+  description: String
+  modifier: CriterionModifier!
+}
+
+input BodyModificationInput {
+  location: String!
+  description: String
+}
+
+input BreastTypeCriterionInput {
+  value: BreastTypeEnum
+  modifier: CriterionModifier!
+}
+
+enum BreastTypeEnum {
+  NATURAL
+  FAKE
+  NA
+}
+
+input CancelEditInput {
+  id: ID!
+}
+
+enum CriterionModifier {
+  """="""
+  EQUALS
+
+  """!="""
+  NOT_EQUALS
+
+  """>"""
+  GREATER_THAN
+
+  """<"""
+  LESS_THAN
+
+  """IS NULL"""
+  IS_NULL
+
+  """IS NOT NULL"""
+  NOT_NULL
+
+  """INCLUDES ALL"""
+  INCLUDES_ALL
+  INCLUDES
+  EXCLUDES
+}
+
+scalar Date
+
+enum DateAccuracyEnum {
+  YEAR
+  MONTH
+  DAY
+}
+
+input DateCriterionInput {
+  value: Date!
+  modifier: CriterionModifier!
+}
+
+scalar DateTime
+
+type Draft {
+  id: ID!
+  created: Time!
+  expires: Time!
+  data: DraftData!
+}
+
+union DraftData = SceneDraft | PerformerDraft
+
+type DraftEntity {
+  name: String!
+  id: ID
+}
+
+input DraftEntityInput {
+  name: String!
+  id: ID
+}
+
+type DraftFingerprint {
+  hash: String!
+  algorithm: FingerprintAlgorithm!
+  duration: Int!
+}
+
+type DraftSubmissionStatus {
+  id: ID
+}
+
+type Edit {
+  id: ID!
+  user: User
+
+  """Object being edited - null if creating a new object"""
+  target: EditTarget
+  target_type: TargetTypeEnum!
+
+  """Objects to merge with the target. Only applicable to merges"""
+  merge_sources: [EditTarget!]!
+  operation: OperationEnum!
+  bot: Boolean!
+  details: EditDetails
+
+  """
+  Previous state of fields being modified - null if operation is create or delete.
+  """
+  old_details: EditDetails
+
+  """Entity specific options"""
+  options: PerformerEditOptions
+  comments: [EditComment!]!
+  votes: [EditVote!]!
+
+  """ = Accepted - Rejected"""
+  vote_count: Int!
+
+  """Is the edit considered destructive."""
+  destructive: Boolean!
+  status: VoteStatusEnum!
+  applied: Boolean!
+  created: Time!
+  updated: Time
+  closed: Time
+  expires: Time
+}
+
+type EditComment {
+  id: ID!
+  user: User
+  date: Time!
+  comment: String!
+}
+
+input EditCommentInput {
+  id: ID!
+  comment: String!
+}
+
+union EditDetails = PerformerEdit | SceneEdit | StudioEdit | TagEdit
+
+input EditInput {
+  """Not required for create type"""
+  id: ID
+  operation: OperationEnum!
+
+  """Only required for merge type"""
+  merge_source_ids: [ID!]
+  comment: String
+
+  """Edit submitted by an automated script. Requires bot permission"""
+  bot: Boolean
+}
+
+input EditQueryInput {
+  """Filter by user id"""
+  user_id: ID
+
+  """Filter by status"""
+  status: VoteStatusEnum
+
+  """Filter by operation"""
+  operation: OperationEnum
+
+  """Filter by vote count"""
+  vote_count: IntCriterionInput
+
+  """Filter by applied status"""
+  applied: Boolean
+
+  """Filter by target type"""
+  target_type: TargetTypeEnum
+
+  """Filter by target id"""
+  target_id: ID
+
+  """Filter by favorite status"""
+  is_favorite: Boolean
+
+  """Filter by user voted status"""
+  voted: UserVotedFilterEnum
+
+  """Filter to bot edits only"""
+  is_bot: Boolean
+
+  """Filter out user's own edits"""
+  include_user_submitted: Boolean
+  page: Int! = 1
+  per_page: Int! = 25
+  direction: SortDirectionEnum! = DESC
+  sort: EditSortEnum! = CREATED_AT
+}
+
+enum EditSortEnum {
+  CREATED_AT
+  UPDATED_AT
+  CLOSED_AT
+}
+
+union EditTarget = Performer | Scene | Studio | Tag
+
+type EditVote {
+  user: User
+  date: Time!
+  vote: VoteTypeEnum!
+}
+
+input EditVoteInput {
+  id: ID!
+  vote: VoteTypeEnum!
+}
+
+enum EthnicityEnum {
+  CAUCASIAN
+  BLACK
+  ASIAN
+  INDIAN
+  LATIN
+  MIDDLE_EASTERN
+  MIXED
+  OTHER
+}
+
+enum EthnicityFilterEnum {
+  UNKNOWN
+  CAUCASIAN
+  BLACK
+  ASIAN
+  INDIAN
+  LATIN
+  MIDDLE_EASTERN
+  MIXED
+  OTHER
+}
+
+input EyeColorCriterionInput {
+  value: EyeColorEnum
+  modifier: CriterionModifier!
+}
+
+enum EyeColorEnum {
+  BLUE
+  BROWN
+  GREY
+  GREEN
+  HAZEL
+  RED
+}
+
+enum FavoriteFilter {
+  PERFORMER
+  STUDIO
+  ALL
+}
+
+type Fingerprint {
+  hash: String!
+  algorithm: FingerprintAlgorithm!
+  duration: Int!
+  submissions: Int!
+  created: Time!
+  updated: Time!
+  user_submitted: Boolean!
+}
+
+enum FingerprintAlgorithm {
+  MD5
+  OSHASH
+  PHASH
+}
+
+input FingerprintEditInput {
+  user_ids: [ID!]
+  hash: String!
+  algorithm: FingerprintAlgorithm!
+  duration: Int!
+  created: Time!
+  submissions: Int
+  updated: Time
+}
+
+input FingerprintInput {
+  """assumes current user if omitted. Ignored for non-modify Users"""
+  user_ids: [ID!]
+  hash: String!
+  algorithm: FingerprintAlgorithm!
+  duration: Int!
+}
+
+input FingerprintQueryInput {
+  hash: String!
+  algorithm: FingerprintAlgorithm!
+}
+
+input FingerprintSubmission {
+  scene_id: ID!
+  fingerprint: FingerprintInput!
+  unmatch: Boolean
+}
+
+type FuzzyDate {
+  date: Date!
+  accuracy: DateAccuracyEnum!
+}
+
+enum GenderEnum {
+  MALE
+  FEMALE
+  TRANSGENDER_MALE
+  TRANSGENDER_FEMALE
+  INTERSEX
+  NON_BINARY
+}
+
+enum GenderFilterEnum {
+  UNKNOWN
+  MALE
+  FEMALE
+  TRANSGENDER_MALE
+  TRANSGENDER_FEMALE
+  INTERSEX
+  NON_BINARY
+}
+
+input GenerateInviteCodeInput {
+  keys: Int
+  uses: Int
+  ttl: Int
+}
+
+input GrantInviteInput {
+  user_id: ID!
+  amount: Int!
+}
+
+input HairColorCriterionInput {
+  value: HairColorEnum
+  modifier: CriterionModifier!
+}
+
+enum HairColorEnum {
+  BLONDE
+  BRUNETTE
+  BLACK
+  RED
+  AUBURN
+  GREY
+  BALD
+  VARIOUS
+  OTHER
+}
+
+input IDCriterionInput {
+  value: [ID!]!
+  modifier: CriterionModifier!
+}
+
+type Image {
+  id: ID!
+  url: String!
+  width: Int!
+  height: Int!
+}
+
+input ImageCreateInput {
+  url: String
+  file: Upload
+}
+
+input ImageDestroyInput {
+  id: ID!
+}
+
+input ImageUpdateInput {
+  id: ID!
+  url: String
+}
+
+input IntCriterionInput {
+  value: Int!
+  modifier: CriterionModifier!
+}
+
+type InviteKey {
+  id: ID!
+  uses: Int
+  expires: Time
+}
+
+type Measurements {
+  cup_size: String
+  band_size: Int
+  waist: Int
+  hip: Int
+}
+
+input MultiIDCriterionInput {
+  value: [ID!]
+  modifier: CriterionModifier!
+}
+
+input MultiStringCriterionInput {
+  value: [String!]!
+  modifier: CriterionModifier!
+}
+
+type Mutation {
+  sceneCreate(input: SceneCreateInput!): Scene
+  sceneUpdate(input: SceneUpdateInput!): Scene
+  sceneDestroy(input: SceneDestroyInput!): Boolean!
+  performerCreate(input: PerformerCreateInput!): Performer
+  performerUpdate(input: PerformerUpdateInput!): Performer
+  performerDestroy(input: PerformerDestroyInput!): Boolean!
+  studioCreate(input: StudioCreateInput!): Studio
+  studioUpdate(input: StudioUpdateInput!): Studio
+  studioDestroy(input: StudioDestroyInput!): Boolean!
+  tagCreate(input: TagCreateInput!): Tag
+  tagUpdate(input: TagUpdateInput!): Tag
+  tagDestroy(input: TagDestroyInput!): Boolean!
+  userCreate(input: UserCreateInput!): User
+  userUpdate(input: UserUpdateInput!): User
+  userDestroy(input: UserDestroyInput!): Boolean!
+  imageCreate(input: ImageCreateInput!): Image
+  imageDestroy(input: ImageDestroyInput!): Boolean!
+
+  """User interface for registering"""
+  newUser(input: NewUserInput!): String
+  activateNewUser(input: ActivateNewUserInput!): User
+  generateInviteCode: ID @deprecated(reason: "Use generateInviteCodes")
+
+  """Generates an invite code using an invite token"""
+  generateInviteCodes(input: GenerateInviteCodeInput): [ID!]!
+
+  """Removes a pending invite code - refunding the token"""
+  rescindInviteCode(code: ID!): Boolean!
+
+  """Adds invite tokens for a user"""
+  grantInvite(input: GrantInviteInput!): Int!
+
+  """Removes invite tokens from a user"""
+  revokeInvite(input: RevokeInviteInput!): Int!
+  tagCategoryCreate(input: TagCategoryCreateInput!): TagCategory
+  tagCategoryUpdate(input: TagCategoryUpdateInput!): TagCategory
+  tagCategoryDestroy(input: TagCategoryDestroyInput!): Boolean!
+  siteCreate(input: SiteCreateInput!): Site
+  siteUpdate(input: SiteUpdateInput!): Site
+  siteDestroy(input: SiteDestroyInput!): Boolean!
+
+  """
+  Regenerates the api key for the given user, or the current user if id not provided
+  """
+  regenerateAPIKey(userID: ID): String!
+
+  """Generates an email to reset a user password"""
+  resetPassword(input: ResetPasswordInput!): Boolean!
+
+  """Changes the password for the current user"""
+  changePassword(input: UserChangePasswordInput!): Boolean!
+
+  """Propose a new scene or modification to a scene"""
+  sceneEdit(input: SceneEditInput!): Edit!
+
+  """Propose a new performer or modification to a performer"""
+  performerEdit(input: PerformerEditInput!): Edit!
+
+  """Propose a new studio or modification to a studio"""
+  studioEdit(input: StudioEditInput!): Edit!
+
+  """Propose a new tag or modification to a tag"""
+  tagEdit(input: TagEditInput!): Edit!
+
+  """Update a pending scene edit"""
+  sceneEditUpdate(id: ID!, input: SceneEditInput!): Edit!
+
+  """Update a pending performer edit"""
+  performerEditUpdate(id: ID!, input: PerformerEditInput!): Edit!
+
+  """Update a pending studio edit"""
+  studioEditUpdate(id: ID!, input: StudioEditInput!): Edit!
+
+  """Update a pending tag edit"""
+  tagEditUpdate(id: ID!, input: TagEditInput!): Edit!
+
+  """Vote to accept/reject an edit"""
+  editVote(input: EditVoteInput!): Edit!
+
+  """Comment on an edit"""
+  editComment(input: EditCommentInput!): Edit!
+
+  """Apply edit without voting"""
+  applyEdit(input: ApplyEditInput!): Edit!
+
+  """Cancel edit without voting"""
+  cancelEdit(input: CancelEditInput!): Edit!
+
+  """Matches/unmatches a scene to fingerprint"""
+  submitFingerprint(input: FingerprintSubmission!): Boolean!
+
+  """Draft submissions"""
+  submitSceneDraft(input: SceneDraftInput!): DraftSubmissionStatus!
+  submitPerformerDraft(input: PerformerDraftInput!): DraftSubmissionStatus!
+  destroyDraft(id: ID!): Boolean!
+
+  """Favorite or unfavorite a performer"""
+  favoritePerformer(id: ID!, favorite: Boolean!): Boolean!
+
+  """Favorite or unfavorite a studio"""
+  favoriteStudio(id: ID!, favorite: Boolean!): Boolean!
+}
+
+input NewUserInput {
+  email: String!
+  invite_key: String
+}
+
+enum OperationEnum {
+  CREATE
+  MODIFY
+  DESTROY
+  MERGE
+}
+
+type Performer {
+  id: ID!
+  name: String!
+  disambiguation: String
+  aliases: [String!]!
+  gender: GenderEnum
+  urls: [URL!]!
+  birthdate: FuzzyDate @deprecated(reason: "Please use `birth_date`")
+  birth_date: String
+  age: Int
+  ethnicity: EthnicityEnum
+  country: String
+  eye_color: EyeColorEnum
+  hair_color: HairColorEnum
+
+  """Height in cm"""
+  height: Int
+  measurements: Measurements! @deprecated(reason: "Use individual fields, cup/band/waist/hip_size")
+  cup_size: String
+  band_size: Int
+  waist_size: Int
+  hip_size: Int
+  breast_type: BreastTypeEnum
+  career_start_year: Int
+  career_end_year: Int
+  tattoos: [BodyModification!]
+  piercings: [BodyModification!]
+  images: [Image!]!
+  deleted: Boolean!
+  edits: [Edit!]!
+  scene_count: Int!
+  scenes(input: PerformerScenesInput): [Scene!]!
+  merged_ids: [ID!]!
+  studios: [PerformerStudio!]!
+  is_favorite: Boolean!
+  created: Time!
+  updated: Time!
+}
+
+type PerformerAppearance {
+  performer: Performer!
+
+  """Performing as alias"""
+  as: String
+}
+
+input PerformerAppearanceInput {
+  performer_id: ID!
+
+  """Performing as alias"""
+  as: String
+}
+
+input PerformerCreateInput {
+  name: String!
+  disambiguation: String
+  aliases: [String!]
+  gender: GenderEnum
+  urls: [URLInput!]
+  birthdate: String
+  ethnicity: EthnicityEnum
+  country: String
+  eye_color: EyeColorEnum
+  hair_color: HairColorEnum
+  height: Int
+  cup_size: String
+  band_size: Int
+  waist_size: Int
+  hip_size: Int
+  breast_type: BreastTypeEnum
+  career_start_year: Int
+  career_end_year: Int
+  tattoos: [BodyModificationInput!]
+  piercings: [BodyModificationInput!]
+  image_ids: [ID!]
+  draft_id: ID
+}
+
+input PerformerDestroyInput {
+  id: ID!
+}
+
+type PerformerDraft {
+  id: ID
+  name: String!
+  disambiguation: String
+  aliases: String
+  gender: String
+  birthdate: String
+  urls: [String!]
+  ethnicity: String
+  country: String
+  eye_color: String
+  hair_color: String
+  height: String
+  measurements: String
+  breast_type: String
+  tattoos: String
+  piercings: String
+  career_start_year: Int
+  career_end_year: Int
+  image: Image
+}
+
+input PerformerDraftInput {
+  id: ID
+  disambiguation: String
+  name: String!
+  aliases: String
+  gender: String
+  birthdate: String
+  urls: [String!]
+  ethnicity: String
+  country: String
+  eye_color: String
+  hair_color: String
+  height: String
+  measurements: String
+  breast_type: String
+  tattoos: String
+  piercings: String
+  career_start_year: Int
+  career_end_year: Int
+  image: Upload
+}
+
+type PerformerEdit {
+  name: String
+  disambiguation: String
+  added_aliases: [String!]
+  removed_aliases: [String!]
+  gender: GenderEnum
+  added_urls: [URL!]
+  removed_urls: [URL!]
+  birthdate: String
+  ethnicity: EthnicityEnum
+  country: String
+  eye_color: EyeColorEnum
+  hair_color: HairColorEnum
+
+  """Height in cm"""
+  height: Int
+  cup_size: String
+  band_size: Int
+  waist_size: Int
+  hip_size: Int
+  breast_type: BreastTypeEnum
+  career_start_year: Int
+  career_end_year: Int
+  added_tattoos: [BodyModification!]
+  removed_tattoos: [BodyModification!]
+  added_piercings: [BodyModification!]
+  removed_piercings: [BodyModification!]
+  added_images: [Image]
+  removed_images: [Image]
+  draft_id: ID
+  aliases: [String!]!
+  urls: [URL!]!
+  images: [Image!]!
+  tattoos: [BodyModification!]!
+  piercings: [BodyModification!]!
+}
+
+input PerformerEditDetailsInput {
+  name: String
+  disambiguation: String
+  aliases: [String!]
+  gender: GenderEnum
+  urls: [URLInput!]
+  birthdate: String
+  ethnicity: EthnicityEnum
+  country: String
+  eye_color: EyeColorEnum
+  hair_color: HairColorEnum
+  height: Int
+  cup_size: String
+  band_size: Int
+  waist_size: Int
+  hip_size: Int
+  breast_type: BreastTypeEnum
+  career_start_year: Int
+  career_end_year: Int
+  tattoos: [BodyModificationInput!]
+  piercings: [BodyModificationInput!]
+  image_ids: [ID!]
+  draft_id: ID
+}
+
+input PerformerEditInput {
+  edit: EditInput!
+
+  """Not required for destroy type"""
+  details: PerformerEditDetailsInput
+
+  """Controls aliases modification for merges and name modifications"""
+  options: PerformerEditOptionsInput
+}
+
+type PerformerEditOptions {
+  """
+  Set performer alias on scenes without alias to old name if name is changed
+  """
+  set_modify_aliases: Boolean!
+
+  """Set performer alias on scenes attached to merge sources to old name"""
+  set_merge_aliases: Boolean!
+}
+
+input PerformerEditOptionsInput {
+  """
+  Set performer alias on scenes without alias to old name if name is changed
+  """
+  set_modify_aliases: Boolean = false
+
+  """Set performer alias on scenes attached to merge sources to old name"""
+  set_merge_aliases: Boolean = true
+}
+
+input PerformerQueryInput {
+  """Searches name and disambiguation - assumes like query unless quoted"""
+  names: String
+
+  """Searches name only - assumes like query unless quoted"""
+  name: String
+
+  """Search aliases only - assumes like query unless quoted"""
+  alias: String
+  disambiguation: StringCriterionInput
+  gender: GenderFilterEnum
+
+  """Filter to search urls - assumes like query unless quoted"""
+  url: String
+  birthdate: DateCriterionInput
+  birth_year: IntCriterionInput
+  age: IntCriterionInput
+  ethnicity: EthnicityFilterEnum
+  country: StringCriterionInput
+  eye_color: EyeColorCriterionInput
+  hair_color: HairColorCriterionInput
+  height: IntCriterionInput
+  cup_size: StringCriterionInput
+  band_size: IntCriterionInput
+  waist_size: IntCriterionInput
+  hip_size: IntCriterionInput
+  breast_type: BreastTypeCriterionInput
+  career_start_year: IntCriterionInput
+  career_end_year: IntCriterionInput
+  tattoos: BodyModificationCriterionInput
+  piercings: BodyModificationCriterionInput
+
+  """Filter by performerfavorite status for the current user"""
+  is_favorite: Boolean
+
+  """Filter by a performer they have performed in scenes with"""
+  performed_with: ID
+
+  """Filter by a studio"""
+  studio_id: ID
+  page: Int! = 1
+  per_page: Int! = 25
+  direction: SortDirectionEnum! = DESC
+  sort: PerformerSortEnum! = CREATED_AT
+}
+
+input PerformerScenesInput {
+  """Filter by another performer that also performs in the scenes"""
+  performed_with: ID
+
+  """Filter by a studio"""
+  studio_id: ID
+
+  """Filter by tags"""
+  tags: MultiIDCriterionInput
+}
+
+enum PerformerSortEnum {
+  NAME
+  BIRTHDATE
+  SCENE_COUNT
+  CAREER_START_YEAR
+  DEBUT
+  LAST_SCENE
+  CREATED_AT
+  UPDATED_AT
+}
+
+type PerformerStudio {
+  studio: Studio!
+  scene_count: Int!
+}
+
+input PerformerUpdateInput {
+  id: ID!
+  name: String
+  disambiguation: String
+  aliases: [String!]
+  gender: GenderEnum
+  urls: [URLInput!]
+  birthdate: String
+  ethnicity: EthnicityEnum
+  country: String
+  eye_color: EyeColorEnum
+  hair_color: HairColorEnum
+  height: Int
+  cup_size: String
+  band_size: Int
+  waist_size: Int
+  hip_size: Int
+  breast_type: BreastTypeEnum
+  career_start_year: Int
+  career_end_year: Int
+  tattoos: [BodyModificationInput!]
+  piercings: [BodyModificationInput!]
+  image_ids: [ID!]
+}
+
+"""The query root for this schema"""
+type Query {
+  """Find a performer by ID"""
+  findPerformer(id: ID!): Performer
+  queryPerformers(input: PerformerQueryInput!): QueryPerformersResultType!
+
+  """Find a studio by ID or name"""
+  findStudio(id: ID, name: String): Studio
+  queryStudios(input: StudioQueryInput!): QueryStudiosResultType!
+
+  """Find a tag by ID or name, or aliases"""
+  findTag(id: ID, name: String): Tag
+  queryTags(input: TagQueryInput!): QueryTagsResultType!
+
+  """Find a tag category by ID"""
+  findTagCategory(id: ID!): TagCategory
+  queryTagCategories: QueryTagCategoriesResultType!
+
+  """Find a scene by ID"""
+  findScene(id: ID!): Scene
+
+  """Finds a scene by an algorithm-specific checksum"""
+  findSceneByFingerprint(fingerprint: FingerprintQueryInput!): [Scene!]!
+
+  """Finds scenes that match a list of hashes"""
+  findScenesByFingerprints(fingerprints: [String!]!): [Scene!]! @deprecated(reason: "Use findScenesBySceneFingerprints")
+  findScenesByFullFingerprints(fingerprints: [FingerprintQueryInput!]!): [Scene!]! @deprecated(reason: "Use findScenesBySceneFingerprints")
+  findScenesBySceneFingerprints(fingerprints: [[FingerprintQueryInput!]!]!): [[Scene!]!]!
+  queryScenes(input: SceneQueryInput!): QueryScenesResultType!
+
+  """Find an external site by ID"""
+  findSite(id: ID!): Site
+  querySites: QuerySitesResultType!
+  findEdit(id: ID!): Edit
+  queryEdits(input: EditQueryInput!): QueryEditsResultType!
+
+  """Find user by ID or username"""
+  findUser(id: ID, username: String): User
+  queryUsers(input: UserQueryInput!): QueryUsersResultType!
+
+  """Returns currently authenticated user"""
+  me: User
+  searchPerformer(term: String!, limit: Int): [Performer!]!
+  searchScene(term: String!, limit: Int): [Scene!]!
+  searchTag(term: String!, limit: Int): [Tag!]!
+  findDraft(id: ID!): Draft
+  findDrafts: [Draft!]!
+  queryExistingScene(input: QueryExistingSceneInput!): QueryExistingSceneResult!
+  version: Version!
+  getConfig: StashBoxConfig!
+}
+
+type QueryEditsResultType {
+  count: Int!
+  edits: [Edit!]!
+}
+
+input QueryExistingSceneInput {
+  title: String
+  studio_id: ID
+  fingerprints: [FingerprintInput!]!
+}
+
+type QueryExistingSceneResult {
+  edits: [Edit!]!
+  scenes: [Scene!]!
+}
+
+type QueryPerformersResultType {
+  count: Int!
+  performers: [Performer!]!
+}
+
+type QueryScenesResultType {
+  count: Int!
+  scenes: [Scene!]!
+}
+
+type QuerySitesResultType {
+  count: Int!
+  sites: [Site!]!
+}
+
+type QueryStudiosResultType {
+  count: Int!
+  studios: [Studio!]!
+}
+
+type QueryTagCategoriesResultType {
+  count: Int!
+  tag_categories: [TagCategory!]!
+}
+
+type QueryTagsResultType {
+  count: Int!
+  tags: [Tag!]!
+}
+
+type QueryUsersResultType {
+  count: Int!
+  users: [User!]!
+}
+
+input ResetPasswordInput {
+  email: String!
+}
+
+input RevokeInviteInput {
+  user_id: ID!
+  amount: Int!
+}
+
+input RoleCriterionInput {
+  value: [RoleEnum!]!
+  modifier: CriterionModifier!
+}
+
+enum RoleEnum {
+  READ
+  VOTE
+  EDIT
+  MODIFY
+  ADMIN
+
+  """May generate invites without tokens"""
+  INVITE
+
+  """May grant and rescind invite tokens and resind invite keys"""
+  MANAGE_INVITES
+  BOT
+}
+
+type Scene {
+  id: ID!
+  title: String
+  details: String
+  date: String @deprecated(reason: "Please use `release_date` instead")
+  release_date: String
+  urls: [URL!]!
+  studio: Studio
+  tags: [Tag!]!
+  images: [Image!]!
+  performers: [PerformerAppearance!]!
+  fingerprints(is_submitted: Boolean): [Fingerprint!]!
+  duration: Int
+  director: String
+  code: String
+  deleted: Boolean!
+  edits: [Edit!]!
+  created: Time!
+  updated: Time!
+}
+
+input SceneCreateInput {
+  title: String
+  details: String
+  urls: [URLInput!]
+  date: String!
+  studio_id: ID
+  performers: [PerformerAppearanceInput!]
+  tag_ids: [ID!]
+  image_ids: [ID!]
+  fingerprints: [FingerprintEditInput!]!
+  duration: Int
+  director: String
+  code: String
+}
+
+input SceneDestroyInput {
+  id: ID!
+}
+
+type SceneDraft {
+  id: ID
+  title: String
+  code: String
+  details: String
+  director: String
+  url: URL
+  date: String
+  studio: SceneDraftStudio
+  performers: [SceneDraftPerformer!]!
+  tags: [SceneDraftTag!]
+  image: Image
+  fingerprints: [DraftFingerprint!]!
+}
+
+input SceneDraftInput {
+  id: ID
+  title: String
+  code: String
+  details: String
+  director: String
+  url: String
+  date: String
+  studio: DraftEntityInput
+  performers: [DraftEntityInput!]!
+  tags: [DraftEntityInput!]
+  image: Upload
+  fingerprints: [FingerprintInput!]!
+}
+
+union SceneDraftPerformer = Performer | DraftEntity
+
+union SceneDraftStudio = Studio | DraftEntity
+
+union SceneDraftTag = Tag | DraftEntity
+
+type SceneEdit {
+  title: String
+  details: String
+  added_urls: [URL!]
+  removed_urls: [URL!]
+  date: String
+  studio: Studio
+
+  """Added or modified performer appearance entries"""
+  added_performers: [PerformerAppearance!]
+  removed_performers: [PerformerAppearance!]
+  added_tags: [Tag!]
+  removed_tags: [Tag!]
+  added_images: [Image]
+  removed_images: [Image]
+  added_fingerprints: [Fingerprint!]
+  removed_fingerprints: [Fingerprint!]
+  duration: Int
+  director: String
+  code: String
+  draft_id: ID
+  urls: [URL!]!
+  performers: [PerformerAppearance!]!
+  tags: [Tag!]!
+  images: [Image!]!
+  fingerprints: [Fingerprint!]!
+}
+
+input SceneEditDetailsInput {
+  title: String
+  details: String
+  urls: [URLInput!]
+  date: String
+  studio_id: ID
+  performers: [PerformerAppearanceInput!]
+  tag_ids: [ID!]
+  image_ids: [ID!]
+  duration: Int
+  director: String
+  code: String
+  fingerprints: [FingerprintInput!]
+  draft_id: ID
+}
+
+input SceneEditInput {
+  edit: EditInput!
+
+  """Not required for destroy type"""
+  details: SceneEditDetailsInput
+}
+
+input SceneQueryInput {
+  """Filter to search title and details - assumes like query unless quoted"""
+  text: String
+
+  """Filter to search title - assumes like query unless quoted"""
+  title: String
+
+  """Filter to search urls - assumes like query unless quoted"""
+  url: String
+
+  """Filter by date"""
+  date: DateCriterionInput
+
+  """Filter to only include scenes with this studio"""
+  studios: MultiIDCriterionInput
+
+  """Filter to only include scenes with this studio as primary or parent"""
+  parentStudio: String
+
+  """Filter to only include scenes with these tags"""
+  tags: MultiIDCriterionInput
+
+  """Filter to only include scenes with these performers"""
+  performers: MultiIDCriterionInput
+
+  """Filter to include scenes with performer appearing as alias"""
+  alias: StringCriterionInput
+
+  """Filter to only include scenes with these fingerprints"""
+  fingerprints: MultiStringCriterionInput
+
+  """Filter by favorited entity"""
+  favorites: FavoriteFilter
+
+  """Filter to scenes with fingerprints submitted by the user"""
+  has_fingerprint_submissions: Boolean
+  page: Int! = 1
+  per_page: Int! = 25
+  direction: SortDirectionEnum! = DESC
+  sort: SceneSortEnum! = DATE
+}
+
+enum SceneSortEnum {
+  TITLE
+  DATE
+  TRENDING
+  CREATED_AT
+  UPDATED_AT
+}
+
+input SceneUpdateInput {
+  id: ID!
+  title: String
+  details: String
+  urls: [URLInput!]
+  date: String
+  studio_id: ID
+  performers: [PerformerAppearanceInput!]
+  tag_ids: [ID!]
+  image_ids: [ID!]
+  fingerprints: [FingerprintEditInput!]
+  duration: Int
+  director: String
+  code: String
+}
+
+type Site {
+  id: ID!
+  name: String!
+  description: String
+  url: String
+  regex: String
+  valid_types: [ValidSiteTypeEnum!]!
+  icon: String!
+  created: Time!
+  updated: Time!
+}
+
+input SiteCreateInput {
+  name: String!
+  description: String
+  url: String
+  regex: String
+  valid_types: [ValidSiteTypeEnum!]!
+}
+
+input SiteDestroyInput {
+  id: ID!
+}
+
+input SiteUpdateInput {
+  id: ID!
+  name: String!
+  description: String
+  url: String
+  regex: String
+  valid_types: [ValidSiteTypeEnum!]!
+}
+
+enum SortDirectionEnum {
+  ASC
+  DESC
+}
+
+type StashBoxConfig {
+  host_url: String!
+  require_invite: Boolean!
+  require_activation: Boolean!
+  vote_promotion_threshold: Int
+  vote_application_threshold: Int!
+  voting_period: Int!
+  min_destructive_voting_period: Int!
+  vote_cron_interval: String!
+  guidelines_url: String!
+}
+
+input StringCriterionInput {
+  value: String!
+  modifier: CriterionModifier!
+}
+
+type Studio {
+  id: ID!
+  name: String!
+  urls: [URL!]!
+  parent: Studio
+  child_studios: [Studio!]!
+  images: [Image!]!
+  deleted: Boolean!
+  is_favorite: Boolean!
+  created: Time!
+  updated: Time!
+  performers(input: PerformerQueryInput!): QueryPerformersResultType!
+}
+
+input StudioCreateInput {
+  name: String!
+  urls: [URLInput!]
+  parent_id: ID
+  image_ids: [ID!]
+}
+
+input StudioDestroyInput {
+  id: ID!
+}
+
+type StudioEdit {
+  name: String
+
+  """Added and modified URLs"""
+  added_urls: [URL!]
+  removed_urls: [URL!]
+  parent: Studio
+  added_images: [Image]
+  removed_images: [Image]
+  images: [Image!]!
+  urls: [URL!]!
+}
+
+input StudioEditDetailsInput {
+  name: String
+  urls: [URLInput!]
+  parent_id: ID
+  image_ids: [ID!]
+}
+
+input StudioEditInput {
+  edit: EditInput!
+
+  """Not required for destroy type"""
+  details: StudioEditDetailsInput
+}
+
+input StudioQueryInput {
+  """Filter to search name - assumes like query unless quoted"""
+  name: String
+
+  """
+  Filter to search studio and parent studio name - assumes like query unless quoted
+  """
+  names: String
+
+  """Filter to search url - assumes like query unless quoted"""
+  url: String
+  parent: IDCriterionInput
+  has_parent: Boolean
+
+  """Filter by studio favorite status for the current user"""
+  is_favorite: Boolean
+  page: Int! = 1
+  per_page: Int! = 25
+  direction: SortDirectionEnum! = ASC
+  sort: StudioSortEnum! = NAME
+}
+
+enum StudioSortEnum {
+  NAME
+  CREATED_AT
+  UPDATED_AT
+}
+
+input StudioUpdateInput {
+  id: ID!
+  name: String
+  urls: [URLInput!]
+  parent_id: ID
+  image_ids: [ID!]
+}
+
+type Tag {
+  id: ID!
+  name: String!
+  description: String
+  aliases: [String!]!
+  deleted: Boolean!
+  edits: [Edit!]!
+  category: TagCategory
+  created: Time!
+  updated: Time!
+}
+
+type TagCategory {
+  id: ID!
+  name: String!
+  group: TagGroupEnum!
+  description: String
+}
+
+input TagCategoryCreateInput {
+  name: String!
+  group: TagGroupEnum!
+  description: String
+}
+
+input TagCategoryDestroyInput {
+  id: ID!
+}
+
+input TagCategoryUpdateInput {
+  id: ID!
+  name: String
+  group: TagGroupEnum
+  description: String
+}
+
+input TagCreateInput {
+  name: String!
+  description: String
+  aliases: [String!]
+  category_id: ID
+}
+
+input TagDestroyInput {
+  id: ID!
+}
+
+type TagEdit {
+  name: String
+  description: String
+  added_aliases: [String!]
+  removed_aliases: [String!]
+  category: TagCategory
+  aliases: [String!]!
+}
+
+input TagEditDetailsInput {
+  name: String
+  description: String
+  aliases: [String!]
+  category_id: ID
+}
+
+input TagEditInput {
+  edit: EditInput!
+
+  """Not required for destroy type"""
+  details: TagEditDetailsInput
+}
+
+enum TagGroupEnum {
+  PEOPLE
+  SCENE
+  ACTION
+}
+
+input TagQueryInput {
+  """
+  Filter to search name, aliases and description - assumes like query unless quoted
+  """
+  text: String
+
+  """Searches name and aliases - assumes like query unless quoted"""
+  names: String
+
+  """Filter to search name - assumes like query unless quoted"""
+  name: String
+
+  """Filter to category ID"""
+  category_id: ID
+  page: Int! = 1
+  per_page: Int! = 25
+  direction: SortDirectionEnum! = ASC
+  sort: TagSortEnum! = NAME
+}
+
+enum TagSortEnum {
+  NAME
+  CREATED_AT
+  UPDATED_AT
+}
+
+input TagUpdateInput {
+  id: ID!
+  name: String
+  description: String
+  aliases: [String!]
+  category_id: ID
+}
+
+enum TargetTypeEnum {
+  SCENE
+  STUDIO
+  PERFORMER
+  TAG
+}
+
+scalar Time
+
+scalar Upload
+
+type URL {
+  url: String!
+  type: String! @deprecated(reason: "Use the site field instead")
+  site: Site!
+}
+
+input URLInput {
+  url: String!
+  site_id: ID!
+}
+
+type User {
+  id: ID!
+  name: String!
+
+  """Should not be visible to other users"""
+  roles: [RoleEnum!]
+
+  """Should not be visible to other users"""
+  email: String
+
+  """Should not be visible to other users"""
+  api_key: String
+
+  """ Vote counts by type """
+  vote_count: UserVoteCount!
+
+  """ Edit counts by status """
+  edit_count: UserEditCount!
+
+  """Calls to the API from this user over a configurable time period"""
+  api_calls: Int!
+  invited_by: User
+  invite_tokens: Int
+  active_invite_codes: [String!] @deprecated(reason: "Use invite_codes instead")
+  invite_codes: [InviteKey!]
+}
+
+input UserChangePasswordInput {
+  """Password in plain text"""
+  existing_password: String
+  new_password: String!
+  reset_key: String
+}
+
+input UserCreateInput {
+  name: String!
+
+  """Password in plain text"""
+  password: String!
+  roles: [RoleEnum!]!
+  email: String!
+  invited_by_id: ID
+}
+
+input UserDestroyInput {
+  id: ID!
+}
+
+type UserEditCount {
+  accepted: Int!
+  rejected: Int!
+  pending: Int!
+  immediate_accepted: Int!
+  immediate_rejected: Int!
+  failed: Int!
+  canceled: Int!
+}
+
+input UserQueryInput {
+  """Filter to search user name - assumes like query unless quoted"""
+  name: String
+
+  """Filter to search email - assumes like query unless quoted"""
+  email: String
+
+  """Filter by roles"""
+  roles: RoleCriterionInput
+
+  """Filter by api key"""
+  apiKey: String
+
+  """Filter by successful edits"""
+  successful_edits: IntCriterionInput
+
+  """Filter by unsuccessful edits"""
+  unsuccessful_edits: IntCriterionInput
+
+  """Filter by votes on successful edits"""
+  successful_votes: IntCriterionInput
+
+  """Filter by votes on unsuccessful edits"""
+  unsuccessful_votes: IntCriterionInput
+
+  """Filter by number of API calls"""
+  api_calls: IntCriterionInput
+
+  """Filter by user that invited"""
+  invited_by: ID
+  page: Int! = 1
+  per_page: Int! = 25
+}
+
+input UserUpdateInput {
+  id: ID!
+  name: String
+
+  """Password in plain text"""
+  password: String
+  roles: [RoleEnum!]
+  email: String
+}
+
+type UserVoteCount {
+  abstain: Int!
+  accept: Int!
+  reject: Int!
+  immediate_accept: Int!
+  immediate_reject: Int!
+}
+
+enum UserVotedFilterEnum {
+  ABSTAIN
+  ACCEPT
+  REJECT
+  NOT_VOTED
+}
+
+enum ValidSiteTypeEnum {
+  PERFORMER
+  SCENE
+  STUDIO
+}
+
+type Version {
+  hash: String!
+  build_time: String!
+  build_type: String!
+  version: String!
+}
+
+enum VoteStatusEnum {
+  ACCEPTED
+  REJECTED
+  PENDING
+  IMMEDIATE_ACCEPTED
+  IMMEDIATE_REJECTED
+  FAILED
+  CANCELED
+}
+
+enum VoteTypeEnum {
+  ABSTAIN
+  ACCEPT
+  REJECT
+
+  """Immediately accepts the edit - bypassing the vote"""
+  IMMEDIATE_ACCEPT
+
+  """Immediately rejects the edit - bypassing the vote"""
+  IMMEDIATE_REJECT
+}
+
