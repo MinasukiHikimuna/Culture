@@ -3,7 +3,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.routers import sites
+from api.routers import releases, sites
 
 
 app = FastAPI(
@@ -26,6 +26,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(sites.router, prefix="/sites", tags=["sites"])
+app.include_router(releases.router, prefix="/releases", tags=["releases"])
 
 
 @app.get("/health")
