@@ -14,6 +14,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
 export default function PerformerDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -27,8 +29,10 @@ export default function PerformerDetailPage() {
   const [linking, setLinking] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
   const [linkSuccess, setLinkSuccess] = useState<string | null>(null);
+  const [imageError, setImageError] = useState(false);
 
   useEffect(() => {
+    setImageError(false);
     fetchPerformer(uuid);
   }, [fetchPerformer, uuid]);
 
@@ -70,6 +74,8 @@ export default function PerformerDetailPage() {
     );
   }
 
+  const imageUrl = `${API_BASE_URL}/performers/${uuid}/image`;
+
   return (
     <div className="p-8">
       <div className="mb-6">
@@ -78,20 +84,38 @@ export default function PerformerDetailPage() {
         </Button>
       </div>
 
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold">{currentPerformer.ce_performers_name}</h1>
-        <p className="text-muted-foreground">
-          {currentPerformer.ce_performers_short_name || "No short name"}
-        </p>
-        {currentPerformer.ce_performers_url && (
-          <p className="text-sm text-muted-foreground">
-            URL: {currentPerformer.ce_performers_url}
+      <div className="mb-8 flex gap-8">
+        {/* Performer Info */}
+        <div className="flex-grow">
+          <h1 className="text-2xl font-bold">{currentPerformer.ce_performers_name}</h1>
+          <p className="text-muted-foreground">
+            {currentPerformer.ce_performers_short_name || "No short name"}
           </p>
-        )}
-        {currentPerformer.ce_sites_name && (
-          <p className="text-sm text-muted-foreground">
-            Site: {currentPerformer.ce_sites_name}
-          </p>
+          {currentPerformer.ce_performers_url && (
+            <p className="mt-2 text-sm text-muted-foreground">
+              URL: {currentPerformer.ce_performers_url}
+            </p>
+          )}
+          {currentPerformer.ce_sites_name && (
+            <p className="text-sm text-muted-foreground">
+              Site: {currentPerformer.ce_sites_name}
+            </p>
+          )}
+        </div>
+
+        {/* Performer Image - right side */}
+        {!imageError && (
+          <div className="flex-shrink-0">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={imageUrl}
+              alt={currentPerformer.ce_performers_name}
+              width={300}
+              height={450}
+              className="rounded-lg object-cover shadow-lg"
+              onError={() => setImageError(true)}
+            />
+          </div>
         )}
       </div>
 
