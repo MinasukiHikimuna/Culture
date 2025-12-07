@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { api, type SiteWithLinkStatus } from "@/lib/api";
+import { useEffect } from "react";
+import { useSitesStore } from "@/stores/sites";
 import {
   Table,
   TableBody,
@@ -21,41 +21,23 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-type LinkFilter = "all" | "linked" | "unlinked";
-
 export default function SitesPage() {
-  const [sites, setSites] = useState<SiteWithLinkStatus[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [linkFilter, setLinkFilter] = useState<LinkFilter>("all");
-
-  const loadSites = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const linked = linkFilter === "all" ? null : linkFilter === "linked";
-      const data = await api.sites.list(linked);
-      setSites(data as SiteWithLinkStatus[]);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load sites");
-    } finally {
-      setLoading(false);
-    }
-  }, [linkFilter]);
+  const {
+    loading,
+    error,
+    searchTerm,
+    linkFilter,
+    setSearchTerm,
+    setLinkFilter,
+    fetchSites,
+    filteredSites,
+  } = useSitesStore();
 
   useEffect(() => {
-    loadSites();
-  }, [loadSites]);
+    fetchSites();
+  }, [fetchSites, linkFilter]);
 
-  const filteredSites = sites.filter((site) => {
-    const term = searchTerm.toLowerCase();
-    return (
-      site.ce_sites_name.toLowerCase().includes(term) ||
-      site.ce_sites_short_name.toLowerCase().includes(term) ||
-      site.ce_sites_url.toLowerCase().includes(term)
-    );
-  });
+  const sites = filteredSites();
 
   if (error) {
     return (
@@ -85,7 +67,9 @@ export default function SitesPage() {
         />
         <Select
           value={linkFilter}
-          onValueChange={(value) => setLinkFilter(value as LinkFilter)}
+          onValueChange={(value) =>
+            setLinkFilter(value as "all" | "linked" | "unlinked")
+          }
         >
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="Filter by status" />
@@ -113,7 +97,7 @@ export default function SitesPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredSites.map((site) => (
+            {sites.map((site) => (
               <TableRow key={site.ce_sites_uuid}>
                 <TableCell className="font-medium">
                   {site.ce_sites_short_name}
@@ -130,12 +114,16 @@ export default function SitesPage() {
                   </a>
                 </TableCell>
                 <TableCell>
-                  <Badge variant={site.has_stashapp_link ? "default" : "secondary"}>
+                  <Badge
+                    variant={site.has_stashapp_link ? "default" : "secondary"}
+                  >
                     {site.has_stashapp_link ? "Linked" : "Not linked"}
                   </Badge>
                 </TableCell>
                 <TableCell>
-                  <Badge variant={site.has_stashdb_link ? "default" : "secondary"}>
+                  <Badge
+                    variant={site.has_stashdb_link ? "default" : "secondary"}
+                  >
                     {site.has_stashdb_link ? "Linked" : "Not linked"}
                   </Badge>
                 </TableCell>
@@ -146,9 +134,12 @@ export default function SitesPage() {
                 </TableCell>
               </TableRow>
             ))}
-            {filteredSites.length === 0 && (
+            {sites.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground">
+                <TableCell
+                  colSpan={6}
+                  className="text-center text-muted-foreground"
+                >
                   No sites found
                 </TableCell>
               </TableRow>

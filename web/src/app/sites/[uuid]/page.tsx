@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { api, type SiteDetail } from "@/lib/api";
+import { useSitesStore } from "@/stores/sites";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -19,9 +19,7 @@ export default function SiteDetailPage() {
   const router = useRouter();
   const uuid = params.uuid as string;
 
-  const [site, setSite] = useState<SiteDetail | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { currentSite, loading, error, fetchSite, linkSite } = useSitesStore();
 
   const [linkTarget, setLinkTarget] = useState<string>("stashapp");
   const [externalId, setExternalId] = useState("");
@@ -29,22 +27,9 @@ export default function SiteDetailPage() {
   const [linkError, setLinkError] = useState<string | null>(null);
   const [linkSuccess, setLinkSuccess] = useState<string | null>(null);
 
-  const loadSite = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await api.sites.get(uuid);
-      setSite(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load site");
-    } finally {
-      setLoading(false);
-    }
-  }, [uuid]);
-
   useEffect(() => {
-    loadSite();
-  }, [loadSite]);
+    fetchSite(uuid);
+  }, [fetchSite, uuid]);
 
   async function handleLink() {
     if (!externalId.trim()) {
@@ -57,13 +42,9 @@ export default function SiteDetailPage() {
     setLinkSuccess(null);
 
     try {
-      await api.sites.link(uuid, {
-        target: linkTarget,
-        external_id: externalId.trim(),
-      });
+      await linkSite(uuid, linkTarget, externalId.trim());
       setLinkSuccess(`Successfully linked to ${linkTarget}`);
       setExternalId("");
-      loadSite();
     } catch (err) {
       setLinkError(err instanceof Error ? err.message : "Failed to link site");
     } finally {
@@ -72,12 +53,10 @@ export default function SiteDetailPage() {
   }
 
   if (loading) {
-    return (
-      <div className="p-8 text-muted-foreground">Loading...</div>
-    );
+    return <div className="p-8 text-muted-foreground">Loading...</div>;
   }
 
-  if (error || !site) {
+  if (error || !currentSite) {
     return (
       <div className="p-8">
         <div className="rounded-md bg-destructive/10 p-4 text-destructive">
@@ -99,15 +78,15 @@ export default function SiteDetailPage() {
       </div>
 
       <div className="mb-8">
-        <h1 className="text-2xl font-bold">{site.ce_sites_name}</h1>
-        <p className="text-muted-foreground">{site.ce_sites_short_name}</p>
+        <h1 className="text-2xl font-bold">{currentSite.ce_sites_name}</h1>
+        <p className="text-muted-foreground">{currentSite.ce_sites_short_name}</p>
         <a
-          href={site.ce_sites_url}
+          href={currentSite.ce_sites_url}
           target="_blank"
           rel="noopener noreferrer"
           className="text-blue-600 hover:underline"
         >
-          {site.ce_sites_url}
+          {currentSite.ce_sites_url}
         </a>
       </div>
 
@@ -116,16 +95,16 @@ export default function SiteDetailPage() {
         <div className="space-y-3">
           <div className="flex items-center gap-4">
             <span className="w-24 font-medium">Stashapp:</span>
-            {site.external_ids.stashapp ? (
-              <Badge variant="default">{site.external_ids.stashapp}</Badge>
+            {currentSite.external_ids.stashapp ? (
+              <Badge variant="default">{currentSite.external_ids.stashapp}</Badge>
             ) : (
               <Badge variant="secondary">Not linked</Badge>
             )}
           </div>
           <div className="flex items-center gap-4">
             <span className="w-24 font-medium">StashDB:</span>
-            {site.external_ids.stashdb ? (
-              <Badge variant="default">{site.external_ids.stashdb}</Badge>
+            {currentSite.external_ids.stashdb ? (
+              <Badge variant="default">{currentSite.external_ids.stashdb}</Badge>
             ) : (
               <Badge variant="secondary">Not linked</Badge>
             )}
@@ -137,13 +116,13 @@ export default function SiteDetailPage() {
         <h2 className="mb-4 text-lg font-semibold">Link to External System</h2>
 
         {linkError && (
-          <div className="mb-4 rounded-md bg-destructive/10 p-3 text-destructive text-sm">
+          <div className="mb-4 rounded-md bg-destructive/10 p-3 text-sm text-destructive">
             {linkError}
           </div>
         )}
 
         {linkSuccess && (
-          <div className="mb-4 rounded-md bg-green-100 p-3 text-green-800 text-sm dark:bg-green-900/20 dark:text-green-400">
+          <div className="mb-4 rounded-md bg-green-100 p-3 text-sm text-green-800 dark:bg-green-900/20 dark:text-green-400">
             {linkSuccess}
           </div>
         )}

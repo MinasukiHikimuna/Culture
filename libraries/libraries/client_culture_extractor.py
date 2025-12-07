@@ -14,6 +14,11 @@ class ClientCultureExtractor:
         if hasattr(self, "connection") and not self.connection.closed:
             self.connection.close()
 
+    def close(self):
+        """Close the database connection."""
+        if hasattr(self, "connection") and not self.connection.closed:
+            self.connection.close()
+
     def get_database_schema(self) -> pl.DataFrame:
         with self.connection.cursor() as cursor:
             cursor.execute(
