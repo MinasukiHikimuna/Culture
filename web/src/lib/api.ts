@@ -63,6 +63,37 @@ export interface LinkReleaseRequest {
   external_id: string;
 }
 
+// Performer types
+export interface Performer {
+  ce_performers_uuid: string;
+  ce_performers_short_name: string | null;
+  ce_performers_name: string;
+  ce_performers_url: string | null;
+}
+
+export interface PerformerWithLinkStatus extends Performer {
+  ce_site_uuid: string | null;
+  ce_site_name: string | null;
+  has_stashapp_link: boolean;
+  has_stashdb_link: boolean;
+}
+
+export interface PerformerExternalIds {
+  stashapp: string | null;
+  stashdb: string | null;
+}
+
+export interface PerformerDetail extends Performer {
+  ce_sites_short_name: string | null;
+  ce_sites_name: string | null;
+  external_ids: PerformerExternalIds;
+}
+
+export interface LinkPerformerRequest {
+  target: string;
+  external_id: string;
+}
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 async function fetchApi<T>(
@@ -138,5 +169,34 @@ export const api = {
 
   health: async (): Promise<Record<string, unknown>> => {
     return fetchApi("/health");
+  },
+
+  performers: {
+    list: async (params: {
+      site: string;
+      name?: string;
+      unmapped_only?: boolean;
+      target_system?: string;
+      limit?: number;
+    }): Promise<PerformerWithLinkStatus[]> => {
+      const searchParams = new URLSearchParams();
+      searchParams.set("site", params.site);
+      if (params.name) searchParams.set("name", params.name);
+      if (params.unmapped_only) searchParams.set("unmapped_only", "true");
+      if (params.target_system) searchParams.set("target_system", params.target_system);
+      if (params.limit) searchParams.set("limit", String(params.limit));
+      return fetchApi(`/performers?${searchParams.toString()}`);
+    },
+
+    get: async (uuid: string): Promise<PerformerDetail> => {
+      return fetchApi(`/performers/${uuid}`);
+    },
+
+    link: async (uuid: string, request: LinkPerformerRequest): Promise<Record<string, unknown>> => {
+      return fetchApi(`/performers/${uuid}/link`, {
+        method: "POST",
+        body: JSON.stringify(request),
+      });
+    },
   },
 };
