@@ -145,3 +145,16 @@ class CultureAPIClient:
         )
         response.raise_for_status()
         return response.json()
+
+    def delete_release(self, uuid: str) -> dict:
+        """Delete a release from the database.
+
+        Args:
+            uuid: Release UUID
+
+        Returns:
+            Response with deletion details (release_name, site_name, downloads)
+        """
+        response = self.client.delete(f"/releases/{uuid}")
+        response.raise_for_status()
+        return response.json()

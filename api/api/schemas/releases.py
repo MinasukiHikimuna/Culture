@@ -80,3 +80,20 @@ class LinkReleaseRequest(BaseModel):
 
     target: str = Field(description="Target system name (stashapp or stashdb)")
     external_id: str = Field(description="External ID value")
+
+
+class DeletedDownload(BaseModel):
+    """Information about a deleted download."""
+
+    uuid: str = Field(description="Download UUID")
+    saved_filename: str | None = Field(default=None, description="Saved filename")
+
+
+class DeleteReleaseResponse(BaseModel):
+    """Response from deleting a release."""
+
+    message: str = Field(description="Success message")
+    release_uuid: str = Field(description="Deleted release UUID")
+    release_name: str = Field(description="Deleted release name")
+    site_name: str = Field(description="Site name")
+    downloads: list[DeletedDownload] = Field(default_factory=list, description="Deleted download records")

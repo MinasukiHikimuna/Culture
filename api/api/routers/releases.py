@@ -6,6 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from api.dependencies import get_ce_client
 from api.schemas.releases import (
+    DeletedDownload,
+    DeleteReleaseResponse,
     LinkReleaseRequest,
     Release,
     ReleaseDetail,
@@ -167,3 +169,40 @@ def link_release(
         "target": request.target,
         "external_id": request.external_id,
     }
+
+
+@router.delete("/{uuid}")
+def delete_release(
+    uuid: str,
+    client: Annotated[ClientCultureExtractor, Depends(get_ce_client)],
+) -> DeleteReleaseResponse:
+    """Delete a release and all associated database records.
+
+    This removes the release from the database along with all related data
+    (downloads, tag links, performer links, external IDs). File system
+    cleanup must be handled separately by the client.
+    """
+    release_df = client.get_release_by_uuid(uuid)
+    if release_df.is_empty():
+        raise HTTPException(status_code=404, detail=f"Release with UUID '{uuid}' not found")
+
+    try:
+        result = client.delete_release(uuid)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+    downloads = [
+        DeletedDownload(
+            uuid=d.get("uuid", ""),
+            saved_filename=d.get("saved_filename"),
+        )
+        for d in result.get("downloads", [])
+    ]
+
+    return DeleteReleaseResponse(
+        message=f"Deleted release '{result['release_name']}' from '{result['site_name']}'",
+        release_uuid=uuid,
+        release_name=result["release_name"],
+        site_name=result["site_name"],
+        downloads=downloads,
+    )

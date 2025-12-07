@@ -11,7 +11,6 @@ from rich.console import Console
 from rich.table import Table
 
 from culture_cli.api_client import CultureAPIClient
-from culture_cli.modules.ce.utils.config import config
 from culture_cli.modules.ce.utils.formatters import (
     format_release_detail_from_dict,
     format_releases_table_from_list,
@@ -309,33 +308,37 @@ def delete_release(
         ce releases delete 018f1477-f285-726b-9136-21956e3e8b92
         ce releases delete 018f1477-f285-726b-9136-21956e3e8b92 --yes
     """
-    # Delete still uses direct database client since it involves file operations
     try:
-        client = config.get_client()
+        with _get_api_client() as api:
+            # First get release info for confirmation prompt
+            release = api.get_release(release_uuid)
+            release_name = release["ce_release_name"]
+            site_name = release["ce_site_name"]
 
-        release_df = client.get_release_by_uuid(release_uuid)
-        if release_df.shape[0] == 0:
+            if not yes:
+                confirmed = _confirm_release_deletion(release_name, site_name, release_uuid)
+                if not confirmed:
+                    print_info("Deletion cancelled")
+                    raise typer.Exit(code=0)
+
+            # Delete via API
+            result = api.delete_release(release_uuid)
+
+            # Handle local file cleanup
+            downloads = result.get("downloads", [])
+            files_deleted = _delete_release_files(site_name, release_uuid, downloads)
+            _print_deletion_summary(result, files_deleted)
+
+    except httpx.ConnectError:
+        print_error("Cannot connect to Culture API. Is the API server running?")
+        print_info("Start the API with: cd api && uv run uvicorn api.main:app --port 8000")
+        raise typer.Exit(code=1) from None
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 404:
             print_error(f"Release with UUID '{release_uuid}' not found")
-            raise typer.Exit(code=1)
-
-        release_name = release_df["ce_release_name"][0]
-        site_name = release_df["ce_site_name"][0]
-
-        if not yes:
-            confirmed = _confirm_release_deletion(release_name, site_name, release_uuid)
-            if not confirmed:
-                print_info("Deletion cancelled")
-                raise typer.Exit(code=0)
-
-        result = client.delete_release(release_uuid)
-        files_deleted = _delete_release_files(result["site_name"], release_uuid, result["downloads"])
-        _print_deletion_summary(result, files_deleted)
-
-    except ValueError as e:
-        print_error(str(e))
-        raise typer.Exit(code=1) from e
-    except Exception as e:
-        print_error(f"Failed to delete release: {e}")
+        else:
+            detail = e.response.json().get("detail", str(e)) if e.response.content else str(e)
+            print_error(f"API error: {detail}")
         raise typer.Exit(code=1) from e
 
 
