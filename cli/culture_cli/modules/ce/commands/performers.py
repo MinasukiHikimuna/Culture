@@ -1,15 +1,15 @@
 """Performers-related commands for the CLI."""
 
-
 from typing import Annotated
 
-import polars as pl
+import httpx
 import typer
+from rich.panel import Panel
+from rich.table import Table
 
-from culture_cli.modules.ce.utils.config import config
+from culture_cli.api_client import CultureAPIClient
 from culture_cli.modules.ce.utils.formatters import (
-    format_performer_detail,
-    format_performers_table,
+    console,
     print_error,
     print_info,
     print_json,
@@ -25,9 +25,9 @@ performers_app = typer.Typer(help="Manage Culture Extractor performers")
 @performers_app.command("list")
 def list_performers(
     site: Annotated[
-        str | None,
+        str,
         typer.Option("--site", "-s", help="Filter by site (short name or UUID)"),
-    ] = None,
+    ],
     name: Annotated[
         str | None,
         typer.Option("--name", "-n", help="Filter by performer name (case-insensitive)"),
@@ -49,16 +49,12 @@ def list_performers(
         typer.Option("--json", "-j", help="Output as JSON instead of table"),
     ] = False,
 ) -> None:
-    """List performers from the Culture Extractor database.
-
-    By default, lists performers across all sites. Use --site to filter by a specific site.
-    Use --name to search by performer name. Combine filters as needed.
+    """List performers from a site.
 
     Examples:
-        ce performers list --name "Jane"                 # Search for Jane across all sites
         ce performers list --site meanawolf              # List all performers from Meana Wolf
         ce performers list -s meanawolf -n "Jane"        # Filter by site and name
-        ce performers list -n "Jane" --limit 20          # Limit results to 20
+        ce performers list -s meanawolf --limit 20       # Limit results to 20
         ce performers list --site meanawolf --json       # JSON output
         ce performers list --site meanawolf --only-unlinked  # Show unlinked performers only
     """
@@ -67,168 +63,34 @@ def list_performers(
             print_error("Cannot use both --only-linked and --only-unlinked")
             raise typer.Exit(code=1)
 
-        client = config.get_client()
+        filter_msg = f" matching '{name}'" if name else ""
+        print_info(f"Fetching performers from '{site}'{filter_msg}...")
 
-        # Fetch performers based on filters
-        performers_df, site_name = _fetch_performers(client, site, name)
+        with CultureAPIClient() as client:
+            performers = client.get_performers(site=site, name=name, limit=limit)
 
-        # Check if any results were found
-        if performers_df.shape[0] == 0:
-            msg = _build_not_found_message(site_name, name)
-            print_info(msg)
+        if not performers:
+            print_info(_build_not_found_message(site, name))
             raise typer.Exit(code=0)
-
-        # Enrich with external link status
-        performers_df = _enrich_with_link_status(client, performers_df)
 
         # Apply link status filters
-        if only_linked:
-            performers_df = performers_df.filter(
-                (performers_df["has_stashapp_link"]) | (performers_df["has_stashdb_link"])
-            )
-        elif only_unlinked:
-            performers_df = performers_df.filter(
-                (~performers_df["has_stashapp_link"]) & (~performers_df["has_stashdb_link"])
-            )
+        performers = _filter_by_link_status(performers, only_linked, only_unlinked)
 
-        # Check again after filtering
-        if performers_df.shape[0] == 0:
-            link_filter = "linked" if only_linked else "unlinked" if only_unlinked else ""
-            msg = f"No {link_filter} performers found"
-            if site_name:
-                msg += f" for site '{site_name}'"
-            if name:
-                msg += f" matching '{name}'"
-            print_info(msg)
+        if not performers:
+            print_info(_build_filtered_not_found_message(site, name, only_linked, only_unlinked))
             raise typer.Exit(code=0)
 
-        # Apply limit if specified
-        if limit and limit > 0:
-            performers_df = performers_df.head(limit)
-
         # Display results
-        count = performers_df.shape[0]
-        if json_output:
-            print_json(performers_df)
-        else:
-            table = format_performers_table(performers_df, site_name)
-            print_table(table)
-            print_success(_build_success_message(count, name, limit))
+        _display_performers(performers, site, name, limit, json_output)
 
-    except ValueError as e:
-        print_error(str(e))
+    except httpx.HTTPStatusError as e:
+        _handle_http_error(e, "fetch performers")
+    except httpx.ConnectError as e:
+        print_error("Could not connect to API. Is the server running?")
         raise typer.Exit(code=1) from e
     except Exception as e:
         print_error(f"Failed to fetch performers: {e}")
         raise typer.Exit(code=1) from e
-
-
-def _fetch_performers(client, site: str | None, name: str | None):
-    """Fetch performers based on site and name filters.
-
-    Args:
-        client: Culture Extractor client
-        site: Optional site identifier
-        name: Optional name filter
-
-    Returns:
-        Tuple of (performers_df, site_name or None)
-    """
-    if site:
-        site_uuid, site_name = _resolve_site_uuid(client, site)
-
-        filter_msg = f" matching '{name}'" if name else ""
-        print_info(f"Fetching performers from '{site_name}'{filter_msg}...")
-
-        performers_df = client.get_performers(site_uuid, name_filter=name)
-        return performers_df, site_name
-    if not name:
-        print_error("When querying across all sites, --name filter is required to avoid overwhelming results")
-        print_info("Use --name to search for a specific performer, or use --site to browse a specific site")
-        raise ValueError("Name filter required for all-sites query")
-
-    filter_msg = f" matching '{name}'"
-    print_info(f"Searching performers across all sites{filter_msg}...")
-
-    performers_df = client.get_performers_all(name_filter=name)
-    return performers_df, None
-
-
-def _resolve_site_uuid(client, site: str) -> tuple[str, str]:
-    """Resolve a site identifier (UUID, short name, or name) to UUID and name.
-
-    Args:
-        client: Culture Extractor client
-        site: Site identifier (UUID, short name, or full name)
-
-    Returns:
-        Tuple of (site_uuid, site_name)
-
-    Raises:
-        ValueError: If site is not found
-    """
-    sites_df = client.get_sites()
-
-    site_match = sites_df.filter(
-        (sites_df["ce_sites_short_name"] == site)
-        | (sites_df["ce_sites_uuid"] == site)
-        | (sites_df["ce_sites_name"] == site)
-    )
-
-    if site_match.shape[0] == 0:
-        print_error(f"Site '{site}' not found")
-        print_info("To see available sites, run: ce sites list")
-        raise ValueError(f"Site '{site}' not found")
-
-    return site_match["ce_sites_uuid"][0], site_match["ce_sites_name"][0]
-
-
-def _enrich_with_link_status(client, performers_df: pl.DataFrame) -> pl.DataFrame:
-    """Enrich performers dataframe with external link status.
-
-    Args:
-        client: Culture Extractor client
-        performers_df: DataFrame with performer information
-
-    Returns:
-        DataFrame with added has_stashapp_link and has_stashdb_link columns
-    """
-    # Get all performer UUIDs
-    performer_uuids = performers_df["ce_performers_uuid"].to_list()
-
-    # Fetch external IDs for all performers
-    stashapp_links = []
-    stashdb_links = []
-
-    for uuid in performer_uuids:
-        external_ids = client.get_performer_external_ids(uuid)
-        stashapp_links.append("stashapp" in external_ids)
-        stashdb_links.append("stashdb" in external_ids)
-
-    # Add columns to dataframe
-    performers_df = performers_df.with_columns([
-        pl.Series("has_stashapp_link", stashapp_links),
-        pl.Series("has_stashdb_link", stashdb_links),
-    ])
-
-    return performers_df
-
-
-def _build_not_found_message(site_name: str | None, name: str | None) -> str:
-    """Build a descriptive message when no performers are found."""
-    msg = "No performers found"
-    if site_name:
-        msg += f" for site '{site_name}'"
-    if name:
-        msg += f" matching '{name}'"
-    return msg
-
-
-def _build_success_message(count: int, name: str | None, limit: int | None) -> str:
-    """Build a success message with count and filter information."""
-    filter_msg = f" matching '{name}'" if name else ""
-    limit_msg = f" (showing first {limit})" if limit else ""
-    return f"Found {count} performer(s){filter_msg}{limit_msg}"
 
 
 @performers_app.command("show")
@@ -246,32 +108,24 @@ def show_performer(
         ce performers show 018f1477-f285-726b-9136-21956e3e8b92 --json
     """
     try:
-        # Get Culture Extractor client
-        client = config.get_client()
-
-        # Get the performer by UUID
-        performer_df = client.get_performer_by_uuid(uuid)
-
-        if performer_df.shape[0] == 0:
-            print_error(f"Performer with UUID '{uuid}' not found")
-            raise typer.Exit(code=1)
-
-        # Get external IDs
-        external_ids = client.get_performer_external_ids(uuid)
+        with CultureAPIClient() as client:
+            performer = client.get_performer(uuid)
 
         if json_output:
-            # Combine performer data with external IDs
-            performer_dict = performer_df.to_dicts()[0]
-            performer_dict["external_ids"] = external_ids
-            print_json(performer_dict)
+            print_json(performer)
         else:
-            # Format as detailed view
-            detail = format_performer_detail(performer_df, external_ids)
-            print(detail)
+            _print_performer_detail(performer)
             print_success(f"Performer details for {uuid}")
 
-    except ValueError as e:
-        print_error(str(e))
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 404:
+            detail = e.response.json().get("detail", str(e))
+            print_error(detail)
+        else:
+            print_error(f"API error: {e}")
+        raise typer.Exit(code=1) from e
+    except httpx.ConnectError as e:
+        print_error("Could not connect to API. Is the server running?")
         raise typer.Exit(code=1) from e
     except Exception as e:
         print_error(f"Failed to fetch performer: {e}")
@@ -315,44 +169,44 @@ def list_unmapped_performers(
         ce performers unmapped -s meanawolf --json                     # JSON output
     """
     try:
-        client = config.get_client()
-
-        # Resolve site UUID
-        site_uuid, site_name = _resolve_site_uuid(client, site)
-
-        # Build filter message
         filter_msg = f" matching '{name}'" if name else ""
-        print_info(f"Fetching performers from '{site_name}' without '{target_system}' mappings{filter_msg}...")
+        print_info(f"Fetching performers from '{site}' without '{target_system}' mappings{filter_msg}...")
 
-        # Fetch unmapped performers
-        performers_df = client.get_performers_unmapped(
-            site_uuid, target_system_name=target_system, name_filter=name
-        )
+        with CultureAPIClient() as client:
+            performers = client.get_performers(
+                site=site,
+                name=name,
+                unmapped_only=True,
+                target_system=target_system,
+                limit=limit,
+            )
 
-        # Check if any results were found
-        if performers_df.shape[0] == 0:
-            msg = f"No unmapped performers found for site '{site_name}'"
+        if not performers:
+            msg = f"No unmapped performers found for site '{site}'"
             if name:
                 msg += f" matching '{name}'"
             print_info(msg)
             raise typer.Exit(code=0)
 
-        # Apply limit if specified
-        if limit and limit > 0:
-            performers_df = performers_df.head(limit)
-
         # Display results
-        count = performers_df.shape[0]
+        site_name = performers[0].get("ce_site_name") if performers else site
         if json_output:
-            print_json(performers_df)
+            print_json(performers)
         else:
-            table = format_performers_table(performers_df, site_name)
+            table = _format_performers_table(performers, site_name)
             print_table(table)
             limit_msg = f" (showing first {limit})" if limit else ""
-            print_success(f"Found {count} unmapped performer(s){filter_msg}{limit_msg}")
+            print_success(f"Found {len(performers)} unmapped performer(s){filter_msg}{limit_msg}")
 
-    except ValueError as e:
-        print_error(str(e))
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 404:
+            detail = e.response.json().get("detail", str(e))
+            print_error(detail)
+        else:
+            print_error(f"API error: {e}")
+        raise typer.Exit(code=1) from e
+    except httpx.ConnectError as e:
+        print_error("Could not connect to API. Is the server running?")
         raise typer.Exit(code=1) from e
     except Exception as e:
         print_error(f"Failed to fetch unmapped performers: {e}")
@@ -388,31 +242,152 @@ def link_performer(
             print_info("Use --stashapp-id and/or --stashdb-id")
             raise typer.Exit(code=1)
 
-        # Get Culture Extractor client
-        client = config.get_client()
+        with CultureAPIClient() as client:
+            links = []
+            if stashapp_id is not None:
+                client.link_performer(uuid, "stashapp", str(stashapp_id))
+                links.append(f"Stashapp ID: {stashapp_id}")
+            if stashdb_id is not None:
+                client.link_performer(uuid, "stashdb", stashdb_id)
+                links.append(f"StashDB ID: {stashdb_id}")
 
-        # Verify performer exists
-        performer_df = client.get_performer_by_uuid(uuid)
-        if performer_df.shape[0] == 0:
-            print_error(f"Performer with UUID '{uuid}' not found")
-            raise typer.Exit(code=1)
+        print_success(f"Linked performer to {', '.join(links)}")
 
-        performer_name = performer_df["ce_performers_name"][0]
-
-        # Set external IDs
-        links = []
-        if stashapp_id is not None:
-            client.set_performer_external_id(uuid, "stashapp", str(stashapp_id))
-            links.append(f"Stashapp ID: {stashapp_id}")
-        if stashdb_id is not None:
-            client.set_performer_external_id(uuid, "stashdb", stashdb_id)
-            links.append(f"StashDB ID: {stashdb_id}")
-
-        print_success(f"Linked performer '{performer_name}' to {', '.join(links)}")
-
-    except ValueError as e:
-        print_error(str(e))
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 404:
+            detail = e.response.json().get("detail", str(e))
+            print_error(detail)
+        else:
+            print_error(f"API error: {e}")
+        raise typer.Exit(code=1) from e
+    except httpx.ConnectError as e:
+        print_error("Could not connect to API. Is the server running?")
         raise typer.Exit(code=1) from e
     except Exception as e:
         print_error(f"Failed to link performer: {e}")
         raise typer.Exit(code=1) from e
+
+
+def _build_not_found_message(site: str, name: str | None) -> str:
+    """Build a descriptive message when no performers are found."""
+    msg = f"No performers found for site '{site}'"
+    if name:
+        msg += f" matching '{name}'"
+    return msg
+
+
+def _build_success_message(count: int, name: str | None, limit: int | None) -> str:
+    """Build a success message with count and filter information."""
+    filter_msg = f" matching '{name}'" if name else ""
+    limit_msg = f" (showing first {limit})" if limit else ""
+    return f"Found {count} performer(s){filter_msg}{limit_msg}"
+
+
+def _format_performers_table(performers: list[dict], site_name: str | None) -> Table:
+    """Format performers list as a Rich table."""
+    title = f"Performers from {site_name}" if site_name else "Performers"
+    table = Table(title=title)
+
+    table.add_column("Name", style="cyan")
+    table.add_column("Site", style="green")
+    table.add_column("Short Name", style="yellow")
+    table.add_column("Links", justify="center")
+    table.add_column("UUID", style="dim")
+
+    for p in performers:
+        # Format link status
+        has_sa = p.get("has_stashapp_link", False)
+        has_db = p.get("has_stashdb_link", False)
+        if has_sa and has_db:
+            links = "SA+DB"
+        elif has_sa:
+            links = "SA"
+        elif has_db:
+            links = "DB"
+        else:
+            links = "-"
+
+        name = p.get("ce_performers_name") or "-"
+        site = p.get("ce_site_name") or p.get("ce_sites_name") or "-"
+        short_name = p.get("ce_performers_short_name") or "None"
+        uuid = p.get("ce_performers_uuid", "")
+
+        table.add_row(name, site, short_name, links, uuid)
+
+    return table
+
+
+def _print_performer_detail(performer: dict) -> None:
+    """Print a performer detail view as a Rich panel."""
+    lines = [
+        f"UUID: {performer.get('ce_performers_uuid', 'N/A')}",
+        f"Name: {performer.get('ce_performers_name', 'N/A')}",
+        f"Short Name: {performer.get('ce_performers_short_name') or 'N/A'}",
+        f"URL: {performer.get('ce_performers_url') or 'N/A'}",
+        "",
+        "External IDs",
+    ]
+
+    external_ids = performer.get("external_ids", {})
+    stashapp_id = external_ids.get("stashapp")
+    stashdb_id = external_ids.get("stashdb")
+
+    lines.append(f"Stashapp: {stashapp_id or 'Not linked'}")
+    lines.append(f"Stashdb: {stashdb_id or 'Not linked'}")
+
+    console.print(Panel("\n".join(lines), title="Performer Details"))
+
+
+def _filter_by_link_status(
+    performers: list[dict], only_linked: bool, only_unlinked: bool
+) -> list[dict]:
+    """Filter performers by link status."""
+    if only_linked:
+        return [
+            p for p in performers if p.get("has_stashapp_link") or p.get("has_stashdb_link")
+        ]
+    if only_unlinked:
+        return [
+            p
+            for p in performers
+            if not p.get("has_stashapp_link") and not p.get("has_stashdb_link")
+        ]
+    return performers
+
+
+def _build_filtered_not_found_message(
+    site: str, name: str | None, only_linked: bool, only_unlinked: bool
+) -> str:
+    """Build a message for when no performers match filter criteria."""
+    link_filter = "linked" if only_linked else "unlinked" if only_unlinked else ""
+    msg = f"No {link_filter} performers found for site '{site}'"
+    if name:
+        msg += f" matching '{name}'"
+    return msg
+
+
+def _display_performers(
+    performers: list[dict],
+    site: str,
+    name: str | None,
+    limit: int | None,
+    json_output: bool,
+) -> None:
+    """Display performers in the requested format."""
+    site_name = performers[0].get("ce_site_name") if performers else site
+    if json_output:
+        print_json(performers)
+    else:
+        table = _format_performers_table(performers, site_name)
+        print_table(table)
+        print_success(_build_success_message(len(performers), name, limit))
+
+
+def _handle_http_error(e: httpx.HTTPStatusError) -> None:
+    """Handle HTTP errors from the API."""
+    if e.response.status_code == 404:
+        detail = e.response.json().get("detail", str(e))
+        print_error(detail)
+    else:
+        print_error(f"API error: {e}")
+    raise typer.Exit(code=1) from e

@@ -158,3 +158,68 @@ class CultureAPIClient:
         response = self.client.delete(f"/releases/{uuid}")
         response.raise_for_status()
         return response.json()
+
+    # Performers endpoints
+
+    def get_performers(
+        self,
+        site: str,
+        name: str | None = None,
+        unmapped_only: bool = False,
+        target_system: str = "stashapp",
+        limit: int | None = None,
+    ) -> list[dict]:
+        """Get performers for a site.
+
+        Args:
+            site: Site identifier (UUID, short_name, or name)
+            name: Optional name filter (case-insensitive)
+            unmapped_only: Only show performers without external IDs
+            target_system: Target system to check for unmapped filter
+            limit: Optional limit on number of results
+
+        Returns:
+            List of performer dictionaries
+        """
+        params: dict[str, str | int | bool] = {"site": site}
+        if name is not None:
+            params["name"] = name
+        if unmapped_only:
+            params["unmapped_only"] = True
+            params["target_system"] = target_system
+        if limit is not None:
+            params["limit"] = limit
+        response = self.client.get("/performers", params=params)
+        response.raise_for_status()
+        return response.json()
+
+    def get_performer(self, uuid: str) -> dict:
+        """Get detailed information about a specific performer.
+
+        Args:
+            uuid: Performer UUID
+
+        Returns:
+            Performer dictionary with external_ids
+        """
+        response = self.client.get(f"/performers/{uuid}")
+        response.raise_for_status()
+        return response.json()
+
+    def link_performer(self, uuid: str, target: str, external_id: str) -> dict:
+        """Link a performer to an external system.
+
+        Args:
+            uuid: Performer UUID
+            target: Target system name (stashapp or stashdb)
+            external_id: External ID value
+
+        Returns:
+            Response with confirmation message
+        """
+        response = self.client.post(
+            f"/performers/{uuid}/link",
+            json={"target": target, "external_id": external_id},
+        )
+        response.raise_for_status()
+        return response.json()
