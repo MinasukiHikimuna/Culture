@@ -3,7 +3,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.routers import performers, releases, sites
+from api.routers import face_matching, performers, releases, sites
 
 
 app = FastAPI(
@@ -28,6 +28,9 @@ app.add_middleware(
 app.include_router(sites.router, prefix="/sites", tags=["sites"])
 app.include_router(releases.router, prefix="/releases", tags=["releases"])
 app.include_router(performers.router, prefix="/performers", tags=["performers"])
+app.include_router(
+    face_matching.router, prefix="/face-matching", tags=["face-matching"]
+)
 
 
 @app.get("/health")

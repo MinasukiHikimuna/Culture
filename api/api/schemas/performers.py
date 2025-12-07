@@ -50,6 +50,57 @@ class LinkPerformerRequest(BaseModel):
     external_id: str
 
 
+class BatchLinkItem(BaseModel):
+    """Single item in a batch link request."""
+
+    performer_uuid: str
+    stashapp_id: str | None = None
+    stashdb_id: str | None = None
+
+
+class BatchLinkRequest(BaseModel):
+    """Request to link multiple performers at once."""
+
+    links: list[BatchLinkItem]
+
+
+class BatchLinkResult(BaseModel):
+    """Result of a batch link operation."""
+
+    performer_uuid: str
+    success: bool
+    error: str | None = None
+
+
+class BatchLinkResponse(BaseModel):
+    """Response from batch link operation."""
+
+    results: list[BatchLinkResult]
+    successful: int
+    failed: int
+
+
+class StashDBSearchResult(BaseModel):
+    """StashDB performer search result."""
+
+    id: str
+    name: str
+    disambiguation: str | None = None
+    aliases: list[str] = []
+    country: str | None = None
+    image_url: str | None = None
+
+
+class StashappSearchResult(BaseModel):
+    """Stashapp performer search result."""
+
+    id: int
+    name: str
+    disambiguation: str | None = None
+    aliases: list[str] = []
+    stashdb_id: str | None = None
+
+
 # Phase 2: Face matching schemas (to be used later)
 
 

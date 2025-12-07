@@ -9,11 +9,18 @@ from fastapi.responses import FileResponse
 from api.config import get_metadata_base_path
 from api.dependencies import get_ce_client
 from api.schemas.performers import (
+    BatchLinkRequest,
+    BatchLinkResponse,
+    BatchLinkResult,
     LinkPerformerRequest,
     PerformerDetail,
     PerformerExternalIds,
     PerformerWithLinkStatus,
+    StashappSearchResult,
+    StashDBSearchResult,
 )
+from api.services.stashapp import StashappClient
+from api.services.stashdb import StashDBClient
 from libraries.client_culture_extractor import ClientCultureExtractor
 
 
@@ -176,6 +183,123 @@ def link_performer(
         "target": request.target,
         "external_id": request.external_id,
     }
+
+
+@router.post("/batch-link")
+def batch_link_performers(
+    request: BatchLinkRequest,
+    client: Annotated[ClientCultureExtractor, Depends(get_ce_client)],
+) -> BatchLinkResponse:
+    """Link multiple performers to external systems in one request."""
+    results = []
+    successful = 0
+    failed = 0
+
+    for link in request.links:
+        result = _process_batch_link_item(client, link)
+        results.append(result)
+        if result.success:
+            successful += 1
+        else:
+            failed += 1
+
+    return BatchLinkResponse(
+        results=results,
+        successful=successful,
+        failed=failed,
+    )
+
+
+@router.get("/search/stashdb")
+async def search_stashdb(
+    query: Annotated[str, Query(description="Search query", min_length=1)],
+    limit: Annotated[int, Query(description="Maximum results", ge=1, le=50)] = 10,
+) -> list[StashDBSearchResult]:
+    """Search StashDB for performers by name."""
+    stashdb = StashDBClient()
+    performers = await stashdb.search_performers(query, limit)
+
+    return [
+        StashDBSearchResult(
+            id=p.id,
+            name=p.name,
+            disambiguation=p.disambiguation,
+            aliases=p.aliases,
+            country=p.country,
+            image_url=p.image_url,
+        )
+        for p in performers
+    ]
+
+
+@router.get("/search/stashapp")
+async def search_stashapp(
+    query: Annotated[str, Query(description="Search query", min_length=1)],
+    limit: Annotated[int, Query(description="Maximum results", ge=1, le=50)] = 10,
+) -> list[StashappSearchResult]:
+    """Search Stashapp for performers by name."""
+    stashapp = StashappClient()
+    performers = await stashapp.search_performers(query, limit)
+
+    return [
+        StashappSearchResult(
+            id=p.id,
+            name=p.name,
+            disambiguation=p.disambiguation,
+            aliases=p.aliases,
+            stashdb_id=p.stashdb_id,
+        )
+        for p in performers
+    ]
+
+
+def _process_batch_link_item(
+    client: ClientCultureExtractor,
+    link,
+) -> BatchLinkResult:
+    """Process a single batch link item.
+
+    Args:
+        client: CE database client
+        link: BatchLinkItem to process
+
+    Returns:
+        BatchLinkResult
+    """
+    performer_uuid = link.performer_uuid
+
+    # Verify performer exists
+    performer_df = client.get_performer_by_uuid(performer_uuid)
+    if performer_df.is_empty():
+        return BatchLinkResult(
+            performer_uuid=performer_uuid,
+            success=False,
+            error=f"Performer '{performer_uuid}' not found",
+        )
+
+    # Link to stashapp if provided
+    if link.stashapp_id:
+        try:
+            client.set_performer_external_id(performer_uuid, "stashapp", link.stashapp_id)
+        except ValueError as e:
+            return BatchLinkResult(
+                performer_uuid=performer_uuid,
+                success=False,
+                error=f"Failed to link stashapp: {e}",
+            )
+
+    # Link to stashdb if provided
+    if link.stashdb_id:
+        try:
+            client.set_performer_external_id(performer_uuid, "stashdb", link.stashdb_id)
+        except ValueError as e:
+            return BatchLinkResult(
+                performer_uuid=performer_uuid,
+                success=False,
+                error=f"Failed to link stashdb: {e}",
+            )
+
+    return BatchLinkResult(performer_uuid=performer_uuid, success=True)
 
 
 def _resolve_site(client: ClientCultureExtractor, site: str) -> tuple[str, str]:
