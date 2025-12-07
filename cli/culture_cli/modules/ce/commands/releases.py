@@ -5,14 +5,16 @@ import shutil
 from pathlib import Path
 from typing import Annotated
 
+import httpx
 import typer
 from rich.console import Console
 from rich.table import Table
 
+from culture_cli.api_client import CultureAPIClient
 from culture_cli.modules.ce.utils.config import config
 from culture_cli.modules.ce.utils.formatters import (
-    format_release_detail,
-    format_releases_table,
+    format_release_detail_from_dict,
+    format_releases_table_from_list,
     print_error,
     print_info,
     print_json,
@@ -26,69 +28,9 @@ from culture_cli.modules.ce.utils.formatters import (
 releases_app = typer.Typer(help="Manage Culture Extractor releases")
 
 
-def _resolve_site_for_releases(client, site: str) -> tuple[str, str]:
-    """Resolve site identifier to UUID and name.
-
-    Returns:
-        Tuple of (site_uuid, site_name)
-    """
-    sites_df = client.get_sites()
-    site_match = sites_df.filter(
-        (sites_df["ce_sites_short_name"] == site)
-        | (sites_df["ce_sites_uuid"] == site)
-        | (sites_df["ce_sites_name"] == site)
-    )
-
-    if site_match.shape[0] == 0:
-        print_error(f"Site '{site}' not found")
-        print_info("To see available sites, run: ce sites list")
-        raise typer.Exit(code=1)
-
-    return site_match["ce_sites_uuid"][0], site_match["ce_sites_name"][0]
-
-
-def _resolve_tag_for_releases(client, site: str, site_uuid: str, site_name: str, tag: str) -> tuple[str, str]:
-    """Resolve tag identifier to UUID and name for a given site.
-
-    Returns:
-        Tuple of (tag_uuid, tag_name)
-    """
-    tags_df = client.get_tags(site_uuid)
-    tag_match = tags_df.filter(
-        (tags_df["ce_tags_name"] == tag)
-        | (tags_df["ce_tags_uuid"] == tag)
-        | (tags_df["ce_tags_short_name"] == tag)
-    )
-
-    if tag_match.shape[0] == 0:
-        print_error(f"Tag '{tag}' not found for site '{site_name}'")
-        print_info(f"To see available tags, run: ce tags list --site {site}")
-        raise typer.Exit(code=1)
-
-    return tag_match["ce_tags_uuid"][0], tag_match["ce_tags_name"][0]
-
-
-def _resolve_performer_for_releases(
-    client, site: str, site_uuid: str, site_name: str, performer: str
-) -> tuple[str, str]:
-    """Resolve performer identifier to UUID and name for a given site.
-
-    Returns:
-        Tuple of (performer_uuid, performer_name)
-    """
-    performers_df = client.get_performers(site_uuid)
-    performer_match = performers_df.filter(
-        (performers_df["ce_performers_name"] == performer)
-        | (performers_df["ce_performers_uuid"] == performer)
-        | (performers_df["ce_performers_short_name"] == performer)
-    )
-
-    if performer_match.shape[0] == 0:
-        print_error(f"Performer '{performer}' not found for site '{site_name}'")
-        print_info(f"To see available performers, run: ce performers list --site {site}")
-        raise typer.Exit(code=1)
-
-    return performer_match["ce_performers_uuid"][0], performer_match["ce_performers_name"][0]
+def _get_api_client() -> CultureAPIClient:
+    """Get an API client instance."""
+    return CultureAPIClient()
 
 
 @releases_app.command("list")
@@ -132,63 +74,50 @@ def list_releases(
         ce releases list --site meanawolf --json               # JSON output
     """
     try:
-        client = config.get_client()
-
         if not site:
             print_error("Site filter is required. Use --site <site_name> or --site <uuid>")
             print_info("To see available sites, run: ce sites list")
             raise typer.Exit(code=1)
 
-        site_uuid, site_name = _resolve_site_for_releases(client, site)
-
-        tag_uuid = None
-        tag_name = None
-        if tag:
-            tag_uuid, tag_name = _resolve_tag_for_releases(client, site, site_uuid, site_name, tag)
-
-        performer_uuid = None
-        performer_name = None
-        if performer:
-            performer_uuid, performer_name = _resolve_performer_for_releases(
-                client, site, site_uuid, site_name, performer
-            )
-
         filter_parts = []
-        if tag_name:
-            filter_parts.append(f"tag '{tag_name}'")
-        if performer_name:
-            filter_parts.append(f"performer '{performer_name}'")
+        if tag:
+            filter_parts.append(f"tag '{tag}'")
+        if performer:
+            filter_parts.append(f"performer '{performer}'")
         filter_msg = f" with {' and '.join(filter_parts)}" if filter_parts else ""
-        print_info(f"Fetching releases from '{site_name}'{filter_msg}...")
+        print_info(f"Fetching releases from '{site}'{filter_msg}...")
 
-        releases_df = client.get_releases(site_uuid, tag_uuid=tag_uuid, performer_uuid=performer_uuid)
+        with _get_api_client() as api:
+            releases = api.get_releases(site, tag=tag, performer=performer, limit=limit, desc=desc)
 
-        if releases_df.shape[0] == 0:
-            msg = f"No releases found for site '{site_name}'"
+        if not releases:
+            msg = f"No releases found for site '{site}'"
             if filter_msg:
                 msg += filter_msg
             print_info(msg)
             raise typer.Exit(code=0)
 
-        releases_df = releases_df.sort("ce_release_date", descending=desc, nulls_last=True)
-
-        if limit and limit > 0:
-            releases_df = releases_df.head(limit)
-
-        count = releases_df.shape[0]
+        count = len(releases)
         if json_output:
-            print_json(releases_df)
+            print_json(releases)
         else:
-            table = format_releases_table(releases_df, site_name)
+            site_name = releases[0]["ce_site_name"] if releases else site
+            table = format_releases_table_from_list(releases, site_name)
             print_table(table)
             limit_msg = f" (showing first {limit})" if limit else ""
             print_success(f"Found {count} release(s){filter_msg}{limit_msg}")
 
-    except ValueError as e:
-        print_error(str(e))
-        raise typer.Exit(code=1) from e
-    except Exception as e:
-        print_error(f"Failed to fetch releases: {e}")
+    except httpx.ConnectError:
+        print_error("Cannot connect to Culture API. Is the API server running?")
+        print_info("Start the API with: cd api && uv run uvicorn api.main:app --port 8000")
+        raise typer.Exit(code=1) from None
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 404:
+            detail = e.response.json().get("detail", str(e)) if e.response.content else str(e)
+            print_error(detail)
+        else:
+            detail = e.response.json().get("detail", str(e)) if e.response.content else str(e)
+            print_error(f"API error: {detail}")
         raise typer.Exit(code=1) from e
 
 
@@ -207,64 +136,40 @@ def show_release(
         ce releases show 018f1477-f285-726b-9136-21956e3e8b92 --json
     """
     try:
-        # Get Culture Extractor client
-        client = config.get_client()
-
-        # Get the release by UUID
-        release_df = client.get_release_by_uuid(uuid)
-
-        if release_df.shape[0] == 0:
-            print_error(f"Release with UUID '{uuid}' not found")
-            raise typer.Exit(code=1)
-
-        # Get external IDs
-        external_ids = client.get_release_external_ids(uuid)
-
-        # Get performers for this release
-        performers_df = client.get_release_performers(uuid)
-
-        # Get tags for this release
-        tags_df = client.get_release_tags(uuid)
-
-        # Get downloads for this release
-        downloads_df = client.get_release_downloads(uuid)
+        with _get_api_client() as api:
+            release = api.get_release(uuid)
 
         if json_output:
-            # Combine release data with external IDs, performers, tags, and downloads
-            release_dict = release_df.to_dicts()[0]
-            release_dict["external_ids"] = external_ids
-            release_dict["performers"] = performers_df.to_dicts() if performers_df.shape[0] > 0 else []
-            release_dict["tags"] = tags_df.to_dicts() if tags_df.shape[0] > 0 else []
-            release_dict["downloads"] = downloads_df.to_dicts() if downloads_df.shape[0] > 0 else []
-            print_json(release_dict)
+            print_json(release)
         else:
-            # Format as detailed view
-            detail = format_release_detail(release_df, external_ids)
+            detail = format_release_detail_from_dict(release)
             print(detail)
 
-            # Display performers if any
-            if performers_df.shape[0] > 0:
-                _display_performers_table(performers_df)
+            if release.get("performers"):
+                _display_performers_table(release["performers"])
 
-            # Display tags if any
-            if tags_df.shape[0] > 0:
-                _display_tags_table(tags_df)
+            if release.get("tags"):
+                _display_tags_table(release["tags"])
 
-            # Display downloads if any
-            if downloads_df.shape[0] > 0:
-                _display_downloads_table(downloads_df)
+            if release.get("downloads"):
+                _display_downloads_table(release["downloads"])
 
             print_success(f"Release details for {uuid}")
 
-    except ValueError as e:
-        print_error(str(e))
-        raise typer.Exit(code=1) from e
-    except Exception as e:
-        print_error(f"Failed to fetch release: {e}")
+    except httpx.ConnectError:
+        print_error("Cannot connect to Culture API. Is the API server running?")
+        print_info("Start the API with: cd api && uv run uvicorn api.main:app --port 8000")
+        raise typer.Exit(code=1) from None
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 404:
+            print_error(f"Release with UUID '{uuid}' not found")
+        else:
+            detail = e.response.json().get("detail", str(e)) if e.response.content else str(e)
+            print_error(f"API error: {detail}")
         raise typer.Exit(code=1) from e
 
 
-def _display_performers_table(performers_df) -> None:
+def _display_performers_table(performers: list[dict]) -> None:
     """Display performers in a formatted table."""
     console = Console()
     performer_table = Table(title="Performers", show_header=True, header_style="bold magenta")
@@ -273,36 +178,36 @@ def _display_performers_table(performers_df) -> None:
     performer_table.add_column("Stashapp ID", style="yellow")
     performer_table.add_column("StashDB ID", style="blue")
 
-    for performer in performers_df.iter_rows(named=True):
+    for performer in performers:
         performer_table.add_row(
-            performer["ce_performers_name"] or "N/A",
-            performer["ce_performers_uuid"] or "N/A",
-            performer["ce_performers_stashapp_id"] or "Not linked",
-            performer["ce_performers_stashdb_id"] or "Not linked",
+            performer.get("ce_performers_name") or "N/A",
+            performer.get("ce_performers_uuid") or "N/A",
+            performer.get("ce_performers_stashapp_id") or "Not linked",
+            performer.get("ce_performers_stashdb_id") or "Not linked",
         )
 
     console.print(performer_table)
     print()
 
 
-def _display_tags_table(tags_df) -> None:
+def _display_tags_table(tags: list[dict]) -> None:
     """Display tags in a formatted table."""
     console = Console()
     tags_table = Table(title="Tags", show_header=True, header_style="bold magenta")
     tags_table.add_column("Name", style="green")
     tags_table.add_column("CE UUID", style="cyan")
 
-    for tag in tags_df.iter_rows(named=True):
+    for tag in tags:
         tags_table.add_row(
-            tag["ce_tags_name"] or "N/A",
-            tag["ce_tags_uuid"] or "N/A",
+            tag.get("ce_tags_name") or "N/A",
+            tag.get("ce_tags_uuid") or "N/A",
         )
 
     console.print(tags_table)
     print()
 
 
-def _display_downloads_table(downloads_df) -> None:
+def _display_downloads_table(downloads: list[dict]) -> None:
     """Display downloaded files in a formatted table."""
     console = Console()
     downloads_table = Table(title="Downloaded Files", show_header=True, header_style="bold magenta")
@@ -312,23 +217,19 @@ def _display_downloads_table(downloads_df) -> None:
     downloads_table.add_column("Variant", style="blue")
     downloads_table.add_column("Downloaded At", style="white")
 
-    for download in downloads_df.iter_rows(named=True):
+    for download in downloads:
         filename = (
-            download["ce_downloads_saved_filename"]
-            or download["ce_downloads_original_filename"]
+            download.get("ce_downloads_saved_filename")
+            or download.get("ce_downloads_original_filename")
             or "N/A"
         )
-        downloaded_at = (
-            str(download["ce_downloads_downloaded_at"])
-            if download["ce_downloads_downloaded_at"]
-            else "N/A"
-        )
+        downloaded_at = download.get("ce_downloads_downloaded_at") or "N/A"
         downloads_table.add_row(
             filename,
-            download["ce_downloads_file_type"] or "N/A",
-            download["ce_downloads_content_type"] or "N/A",
-            download["ce_downloads_variant"] or "N/A",
-            downloaded_at,
+            download.get("ce_downloads_file_type") or "N/A",
+            download.get("ce_downloads_content_type") or "N/A",
+            download.get("ce_downloads_variant") or "N/A",
+            str(downloaded_at),
         )
 
     console.print(downloads_table)
@@ -358,39 +259,35 @@ def link_release(
         ce releases link 018f1477-f285-726b-9136-21956e3e8b92 --stashapp-id 12345 --stashdb-id "a1b2c3d4-..."
     """
     try:
-        # Validate that at least one ID was provided
         if stashapp_id is None and stashdb_id is None:
             print_error("At least one external ID must be provided")
             print_info("Use --stashapp-id and/or --stashdb-id")
             raise typer.Exit(code=1)
 
-        # Get Culture Extractor client
-        client = config.get_client()
+        with _get_api_client() as api:
+            release = api.get_release(uuid)
+            release_name = release["ce_release_name"]
 
-        # Verify release exists
-        release_df = client.get_release_by_uuid(uuid)
-        if release_df.shape[0] == 0:
+            links = []
+            if stashapp_id is not None:
+                api.link_release(uuid, "stashapp", str(stashapp_id))
+                links.append(f"Stashapp ID: {stashapp_id}")
+            if stashdb_id is not None:
+                api.link_release(uuid, "stashdb", stashdb_id)
+                links.append(f"StashDB ID: {stashdb_id}")
+
+            print_success(f"Linked release '{release_name}' to {', '.join(links)}")
+
+    except httpx.ConnectError:
+        print_error("Cannot connect to Culture API. Is the API server running?")
+        print_info("Start the API with: cd api && uv run uvicorn api.main:app --port 8000")
+        raise typer.Exit(code=1) from None
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 404:
             print_error(f"Release with UUID '{uuid}' not found")
-            raise typer.Exit(code=1)
-
-        release_name = release_df["ce_release_name"][0]
-
-        # Set external IDs
-        links = []
-        if stashapp_id is not None:
-            client.set_release_external_id(uuid, "stashapp", str(stashapp_id))
-            links.append(f"Stashapp ID: {stashapp_id}")
-        if stashdb_id is not None:
-            client.set_release_external_id(uuid, "stashdb", stashdb_id)
-            links.append(f"StashDB ID: {stashdb_id}")
-
-        print_success(f"Linked release '{release_name}' to {', '.join(links)}")
-
-    except ValueError as e:
-        print_error(str(e))
-        raise typer.Exit(code=1) from e
-    except Exception as e:
-        print_error(f"Failed to link release: {e}")
+        else:
+            detail = e.response.json().get("detail", str(e)) if e.response.content else str(e)
+            print_error(f"API error: {detail}")
         raise typer.Exit(code=1) from e
 
 
@@ -412,6 +309,7 @@ def delete_release(
         ce releases delete 018f1477-f285-726b-9136-21956e3e8b92
         ce releases delete 018f1477-f285-726b-9136-21956e3e8b92 --yes
     """
+    # Delete still uses direct database client since it involves file operations
     try:
         client = config.get_client()
 
@@ -430,9 +328,7 @@ def delete_release(
                 raise typer.Exit(code=0)
 
         result = client.delete_release(release_uuid)
-
         files_deleted = _delete_release_files(result["site_name"], release_uuid, result["downloads"])
-
         _print_deletion_summary(result, files_deleted)
 
     except ValueError as e:

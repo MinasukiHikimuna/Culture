@@ -64,6 +64,43 @@ def format_releases_table(releases_df: pl.DataFrame, site_name: str | None = Non
     return table
 
 
+def format_releases_table_from_list(releases: list[dict], site_name: str | None = None) -> Table:
+    """Format releases list as a Rich table.
+
+    Args:
+        releases: List of release dictionaries
+        site_name: Optional site name for table title
+
+    Returns:
+        Rich Table object ready for display
+    """
+    title = f"Releases from {site_name}" if site_name else "Releases"
+    table = Table(title=title, show_header=True, header_style="bold cyan", expand=False)
+
+    table.add_column("Date", style="dim")
+    table.add_column("Name", style="green")
+    table.add_column("Short Name", style="yellow")
+    table.add_column("UUID", style="dim")
+
+    for row in releases:
+        release_date = str(row.get("ce_release_date", "")) or "-"
+        release_name = str(row.get("ce_release_name", "")) or "-"
+        release_short_name = str(row.get("ce_release_short_name", "")) or "-"
+        release_uuid = str(row.get("ce_release_uuid", "")) or "-"
+
+        if release_name != "-" and len(release_name) > 50:
+            release_name = release_name[:47] + "..."
+
+        table.add_row(
+            release_date,
+            release_name,
+            release_short_name,
+            release_uuid,
+        )
+
+    return table
+
+
 def format_release_detail(release_df: pl.DataFrame, external_ids: dict | None = None) -> str:
     """Format a single release as detailed text view.
 
@@ -101,6 +138,52 @@ def format_release_detail(release_df: pl.DataFrame, external_ids: dict | None = 
 
     # Show available files if present
     available_files = row.get("ce_release_available_files")
+    if available_files:
+        try:
+            files_json = json.loads(available_files) if isinstance(available_files, str) else available_files
+            console.print("\n[bold cyan]Available Files:[/bold cyan]")
+            console.print_json(json.dumps(files_json, indent=2))
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    return ""
+
+
+def format_release_detail_from_dict(release: dict) -> str:
+    """Format a single release dictionary as detailed text view.
+
+    Args:
+        release: Dictionary with release information (from API response)
+
+    Returns:
+        Formatted string with release details
+    """
+    details = []
+    details.append("[bold cyan]Scene Details[/bold cyan]\n")
+    details.append(f"[yellow]UUID:[/yellow] {release.get('ce_release_uuid', 'N/A')}")
+    details.append(f"[yellow]Name:[/yellow] {release.get('ce_release_name', 'N/A')}")
+    details.append(f"[yellow]Short Name:[/yellow] {release.get('ce_release_short_name', 'N/A')}")
+    details.append(f"[yellow]Date:[/yellow] {release.get('ce_release_date', 'N/A')}")
+    details.append(f"[yellow]URL:[/yellow] {release.get('ce_release_url', 'N/A')}")
+    details.append("\n[yellow]Description:[/yellow]")
+    details.append(release.get("ce_release_description", "N/A") or "N/A")
+
+    # Add external IDs if present
+    external_ids = release.get("external_ids", {})
+    if external_ids:
+        has_ids = any(v for v in external_ids.values() if v)
+        if has_ids:
+            details.append("\n[bold cyan]External IDs[/bold cyan]")
+            for system_name, ext_id in external_ids.items():
+                if ext_id:
+                    formatted_name = system_name.replace("_", " ").title()
+                    details.append(f"[yellow]{formatted_name}:[/yellow] {ext_id}")
+
+    detail_text = "\n".join(details)
+    console.print(Panel(detail_text, border_style="cyan"))
+
+    # Show available files if present
+    available_files = release.get("ce_release_available_files")
     if available_files:
         try:
             files_json = json.loads(available_files) if isinstance(available_files, str) else available_files

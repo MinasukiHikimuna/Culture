@@ -79,3 +79,69 @@ class CultureAPIClient:
         )
         response.raise_for_status()
         return response.json()
+
+    # Releases endpoints
+
+    def get_releases(
+        self,
+        site: str,
+        tag: str | None = None,
+        performer: str | None = None,
+        limit: int | None = None,
+        desc: bool = False,
+    ) -> list[dict]:
+        """Get releases for a site.
+
+        Args:
+            site: Site identifier (UUID, short_name, or name)
+            tag: Optional tag filter (UUID, short_name, or name)
+            performer: Optional performer filter (UUID, short_name, or name)
+            limit: Optional limit on number of results
+            desc: Sort by release date descending (newest first)
+
+        Returns:
+            List of release dictionaries
+        """
+        params: dict[str, str | int] = {"site": site}
+        if tag is not None:
+            params["tag"] = tag
+        if performer is not None:
+            params["performer"] = performer
+        if limit is not None:
+            params["limit"] = limit
+        if desc:
+            params["desc"] = "true"
+        response = self.client.get("/releases", params=params)
+        response.raise_for_status()
+        return response.json()
+
+    def get_release(self, uuid: str) -> dict:
+        """Get detailed information about a specific release.
+
+        Args:
+            uuid: Release UUID
+
+        Returns:
+            Release dictionary with performers, tags, downloads, and external_ids
+        """
+        response = self.client.get(f"/releases/{uuid}")
+        response.raise_for_status()
+        return response.json()
+
+    def link_release(self, uuid: str, target: str, external_id: str) -> dict:
+        """Link a release to an external system.
+
+        Args:
+            uuid: Release UUID
+            target: Target system name (stashapp or stashdb)
+            external_id: External ID value
+
+        Returns:
+            Response with confirmation message
+        """
+        response = self.client.post(
+            f"/releases/{uuid}/link",
+            json={"target": target, "external_id": external_id},
+        )
+        response.raise_for_status()
+        return response.json()
