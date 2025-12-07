@@ -133,8 +133,9 @@ class WowGirlsSpider(scrapy.Spider):
         content_items = response.css("div.content_item")
 
         # Track counts for this page
-        new_releases_count = 0
-        existing_releases_count = 0
+        new_count = 0
+        forced_count = 0
+        exists_count = 0
         release_lines = []
 
         for item in content_items:
@@ -172,17 +173,17 @@ class WowGirlsSpider(scrapy.Spider):
                 # Fallback to image alt
                 title = item.css("img::attr(alt)").get() or short_name
 
-            # Check if this release already exists
-            existing_release = self.existing_releases.get(short_name)
+            # Check release status
+            status, log_line = self._get_release_status(short_name, title, content_type)
+            release_lines.append(log_line)
 
-            if existing_release and not self.force_update:
-                existing_releases_count += 1
-                release_lines.append(f"  [EXISTS] {title} [{content_type}]")
+            if status == "new":
+                new_count += 1
+            elif status == "forced":
+                forced_count += 1
+            else:
+                exists_count += 1
                 continue
-
-            # This is a new release
-            new_releases_count += 1
-            release_lines.append(f"  [NEW]    {title} [{content_type}]")
 
             # Request detail page with appropriate callback
             if is_film:
@@ -207,16 +208,15 @@ class WowGirlsSpider(scrapy.Spider):
                 )
 
         # Log page summary
-        releases_detail = "\n".join(release_lines) if release_lines else "  (no releases found)"
-        self.logger.info(
-            f"Updates page {page_num}: {new_releases_count} new, {existing_releases_count} existing\n{releases_detail}"
+        self._log_page_summary(
+            "Updates", page_num, new_count, forced_count, exists_count, release_lines
         )
 
         # Handle pagination
         next_page = self._get_next_page(response, page_num)
         if next_page:
-            # Early stopping logic
-            if not self.scan_all and new_releases_count == 0 and existing_releases_count > 0:
+            # Early stopping logic: stop if no new/forced releases and some existing
+            if not self.scan_all and new_count == 0 and forced_count == 0 and exists_count > 0:
                 self.logger.info(
                     f"Stopping updates: all releases on page {page_num} already exist. "
                     f"Use -a scan_all=1 to scan all pages."
@@ -254,8 +254,9 @@ class WowGirlsSpider(scrapy.Spider):
         film_items = response.css('a[href*="/film/"]')
 
         # Track counts for this page
-        new_releases_count = 0
-        existing_releases_count = 0
+        new_count = 0
+        forced_count = 0
+        exists_count = 0
         release_lines = []
 
         # Process unique film URLs (dedupe since title appears twice)
@@ -277,17 +278,17 @@ class WowGirlsSpider(scrapy.Spider):
             if title:
                 title = title.strip()
 
-            # Check if this release already exists
-            existing_release = self.existing_releases.get(short_name)
+            # Check release status
+            status, log_line = self._get_release_status(short_name, title, "film")
+            release_lines.append(log_line)
 
-            if existing_release and not self.force_update:
-                existing_releases_count += 1
-                release_lines.append(f"  [EXISTS] {title} [film]")
+            if status == "new":
+                new_count += 1
+            elif status == "forced":
+                forced_count += 1
+            else:
+                exists_count += 1
                 continue
-
-            # This is a new release
-            new_releases_count += 1
-            release_lines.append(f"  [NEW]    {title} [film]")
 
             # Request detail page
             yield scrapy.Request(
@@ -301,16 +302,15 @@ class WowGirlsSpider(scrapy.Spider):
             )
 
         # Log page summary
-        releases_detail = "\n".join(release_lines) if release_lines else "  (no releases found)"
-        self.logger.info(
-            f"Films page {page_num}: {new_releases_count} new, {existing_releases_count} existing\n{releases_detail}"
+        self._log_page_summary(
+            "Films", page_num, new_count, forced_count, exists_count, release_lines
         )
 
         # Handle pagination
         next_page = self._get_next_page(response, page_num)
         if next_page:
-            # Early stopping logic
-            if not self.scan_all and new_releases_count == 0 and existing_releases_count > 0:
+            # Early stopping logic: stop if no new/forced releases and some existing
+            if not self.scan_all and new_count == 0 and forced_count == 0 and exists_count > 0:
                 self.logger.info(
                     f"Stopping films: all releases on page {page_num} already exist. "
                     f"Use -a scan_all=1 to scan all pages."
@@ -348,8 +348,9 @@ class WowGirlsSpider(scrapy.Spider):
         gallery_items = response.css('a[href*="/gallery/"]')
 
         # Track counts for this page
-        new_releases_count = 0
-        existing_releases_count = 0
+        new_count = 0
+        forced_count = 0
+        exists_count = 0
         release_lines = []
 
         # Process unique gallery URLs (dedupe since title appears twice)
@@ -371,17 +372,17 @@ class WowGirlsSpider(scrapy.Spider):
             if title:
                 title = title.strip()
 
-            # Check if this release already exists
-            existing_release = self.existing_releases.get(short_name)
+            # Check release status
+            status, log_line = self._get_release_status(short_name, title, "gallery")
+            release_lines.append(log_line)
 
-            if existing_release and not self.force_update:
-                existing_releases_count += 1
-                release_lines.append(f"  [EXISTS] {title} [gallery]")
+            if status == "new":
+                new_count += 1
+            elif status == "forced":
+                forced_count += 1
+            else:
+                exists_count += 1
                 continue
-
-            # This is a new release
-            new_releases_count += 1
-            release_lines.append(f"  [NEW]    {title} [gallery]")
 
             # Request detail page
             yield scrapy.Request(
@@ -395,16 +396,15 @@ class WowGirlsSpider(scrapy.Spider):
             )
 
         # Log page summary
-        releases_detail = "\n".join(release_lines) if release_lines else "  (no releases found)"
-        self.logger.info(
-            f"Galleries page {page_num}: {new_releases_count} new, {existing_releases_count} existing\n{releases_detail}"
+        self._log_page_summary(
+            "Galleries", page_num, new_count, forced_count, exists_count, release_lines
         )
 
         # Handle pagination
         next_page = self._get_next_page(response, page_num)
         if next_page:
-            # Early stopping logic
-            if not self.scan_all and new_releases_count == 0 and existing_releases_count > 0:
+            # Early stopping logic: stop if no new/forced releases and some existing
+            if not self.scan_all and new_count == 0 and forced_count == 0 and exists_count > 0:
                 self.logger.info(
                     f"Stopping galleries: all releases on page {page_num} already exist. "
                     f"Use -a scan_all=1 to scan all pages."
@@ -426,6 +426,35 @@ class WowGirlsSpider(scrapy.Spider):
                 meta={"page": next_page},
                 priority=-page_num,
             )
+
+    def _get_release_status(self, short_name, title, content_type):
+        """Determine release status and return (status, log_line).
+
+        Returns:
+            tuple: (status, log_line) where:
+                - status: 'new', 'forced', or 'exists'
+                - log_line: Formatted log line for this release
+        """
+        existing = self.existing_releases.get(short_name)
+        if existing and not self.force_update:
+            return "exists", f"  [EXISTS] {title} [{content_type}]"
+        elif existing and self.force_update:
+            return "forced", f"  [FORCED] {title} [{content_type}]"
+        else:
+            return "new", f"  [NEW]    {title} [{content_type}]"
+
+    def _log_page_summary(self, page_type, page_num, new_count, forced_count, exists_count, lines):
+        """Log a summary of releases found on a page."""
+        releases_detail = "\n".join(lines) if lines else "  (no releases found)"
+        parts = []
+        if new_count > 0:
+            parts.append(f"{new_count} new")
+        if forced_count > 0:
+            parts.append(f"{forced_count} forced")
+        if exists_count > 0:
+            parts.append(f"{exists_count} existing")
+        summary = ", ".join(parts) if parts else "0 releases"
+        self.logger.info(f"{page_type} page {page_num}: {summary}\n{releases_detail}")
 
     def _get_next_page(self, response, current_page):
         """Extract next page number from pagination."""
@@ -629,9 +658,7 @@ class WowGirlsSpider(scrapy.Spider):
 
         # Add only the highest quality video for download
         # TEMPORARY: Only download if this release has NO video downloads at all
-        has_any_video_download = any(
-            ft == "video" for (ft, ct, v) in downloaded_files
-        )
+        has_any_video_download = any(ft == "video" for (ft, ct, v) in downloaded_files)
 
         if download_files and not has_any_video_download:
             # Sort by resolution (width * height) descending, prefer H.265
@@ -667,7 +694,9 @@ class WowGirlsSpider(scrapy.Spider):
                     )
                 )
         elif has_any_video_download:
-            self.logger.info(f"Skipping video download for {short_name} - already has video downloads")
+            self.logger.info(
+                f"Skipping video download for {short_name} - already has video downloads"
+            )
 
         # Create post data for json_document
         post_data = {
@@ -824,9 +853,7 @@ class WowGirlsSpider(scrapy.Spider):
 
         # Add only the highest quality (Original) for download
         # TEMPORARY: Only download if this release has NO gallery/zip downloads at all
-        has_any_gallery_download = any(
-            ft == "zip" for (ft, ct, v) in downloaded_files
-        )
+        has_any_gallery_download = any(ft == "zip" for (ft, ct, v) in downloaded_files)
 
         original_download = next((df for df in download_files if df["variant"] == "Original"), None)
         if original_download and not has_any_gallery_download:
@@ -852,7 +879,9 @@ class WowGirlsSpider(scrapy.Spider):
                     )
                 )
         elif has_any_gallery_download:
-            self.logger.info(f"Skipping gallery download for {short_name} - already has gallery downloads")
+            self.logger.info(
+                f"Skipping gallery download for {short_name} - already has gallery downloads"
+            )
 
         # Create post data for json_document
         post_data = {
