@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.14"
 
 [tool.uv.workspace]
-members = ["cli", "extractors/scrapy", "libraries"]
+members = ["api", "cli", "extractors/scrapy", "libraries"]
 
 [tool.uv.sources]
 culture-libraries = { workspace = true }
@@ -63,6 +63,8 @@ ignore = [
     "PLR0913",  # Too many arguments to function call
     "PLR2004",  # Magic value used in comparison
     "RET504",   # Unnecessary assignment before return
+    "TC001",    # Move import into type-checking block (breaks runtime for FastAPI deps)
+    "TC003",    # Move stdlib import into type-checking block (breaks runtime)
 ]
 
 fixable = ["ALL"]

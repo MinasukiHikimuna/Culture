@@ -112,11 +112,11 @@ def format_release_detail(release_df: pl.DataFrame, external_ids: dict | None = 
     return ""
 
 
-def format_sites_table(sites_df: pl.DataFrame) -> Table:
-    """Format sites dataframe as a Rich table.
+def format_sites_table(sites_df: pl.DataFrame | list[dict]) -> Table:
+    """Format sites dataframe or list of dicts as a Rich table.
 
     Args:
-        sites_df: Polars DataFrame with site information
+        sites_df: Polars DataFrame or list of dicts with site information
 
     Returns:
         Rich Table object ready for display
@@ -129,8 +129,11 @@ def format_sites_table(sites_df: pl.DataFrame) -> Table:
     table.add_column("Name", style="green")
     table.add_column("URL", style="blue")
 
+    # Convert to iterable of dicts
+    rows = sites_df.iter_rows(named=True) if isinstance(sites_df, pl.DataFrame) else sites_df
+
     # Add rows
-    for row in sites_df.iter_rows(named=True):
+    for row in rows:
         table.add_row(
             row["ce_sites_uuid"],
             row["ce_sites_short_name"],

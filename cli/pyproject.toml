@@ -7,6 +7,7 @@ dependencies = [
     "typer>=0.15.1",
     "rich>=13.9.4",
     "culture-libraries",
+    "httpx>=0.28.1",
 ]
 
 [project.scripts]

@@ -2,10 +2,10 @@
 
 from typing import Annotated
 
-import polars as pl
+import httpx
 import typer
 
-from culture_cli.modules.ce.utils.config import config
+from culture_cli.api_client import CultureAPIClient
 from culture_cli.modules.ce.utils.formatters import (
     format_sites_table,
     print_error,
@@ -18,6 +18,11 @@ from culture_cli.modules.ce.utils.formatters import (
 
 # Create sites command group
 sites_app = typer.Typer(help="Manage Culture Extractor sites")
+
+
+def _get_api_client() -> CultureAPIClient:
+    """Get an API client instance."""
+    return CultureAPIClient()
 
 
 @sites_app.command("list")
@@ -49,60 +54,40 @@ def list_sites(
             print_error("Cannot use both --only-linked and --only-unlinked")
             raise typer.Exit(code=1)
 
-        # Get Culture Extractor client
-        client = config.get_client()
+        # Determine linked filter
+        linked: bool | None = None
+        if only_linked:
+            linked = True
+        elif only_unlinked:
+            linked = False
 
-        # Fetch all sites
-        sites_df = client.get_sites()
+        # Get sites from API
+        with _get_api_client() as api:
+            sites = api.get_sites(linked=linked)
 
-        # Apply link status filters if requested
-        if only_linked or only_unlinked:
-            site_uuids = sites_df["ce_sites_uuid"].to_list()
-            stashapp_links = []
-            stashdb_links = []
-
-            for uuid in site_uuids:
-                external_ids = client.get_site_external_ids(uuid)
-                stashapp_links.append("stashapp" in external_ids)
-                stashdb_links.append("stashdb" in external_ids)
-
-            # Add link status columns
-            sites_df = sites_df.with_columns([
-                pl.Series("has_stashapp_link", stashapp_links),
-                pl.Series("has_stashdb_link", stashdb_links),
-            ])
-
-            # Filter based on link status
-            if only_linked:
-                sites_df = sites_df.filter(
-                    (sites_df["has_stashapp_link"]) | (sites_df["has_stashdb_link"])
-                )
-            elif only_unlinked:
-                sites_df = sites_df.filter(
-                    (~sites_df["has_stashapp_link"]) & (~sites_df["has_stashdb_link"])
-                )
-
-        # Check if any results remain after filtering
-        if sites_df.shape[0] == 0:
+        # Check if any results
+        if not sites:
             link_filter = "linked" if only_linked else "unlinked" if only_unlinked else ""
             msg = f"No {link_filter} sites found" if link_filter else "No sites found"
             print_info(msg)
             raise typer.Exit(code=0)
 
         # Display results
-        count = sites_df.shape[0]
+        count = len(sites)
         if json_output:
-            print_json(sites_df)
+            print_json(sites)
         else:
-            table = format_sites_table(sites_df)
+            table = format_sites_table(sites)
             print_table(table)
             print_success(f"Found {count} sites")
 
-    except ValueError as e:
-        print_error(str(e))
-        raise typer.Exit(code=1) from e
-    except Exception as e:
-        print_error(f"Failed to fetch sites: {e}")
+    except httpx.ConnectError:
+        print_error("Cannot connect to Culture API. Is the API server running?")
+        print_info("Start the API with: cd api && uv run uvicorn api.main:app --port 8000")
+        raise typer.Exit(code=1) from None
+    except httpx.HTTPStatusError as e:
+        detail = e.response.json().get("detail", str(e)) if e.response.content else str(e)
+        print_error(f"API error: {detail}")
         raise typer.Exit(code=1) from e
 
 
@@ -135,31 +120,30 @@ def link_site(
             print_info("Use --stashapp-id and/or --stashdb-id")
             raise typer.Exit(code=1)
 
-        # Get Culture Extractor client
-        client = config.get_client()
+        with _get_api_client() as api:
+            # First verify the site exists by fetching it
+            site = api.get_site(uuid)
+            site_name = site["ce_sites_name"]
 
-        # Verify site exists
-        site_df = client.get_site_by_uuid(uuid)
-        if site_df.shape[0] == 0:
+            # Link to external systems
+            links = []
+            if stashapp_id is not None:
+                api.link_site(uuid, "stashapp", str(stashapp_id))
+                links.append(f"Stashapp ID: {stashapp_id}")
+            if stashdb_id is not None:
+                api.link_site(uuid, "stashdb", stashdb_id)
+                links.append(f"StashDB ID: {stashdb_id}")
+
+            print_success(f"Linked site '{site_name}' to {', '.join(links)}")
+
+    except httpx.ConnectError:
+        print_error("Cannot connect to Culture API. Is the API server running?")
+        print_info("Start the API with: cd api && uv run uvicorn api.main:app --port 8000")
+        raise typer.Exit(code=1) from None
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 404:
             print_error(f"Site with UUID '{uuid}' not found")
-            raise typer.Exit(code=1)
-
-        site_name = site_df["ce_sites_name"][0]
-
-        # Set external IDs
-        links = []
-        if stashapp_id is not None:
-            client.set_site_external_id(uuid, "stashapp", str(stashapp_id))
-            links.append(f"Stashapp ID: {stashapp_id}")
-        if stashdb_id is not None:
-            client.set_site_external_id(uuid, "stashdb", stashdb_id)
-            links.append(f"StashDB ID: {stashdb_id}")
-
-        print_success(f"Linked site '{site_name}' to {', '.join(links)}")
-
-    except ValueError as e:
-        print_error(str(e))
-        raise typer.Exit(code=1) from e
-    except Exception as e:
-        print_error(f"Failed to link site: {e}")
+        else:
+            detail = e.response.json().get("detail", str(e)) if e.response.content else str(e)
+            print_error(f"API error: {detail}")
         raise typer.Exit(code=1) from e
