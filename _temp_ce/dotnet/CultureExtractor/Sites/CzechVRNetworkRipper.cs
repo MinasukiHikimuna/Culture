@@ -1,0 +1,321 @@
+﻿using CultureExtractor.Interfaces;
+using Microsoft.Playwright;
+using Serilog;
+using System.Text.RegularExpressions;
+using CultureExtractor.Models;
+
+namespace CultureExtractor.Sites;
+
+[Site("czechvr")]
+[Site("czechvrcasting")]
+[Site("czechvrfetish")]
+[Site("czechvrintimacy")]
+public class CzechVRNetworkRipper : ISiteScraper
+{
+    private readonly ILegacyDownloader _legacyDownloader;
+
+    public CzechVRNetworkRipper(ILegacyDownloader legacyDownloader)
+    {
+        _legacyDownloader = legacyDownloader;
+    }
+
+    public async Task LoginAsync(Site site, IPage page)
+    {
+        var memberLoginHeader = page.GetByRole(AriaRole.Heading, new() { NameString = "Member login" });
+
+        // TODO: sometimes this requires captcha, how to handle reliably?
+        if (await memberLoginHeader.IsVisibleAsync())
+        {
+            // Login requires CAPTCHA so we need to create a headful browser
+            /*IPage loginPage = await PlaywrightFactory.CreatePageAsync(site, new BrowserSettings(false));
+            await loginPage.WaitForLoadStateAsync();*/
+
+            var loginPage = page;
+
+            await loginPage.GetByPlaceholder("Username").TypeAsync(site.Username);
+            await loginPage.GetByPlaceholder("Password").TypeAsync(site.Password);
+            await loginPage.GetByRole(AriaRole.Button, new() { NameString = "CLICK HERE TO LOGIN" }).ClickAsync();
+            await loginPage.GetByRole(AriaRole.Button, new() { NameString = "CLICK HERE TO LOGIN" }).WaitForAsync(new LocatorWaitForOptions()
+            {
+                State = WaitForSelectorState.Detached
+            });
+            await loginPage.WaitForLoadStateAsync();
+
+            await Task.Delay(1000);
+
+            Log.Information($"Logged in as {site.Username}.");
+        }
+        else
+        {
+            Log.Debug("Login was not necessary.");
+        }
+    }
+
+    public async Task<int> NavigateToReleasesAndReturnPageCountAsync(Site site, IPage page)
+    {
+        await page.GetByRole(AriaRole.Link, new() { NameString = "VIDEOS" }).ClickAsync();
+        await page.WaitForLoadStateAsync();
+
+        var siteName = site.ShortName switch
+        {
+            "czechvr" => "Czech VR",
+            "czechvrfetish" => "CVR Fetish",
+            "czechvrcasting" => "CVR Casting",
+            "czechvrintimacy" => "VR Intimacy",
+            _ => string.Empty
+        };
+
+        await page.Locator("#Filtrace").GetByRole(AriaRole.Link, new() { NameString = siteName }).ClickAsync();
+        await page.WaitForLoadStateAsync();
+        await Task.Delay(5000);
+
+        var lastPageButton = await page.QuerySelectorAsync("div.strankovani > span:last-child > a.last");
+        var lastPageUrl = await lastPageButton.GetAttributeAsync("href");
+
+        string linkPattern = @"next=(\d+)";
+        Match linkMatch = Regex.Match(lastPageUrl, linkPattern);
+        if (!linkMatch.Success)
+        {
+            Log.Error($"Could not parse last page URL video count from URL {lastPageUrl} using pattern {linkPattern}.");
+            return 0;
+        }
+
+        var totalVideoCount = int.Parse(linkMatch.Groups[1].Value);
+
+        var videosOnCurrentPage = await page.Locator("div.foto").ElementHandlesAsync();
+
+        return (int)Math.Ceiling((double)totalVideoCount / videosOnCurrentPage.Count());
+    }
+
+    public async Task<IReadOnlyList<ListedRelease>> GetCurrentReleasesAsync(Site site, SubSite subSite, IPage page, IReadOnlyList<IRequest> requests, int pageNumber)
+    {
+        await GoToPageAsync(page, site, subSite, pageNumber);
+        
+        var releaseHandles = await page.Locator("div.tagyCenter > div.postTag").ElementHandlesAsync();
+
+        var listedReleases = new List<ListedRelease>();
+        foreach (var releaseHandle in releaseHandles.Reverse())
+        {
+            var releaseIdAndUrl = await GetReleaseIdAsync(releaseHandle);
+            listedReleases.Add(new ListedRelease(null, releaseIdAndUrl.Id, releaseIdAndUrl.Url, releaseHandle));
+        }
+
+        return listedReleases.AsReadOnly();
+    }
+
+    private static Task GoToPageAsync(IPage page, Site site, SubSite subSite, int pageNumber)
+    {
+        throw new NotImplementedException();
+    }
+
+    private static async Task<ReleaseIdAndUrl> GetReleaseIdAsync(IElementHandle currentRelease)
+    {
+        var linkElement = await currentRelease.QuerySelectorAsync("div.nazev > h2 > a");
+        var relativeUrl = await linkElement.GetAttributeAsync("href");
+        if (relativeUrl.StartsWith("./"))
+        {
+            relativeUrl = relativeUrl.Substring(2);
+        }
+
+        var titleElement = await currentRelease.QuerySelectorAsync("div.nazev > h2");
+        var title = await titleElement.TextContentAsync();
+
+        string pattern = @" (?<id>\d+) - ";
+        Match match = Regex.Match(title, pattern);
+        if (!match.Success)
+        {
+            throw new InvalidOperationException($@"Could not determine ID from ""{title}"" using pattern {pattern}. Skipping...");
+        }
+
+        var sceneShortName = match.Groups["id"].Value;
+
+        return new ReleaseIdAndUrl(sceneShortName, relativeUrl);
+    }
+
+    public async Task<Release> ScrapeReleaseAsync(Guid releaseUuid, Site site, SubSite subSite, string url, string releaseShortName, IPage page, IReadOnlyList<IRequest> requests)
+    {
+        var releaseDate = await ScrapeReleaseDateAsync(page);
+        var duration = await ScrapeDurationAsync(page);
+        var description = await ScrapeDescriptionAsync(page);
+        var title = await ScrapeTitleAsync(page);
+        var performers = await ScrapePerformersAsync(page);
+        var tags = await ScrapeTagsAsync(page);
+        var downloadOptionsAndHandles = await ParseAvailableDownloadsAsync(page);
+
+        var scene = new Release(
+            releaseUuid,
+            site,
+            null,
+            releaseDate,
+            releaseShortName,
+            title,
+            url,
+            description,
+            duration.TotalSeconds,
+            performers,
+            tags,
+            downloadOptionsAndHandles.Select(f => f.AvailableVideoFile).ToList(),
+            "{}",
+            DateTime.Now);
+        
+        // TODO: Fix this
+        if (!_legacyDownloader.SceneImageExists(scene))
+        {
+            /*var previewElement = await currentRelease.QuerySelectorAsync("img");
+            var originalUrl = await previewElement.GetAttributeAsync("src");
+            await _downloader.DownloadSceneImageAsync(scene, originalUrl);*/
+        }
+        
+        return scene;
+    }
+
+    public async Task<Download> DownloadReleaseAsync(Release release, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)
+    {
+        await page.GotoAsync(release.Url);
+        await page.WaitForLoadStateAsync();
+
+        await Task.Delay(3000);
+
+        var availableDownloads = await ParseAvailableDownloadsAsync(page);
+
+        DownloadDetailsAndElementHandle selectedDownload = downloadConditions.PreferredDownloadQuality switch
+        {
+            PreferredDownloadQuality.Phash => availableDownloads.Last(),
+            PreferredDownloadQuality.Best => availableDownloads.First(),
+            PreferredDownloadQuality.Worst => availableDownloads.Last(),
+            _ => throw new InvalidOperationException("Could not find a download candidate!")
+        };
+
+        return await _legacyDownloader.DownloadSceneAsync(release, page, selectedDownload.AvailableVideoFile, downloadConditions.PreferredDownloadQuality, async () =>
+        {
+            await page.EvaluateAsync(
+                $"document.querySelector('a[href=\"{selectedDownload.AvailableVideoFile.Url}\"')" +
+                $".parentElement" +
+                $".parentElement" +
+                $".parentElement" +
+                $".previousElementSibling" +
+                $".click()");
+            await page.Locator($"a[href=\"{selectedDownload.AvailableVideoFile.Url}\"]").ClickAsync();
+        });
+    }
+
+    private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloadsAsync(IPage page)
+    {
+        var downloadOptions = new List<DownloadOptionElements>();
+        var deviceElements = await page.Locator("ul.zalozky > li:not(.download)").ElementHandlesAsync();
+        var downloadElements = await page.Locator("ul.zalozky > li.download").ElementHandlesAsync();
+
+        for (var i = 0; i < deviceElements.Count; i++)
+        {
+            var deviceElement = deviceElements[i];
+            var downloadElement = downloadElements[i];
+
+            var downloadDescriptionElements = await downloadElement.QuerySelectorAllAsync("div.nazevpopis");
+            var downloadLinkElements = await downloadElement.QuerySelectorAllAsync("div.dlnew > div.dlp > a");
+
+            for (var j = 0; j < downloadDescriptionElements.Count; j++)
+            {
+                downloadOptions.Add(new DownloadOptionElements(downloadElement, downloadDescriptionElements[j], downloadLinkElements[j]));
+            }
+        }
+
+        var availableDownloads = new List<DownloadDetailsAndElementHandle>();
+        foreach (var downloadOption in downloadOptions)
+        {
+            var descriptionRaw = await downloadOption.Details.TextContentAsync();
+            var description = descriptionRaw.Replace("\t", "").Replace("\n", "").Trim();
+
+            var resolutionWidth = HumanParser.ParseResolutionWidth(descriptionRaw);
+            var resolutionHeight = HumanParser.ParseResolutionHeight(descriptionRaw);
+
+            var url = await downloadOption.Link.GetAttributeAsync("href");
+            availableDownloads.Add(
+                new DownloadDetailsAndElementHandle(
+                    new AvailableVideoFile(
+                        "scene",
+                        "video",
+                        description,
+                        url,
+                        resolutionWidth,
+                        resolutionHeight,
+                        HumanParser.ParseFileSize(description),
+                        HumanParser.ParseFps(description),
+                        HumanParser.ParseCodec(description)),
+                    null));
+        }
+        return availableDownloads.OrderByDescending(d => d.AvailableVideoFile.FileSize).ToList();
+    }
+
+    private record DownloadOptionElements(IElementHandle Device, IElementHandle Details, IElementHandle Link);
+
+    private async Task<DateOnly> ScrapeReleaseDateAsync(IPage page)
+    {
+        var releaseDateRaw = await page.Locator("div.nazev > div.desktop > div.datum").TextContentAsync();
+        return DateOnly.Parse(releaseDateRaw);
+    }
+
+    private async Task<string> ScrapeTitleAsync(IPage page)
+    {
+        var title = await page.Locator("div.post > div.left > div.nazev > h2").TextContentAsync();
+        string pattern = @"\w+ \d+ - (.*)";
+        Match match = Regex.Match(title, pattern);
+        if (!match.Success)
+        {
+            Log.Warning($@"Could not determine title from ""{title}"" using pattern {pattern}. Skipping...");
+            throw new Exception();
+        }
+
+        return match.Groups[1].Value;
+    }
+
+    private async Task<IList<SitePerformer>> ScrapePerformersAsync(IPage page)
+    {
+        var castElements = await page.Locator("div.post > div.left > div.nazev > div.desktop > div.featuring > a").ElementHandlesAsync();
+        var performers = new List<SitePerformer>();
+        foreach (var castElement in castElements)
+        {
+            var castUrl = await castElement.GetAttributeAsync("href");
+            if (castUrl.StartsWith("./"))
+            {
+                castUrl = castUrl.Substring(2);
+            }
+
+            var castId = castUrl.Replace("model-", "");
+            var castName = await castElement.TextContentAsync();
+            performers.Add(new SitePerformer(castId, castName, castUrl, "{}"));
+        }
+        return performers.AsReadOnly();
+    }
+
+    private async Task<IList<SiteTag>> ScrapeTagsAsync(IPage page)
+    {
+        var tagElements = await page.Locator("div.post > div.left > div.tagy > div.tag > a").ElementHandlesAsync();
+        var tags = new List<SiteTag>();
+        foreach (var tagElement in tagElements)
+        {
+            var tagUrl = await tagElement.GetAttributeAsync("href");
+            if (tagUrl.StartsWith("./"))
+            {
+                tagUrl = tagUrl.Substring(2);
+            }
+
+            var tagId = tagUrl.Replace("tag-", "");
+            var tagName = await tagElement.TextContentAsync();
+            tags.Add(new SiteTag(tagId, tagName, tagUrl));
+        }
+        return tags;
+    }
+
+    private async Task<TimeSpan> ScrapeDurationAsync(IPage page)
+    {
+        var duration = await page.Locator("div.nazev > div.desktop > div.cas > span.desktop").TextContentAsync();
+        var components = duration.Split(":");
+        return TimeSpan.FromMinutes(int.Parse(components[0])).Add(TimeSpan.FromSeconds(int.Parse(components[1])));
+    }
+
+    private async Task<string> ScrapeDescriptionAsync(IPage page)
+    {
+        var content = await page.Locator("div.post > div.left > div.text").TextContentAsync();
+        return content.Replace("\n", "").Replace("\t", "").Trim();
+    }
+}

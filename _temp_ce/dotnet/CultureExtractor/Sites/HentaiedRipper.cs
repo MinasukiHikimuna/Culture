@@ -1,0 +1,328 @@
+﻿using CultureExtractor.Interfaces;
+using Microsoft.Playwright;
+using Serilog;
+using System.Net;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
+using CultureExtractor.Exceptions;
+using CultureExtractor.Models;
+
+namespace CultureExtractor.Sites;
+
+public class Sources
+{
+    [JsonPropertyName("sources")]
+    public IList<FileSource> FileSources { get; set; }
+}
+
+public class FileSource
+{
+    [JsonPropertyName("file")]
+    public string Url { get; set; }
+    [JsonPropertyName("label")]
+    public string Resolution { get; set; }
+}
+
+
+[Site("futanari")]
+[Site("hentaied")]
+public class HentaiedRipper : ISiteScraper
+{
+    private readonly ILegacyDownloader _legacyDownloader;
+
+    public HentaiedRipper(ILegacyDownloader legacyDownloader)
+    {
+        _legacyDownloader = legacyDownloader;
+    }
+
+    public async Task LoginAsync(Site site, IPage page)
+    {
+        await Task.Delay(10000);
+
+        var modalContentClose = page.Locator("div.modal-content span.close-btn");
+        if (await modalContentClose.IsVisibleAsync())
+        {
+            await modalContentClose.ClickAsync();
+        }
+
+        var loginLink = page.GetByRole(AriaRole.Link).Filter(new LocatorFilterOptions() { HasText = "Login" });
+        if (await loginLink.IsVisibleAsync())
+        {
+            await loginLink.ClickAsync();
+        }
+
+        var usernameInput = page.Locator("input#amember-login");
+        if (await usernameInput.IsVisibleAsync())
+        {
+            await usernameInput.FillAsync(site.Username);
+        }
+
+        var passwordInput = page.Locator("input#amember-pass");
+        if (await passwordInput.IsVisibleAsync())
+        {
+            await passwordInput.FillAsync(site.Password);
+            await passwordInput.PressAsync("Enter");
+            await Task.Delay(5000);
+        }
+    }
+
+    public async Task<int> NavigateToReleasesAndReturnPageCountAsync(Site site, IPage page)
+    {
+        await page.GotoAsync("/all-videos/");
+
+        var lastPageLink = page.Locator("section.pagination > p > a.page-numbers").Nth(-2);
+        var lastPageRaw = await lastPageLink.TextContentAsync();
+        return int.Parse(lastPageRaw);
+    }
+
+    public async Task<IReadOnlyList<ListedRelease>> GetCurrentReleasesAsync(Site site, SubSite subSite, IPage page, IReadOnlyList<IRequest> requests, int pageNumber)
+    {
+        await GoToPageAsync(page, pageNumber);
+        
+        var releaseHandles = await page.Locator("div.catposts div.half").ElementHandlesAsync();
+
+        var listedReleases = new List<ListedRelease>();
+        foreach (var releaseHandle in releaseHandles.Reverse())
+        {
+            var releaseIdAndUrl = await GetReleaseIdAsync(site, releaseHandle);
+            // These sites seem to contain ads linking to other sites of the network. We don't want to scrape those.
+            if (releaseIdAndUrl.Url.StartsWith(site.Url))
+            {
+                listedReleases.Add(new ListedRelease(null, releaseIdAndUrl.Id, releaseIdAndUrl.Url, releaseHandle));   
+            }
+        }
+
+        return listedReleases.AsReadOnly();
+    }
+
+    private static async Task GoToPageAsync(IPage page, int pageNumber)
+    {
+        await page.GotoAsync($"/all-videos/page/{pageNumber}/");
+        await Task.Delay(5000);
+    }
+
+    private static async Task<ReleaseIdAndUrl> GetReleaseIdAsync(Site site, IElementHandle currentRelease)
+    {
+        var link = await currentRelease.QuerySelectorAsync("div.allvideostitle > a");
+        var url = await link.GetAttributeAsync("href");
+        var shortName = url.Replace(site.Url, "").Replace("/", "");
+        return new ReleaseIdAndUrl(shortName, url);
+    }
+
+    public async Task<Release> ScrapeReleaseAsync(Guid releaseUuid, Site site, SubSite subSite, string url, string releaseShortName, IPage page, IReadOnlyList<IRequest> requests)
+    {
+        var releaseDateElement = await page.QuerySelectorAsync("div.left-top-part > div.entry-date");
+        string releaseDateRaw = await releaseDateElement.TextContentAsync();
+        releaseDateRaw = releaseDateRaw.Trim();
+        DateOnly releaseDate = DateOnly.Parse(releaseDateRaw);
+
+        var durationRaw = await page.Locator("div.durationandtime > div.duration").TextContentAsync();
+        var duration = HumanParser.ParseDuration(durationRaw);
+
+        var titleRaw = await page.Locator("div.left-top-part h1").TextContentAsync();
+        var title = titleRaw.Replace("\n", "").Trim();
+
+        var castElements = await page.Locator("div.taglist > a").ElementHandlesAsync();
+        var performers = new List<SitePerformer>();
+        foreach (var castElement in castElements)
+        {
+            var castUrl = await castElement.GetAttributeAsync("href");
+            var castId = castUrl.Replace($"{site.Url}/tag/", "").Replace("/", "");
+            var castName = await castElement.TextContentAsync();
+            performers.Add(new SitePerformer(castId, castName, castUrl, "{}"));
+        }
+
+        var descriptionRaw = await page.Locator("div#fullstory").TextContentAsync();
+        string pattern = @"\s*Read Less$";
+        string description = Regex.Replace(descriptionRaw, pattern, "").Trim();
+
+        var tagElements = await page.Locator("ul.post-categories a").ElementHandlesAsync();
+        var tags = new List<SiteTag>();
+        foreach (var tagElement in tagElements)
+        {
+            var tagUrl = await tagElement.GetAttributeAsync("href");
+            var tagId = tagUrl.Replace(site.Url + "/category/", "").Replace("/", "");
+            var tagNameRaw = await tagElement.TextContentAsync();
+            var tagName = tagNameRaw.Replace("\n", "").Trim();
+            tags.Add(new SiteTag(tagId, tagName, tagUrl));
+        }
+
+        var downloadOptionsAndHandles = await ParseAvailableDownloadsAsync(page);
+
+        var scene = new Release(
+            releaseUuid,
+            site,
+            subSite,
+            releaseDate,
+            releaseShortName,
+            title,
+            url,
+            description,
+            duration.TotalSeconds,
+            performers,
+            tags,
+            downloadOptionsAndHandles.Select(f => f.AvailableVideoFile).ToList(),
+            "{}",
+            DateTime.Now);
+        
+        // TODO: There are other ways to get the preview image as sometimes the og:image is missing.
+        // - playerInstance configuration contains image property for some scenes
+        // - jw-preview has background-image at least for some scenes
+        // However these are not typically very high quality images so it is fine for now if we aren't able to download
+        // them.
+        var ogImageMeta = await page.QuerySelectorAsync("meta[property='og:image']");
+        if (ogImageMeta == null)
+        {
+            Log.Warning("Could not find og:image meta tag");
+        }
+        else
+        {
+            string ogImageUrl = await ogImageMeta.GetAttributeAsync("content");
+
+            try
+            {
+                await _legacyDownloader.DownloadSceneImageAsync(scene, ogImageUrl, scene.Url);
+            }
+            catch (Exception ex)
+            {
+                Log.Warning($"Could not download preview image: {ex}" );
+            }
+        }
+        
+        return scene;
+    }
+
+    private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloadsAsync(IPage page)
+    {
+        var input = await page.EvaluateAsync<string>(@"
+            Array.from(document.querySelectorAll('script'))
+            .map(script => script.innerHTML)
+            .find(content => content && content.includes('var playerInstance_'))
+        ");
+        if (input == null)
+        {
+            throw new ExtractorException(ExtractorRetryMode.RetryLogin, "Could not find playerInstance from DOM!");
+        }
+        
+        var sources = ParseSources(input);
+
+        var availableDownloads = new List<DownloadDetailsAndElementHandle>();
+        foreach (var fileSource in sources.FileSources)
+        {
+            var description = fileSource.Resolution;
+            var url = fileSource.Url;
+
+            var resolutionRaw = fileSource.Resolution.Replace(" ", "").Trim().ToUpperInvariant();
+
+            var resolutionWidth = -1;
+            var resolutionHeight = -1;
+
+            if (resolutionRaw == "HD")
+            {
+                resolutionWidth = 1280;
+                resolutionHeight = 720;
+            }
+            else if (resolutionRaw == "FULLHD" || resolutionRaw == "FULLDH")
+            {
+                resolutionWidth = 1920;
+                resolutionHeight = 1080;
+            }
+            else if (resolutionRaw == "4K")
+            {
+                resolutionWidth = 3840;
+                resolutionHeight = 2160;
+            }
+
+            if (resolutionWidth == -1)
+            {
+                throw new Exception("Could not parse resolutionWidth");
+            }
+
+            if (resolutionHeight == -1)
+            {
+                throw new Exception("Could not parse resolutionHeight");
+            }
+
+            availableDownloads.Add(
+                new DownloadDetailsAndElementHandle(
+                    new AvailableVideoFile(
+                        "video",
+                        "scene",
+                        description,
+                        url,
+                        resolutionWidth,
+                        resolutionHeight,
+                        -1,
+                        -1,
+                        string.Empty),
+                    null));
+        }
+        return availableDownloads.OrderByDescending(d => d.AvailableVideoFile.ResolutionHeight).ToList();
+    }
+
+    private static Sources ParseSources(string input)
+    {
+        var sourcesRegex = new Regex(@"sources:\s*\[(.*?)\]", RegexOptions.Singleline);
+        var sourcesMatch = sourcesRegex.Match(input);
+        if (sourcesMatch.Success)
+        {
+            string sourcesContent = sourcesMatch.Groups[1].Value;
+            // Wrap property names with double quotes and fix extra double quotes in URLs
+            string sourcesJson = Regex.Replace(sourcesContent, @"(\w+):\s*""", "\"$1\": \"");
+            // Remove trailing comma if present
+            sourcesJson = Regex.Replace(sourcesJson.Trim(), @",\s*$", "");
+            // Wrap the entire JSON string with the "sources" property name
+            sourcesJson = "{\"sources\": [" + sourcesJson + "]}";
+            return JsonSerializer.Deserialize<Sources>(sourcesJson);
+        }
+
+        var fileSourceRegex = new Regex(@"file:\s*""(.*?)""", RegexOptions.Singleline);
+        var fileSourceMatch = fileSourceRegex.Match(input);
+        if (fileSourceMatch.Success)
+        {
+            return new Sources
+            {
+                FileSources = new List<FileSource>
+                {
+                    new()
+                    {
+                        Url = fileSourceMatch.Groups[1].Value,
+                        Resolution = "FULL HD"
+                    }
+                }
+            };
+        }
+        
+        return new Sources { FileSources = new List<FileSource>() };
+    }
+
+    public async Task<Download> DownloadReleaseAsync(Release release, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)
+    {
+        var cookies = await page.Context.CookiesAsync();
+
+
+        var availableDownloads = await ParseAvailableDownloadsAsync(page);
+
+        DownloadDetailsAndElementHandle selectedDownload = downloadConditions.PreferredDownloadQuality switch
+        {
+            PreferredDownloadQuality.Phash => availableDownloads.Last(),
+            PreferredDownloadQuality.Best => availableDownloads.First(),
+            PreferredDownloadQuality.Worst => availableDownloads.Last(),
+            _ => throw new InvalidOperationException("Could not find a download candidate!")
+        };
+
+        var userAgent = await page.EvaluateAsync<string>("() => navigator.userAgent");
+        string cookieString = string.Join("; ", cookies.Select(c => $"{c.Name}={c.Value}"));
+
+        var headers = new WebHeaderCollection()
+        {
+            { HttpRequestHeader.Referer, page.Url },
+            { HttpRequestHeader.Accept, "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7" },
+            { HttpRequestHeader.UserAgent, userAgent },
+            { HttpRequestHeader.Cookie, cookieString }
+        };
+
+        return await _legacyDownloader.DownloadSceneDirectAsync(release, selectedDownload.AvailableVideoFile, downloadConditions.PreferredDownloadQuality, headers, referer: page.Url);
+    }
+}

@@ -1,0 +1,45 @@
+﻿@page "/scenes"
+@using CultureExtractor.Blazor.Data
+@using CultureExtractor;
+@using CultureExtractor.Models
+
+<PageTitle>Scenes</PageTitle>
+
+@if (scenes == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Site</th>
+                <th>Release date</th>
+                <th>Scene</th>
+                <th>Performers</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var scene in scenes)
+            {
+                <tr>
+                    <td><a href="@scene.Site.Url">@scene.Site.Name</a></td>
+                    <td>@scene.ReleaseDate</td>
+                    <td><a href="@scene.Url">@scene.Name</a></td>
+                    <td>@string.Join(", ", scene.Performers.Select(p => p.Name))</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private IEnumerable<Release> scenes;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var repository = new Repository(new CultureExtractorContext());
+        scenes = await repository.GetReleasesAsync();
+    }
+}

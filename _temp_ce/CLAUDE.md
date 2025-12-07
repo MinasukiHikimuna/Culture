@@ -1,0 +1,17 @@
+- Culture Extractor is a scraper software.
+- It scrapes both the metadata and the actual files.
+- It utilizes primarily Python-based scrapy now.
+- There are historical scrapers created with .NET-based Playwright.
+- There might still be cases where we need Playwright but scrapy should be preferred unless Playwright is absolutely needed.
+- The scraped metadata is stored into PostgreSQL database.
+- The scraped files are stored on disk. Some of those might be moved elsewhere to Stashapp for persistent storage.
+- During developing a new scraper, we can use MCP Playwright to interact with the site and inspect DOM.
+- If a login page is encountered, let user handle the login.
+- Prefer small commits i.e. first implementing just scraping a single list page and printing out the output, commit and then proceed.
+- Use uv to run Python code.
+
+# Agents
+
+- playwright-site-inspector to inspect the target sites.
+- scrapy-output-validator should be used whenever scraper code is changed to check if the output is right.
+- code-reviewer needs to be used before committing anything.

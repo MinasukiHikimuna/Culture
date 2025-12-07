@@ -1,0 +1,71 @@
+﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using CultureExtractor.Interfaces;
+using System.Reflection;
+
+namespace CultureExtractor;
+
+public static class AppHostFactory
+{
+    public static IHost CreateHost(string[] args, string siteShortName)
+    {
+        return Host.CreateDefaultBuilder(args)
+            .ConfigureServices(services =>
+            {
+                services.AddDbContext<ICultureExtractorContext, CultureExtractorContext>();
+
+                services.AddScoped<IPlaywrightFactory, PlaywrightFactory>();
+                services.AddScoped<ICaptchaSolver, CaptchaSolver>();
+                services.AddScoped<IRepository, Repository>();
+                services.AddScoped<ILegacyDownloader, LegacyDownloader>();
+                services.AddScoped<IDownloader, Downloader>();
+                services.AddScoped<IDownloadPlanner, DownloadPlanner>();
+                services.AddTransient<INetworkRipper, NetworkRipper>();
+                services.AddTransient<CultureExtractorConsoleApp>();
+
+                var siteScraper = GetSiteScraperType<IScraper>(siteShortName);
+                IList<Type> types = new List<Type> { typeof(IScraper) };
+                foreach (var type in types)
+                {
+                    if (siteScraper.IsAssignableTo(type))
+                    {
+                        services.AddTransient(type, siteScraper);
+                    }
+                }
+            })
+            .Build();
+    }
+
+    public static CultureExtractorConsoleApp CreateCultureExtractorConsoleApp(IHost host)
+    {
+        return host.Services.GetRequiredService<CultureExtractorConsoleApp>();
+    }
+
+    // The existing GetSiteScraperType method can be moved into this class
+    private static Type GetSiteScraperType<T>(string shortName) where T : IScraper
+    {
+        var attributeType = typeof(SiteAttribute);
+
+        var siteRipperTypes = Assembly
+            .GetExecutingAssembly()
+            .GetTypes()
+            .Where(type => typeof(T).IsAssignableFrom(type))
+            .Where(type =>
+            {
+                var attributes = type.GetCustomAttributes(attributeType, true);
+                return attributes.Length > 0 && attributes.Any(attribute => (attribute as SiteAttribute)?.ShortName == shortName);
+            })
+            .ToList();
+
+        if (!siteRipperTypes.Any())
+        {
+            throw new ArgumentException($"Could not find any class with short name {shortName} with type {typeof(T)}");
+        }
+        if (siteRipperTypes.Count > 2)
+        {
+            throw new ArgumentException($"Found more than one classes with short name {shortName} with type {typeof(T)}");
+        }
+
+        return siteRipperTypes.Single();
+    }
+}

@@ -1,0 +1,39 @@
+﻿@page "/sites"
+@using CultureExtractor.Blazor.Data
+@using CultureExtractor;
+@using CultureExtractor.Models
+
+<PageTitle>Sites</PageTitle>
+
+@if (sites == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Site</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var site in sites)
+            {
+                <tr>
+                    <td><a href="@site.Url">@site.Name</a></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private IEnumerable<Site> sites;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var repository = new Repository(new CultureExtractorContext());
+        sites = await repository.GetSitesAsync();
+    }
+}

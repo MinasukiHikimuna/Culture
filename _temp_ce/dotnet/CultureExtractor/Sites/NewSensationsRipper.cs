@@ -1,0 +1,210 @@
+﻿using CultureExtractor.Interfaces;
+using Microsoft.Playwright;
+using System.Text.RegularExpressions;
+using CultureExtractor.Models;
+
+namespace CultureExtractor.Sites;
+
+[Site("newsensations")]
+public class NewSensationsRipper : ISiteScraper
+{
+    private readonly ILegacyDownloader _legacyDownloader;
+
+    public NewSensationsRipper(ILegacyDownloader legacyDownloader)
+    {
+        _legacyDownloader = legacyDownloader;
+    }
+
+    public async Task LoginAsync(Site site, IPage page)
+    {
+        var usernameInput = page.GetByPlaceholder("Username");
+        if (await usernameInput.IsVisibleAsync())
+        {
+            await page.GetByPlaceholder("Username").ClickAsync();
+            await page.GetByPlaceholder("Username").FillAsync(site.Username);
+
+            await page.GetByPlaceholder("password").ClickAsync();
+            await page.GetByPlaceholder("password").FillAsync(site.Password);
+
+            await page.GetByText("remember me").ClickAsync();
+
+            await page.GetByRole(AriaRole.Button, new() { NameString = "Login to Our Members Area" }).ClickAsync();
+        }
+    }
+
+    public async Task<int> NavigateToReleasesAndReturnPageCountAsync(Site site, IPage page)
+    {
+        await page.WaitForLoadStateAsync();
+
+        await page.GetByRole(AriaRole.Navigation).GetByRole(AriaRole.Link, new() { NameString = "Network" }).ClickAsync();
+        await page.Locator(".videothumb > a").First.ClickAsync();
+        await page.GetByRole(AriaRole.Link, new() { NameString = "view all >" }).First.ClickAsync();
+
+        await page.WaitForLoadStateAsync();
+
+        var lastPage = await page.Locator("div.pagination > ul > li:not(.pagination_jump) > a").Last.TextContentAsync();
+        return int.Parse(lastPage);
+    }
+
+    public async Task<IReadOnlyList<ListedRelease>> GetCurrentReleasesAsync(Site site, SubSite subSite, IPage page, IReadOnlyList<IRequest> requests, int pageNumber)
+    {
+        await GoToPageAsync(page, pageNumber);
+        
+        var releaseHandles = await page.Locator("div.videoArea > div.videoBlock").ElementHandlesAsync();
+
+        var listedReleases = new List<ListedRelease>();
+        foreach (var releaseHandle in releaseHandles.Reverse())
+        {
+            var releaseIdAndUrl = await GetReleaseIdAsync(releaseHandle);
+            listedReleases.Add(new ListedRelease(null, releaseIdAndUrl.Id, releaseIdAndUrl.Url, releaseHandle));
+        }
+
+        return listedReleases.AsReadOnly();
+    }
+
+    private static async Task GoToPageAsync(IPage page, int pageNumber)
+    {
+        for (var i = 0; i < 3; i++)
+        {
+            try
+            {
+                await page.GotoAsync($"/members/category.php?id=5&page={pageNumber}&s=d");
+                return;
+            }
+            catch (TimeoutException)
+            {
+                await page.EvaluateAsync("window.stop()");
+            }
+        }
+    }
+
+    private static async Task<ReleaseIdAndUrl> GetReleaseIdAsync(IElementHandle currentRelease)
+    {
+        var thumbLinkElement = await currentRelease.QuerySelectorAsync("a");
+        var url = await thumbLinkElement.GetAttributeAsync("href");
+        var pattern = @"id=(\d+)&";
+        Match match = Regex.Match(url, pattern);
+        if (!match.Success)
+        {
+            throw new InvalidOperationException($"Could not parse numerical ID from {url} using pattern {pattern}.");
+        }
+
+        string shortName = match.Groups[1].Value;
+        return new ReleaseIdAndUrl(shortName, url);
+    }
+
+    public async Task<Release> ScrapeReleaseAsync(Guid releaseUuid, Site site, SubSite subSite, string url, string releaseShortName, IPage page, IReadOnlyList<IRequest> requests)
+    {
+        var releaseDateRaw = await page.Locator("div.datePhotos > span").TextContentAsync();
+        var releaseDate = DateOnly.Parse(releaseDateRaw);
+
+        var datePhotosTextRaw = await page.Locator("div.datePhotos").TextContentAsync();
+        string pattern = @"(?<minutes>[0-9]+) Minutes of Video";
+        Match match = Regex.Match(datePhotosTextRaw, pattern);
+        if (!match.Success)
+        {
+            throw new InvalidOperationException($"Unable to parse date from {datePhotosTextRaw} using pattern {pattern}");
+        }
+
+        var duration = TimeSpan.FromMinutes(int.Parse(match.Groups["minutes"].Value));
+
+        var titleRaw = await page.Locator("div.indRight > h2").TextContentAsync();
+        var title = titleRaw.Replace("\n", "").Trim();
+
+        var performersRaw = await page.Locator("p > span.update_models > a").ElementHandlesAsync();
+
+        var performers = new List<SitePerformer>();
+        foreach (var performerElement in performersRaw)
+        {
+            var performerUrl = await performerElement.GetAttributeAsync("href");
+            var shortName = performerUrl.Replace("sets.php?id=", "");
+            var name = await performerElement.TextContentAsync();
+            performers.Add(new SitePerformer(shortName, name, performerUrl, "{}"));
+        }
+
+        string descriptionRaw = await page.Locator("div.indLeft > div.description > p").TextContentAsync();
+        string description = descriptionRaw.StartsWith("Description: ")
+            ? descriptionRaw.Substring("Description: ".Length)
+            : descriptionRaw;
+
+        var downloadOptionsAndHandles = await ParseAvailableDownloadsAsync(page);
+
+        var scene = new Release(
+            releaseUuid,
+            site,
+            null,
+            releaseDate,
+            releaseShortName,
+            title,
+            url,
+            description,
+            duration.TotalSeconds,
+            performers,
+            new List<SiteTag>(),
+            downloadOptionsAndHandles.Select(f => f.AvailableVideoFile).ToList(),
+            "{}",
+            DateTime.Now);
+        
+        var sceneImageUrl = await page.GetAttributeAsync("img#default_poster", "src");
+        await _legacyDownloader.DownloadSceneImageAsync(scene, sceneImageUrl);
+        
+        return scene;
+    }
+
+    public async Task<Download> DownloadReleaseAsync(Release release, IPage page, DownloadConditions downloadConditions, IReadOnlyList<IRequest> requests)
+    {
+        await page.GotoAsync(release.Url);
+        await page.WaitForLoadStateAsync();
+
+        await Task.Delay(3000);
+
+
+        var availableDownloads = await ParseAvailableDownloadsAsync(page);
+
+        DownloadDetailsAndElementHandle selectedDownload = downloadConditions.PreferredDownloadQuality switch
+        {
+            PreferredDownloadQuality.Phash => availableDownloads.Last(),
+            PreferredDownloadQuality.Best => availableDownloads.First(),
+            PreferredDownloadQuality.Worst => availableDownloads.Last(),
+            _ => throw new InvalidOperationException("Could not find a download candidate!")
+        };
+
+        return await _legacyDownloader.DownloadSceneAsync(release, page, selectedDownload.AvailableVideoFile, downloadConditions.PreferredDownloadQuality, async () =>
+        {
+            await page.Locator("div#download_select > a").ClickAsync();
+            await selectedDownload.ElementHandle.ClickAsync();
+        });
+    }
+
+    private static async Task<IList<DownloadDetailsAndElementHandle>> ParseAvailableDownloadsAsync(IPage page)
+    {
+        var downloadLinks = await page.Locator("div#download_select > ul > li").ElementHandlesAsync();
+        var availableDownloads = new List<DownloadDetailsAndElementHandle>();
+        foreach (var downloadLink in downloadLinks)
+        {
+            var descriptionRaw = await downloadLink.InnerTextAsync();
+            var description = descriptionRaw.Replace("\n", "").Trim();
+
+            var resolutionHeight = HumanParser.ParseResolutionHeight(description);
+
+            var linkElement = await downloadLink.QuerySelectorAsync("a");
+            var url = await linkElement.GetAttributeAsync("href");
+
+            availableDownloads.Add(
+                new DownloadDetailsAndElementHandle(
+                    new AvailableVideoFile(
+                        "video",
+                        "scene",
+                        description,
+                        url,
+                        -1,
+                        resolutionHeight,
+                        HumanParser.ParseFileSize(description),
+                        -1,
+                        string.Empty
+                    ),
+                    downloadLink));
+        }
+        return availableDownloads.OrderByDescending(d => d.AvailableVideoFile.FileSize).ToList();
+    }
+}
