@@ -21,7 +21,7 @@ interface SitesState {
 export const useSitesStore = create<SitesState>((set, get) => ({
   sites: [],
   currentSite: null,
-  loading: false,
+  loading: true,
   error: null,
   searchTerm: "",
   linkFilter: "all",
