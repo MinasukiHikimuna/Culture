@@ -15,6 +15,11 @@ const nextConfig: NextConfig = {
         port: "8000",
         pathname: "/performers/**",
       },
+      {
+        protocol: "https",
+        hostname: "cdn.stashdb.org",
+        pathname: "/**",
+      },
     ],
   },
 };

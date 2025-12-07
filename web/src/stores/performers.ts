@@ -4,7 +4,17 @@ import {
   type PerformerWithLinkStatus,
   type PerformerDetail,
   type SiteWithLinkStatus,
+  type MatchingJobDetail,
+  type MatchingJob,
+  type EnrichedMatch,
+  type BatchLinkItem,
 } from "@/lib/api";
+
+// Selection for a performer match
+export interface MatchSelection {
+  performerUuid: string;
+  match: EnrichedMatch;
+}
 
 interface PerformersState {
   performers: PerformerWithLinkStatus[];
@@ -16,6 +26,14 @@ interface PerformersState {
   searchTerm: string;
   unmappedOnly: boolean;
 
+  // Job state
+  currentJob: MatchingJobDetail | null;
+  recentJobs: MatchingJob[];
+  jobPollingInterval: ReturnType<typeof setInterval> | null;
+
+  // Match selections (performer_uuid -> selected match or null for skip)
+  selections: Record<string, MatchSelection | null>;
+
   setSelectedSite: (site: string | null) => void;
   setSearchTerm: (term: string) => void;
   setUnmappedOnly: (value: boolean) => void;
@@ -23,6 +41,19 @@ interface PerformersState {
   fetchPerformers: () => Promise<void>;
   fetchPerformer: (uuid: string) => Promise<void>;
   linkPerformer: (uuid: string, target: string, externalId: string) => Promise<void>;
+
+  // Job actions
+  startMatchingJob: (siteUuid: string) => Promise<string>;
+  fetchJobStatus: (jobId: string) => Promise<void>;
+  cancelJob: (jobId: string) => Promise<void>;
+  fetchRecentJobs: () => Promise<void>;
+  startPolling: (jobId: string) => void;
+  stopPolling: () => void;
+
+  // Selection actions
+  setSelection: (performerUuid: string, selection: MatchSelection | null) => void;
+  clearSelections: () => void;
+  approveSelections: () => Promise<void>;
 
   filteredPerformers: () => PerformerWithLinkStatus[];
 }
@@ -36,6 +67,12 @@ export const usePerformersStore = create<PerformersState>((set, get) => ({
   error: null,
   searchTerm: "",
   unmappedOnly: false,
+
+  // Job state
+  currentJob: null,
+  recentJobs: [],
+  jobPollingInterval: null,
+  selections: {},
 
   setSelectedSite: (site) => set({ selectedSite: site, performers: [] }),
   setSearchTerm: (term) => set({ searchTerm: term }),
@@ -90,6 +127,129 @@ export const usePerformersStore = create<PerformersState>((set, get) => ({
   linkPerformer: async (uuid, target, externalId) => {
     await api.performers.link(uuid, { target, external_id: externalId });
     await get().fetchPerformer(uuid);
+  },
+
+  // Job actions
+  startMatchingJob: async (siteUuid) => {
+    set({ loading: true, error: null });
+    try {
+      const response = await api.faceMatching.startJob(siteUuid);
+      // Start polling for job status
+      get().startPolling(response.job_id);
+      set({ loading: false });
+      return response.job_id;
+    } catch (err) {
+      set({
+        error: err instanceof Error ? err.message : "Failed to start matching job",
+        loading: false,
+      });
+      throw err;
+    }
+  },
+
+  fetchJobStatus: async (jobId) => {
+    try {
+      const job = await api.faceMatching.getJob(jobId);
+      set({ currentJob: job });
+
+      // Stop polling if job is completed, cancelled, or failed
+      if (["completed", "cancelled", "failed"].includes(job.status)) {
+        get().stopPolling();
+      }
+    } catch (err) {
+      set({
+        error: err instanceof Error ? err.message : "Failed to fetch job status",
+      });
+    }
+  },
+
+  cancelJob: async (jobId) => {
+    try {
+      await api.faceMatching.cancelJob(jobId);
+      get().stopPolling();
+      await get().fetchJobStatus(jobId);
+    } catch (err) {
+      set({
+        error: err instanceof Error ? err.message : "Failed to cancel job",
+      });
+    }
+  },
+
+  fetchRecentJobs: async () => {
+    try {
+      const jobs = await api.faceMatching.listJobs(10);
+      set({ recentJobs: jobs });
+    } catch (err) {
+      set({
+        error: err instanceof Error ? err.message : "Failed to fetch recent jobs",
+      });
+    }
+  },
+
+  startPolling: (jobId) => {
+    const { stopPolling, fetchJobStatus } = get();
+    stopPolling(); // Clear any existing interval
+
+    // Fetch immediately
+    fetchJobStatus(jobId);
+
+    // Then poll every 2 seconds
+    const interval = setInterval(() => {
+      fetchJobStatus(jobId);
+    }, 2000);
+
+    set({ jobPollingInterval: interval });
+  },
+
+  stopPolling: () => {
+    const { jobPollingInterval } = get();
+    if (jobPollingInterval) {
+      clearInterval(jobPollingInterval);
+      set({ jobPollingInterval: null });
+    }
+  },
+
+  // Selection actions
+  setSelection: (performerUuid, selection) => {
+    set((state) => ({
+      selections: {
+        ...state.selections,
+        [performerUuid]: selection,
+      },
+    }));
+  },
+
+  clearSelections: () => {
+    set({ selections: {} });
+  },
+
+  approveSelections: async () => {
+    const { selections } = get();
+    const links: BatchLinkItem[] = [];
+
+    for (const [performerUuid, selection] of Object.entries(selections)) {
+      if (selection) {
+        links.push({
+          performer_uuid: performerUuid,
+          stashdb_id: selection.match.stashdb_id,
+          stashapp_id: selection.match.stashapp_id?.toString() ?? null,
+        });
+      }
+    }
+
+    if (links.length === 0) return;
+
+    set({ loading: true, error: null });
+    try {
+      await api.performers.batchLink({ links });
+      set({ selections: {}, loading: false });
+    } catch (err) {
+      set({
+        error: err instanceof Error ? err.message : "Failed to approve selections",
+        loading: false,
+      });
+      throw err;
+    }
   },
 
   filteredPerformers: () => {

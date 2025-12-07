@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { usePerformersStore } from "@/stores/performers";
 import {
   Table,
@@ -22,6 +23,9 @@ import {
 } from "@/components/ui/select";
 
 export default function PerformersPage() {
+  const router = useRouter();
+  const [startingJob, setStartingJob] = useState(false);
+
   const {
     sites,
     selectedSite,
@@ -35,6 +39,7 @@ export default function PerformersPage() {
     fetchSites,
     fetchPerformers,
     filteredPerformers,
+    startMatchingJob,
   } = usePerformersStore();
 
   useEffect(() => {
@@ -103,6 +108,25 @@ export default function PerformersPage() {
           />
           Unmapped only
         </label>
+
+        <Button
+          variant="default"
+          disabled={!selectedSite || startingJob}
+          onClick={async () => {
+            if (!selectedSite) return;
+            setStartingJob(true);
+            try {
+              const jobId = await startMatchingJob(selectedSite);
+              router.push(`/performers/match/${jobId}`);
+            } catch {
+              // Error is handled in the store
+            } finally {
+              setStartingJob(false);
+            }
+          }}
+        >
+          {startingJob ? "Starting..." : "Start Face Matching"}
+        </Button>
       </div>
 
       {!selectedSite ? (
