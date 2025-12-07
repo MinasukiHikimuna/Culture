@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useReleasesStore } from "@/stores/releases";
@@ -22,6 +23,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
 export default function ReleaseDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -35,9 +38,11 @@ export default function ReleaseDetailPage() {
   const [linking, setLinking] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
   const [linkSuccess, setLinkSuccess] = useState<string | null>(null);
+  const [thumbnailError, setThumbnailError] = useState(false);
 
   useEffect(() => {
     fetchRelease(uuid);
+    setThumbnailError(false);
   }, [fetchRelease, uuid]);
 
   async function handleLink() {
@@ -88,28 +93,46 @@ export default function ReleaseDetailPage() {
         </Button>
       </div>
 
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold">{currentRelease.ce_release_name}</h1>
-        <p className="text-muted-foreground">
-          {currentRelease.ce_release_short_name}
-        </p>
-        <div className="mt-2 flex items-center gap-4 text-sm">
-          <span>
-            <strong>Site:</strong> {currentRelease.ce_site_name}
-          </span>
-          <span>
-            <strong>Date:</strong> {currentRelease.ce_release_date || "N/A"}
-          </span>
+      <div className="mb-8 flex gap-8">
+        {/* Release Info */}
+        <div className="flex-grow">
+          <h1 className="text-2xl font-bold">{currentRelease.ce_release_name}</h1>
+          <p className="text-muted-foreground">
+            {currentRelease.ce_release_short_name}
+          </p>
+          <div className="mt-2 flex items-center gap-4 text-sm">
+            <span>
+              <strong>Site:</strong> {currentRelease.ce_site_name}
+            </span>
+            <span>
+              <strong>Date:</strong> {currentRelease.ce_release_date || "N/A"}
+            </span>
+          </div>
+          {currentRelease.ce_release_url && (
+            <a
+              href={currentRelease.ce_release_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:underline text-sm"
+            >
+              {currentRelease.ce_release_url}
+            </a>
+          )}
         </div>
-        {currentRelease.ce_release_url && (
-          <a
-            href={currentRelease.ce_release_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-blue-600 hover:underline text-sm"
-          >
-            {currentRelease.ce_release_url}
-          </a>
+
+        {/* Thumbnail - right side */}
+        {!thumbnailError && (
+          <div className="flex-shrink-0">
+            <Image
+              src={`${API_BASE_URL}/releases/${uuid}/thumbnail`}
+              alt={currentRelease.ce_release_name}
+              width={480}
+              height={270}
+              className="rounded-lg object-cover shadow-lg"
+              onError={() => setThumbnailError(true)}
+              unoptimized
+            />
+          </div>
         )}
       </div>
 

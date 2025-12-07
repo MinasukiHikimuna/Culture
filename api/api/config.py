@@ -54,3 +54,15 @@ def get_connection_string() -> str:
         )
 
     return f"dbname={db} user={user} password={pw} host={host} port={port}"
+
+
+def get_metadata_base_path() -> Path | None:
+    """Get the base path for metadata files.
+
+    Returns:
+        Path to metadata directory, or None if not configured
+    """
+    path = os.environ.get("CE_METADATA_BASE_PATH")
+    if path:
+        return Path(path)
+    return None

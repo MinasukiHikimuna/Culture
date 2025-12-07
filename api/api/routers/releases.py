@@ -3,7 +3,9 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import FileResponse
 
+from api.config import get_metadata_base_path
 from api.dependencies import get_ce_client
 from api.schemas.releases import (
     DeletedDownload,
@@ -64,6 +66,52 @@ def list_releases(
     return [Release(**row) for row in releases_df.to_dicts()]
 
 
+@router.get("/{uuid}/thumbnail")
+def get_release_thumbnail(
+    uuid: str,
+    client: Annotated[ClientCultureExtractor, Depends(get_ce_client)],
+) -> FileResponse:
+    """Get the thumbnail image for a release.
+
+    Returns the cover/thumbnail image file if it exists on disk.
+    """
+    metadata_base = get_metadata_base_path()
+    if not metadata_base:
+        raise HTTPException(
+            status_code=503,
+            detail="Metadata storage not configured (CE_METADATA_BASE_PATH not set)",
+        )
+
+    release_df = client.get_release_by_uuid(uuid)
+    if release_df.is_empty():
+        raise HTTPException(status_code=404, detail=f"Release with UUID '{uuid}' not found")
+
+    site_name = release_df["ce_site_name"][0]
+    downloads_df = client.get_release_downloads(uuid)
+
+    # Find thumbnail download - try different patterns in order of preference
+    thumbnail = _find_thumbnail(downloads_df)
+
+    if not thumbnail:
+        raise HTTPException(status_code=404, detail="No thumbnail found for this release")
+
+    saved_filename = thumbnail.get("ce_downloads_saved_filename")
+    if not saved_filename:
+        raise HTTPException(status_code=404, detail="Thumbnail file not available")
+
+    # Build path: {base}/{site_name}/Metadata/{release_uuid}/{filename}
+    file_path = metadata_base / site_name / "Metadata" / uuid / saved_filename
+
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Thumbnail file not found on disk")
+
+    return FileResponse(
+        path=file_path,
+        media_type="image/jpeg",
+        filename=saved_filename,
+    )
+
+
 def _resolve_site(client: ClientCultureExtractor, site: str) -> tuple[str, str]:
     """Resolve site identifier to UUID and name."""
     sites_df = client.get_sites()
@@ -107,6 +155,51 @@ def _resolve_performer(client: ClientCultureExtractor, site_uuid: str, performer
         raise HTTPException(status_code=404, detail=f"Performer '{performer}' not found for this site")
 
     return performer_match["ce_performers_uuid"][0]
+
+
+def _find_thumbnail(downloads_df) -> dict | None:
+    """Find the best thumbnail image from downloads.
+
+    Tries patterns in order of preference:
+    1. image/cover/thumbnail
+    2. image/cover/* (any cover image)
+    3. image/scene/preview
+    4. Any image file
+    """
+    downloads = list(downloads_df.iter_rows(named=True))
+
+    # Priority 1: image/cover/thumbnail
+    for d in downloads:
+        if (
+            d.get("ce_downloads_file_type") == "image"
+            and d.get("ce_downloads_content_type") == "cover"
+            and d.get("ce_downloads_variant") == "thumbnail"
+        ):
+            return d
+
+    # Priority 2: any image/cover
+    for d in downloads:
+        if (
+            d.get("ce_downloads_file_type") == "image"
+            and d.get("ce_downloads_content_type") == "cover"
+        ):
+            return d
+
+    # Priority 3: image/scene/preview
+    for d in downloads:
+        if (
+            d.get("ce_downloads_file_type") == "image"
+            and d.get("ce_downloads_content_type") == "scene"
+            and d.get("ce_downloads_variant") == "preview"
+        ):
+            return d
+
+    # Priority 4: any image
+    for d in downloads:
+        if d.get("ce_downloads_file_type") == "image":
+            return d
+
+    return None
 
 
 @router.get("/{uuid}")
