@@ -9,7 +9,8 @@ from libraries.client_culture_extractor import ClientCultureExtractor
 
 
 # Repository root for .env file location
-_REPO_ROOT = Path(__file__).parent.parent.parent.parent.parent
+# Path: config.py -> utils -> ce -> modules -> culture_cli -> cli -> Culture
+_REPO_ROOT = Path(__file__).parent.parent.parent.parent.parent.parent
 
 
 class Config:

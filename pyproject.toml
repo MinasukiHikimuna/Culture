@@ -1,29 +1,15 @@
 [project]
-name = "CultureDataAnalysis"
+name = "culture"
 version = "0.1.0"
-description = "CLI tool for Culture Extractor database operations"
+description = "Culture platform: scrapers, CLI, and data analysis tools"
 readme = "README.md"
 requires-python = ">=3.14"
-dependencies = [
-    "typer>=0.15.1",
-    "rich>=13.9.4",
-    "polars>=1.19.0",
-    "psycopg[binary]>=3.2.5",
-    "python-dotenv>=1.0.1",
-    "stashapp-tools>=0.2.52",
-    "numpy>=2.0.0",
-    "python-levenshtein>=0.27.3",
-]
 
-[project.scripts]
-culture = "culture_cli.cli:app"
+[tool.uv.workspace]
+members = ["cli", "extractors/scrapy", "libraries"]
 
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
-[tool.hatch.build.targets.wheel]
-packages = ["culture_cli", "libraries"]
+[tool.uv.sources]
+culture-libraries = { workspace = true }
 
 [dependency-groups]
 dev = [
@@ -33,13 +19,9 @@ dev = [
 ]
 
 [tool.ruff]
-# Set the target Python version
 target-version = "py314"
-
-# Set line length to match common Python standards
 line-length = 120
 
-# Exclude common directories
 exclude = [
     ".git",
     ".venv",
@@ -51,7 +33,6 @@ exclude = [
 ]
 
 [tool.ruff.lint]
-# Enable specific rule categories
 select = [
     "E",      # pycodestyle errors
     "W",      # pycodestyle warnings
@@ -78,39 +59,28 @@ select = [
     "RUF",    # Ruff-specific rules
 ]
 
-# Ignore specific rules that might be too strict for CLI tools
 ignore = [
     "PLR0913",  # Too many arguments to function call
     "PLR2004",  # Magic value used in comparison
     "RET504",   # Unnecessary assignment before return
 ]
 
-# Allow autofix for all enabled rules
 fixable = ["ALL"]
 unfixable = []
 
 [tool.ruff.lint.per-file-ignores]
-# Ignore certain rules in test files
 "tests/**/*.py" = [
     "ARG",      # Unused arguments are common in tests
     "PLR2004",  # Magic values are acceptable in tests
 ]
 
 [tool.ruff.lint.isort]
-# Configure import sorting
 known-first-party = ["culture_cli", "libraries"]
 force-single-line = false
 lines-after-imports = 2
 
 [tool.ruff.format]
-# Use double quotes for strings
 quote-style = "double"
-
-# Indent with spaces
 indent-style = "space"
-
-# Respect magic trailing comma
 skip-magic-trailing-comma = false
-
-# Auto-detect line endings
 line-ending = "auto"
