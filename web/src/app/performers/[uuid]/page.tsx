@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { usePerformersStore } from "@/stores/performers";
 import {
   api,
+  API_BASE_URL,
   PerformerRelease,
   StashDBSearchResult,
   StashappSearchResult,
@@ -35,8 +36,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export default function PerformerDetailPage() {
   const params = useParams();

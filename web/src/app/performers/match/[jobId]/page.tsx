@@ -25,13 +25,12 @@ import {
 } from "@/components/ui/select";
 import {
   api,
+  API_BASE_URL,
   type PerformerMatchResult,
   type EnrichedMatch,
   type StashDBSearchResult,
   type StashappSearchResult,
 } from "@/lib/api";
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export default function MatchResultsPage() {
   const params = useParams();
