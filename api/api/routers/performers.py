@@ -15,6 +15,7 @@ from api.schemas.performers import (
     LinkPerformerRequest,
     PerformerDetail,
     PerformerExternalIds,
+    PerformerRelease,
     PerformerWithLinkStatus,
     StashappSearchResult,
     StashDBSearchResult,
@@ -170,6 +171,33 @@ def get_performer(
             stashdb=external_ids_dict.get("stashdb"),
         ),
     )
+
+
+@router.get("/{uuid}/releases")
+def get_performer_releases(
+    uuid: str,
+    client: Annotated[ClientCultureExtractor, Depends(get_ce_client)],
+) -> list[PerformerRelease]:
+    """Get all releases linked to a performer."""
+    performer_df = client.get_performer_by_uuid(uuid)
+
+    if performer_df.is_empty():
+        raise HTTPException(status_code=404, detail=f"Performer with UUID '{uuid}' not found")
+
+    releases_df = client.get_performer_releases(uuid)
+
+    return [
+        PerformerRelease(
+            ce_release_uuid=row["ce_release_uuid"],
+            ce_release_date=str(row["ce_release_date"]) if row["ce_release_date"] else None,
+            ce_release_short_name=row["ce_release_short_name"],
+            ce_release_name=row["ce_release_name"],
+            ce_release_url=row.get("ce_release_url"),
+            ce_site_uuid=row["ce_site_uuid"],
+            ce_site_name=row["ce_site_name"],
+        )
+        for row in releases_df.to_dicts()
+    ]
 
 
 @router.post("/{uuid}/link")

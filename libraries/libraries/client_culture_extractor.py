@@ -1780,6 +1780,61 @@ class ClientCultureExtractor:
 
             self.connection.commit()
 
+    def get_performer_releases(self, performer_uuid: str) -> pl.DataFrame:
+        """Get all releases that feature a specific performer.
+
+        Args:
+            performer_uuid: UUID of the performer
+
+        Returns:
+            DataFrame containing releases linked to the performer
+        """
+        with self.connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT
+                    r.uuid AS ce_release_uuid,
+                    NULLIF(r.release_date, '-infinity') AS ce_release_date,
+                    r.short_name AS ce_release_short_name,
+                    r.name AS ce_release_name,
+                    r.url AS ce_release_url,
+                    s.uuid AS ce_site_uuid,
+                    s.name AS ce_site_name
+                FROM releases r
+                JOIN release_entity_site_performer_entity resp ON r.uuid = resp.releases_uuid
+                JOIN sites s ON r.site_uuid = s.uuid
+                WHERE resp.performers_uuid = %s
+                ORDER BY r.release_date DESC NULLS LAST
+                """,
+                (performer_uuid,),
+            )
+            releases_rows = cursor.fetchall()
+
+            releases = [
+                {
+                    "ce_release_uuid": str(row[0]),
+                    "ce_release_date": row[1],
+                    "ce_release_short_name": row[2],
+                    "ce_release_name": row[3],
+                    "ce_release_url": row[4],
+                    "ce_site_uuid": str(row[5]),
+                    "ce_site_name": row[6],
+                }
+                for row in releases_rows
+            ]
+
+            schema = {
+                "ce_release_uuid": pl.Utf8,
+                "ce_release_date": pl.Date,
+                "ce_release_short_name": pl.Utf8,
+                "ce_release_name": pl.Utf8,
+                "ce_release_url": pl.Utf8,
+                "ce_site_uuid": pl.Utf8,
+                "ce_site_name": pl.Utf8,
+            }
+
+            return pl.DataFrame(releases, schema=schema)
+
     def delete_release(self, release_uuid: str) -> dict:
         """Delete a release and all associated records from the database.
 

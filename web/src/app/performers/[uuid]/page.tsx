@@ -1,8 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { usePerformersStore } from "@/stores/performers";
+import { api, PerformerRelease } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +15,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -30,10 +40,25 @@ export default function PerformerDetailPage() {
   const [linkError, setLinkError] = useState<string | null>(null);
   const [linkSuccess, setLinkSuccess] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
+  const [releases, setReleases] = useState<PerformerRelease[]>([]);
+  const [releasesLoading, setReleasesLoading] = useState(false);
 
   useEffect(() => {
     setImageError(false);
     fetchPerformer(uuid);
+
+    async function fetchReleases() {
+      setReleasesLoading(true);
+      try {
+        const data = await api.performers.getReleases(uuid);
+        setReleases(data);
+      } catch {
+        setReleases([]);
+      } finally {
+        setReleasesLoading(false);
+      }
+    }
+    fetchReleases();
   }, [fetchPerformer, uuid]);
 
   async function handleLink() {
@@ -139,6 +164,44 @@ export default function PerformerDetailPage() {
             )}
           </div>
         </div>
+      </div>
+
+      {/* Releases */}
+      <div className="mb-8 rounded-lg border p-6">
+        <h2 className="mb-4 text-lg font-semibold">
+          Releases {!releasesLoading && `(${releases.length})`}
+        </h2>
+        {releasesLoading ? (
+          <p className="text-muted-foreground">Loading releases...</p>
+        ) : releases.length > 0 ? (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead>Site</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {releases.map((release) => (
+                <TableRow key={release.ce_release_uuid}>
+                  <TableCell className="font-medium">
+                    <Link
+                      href={`/releases/${release.ce_release_uuid}`}
+                      className="text-blue-600 hover:underline"
+                    >
+                      {release.ce_release_name}
+                    </Link>
+                  </TableCell>
+                  <TableCell>{release.ce_release_date || "-"}</TableCell>
+                  <TableCell>{release.ce_site_name}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        ) : (
+          <p className="text-muted-foreground">No releases found for this performer.</p>
+        )}
       </div>
 
       <div className="rounded-lg border p-6">

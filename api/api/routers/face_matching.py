@@ -82,6 +82,7 @@ class StartJobRequest(BaseModel):
     """Request to start a face matching job."""
 
     site: str  # Site identifier (UUID, short_name, or name)
+    link_filter: str = "unlinked_stashdb"  # Filter for which performers to process
 
 
 class StartJobResponse(BaseModel):
@@ -111,8 +112,8 @@ async def start_matching_job(
     # Resolve site
     site_uuid, site_name = _resolve_site(client, request.site)
 
-    # Get unmapped performers
-    performers_df = client.get_performers_unmapped(site_uuid, target_system_name="stashapp")
+    # Get performers based on link filter
+    performers_df = _get_performers_for_matching(client, site_uuid, request.link_filter)
     total_performers = len(performers_df)
 
     if total_performers == 0:
@@ -389,6 +390,55 @@ def _resolve_site(client: ClientCultureExtractor, site: str) -> tuple[str, str]:
         raise HTTPException(status_code=404, detail=f"Site '{site}' not found")
 
     return site_match["ce_sites_uuid"][0], site_match["ce_sites_name"][0]
+
+
+def _get_performers_for_matching(client: ClientCultureExtractor, site_uuid: str, link_filter: str):
+    """Get performers for face matching based on link filter.
+
+    Args:
+        client: CE database client
+        site_uuid: Site UUID
+        link_filter: Filter type ('all', 'unlinked', 'unlinked_stashdb', 'unlinked_stashapp', 'linked')
+
+    Returns:
+        DataFrame of performers to process
+    """
+    if link_filter == "unlinked_stashdb":
+        performers_df = client.get_performers_unmapped(site_uuid, target_system_name="stashdb")
+    elif link_filter == "unlinked_stashapp":
+        performers_df = client.get_performers_unmapped(site_uuid, target_system_name="stashapp")
+    elif link_filter == "unlinked":
+        # Unlinked to both - get unmapped for stashdb, then filter out those with stashapp
+        performers_df = client.get_performers_unmapped(site_uuid, target_system_name="stashdb")
+        if not performers_df.is_empty():
+            # Filter out performers that have stashapp links
+            performer_uuids = performers_df["ce_performers_uuid"].to_list()
+            unlinked_uuids = []
+            for uuid in performer_uuids:
+                external_ids = client.get_performer_external_ids(uuid)
+                if "stashapp" not in external_ids:
+                    unlinked_uuids.append(uuid)
+            performers_df = performers_df.filter(
+                performers_df["ce_performers_uuid"].is_in(unlinked_uuids)
+            )
+    elif link_filter == "linked":
+        # Only linked performers - get all, then filter to those with links
+        performers_df = client.get_performers(site_uuid)
+        if not performers_df.is_empty():
+            performer_uuids = performers_df["ce_performers_uuid"].to_list()
+            linked_uuids = []
+            for uuid in performer_uuids:
+                external_ids = client.get_performer_external_ids(uuid)
+                if "stashapp" in external_ids or "stashdb" in external_ids:
+                    linked_uuids.append(uuid)
+            performers_df = performers_df.filter(
+                performers_df["ce_performers_uuid"].is_in(linked_uuids)
+            )
+    else:
+        # 'all' - get all performers
+        performers_df = client.get_performers(site_uuid)
+
+    return performers_df
 
 
 def _job_to_response(job: MatchingJob) -> JobResponse:

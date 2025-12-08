@@ -89,6 +89,16 @@ export interface PerformerDetail extends Performer {
   external_ids: PerformerExternalIds;
 }
 
+export interface PerformerRelease {
+  ce_release_uuid: string;
+  ce_release_date: string | null;
+  ce_release_short_name: string;
+  ce_release_name: string;
+  ce_release_url: string | null;
+  ce_site_uuid: string;
+  ce_site_name: string;
+}
+
 export interface LinkPerformerRequest {
   target: string;
   external_id: string;
@@ -306,13 +316,17 @@ export const api = {
       if (limit) params.set("limit", String(limit));
       return fetchApi(`/performers/search/stashapp?${params.toString()}`);
     },
+
+    getReleases: async (uuid: string): Promise<PerformerRelease[]> => {
+      return fetchApi(`/performers/${uuid}/releases`);
+    },
   },
 
   faceMatching: {
-    startJob: async (site: string): Promise<StartJobResponse> => {
+    startJob: async (site: string, linkFilter?: LinkFilter): Promise<StartJobResponse> => {
       return fetchApi(`/face-matching/jobs`, {
         method: "POST",
-        body: JSON.stringify({ site }),
+        body: JSON.stringify({ site, link_filter: linkFilter || "unlinked_stashdb" }),
       });
     },
 

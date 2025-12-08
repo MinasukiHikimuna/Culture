@@ -128,3 +128,15 @@ class FaceRecognitionResult(BaseModel):
     success: bool
     error: str | None = None
     results: list[FaceRecognitionFace] = []
+
+
+class PerformerRelease(BaseModel):
+    """A release linked to a performer."""
+
+    ce_release_uuid: str
+    ce_release_date: str | None = None
+    ce_release_short_name: str
+    ce_release_name: str
+    ce_release_url: str | None = None
+    ce_site_uuid: str
+    ce_site_name: str
