@@ -28,6 +28,16 @@ class PerformerWithLinkStatus(PerformerWithSite):
     has_stashdb_link: bool = False
 
 
+class PaginatedPerformersResponse(BaseModel):
+    """Paginated response for performers list."""
+
+    items: list[PerformerWithLinkStatus]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+
+
 class PerformerExternalIds(BaseModel):
     """External IDs for a performer."""
 

@@ -78,6 +78,14 @@ export interface PerformerWithLinkStatus extends Performer {
   has_stashdb_link: boolean;
 }
 
+export interface PaginatedPerformersResponse {
+  items: PerformerWithLinkStatus[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
 export interface PerformerExternalIds {
   stashapp: string | null;
   stashdb: string | null;
@@ -195,7 +203,7 @@ export interface StashappSearchResult {
   stashdb_id: string | null;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 async function fetchApi<T>(
   endpoint: string,
@@ -277,13 +285,15 @@ export const api = {
       site: string;
       name?: string;
       link_filter?: "all" | "linked" | "unlinked" | "unlinked_stashdb" | "unlinked_stashapp";
-      limit?: number;
-    }): Promise<PerformerWithLinkStatus[]> => {
+      page?: number;
+      page_size?: number;
+    }): Promise<PaginatedPerformersResponse> => {
       const searchParams = new URLSearchParams();
       searchParams.set("site", params.site);
       if (params.name) searchParams.set("name", params.name);
       if (params.link_filter) searchParams.set("link_filter", params.link_filter);
-      if (params.limit) searchParams.set("limit", String(params.limit));
+      if (params.page) searchParams.set("page", String(params.page));
+      if (params.page_size) searchParams.set("page_size", String(params.page_size));
       return fetchApi(`/performers?${searchParams.toString()}`);
     },
 

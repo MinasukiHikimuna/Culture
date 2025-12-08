@@ -42,9 +42,13 @@ export default function PerformersPage() {
     error,
     searchTerm,
     linkFilter,
+    currentPage,
+    totalPages,
+    totalPerformers,
     setSelectedSite,
     setSearchTerm,
     setLinkFilter,
+    setCurrentPage,
     fetchSites,
     fetchPerformers,
     filteredPerformers,
@@ -151,56 +155,104 @@ export default function PerformersPage() {
       ) : loading ? (
         <div className="text-muted-foreground">Loading...</div>
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Short Name</TableHead>
-              <TableHead>Stashapp</TableHead>
-              <TableHead>StashDB</TableHead>
-              <TableHead>Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {performers.map((performer) => (
-              <TableRow key={performer.ce_performers_uuid}>
-                <TableCell className="font-medium">
-                  {performer.ce_performers_name || "-"}
-                </TableCell>
-                <TableCell>{performer.ce_performers_short_name || "-"}</TableCell>
-                <TableCell>
-                  <Badge
-                    variant={performer.has_stashapp_link ? "default" : "secondary"}
-                  >
-                    {performer.has_stashapp_link ? "Linked" : "Not linked"}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <Badge
-                    variant={performer.has_stashdb_link ? "default" : "secondary"}
-                  >
-                    {performer.has_stashdb_link ? "Linked" : "Not linked"}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <Button variant="outline" size="sm" asChild>
-                    <a href={`/performers/${performer.ce_performers_uuid}`}>View</a>
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-            {performers.length === 0 && (
+        <>
+          <div className="text-sm text-muted-foreground mb-2">
+            Showing {performers.length} of {totalPerformers} performers
+          </div>
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell
-                  colSpan={5}
-                  className="text-center text-muted-foreground"
-                >
-                  No performers found
-                </TableCell>
+                <TableHead>Name</TableHead>
+                <TableHead>Short Name</TableHead>
+                <TableHead>Stashapp</TableHead>
+                <TableHead>StashDB</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
-            )}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {performers.map((performer) => (
+                <TableRow key={performer.ce_performers_uuid}>
+                  <TableCell className="font-medium">
+                    {performer.ce_performers_name || "-"}
+                  </TableCell>
+                  <TableCell>{performer.ce_performers_short_name || "-"}</TableCell>
+                  <TableCell>
+                    <Badge
+                      variant={performer.has_stashapp_link ? "default" : "secondary"}
+                    >
+                      {performer.has_stashapp_link ? "Linked" : "Not linked"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge
+                      variant={performer.has_stashdb_link ? "default" : "secondary"}
+                    >
+                      {performer.has_stashdb_link ? "Linked" : "Not linked"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Button variant="outline" size="sm" asChild>
+                      <a href={`/performers/${performer.ce_performers_uuid}`}>View</a>
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {performers.length === 0 && (
+                <TableRow>
+                  <TableCell
+                    colSpan={5}
+                    className="text-center text-muted-foreground"
+                  >
+                    No performers found
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+
+          {/* Pagination controls */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-4">
+              <div className="text-sm text-muted-foreground">
+                Page {currentPage} of {totalPages}
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                >
+                  First
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(currentPage - 1)}
+                  disabled={currentPage === 1}
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={currentPage === totalPages}
+                >
+                  Last
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

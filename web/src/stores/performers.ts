@@ -27,6 +27,12 @@ interface PerformersState {
   searchTerm: string;
   linkFilter: LinkFilter;
 
+  // Pagination state
+  currentPage: number;
+  totalPages: number;
+  totalPerformers: number;
+  pageSize: number;
+
   // Job state
   currentJob: MatchingJobDetail | null;
   recentJobs: MatchingJob[];
@@ -38,6 +44,7 @@ interface PerformersState {
   setSelectedSite: (site: string | null) => void;
   setSearchTerm: (term: string) => void;
   setLinkFilter: (filter: LinkFilter) => void;
+  setCurrentPage: (page: number) => void;
   fetchSites: () => Promise<void>;
   fetchPerformers: () => Promise<void>;
   fetchPerformer: (uuid: string) => Promise<void>;
@@ -69,15 +76,25 @@ export const usePerformersStore = create<PerformersState>((set, get) => ({
   searchTerm: "",
   linkFilter: "all",
 
+  // Pagination state
+  currentPage: 1,
+  totalPages: 0,
+  totalPerformers: 0,
+  pageSize: 50,
+
   // Job state
   currentJob: null,
   recentJobs: [],
   jobPollingInterval: null,
   selections: {},
 
-  setSelectedSite: (site) => set({ selectedSite: site, performers: [] }),
+  setSelectedSite: (site) => set({ selectedSite: site, performers: [], currentPage: 1 }),
   setSearchTerm: (term) => set({ searchTerm: term }),
-  setLinkFilter: (filter) => set({ linkFilter: filter }),
+  setLinkFilter: (filter) => set({ linkFilter: filter, currentPage: 1 }),
+  setCurrentPage: (page) => {
+    set({ currentPage: page });
+    get().fetchPerformers();
+  },
 
   fetchSites: async () => {
     try {
@@ -91,9 +108,9 @@ export const usePerformersStore = create<PerformersState>((set, get) => ({
   },
 
   fetchPerformers: async () => {
-    const { selectedSite, linkFilter } = get();
+    const { selectedSite, linkFilter, currentPage, pageSize } = get();
     if (!selectedSite) {
-      set({ performers: [], loading: false });
+      set({ performers: [], loading: false, totalPages: 0, totalPerformers: 0 });
       return;
     }
 
@@ -102,8 +119,15 @@ export const usePerformersStore = create<PerformersState>((set, get) => ({
       const data = await api.performers.list({
         site: selectedSite,
         link_filter: linkFilter,
+        page: currentPage,
+        page_size: pageSize,
       });
-      set({ performers: data, loading: false });
+      set({
+        performers: data.items,
+        totalPages: data.total_pages,
+        totalPerformers: data.total,
+        loading: false,
+      });
     } catch (err) {
       set({
         error: err instanceof Error ? err.message : "Failed to load performers",

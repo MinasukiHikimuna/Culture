@@ -13,6 +13,7 @@ from api.schemas.performers import (
     BatchLinkResponse,
     BatchLinkResult,
     LinkPerformerRequest,
+    PaginatedPerformersResponse,
     PerformerDetail,
     PerformerExternalIds,
     PerformerRelease,
@@ -45,12 +46,16 @@ def list_performers(
             description="Filter by link status: 'all', 'unlinked', 'unlinked_stashdb', 'unlinked_stashapp', 'linked'"
         ),
     ] = "all",
-    limit: Annotated[
-        int | None,
-        Query(description="Limit number of results", ge=1),
-    ] = None,
-) -> list[PerformerWithLinkStatus]:
-    """List performers for a site with optional filtering."""
+    page: Annotated[
+        int,
+        Query(description="Page number (1-indexed)", ge=1),
+    ] = 1,
+    page_size: Annotated[
+        int,
+        Query(description="Number of items per page", ge=1, le=100),
+    ] = 50,
+) -> PaginatedPerformersResponse:
+    """List performers for a site with optional filtering and pagination."""
     site_uuid, site_name = _resolve_site(client, site)
 
     # Get base performers list based on filter
@@ -72,10 +77,12 @@ def list_performers(
         performers_df = client.get_performers(site_uuid, name_filter=name)
 
     if performers_df.is_empty():
-        return []
+        return PaginatedPerformersResponse(
+            items=[], total=0, page=page, page_size=page_size, total_pages=0
+        )
 
     # Enrich with link status and apply post-filters
-    performers = []
+    all_performers = []
     for row in performers_df.to_dicts():
         performer_uuid = row["ce_performers_uuid"]
         external_ids = client.get_performer_external_ids(performer_uuid)
@@ -90,7 +97,7 @@ def list_performers(
             # Only show performers linked to at least one system
             continue
 
-        performers.append(
+        all_performers.append(
             PerformerWithLinkStatus(
                 ce_performers_uuid=row["ce_performers_uuid"],
                 ce_performers_short_name=row.get("ce_performers_short_name"),
@@ -103,11 +110,20 @@ def list_performers(
             )
         )
 
-        # Apply limit after filtering
-        if limit and len(performers) >= limit:
-            break
+    # Calculate pagination
+    total = len(all_performers)
+    total_pages = (total + page_size - 1) // page_size if total > 0 else 0
+    start_idx = (page - 1) * page_size
+    end_idx = start_idx + page_size
+    items = all_performers[start_idx:end_idx]
 
-    return performers
+    return PaginatedPerformersResponse(
+        items=items,
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages,
+    )
 
 
 @router.get("/{uuid}/image")
