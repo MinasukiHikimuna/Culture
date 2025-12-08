@@ -148,13 +148,36 @@ def list_jobs(
 
 
 @router.get("/jobs/{job_id}")
-def get_job(job_id: str) -> JobDetailResponse:
-    """Get the status and results of a face matching job."""
+def get_job(
+    job_id: str,
+    client: Annotated[ClientCultureExtractor, Depends(get_ce_client)],
+) -> JobDetailResponse:
+    """Get the status and results of a face matching job.
+
+    Filters out performers that are already linked to StashDB.
+    """
     job = job_manager.get_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found")
 
-    return _job_to_detail_response(job)
+    # Filter out performers already linked to StashDB
+    filtered_results = _filter_linked_performers(job.results, client)
+
+    # Create a copy of the job with filtered results
+    filtered_job = MatchingJob(
+        job_id=job.job_id,
+        site_uuid=job.site_uuid,
+        site_name=job.site_name,
+        status=job.status,
+        total_performers=job.total_performers,
+        processed_count=job.processed_count,
+        results=filtered_results,
+        error=job.error,
+        created_at=job.created_at,
+        updated_at=job.updated_at,
+    )
+
+    return _job_to_detail_response(filtered_job)
 
 
 @router.delete("/jobs/{job_id}")
@@ -166,6 +189,42 @@ def cancel_job(job_id: str) -> dict:
         status_code=400,
         detail=f"Job '{job_id}' not found or cannot be cancelled",
     )
+
+
+def _filter_linked_performers(
+    results: dict[str, PerformerMatchResult],
+    client: ClientCultureExtractor,
+) -> dict[str, PerformerMatchResult]:
+    """Filter out performers that are already linked to StashDB.
+
+    Args:
+        results: Dict of performer UUID to match result
+        client: CE database client
+
+    Returns:
+        Filtered dict excluding already-linked performers
+    """
+    if not results:
+        return results
+
+    # Get performer UUIDs that need checking
+    performer_uuids = list(results.keys())
+
+    # Check each performer's StashDB link status
+    linked_uuids = set()
+    for uuid in performer_uuids:
+        performer_df = client.get_performer_by_uuid(uuid)
+        if not performer_df.is_empty():
+            stashdb_id = performer_df.row(0, named=True).get("ce_performers_stashdb_id")
+            if stashdb_id:
+                linked_uuids.add(uuid)
+
+    # Return only unlinked performers
+    return {
+        uuid: result
+        for uuid, result in results.items()
+        if uuid not in linked_uuids
+    }
 
 
 async def _process_matching_job(

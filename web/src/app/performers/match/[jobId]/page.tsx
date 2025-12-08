@@ -61,8 +61,8 @@ export default function MatchResultsPage() {
     setApproving(true);
     try {
       await approveSelections();
-      // Refresh job status after approval
-      await fetchJobStatus(jobId);
+      // Note: approveSelections already removes approved performers from currentJob.results
+      // Do NOT call fetchJobStatus here as it would overwrite the local state with server state
     } finally {
       setApproving(false);
     }

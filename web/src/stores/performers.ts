@@ -224,8 +224,9 @@ export const usePerformersStore = create<PerformersState>((set, get) => ({
   },
 
   approveSelections: async () => {
-    const { selections } = get();
+    const { selections, currentJob } = get();
     const links: BatchLinkItem[] = [];
+    const approvedUuids: string[] = [];
 
     for (const [performerUuid, selection] of Object.entries(selections)) {
       if (selection) {
@@ -234,6 +235,7 @@ export const usePerformersStore = create<PerformersState>((set, get) => ({
           stashdb_id: selection.match.stashdb_id,
           stashapp_id: selection.match.stashapp_id?.toString() ?? null,
         });
+        approvedUuids.push(performerUuid);
       }
     }
 
@@ -242,7 +244,21 @@ export const usePerformersStore = create<PerformersState>((set, get) => ({
     set({ loading: true, error: null });
     try {
       await api.performers.batchLink({ links });
-      set({ selections: {}, loading: false });
+
+      // Remove approved performers from the job results
+      if (currentJob) {
+        const updatedResults = { ...currentJob.results };
+        for (const uuid of approvedUuids) {
+          delete updatedResults[uuid];
+        }
+        set({
+          selections: {},
+          loading: false,
+          currentJob: { ...currentJob, results: updatedResults },
+        });
+      } else {
+        set({ selections: {}, loading: false });
+      }
     } catch (err) {
       set({
         error: err instanceof Error ? err.message : "Failed to approve selections",
