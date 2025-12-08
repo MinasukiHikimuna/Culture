@@ -21,7 +21,6 @@ export default function MatchResultsPage() {
     currentJob,
     selections,
     error,
-    fetchJobStatus,
     startPolling,
     stopPolling,
     cancelJob,

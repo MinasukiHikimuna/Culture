@@ -94,6 +94,8 @@ export interface LinkPerformerRequest {
   external_id: string;
 }
 
+export type LinkFilter = "all" | "linked" | "unlinked" | "unlinked_stashdb" | "unlinked_stashapp";
+
 // Face matching types
 export interface NameMatchResult {
   match_type: string;
@@ -264,15 +266,13 @@ export const api = {
     list: async (params: {
       site: string;
       name?: string;
-      unmapped_only?: boolean;
-      target_system?: string;
+      link_filter?: "all" | "linked" | "unlinked" | "unlinked_stashdb" | "unlinked_stashapp";
       limit?: number;
     }): Promise<PerformerWithLinkStatus[]> => {
       const searchParams = new URLSearchParams();
       searchParams.set("site", params.site);
       if (params.name) searchParams.set("name", params.name);
-      if (params.unmapped_only) searchParams.set("unmapped_only", "true");
-      if (params.target_system) searchParams.set("target_system", params.target_system);
+      if (params.link_filter) searchParams.set("link_filter", params.link_filter);
       if (params.limit) searchParams.set("limit", String(params.limit));
       return fetchApi(`/performers?${searchParams.toString()}`);
     },

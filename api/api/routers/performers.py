@@ -38,14 +38,12 @@ def list_performers(
         str | None,
         Query(description="Filter by performer name (case-insensitive)"),
     ] = None,
-    unmapped_only: Annotated[
-        bool,
-        Query(description="Only show performers without external IDs"),
-    ] = False,
-    target_system: Annotated[
-        str,
-        Query(description="Target system to check for unmapped filter"),
-    ] = "stashapp",
+    link_filter: Annotated[
+        str | None,
+        Query(
+            description="Filter by link status: 'all', 'unlinked', 'unlinked_stashdb', 'unlinked_stashapp', 'linked'"
+        ),
+    ] = "all",
     limit: Annotated[
         int | None,
         Query(description="Limit number of results", ge=1),
@@ -54,24 +52,42 @@ def list_performers(
     """List performers for a site with optional filtering."""
     site_uuid, site_name = _resolve_site(client, site)
 
-    if unmapped_only:
+    # Get base performers list based on filter
+    if link_filter == "unlinked_stashdb":
         performers_df = client.get_performers_unmapped(
-            site_uuid, target_system_name=target_system, name_filter=name
+            site_uuid, target_system_name="stashdb", name_filter=name
+        )
+    elif link_filter == "unlinked_stashapp":
+        performers_df = client.get_performers_unmapped(
+            site_uuid, target_system_name="stashapp", name_filter=name
+        )
+    elif link_filter == "unlinked":
+        # Unlinked to both - get unmapped for stashdb first, then filter by stashapp
+        performers_df = client.get_performers_unmapped(
+            site_uuid, target_system_name="stashdb", name_filter=name
         )
     else:
+        # 'all' or 'linked' - get all performers first
         performers_df = client.get_performers(site_uuid, name_filter=name)
 
     if performers_df.is_empty():
         return []
 
-    if limit and limit > 0:
-        performers_df = performers_df.head(limit)
-
-    # Enrich with link status
+    # Enrich with link status and apply post-filters
     performers = []
     for row in performers_df.to_dicts():
         performer_uuid = row["ce_performers_uuid"]
         external_ids = client.get_performer_external_ids(performer_uuid)
+        has_stashapp = "stashapp" in external_ids
+        has_stashdb = "stashdb" in external_ids
+
+        # Apply post-enrichment filters
+        if link_filter == "unlinked" and has_stashapp:
+            # Already filtered by stashdb unmapped, now filter out those with stashapp
+            continue
+        if link_filter == "linked" and not (has_stashapp or has_stashdb):
+            # Only show performers linked to at least one system
+            continue
 
         performers.append(
             PerformerWithLinkStatus(
@@ -81,10 +97,14 @@ def list_performers(
                 ce_performers_url=row.get("ce_performers_url"),
                 ce_site_uuid=site_uuid,
                 ce_site_name=site_name,
-                has_stashapp_link="stashapp" in external_ids,
-                has_stashdb_link="stashdb" in external_ids,
+                has_stashapp_link=has_stashapp,
+                has_stashdb_link=has_stashdb,
             )
         )
+
+        # Apply limit after filtering
+        if limit and len(performers) >= limit:
+            break
 
     return performers
 

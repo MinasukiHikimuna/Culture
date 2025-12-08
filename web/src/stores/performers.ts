@@ -8,6 +8,7 @@ import {
   type MatchingJob,
   type EnrichedMatch,
   type BatchLinkItem,
+  type LinkFilter,
 } from "@/lib/api";
 
 // Selection for a performer match
@@ -24,7 +25,7 @@ interface PerformersState {
   loading: boolean;
   error: string | null;
   searchTerm: string;
-  unmappedOnly: boolean;
+  linkFilter: LinkFilter;
 
   // Job state
   currentJob: MatchingJobDetail | null;
@@ -36,7 +37,7 @@ interface PerformersState {
 
   setSelectedSite: (site: string | null) => void;
   setSearchTerm: (term: string) => void;
-  setUnmappedOnly: (value: boolean) => void;
+  setLinkFilter: (filter: LinkFilter) => void;
   fetchSites: () => Promise<void>;
   fetchPerformers: () => Promise<void>;
   fetchPerformer: (uuid: string) => Promise<void>;
@@ -66,7 +67,7 @@ export const usePerformersStore = create<PerformersState>((set, get) => ({
   loading: true,
   error: null,
   searchTerm: "",
-  unmappedOnly: false,
+  linkFilter: "all",
 
   // Job state
   currentJob: null,
@@ -76,7 +77,7 @@ export const usePerformersStore = create<PerformersState>((set, get) => ({
 
   setSelectedSite: (site) => set({ selectedSite: site, performers: [] }),
   setSearchTerm: (term) => set({ searchTerm: term }),
-  setUnmappedOnly: (value) => set({ unmappedOnly: value }),
+  setLinkFilter: (filter) => set({ linkFilter: filter }),
 
   fetchSites: async () => {
     try {
@@ -90,7 +91,7 @@ export const usePerformersStore = create<PerformersState>((set, get) => ({
   },
 
   fetchPerformers: async () => {
-    const { selectedSite, unmappedOnly } = get();
+    const { selectedSite, linkFilter } = get();
     if (!selectedSite) {
       set({ performers: [], loading: false });
       return;
@@ -100,7 +101,7 @@ export const usePerformersStore = create<PerformersState>((set, get) => ({
     try {
       const data = await api.performers.list({
         site: selectedSite,
-        unmapped_only: unmappedOnly,
+        link_filter: linkFilter,
       });
       set({ performers: data, loading: false });
     } catch (err) {

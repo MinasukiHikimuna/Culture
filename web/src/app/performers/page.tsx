@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { usePerformersStore } from "@/stores/performers";
+import type { LinkFilter } from "@/lib/api";
 import {
   Table,
   TableBody,
@@ -22,6 +23,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+const LINK_FILTER_OPTIONS: { value: LinkFilter; label: string }[] = [
+  { value: "all", label: "All performers" },
+  { value: "linked", label: "Linked" },
+  { value: "unlinked", label: "Unlinked (all)" },
+  { value: "unlinked_stashdb", label: "Unlinked to StashDB" },
+  { value: "unlinked_stashapp", label: "Unlinked to Stashapp" },
+];
+
 export default function PerformersPage() {
   const router = useRouter();
   const [startingJob, setStartingJob] = useState(false);
@@ -32,10 +41,10 @@ export default function PerformersPage() {
     loading,
     error,
     searchTerm,
-    unmappedOnly,
+    linkFilter,
     setSelectedSite,
     setSearchTerm,
-    setUnmappedOnly,
+    setLinkFilter,
     fetchSites,
     fetchPerformers,
     filteredPerformers,
@@ -50,7 +59,7 @@ export default function PerformersPage() {
     if (selectedSite) {
       fetchPerformers();
     }
-  }, [selectedSite, unmappedOnly, fetchPerformers]);
+  }, [selectedSite, linkFilter, fetchPerformers]);
 
   const performers = filteredPerformers();
 
@@ -98,16 +107,22 @@ export default function PerformersPage() {
           disabled={!selectedSite}
         />
 
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={unmappedOnly}
-            onChange={(e) => setUnmappedOnly(e.target.checked)}
-            disabled={!selectedSite}
-            className="rounded border-gray-300"
-          />
-          Unmapped only
-        </label>
+        <Select
+          value={linkFilter}
+          onValueChange={(value) => setLinkFilter(value as LinkFilter)}
+          disabled={!selectedSite}
+        >
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder="Filter by link status" />
+          </SelectTrigger>
+          <SelectContent>
+            {LINK_FILTER_OPTIONS.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
         <Button
           variant="default"
