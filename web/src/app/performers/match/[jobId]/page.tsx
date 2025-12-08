@@ -290,26 +290,10 @@ function PerformerMatchCard({ result, selection, onSelectionChange }: PerformerM
 
   return (
     <div className={`rounded-lg border p-4 ${isSelected ? "border-primary bg-primary/5" : ""}`}>
-      <div className="flex gap-6">
-        {/* CE Performer Info + Image */}
-        <div className="flex-shrink-0">
-          {result.performer_image_available ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={`${API_BASE_URL}/performers/${result.performer_uuid}/image`}
-              alt={result.performer_name}
-              className="h-32 w-24 rounded-lg object-cover"
-            />
-          ) : (
-            <div className="flex h-32 w-24 items-center justify-center rounded-lg bg-muted">
-              <span className="text-xs text-muted-foreground">No image</span>
-            </div>
-          )}
-        </div>
-
-        {/* Performer Name & Bin */}
-        <div className="flex-grow">
-          <div className="flex items-center gap-2">
+      <div className="grid grid-cols-[280px_1fr] gap-6">
+        {/* Left Column: CE Performer */}
+        <div className="flex flex-col">
+          <div className="flex items-center gap-2 mb-3">
             <Checkbox
               checked={isSelected}
               onCheckedChange={(checked) => {
@@ -328,92 +312,113 @@ function PerformerMatchCard({ result, selection, onSelectionChange }: PerformerM
               {result.bin}
             </Badge>
           </div>
+          {result.performer_image_available ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={`${API_BASE_URL}/performers/${result.performer_uuid}/image`}
+              alt={result.performer_name}
+              className="w-full aspect-[3/4] rounded-lg object-cover"
+            />
+          ) : (
+            <div className="w-full aspect-[3/4] flex items-center justify-center rounded-lg bg-muted">
+              <span className="text-sm text-muted-foreground">No image</span>
+            </div>
+          )}
+        </div>
 
-          {/* Matches */}
-          <div className="mt-3 space-y-2">
-            {result.matches.map((match) => (
-              <MatchOption
-                key={match.stashdb_id}
-                match={match}
-                isSelected={selectedMatch?.stashdb_id === match.stashdb_id}
-                onSelect={() => handleMatchSelect(match)}
-              />
-            ))}
-          </div>
+        {/* Right Column: Match Candidates */}
+        <div className="grid grid-cols-2 gap-3 content-start">
+          {result.matches.map((match) => (
+            <MatchCard
+              key={match.stashdb_id}
+              match={match}
+              isSelected={selectedMatch?.stashdb_id === match.stashdb_id}
+              onSelect={() => handleMatchSelect(match)}
+            />
+          ))}
+          {result.matches.length === 0 && (
+            <div className="col-span-2 flex items-center justify-center h-32 text-muted-foreground">
+              No matches found
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-interface MatchOptionProps {
+interface MatchCardProps {
   match: EnrichedMatch;
   isSelected: boolean;
   onSelect: () => void;
 }
 
-function MatchOption({ match, isSelected, onSelect }: MatchOptionProps) {
+function MatchCard({ match, isSelected, onSelect }: MatchCardProps) {
   return (
     <div
-      className={`flex cursor-pointer items-center gap-4 rounded-lg border p-3 transition-colors ${
-        isSelected ? "border-primary bg-primary/10" : "hover:bg-muted/50"
+      className={`cursor-pointer rounded-lg border p-3 transition-colors ${
+        isSelected ? "border-primary bg-primary/10 ring-2 ring-primary" : "hover:bg-muted/50"
       }`}
       onClick={onSelect}
     >
-      {/* Match Image */}
+      {/* Header with name and badges */}
+      <div className="mb-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <a
+            href={`https://stashdb.org/performers/${match.stashdb_id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium hover:underline text-primary"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {match.name}
+          </a>
+          <Badge variant={match.confidence >= 90 ? "default" : "outline"} className="text-xs">
+            {match.confidence}%
+          </Badge>
+        </div>
+        <div className="flex gap-1 mt-1 flex-wrap">
+          {match.name_match.match_type === "exact" && (
+            <Badge variant="secondary" className="text-green-600 text-xs">
+              Name match
+            </Badge>
+          )}
+          {match.stashapp_exists && (
+            <Badge variant="outline" className="text-blue-600 text-xs">
+              In Stashapp
+            </Badge>
+          )}
+        </div>
+      </div>
+
+      {/* Large Match Image */}
       {match.stashdb_image_url ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={match.stashdb_image_url}
           alt={match.name}
-          className="h-16 w-12 rounded object-cover"
+          className="w-full aspect-[3/4] rounded-lg object-cover"
         />
       ) : (
-        <div className="flex h-16 w-12 items-center justify-center rounded bg-muted">
-          <span className="text-xs text-muted-foreground">?</span>
+        <div className="w-full aspect-[3/4] flex items-center justify-center rounded-lg bg-muted">
+          <span className="text-sm text-muted-foreground">No image</span>
         </div>
       )}
 
-      {/* Match Details */}
-      <div className="flex-grow">
-        <div className="flex items-center gap-2">
-          <span className="font-medium">{match.name}</span>
-          <Badge variant={match.confidence >= 90 ? "default" : "outline"}>
-            {match.confidence}%
-          </Badge>
-          {match.name_match.match_type === "exact" && (
-            <Badge variant="secondary" className="text-green-600">
-              Name match
-            </Badge>
-          )}
-          {match.stashapp_exists && (
-            <Badge variant="outline" className="text-blue-600">
-              In Stashapp
-            </Badge>
-          )}
+      {/* Aliases */}
+      {match.aliases.length > 0 && (
+        <div className="mt-2 text-xs text-muted-foreground">
+          <span className="font-medium">Aliases:</span>{" "}
+          {match.aliases.join(", ")}
         </div>
-
-        {match.aliases.length > 0 && (
-          <div className="mt-1 text-sm text-muted-foreground">
-            Aliases: {match.aliases.slice(0, 3).join(", ")}
-            {match.aliases.length > 3 && ` +${match.aliases.length - 3} more`}
-          </div>
-        )}
-
-        <div className="mt-1 text-xs text-muted-foreground">
-          StashDB: {match.stashdb_id.slice(0, 8)}...
-          {match.stashapp_id && ` | Stashapp: #${match.stashapp_id}`}
-        </div>
-      </div>
+      )}
 
       {/* Selection indicator */}
-      <div className="flex-shrink-0">
-        <div
-          className={`h-5 w-5 rounded-full border-2 ${
-            isSelected ? "border-primary bg-primary" : "border-muted-foreground"
-          }`}
-        />
-      </div>
+      {isSelected && (
+        <div className="mt-2 pt-2 border-t text-xs text-primary font-medium text-center">
+          Selected
+        </div>
+      )}
     </div>
   );
 }
