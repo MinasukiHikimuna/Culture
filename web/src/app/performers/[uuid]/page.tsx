@@ -4,7 +4,12 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { usePerformersStore } from "@/stores/performers";
-import { api, PerformerRelease } from "@/lib/api";
+import {
+  api,
+  PerformerRelease,
+  StashDBSearchResult,
+  StashappSearchResult,
+} from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +28,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -240,8 +252,188 @@ export default function PerformerDetailPage() {
           <Button onClick={handleLink} disabled={linking}>
             {linking ? "Linking..." : "Link"}
           </Button>
+
+          <PerformerSearchDialog
+            performerName={currentPerformer.ce_performers_name}
+            onSelect={(target, id) => {
+              setLinkTarget(target);
+              setExternalId(id);
+            }}
+          />
         </div>
       </div>
     </div>
+  );
+}
+
+interface PerformerSearchDialogProps {
+  performerName: string;
+  onSelect: (target: "stashapp" | "stashdb", externalId: string) => void;
+}
+
+function PerformerSearchDialog({ performerName, onSelect }: PerformerSearchDialogProps) {
+  const [open, setOpen] = useState(false);
+  const [searchSource, setSearchSource] = useState<"stashdb" | "stashapp">("stashdb");
+  const [searchQuery, setSearchQuery] = useState(performerName);
+  const [searching, setSearching] = useState(false);
+  const [stashdbResults, setStashdbResults] = useState<StashDBSearchResult[]>([]);
+  const [stashappResults, setStashappResults] = useState<StashappSearchResult[]>([]);
+
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) return;
+    setSearching(true);
+    try {
+      if (searchSource === "stashdb") {
+        const results = await api.performers.searchStashDB(searchQuery, 10);
+        setStashdbResults(results);
+        setStashappResults([]);
+      } else {
+        const results = await api.performers.searchStashapp(searchQuery, 10);
+        setStashappResults(results);
+        setStashdbResults([]);
+      }
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const handleSelectStashDB = (result: StashDBSearchResult) => {
+    onSelect("stashdb", result.id);
+    setOpen(false);
+  };
+
+  const handleSelectStashapp = (result: StashappSearchResult) => {
+    onSelect("stashapp", String(result.id));
+    setOpen(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline">Search</Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Search for {performerName}</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="flex gap-2">
+            <Select
+              value={searchSource}
+              onValueChange={(v) => setSearchSource(v as "stashdb" | "stashapp")}
+            >
+              <SelectTrigger className="w-[140px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="stashdb">StashDB</SelectItem>
+                <SelectItem value="stashapp">Stashapp</SelectItem>
+              </SelectContent>
+            </Select>
+            <Input
+              placeholder="Search performer name..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              className="flex-1"
+            />
+            <Button onClick={handleSearch} disabled={searching}>
+              {searching ? "Searching..." : "Search"}
+            </Button>
+          </div>
+
+          {/* StashDB Results */}
+          {stashdbResults.length > 0 && (
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium">StashDB Results</h4>
+              <div className="grid grid-cols-2 gap-2">
+                {stashdbResults.map((result) => (
+                  <div
+                    key={result.id}
+                    className="flex gap-3 p-2 border rounded-lg cursor-pointer hover:bg-muted/50"
+                    onClick={() => handleSelectStashDB(result)}
+                  >
+                    {result.image_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={result.image_url}
+                        alt={result.name}
+                        className="w-16 h-20 rounded object-cover flex-shrink-0"
+                      />
+                    ) : (
+                      <div className="w-16 h-20 rounded bg-muted flex items-center justify-center flex-shrink-0">
+                        <span className="text-xs text-muted-foreground">?</span>
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <a
+                        href={`https://stashdb.org/performers/${result.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-medium text-sm hover:underline text-primary block truncate"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {result.name}
+                      </a>
+                      {result.disambiguation && (
+                        <div className="text-xs text-muted-foreground truncate">
+                          {result.disambiguation}
+                        </div>
+                      )}
+                      {result.aliases.length > 0 && (
+                        <div className="text-xs text-muted-foreground truncate">
+                          {result.aliases.slice(0, 3).join(", ")}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Stashapp Results */}
+          {stashappResults.length > 0 && (
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium">Stashapp Results</h4>
+              <div className="grid grid-cols-2 gap-2">
+                {stashappResults.map((result) => (
+                  <div
+                    key={result.id}
+                    className="flex gap-3 p-2 border rounded-lg cursor-pointer hover:bg-muted/50"
+                    onClick={() => handleSelectStashapp(result)}
+                  >
+                    <div className="w-16 h-20 rounded bg-muted flex items-center justify-center flex-shrink-0">
+                      <span className="text-xs text-muted-foreground">#{result.id}</span>
+                    </div>
+                    <div className="min-w-0">
+                      <div className="font-medium text-sm truncate">{result.name}</div>
+                      {result.disambiguation && (
+                        <div className="text-xs text-muted-foreground truncate">
+                          {result.disambiguation}
+                        </div>
+                      )}
+                      {result.stashdb_id && (
+                        <Badge variant="outline" className="text-xs mt-1">
+                          Has StashDB
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* No results message */}
+          {!searching && stashdbResults.length === 0 && stashappResults.length === 0 && (
+            <div className="text-center text-muted-foreground py-8">
+              Enter a search query and click Search
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
