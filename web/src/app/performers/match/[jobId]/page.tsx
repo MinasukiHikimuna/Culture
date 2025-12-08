@@ -306,7 +306,13 @@ function PerformerMatchCard({ result, selection, onSelectionChange }: PerformerM
                 }
               }}
             />
-            <h3 className="text-lg font-semibold">{result.performer_name}</h3>
+            <a
+              href={`/performers/${result.performer_uuid}`}
+              className="text-lg font-semibold hover:underline text-primary"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {result.performer_name}
+            </a>
             <Badge variant={result.bin === "easy" ? "default" : "secondary"}>
               {result.bin}
             </Badge>
