@@ -333,10 +333,10 @@ export const api = {
   },
 
   faceMatching: {
-    startJob: async (site: string, linkFilter?: LinkFilter): Promise<StartJobResponse> => {
+    startJob: async (site: string, performerUuids: string[]): Promise<StartJobResponse> => {
       return fetchApi(`/face-matching/jobs`, {
         method: "POST",
-        body: JSON.stringify({ site, link_filter: linkFilter || "unlinked_stashdb" }),
+        body: JSON.stringify({ site, performer_uuids: performerUuids }),
       });
     },
 

@@ -156,10 +156,16 @@ export const usePerformersStore = create<PerformersState>((set, get) => ({
 
   // Job actions
   startMatchingJob: async (siteUuid) => {
-    const { linkFilter } = get();
+    const { performers } = get();
+    const performerUuids = performers.map((p) => p.ce_performers_uuid);
+
+    if (performerUuids.length === 0) {
+      throw new Error("No performers on current page to match");
+    }
+
     set({ loading: true, error: null });
     try {
-      const response = await api.faceMatching.startJob(siteUuid, linkFilter);
+      const response = await api.faceMatching.startJob(siteUuid, performerUuids);
       // Start polling for job status
       get().startPolling(response.job_id);
       set({ loading: false });
