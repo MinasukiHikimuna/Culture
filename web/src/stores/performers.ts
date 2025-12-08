@@ -132,9 +132,10 @@ export const usePerformersStore = create<PerformersState>((set, get) => ({
 
   // Job actions
   startMatchingJob: async (siteUuid) => {
+    const { linkFilter } = get();
     set({ loading: true, error: null });
     try {
-      const response = await api.faceMatching.startJob(siteUuid);
+      const response = await api.faceMatching.startJob(siteUuid, linkFilter);
       // Start polling for job status
       get().startPolling(response.job_id);
       set({ loading: false });
