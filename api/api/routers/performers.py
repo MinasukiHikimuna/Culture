@@ -384,19 +384,26 @@ def _resolve_site(client: ClientCultureExtractor, site: str) -> tuple[str, str]:
 def _find_performer_image(metadata_base: Path, site_name: str, performer_uuid: str) -> Path | None:
     """Find performer image trying different path patterns.
 
-    Tries patterns in order:
-    1. {base}/{site_name}/Performers/{uuid}/{uuid}.jpg
-    2. Various case variations of site_name
+    Tries site name case variations and multiple image extensions.
+    Prefers exact {uuid}.{ext} match over numbered variants.
     """
-    patterns = [
-        metadata_base / site_name / "Performers" / performer_uuid / f"{performer_uuid}.jpg",
-        metadata_base / site_name.title() / "Performers" / performer_uuid / f"{performer_uuid}.jpg",
-        metadata_base / site_name.upper() / "Performers" / performer_uuid / f"{performer_uuid}.jpg",
-        metadata_base / site_name.lower() / "Performers" / performer_uuid / f"{performer_uuid}.jpg",
-    ]
+    site_variations = [site_name, site_name.title(), site_name.upper(), site_name.lower()]
+    extensions = [".jpg", ".jpeg", ".png", ".webp"]
 
-    for path in patterns:
-        if path.exists():
-            return path
+    for site in site_variations:
+        performer_dir = metadata_base / site / "Performers" / performer_uuid
+        if not performer_dir.exists():
+            continue
+
+        # Prefer exact {uuid}.{ext} match
+        for ext in extensions:
+            path = performer_dir / f"{performer_uuid}{ext}"
+            if path.exists():
+                return path
+
+        # Fall back to any image file in the directory
+        for ext in extensions:
+            for path in performer_dir.glob(f"{performer_uuid}*{ext}"):
+                return path
 
     return None
