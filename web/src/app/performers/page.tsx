@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { usePerformersStore } from "@/stores/performers";
 import type { LinkFilter } from "@/lib/api";
 import {
@@ -31,9 +31,13 @@ const LINK_FILTER_OPTIONS: { value: LinkFilter; label: string }[] = [
   { value: "unlinked_stashapp", label: "Unlinked to Stashapp" },
 ];
 
+const VALID_LINK_FILTERS: LinkFilter[] = ["all", "linked", "unlinked", "unlinked_stashdb", "unlinked_stashapp"];
+
 export default function PerformersPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [startingJob, setStartingJob] = useState(false);
+  const initializedRef = useRef(false);
 
   const {
     sites,
@@ -55,15 +59,59 @@ export default function PerformersPage() {
     startMatchingJob,
   } = usePerformersStore();
 
+  // Update URL when state changes
+  const updateUrl = useCallback((params: { site?: string | null; filter?: string; page?: number; search?: string }) => {
+    const newParams = new URLSearchParams(searchParams.toString());
+
+    if (params.site !== undefined) {
+      if (params.site) newParams.set("site", params.site);
+      else newParams.delete("site");
+    }
+    if (params.filter !== undefined) {
+      if (params.filter && params.filter !== "all") newParams.set("filter", params.filter);
+      else newParams.delete("filter");
+    }
+    if (params.page !== undefined) {
+      if (params.page > 1) newParams.set("page", params.page.toString());
+      else newParams.delete("page");
+    }
+    if (params.search !== undefined) {
+      if (params.search) newParams.set("search", params.search);
+      else newParams.delete("search");
+    }
+
+    const newUrl = newParams.toString() ? `?${newParams.toString()}` : "/performers";
+    router.replace(newUrl, { scroll: false });
+  }, [searchParams, router]);
+
+  // Initialize state from URL params on mount
+  useEffect(() => {
+    if (initializedRef.current) return;
+    initializedRef.current = true;
+
+    const siteParam = searchParams.get("site");
+    const filterParam = searchParams.get("filter") as LinkFilter | null;
+    const pageParam = searchParams.get("page");
+    const searchParam = searchParams.get("search");
+
+    if (siteParam) setSelectedSite(siteParam);
+    if (filterParam && VALID_LINK_FILTERS.includes(filterParam)) setLinkFilter(filterParam);
+    if (pageParam) {
+      const page = parseInt(pageParam, 10);
+      if (!isNaN(page) && page > 0) setCurrentPage(page);
+    }
+    if (searchParam) setSearchTerm(searchParam);
+  }, [searchParams, setSelectedSite, setLinkFilter, setCurrentPage, setSearchTerm]);
+
   useEffect(() => {
     fetchSites();
   }, [fetchSites]);
 
   useEffect(() => {
-    if (selectedSite) {
+    if (initializedRef.current && selectedSite) {
       fetchPerformers();
     }
-  }, [selectedSite, linkFilter, fetchPerformers]);
+  }, [selectedSite, linkFilter, currentPage, fetchPerformers]);
 
   const performers = filteredPerformers();
 
@@ -89,7 +137,10 @@ export default function PerformersPage() {
       <div className="mb-4 flex gap-4 flex-wrap">
         <Select
           value={selectedSite || ""}
-          onValueChange={(value) => setSelectedSite(value || null)}
+          onValueChange={(value) => {
+            setSelectedSite(value || null);
+            updateUrl({ site: value || null, page: 1 });
+          }}
         >
           <SelectTrigger className="w-[250px]">
             <SelectValue placeholder="Select a site..." />
@@ -106,14 +157,20 @@ export default function PerformersPage() {
         <Input
           placeholder="Search performers..."
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          onChange={(e) => {
+            setSearchTerm(e.target.value);
+            updateUrl({ search: e.target.value });
+          }}
           className="max-w-sm"
           disabled={!selectedSite}
         />
 
         <Select
           value={linkFilter}
-          onValueChange={(value) => setLinkFilter(value as LinkFilter)}
+          onValueChange={(value) => {
+            setLinkFilter(value as LinkFilter);
+            updateUrl({ filter: value, page: 1 });
+          }}
           disabled={!selectedSite}
         >
           <SelectTrigger className="w-[200px]">
@@ -220,7 +277,10 @@ export default function PerformersPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setCurrentPage(1)}
+                  onClick={() => {
+                    setCurrentPage(1);
+                    updateUrl({ page: 1 });
+                  }}
                   disabled={currentPage === 1}
                 >
                   First
@@ -228,7 +288,10 @@ export default function PerformersPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setCurrentPage(currentPage - 1)}
+                  onClick={() => {
+                    setCurrentPage(currentPage - 1);
+                    updateUrl({ page: currentPage - 1 });
+                  }}
                   disabled={currentPage === 1}
                 >
                   Previous
@@ -236,7 +299,10 @@ export default function PerformersPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setCurrentPage(currentPage + 1)}
+                  onClick={() => {
+                    setCurrentPage(currentPage + 1);
+                    updateUrl({ page: currentPage + 1 });
+                  }}
                   disabled={currentPage === totalPages}
                 >
                   Next
@@ -244,7 +310,10 @@ export default function PerformersPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setCurrentPage(totalPages)}
+                  onClick={() => {
+                    setCurrentPage(totalPages);
+                    updateUrl({ page: totalPages });
+                  }}
                   disabled={currentPage === totalPages}
                 >
                   Last

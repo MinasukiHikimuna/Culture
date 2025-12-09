@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useCallback, useRef } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useReleasesStore } from "@/stores/releases";
 import {
   Table,
@@ -21,6 +22,10 @@ import {
 } from "@/components/ui/select";
 
 export default function ReleasesPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const initializedRef = useRef(false);
+
   const {
     sites,
     selectedSiteUuid,
@@ -38,12 +43,58 @@ export default function ReleasesPage() {
     filteredReleases,
   } = useReleasesStore();
 
+  // Update URL when state changes
+  const updateUrl = useCallback((params: { site?: string | null; sort?: string; limit?: string; search?: string }) => {
+    const newParams = new URLSearchParams(searchParams.toString());
+
+    if (params.site !== undefined) {
+      if (params.site) newParams.set("site", params.site);
+      else newParams.delete("site");
+    }
+    if (params.sort !== undefined) {
+      if (params.sort === "oldest") newParams.set("sort", "oldest");
+      else newParams.delete("sort");
+    }
+    if (params.limit !== undefined) {
+      if (params.limit && params.limit !== "100") newParams.set("limit", params.limit);
+      else newParams.delete("limit");
+    }
+    if (params.search !== undefined) {
+      if (params.search) newParams.set("search", params.search);
+      else newParams.delete("search");
+    }
+
+    const newUrl = newParams.toString() ? `?${newParams.toString()}` : "/releases";
+    router.replace(newUrl, { scroll: false });
+  }, [searchParams, router]);
+
+  // Initialize state from URL params on mount
+  useEffect(() => {
+    if (initializedRef.current) return;
+    initializedRef.current = true;
+
+    const siteParam = searchParams.get("site");
+    const sortParam = searchParams.get("sort");
+    const limitParam = searchParams.get("limit");
+    const searchParam = searchParams.get("search");
+
+    if (siteParam) setSelectedSite(siteParam);
+    if (sortParam === "oldest") setSortDesc(false);
+    if (limitParam) {
+      const limitVal = limitParam === "all" ? null : parseInt(limitParam, 10);
+      if (limitParam === "all" || (!isNaN(limitVal!) && limitVal! > 0)) {
+        setLimit(limitVal);
+      }
+    }
+    if (searchParam) setSearchTerm(searchParam);
+  }, [searchParams, setSelectedSite, setSortDesc, setLimit, setSearchTerm]);
+
   useEffect(() => {
     fetchSites();
   }, [fetchSites]);
 
   useEffect(() => {
-    if (selectedSiteUuid) {
+    if (initializedRef.current && selectedSiteUuid) {
       fetchReleases();
     }
   }, [selectedSiteUuid, sortDesc, limit, fetchReleases]);
@@ -72,7 +123,10 @@ export default function ReleasesPage() {
       <div className="mb-4 flex flex-wrap gap-4">
         <Select
           value={selectedSiteUuid || ""}
-          onValueChange={(value) => setSelectedSite(value || null)}
+          onValueChange={(value) => {
+            setSelectedSite(value || null);
+            updateUrl({ site: value || null });
+          }}
         >
           <SelectTrigger className="w-[250px]">
             <SelectValue placeholder="Select a site..." />
@@ -89,14 +143,20 @@ export default function ReleasesPage() {
         <Input
           placeholder="Search releases..."
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          onChange={(e) => {
+            setSearchTerm(e.target.value);
+            updateUrl({ search: e.target.value });
+          }}
           className="max-w-sm"
           disabled={!selectedSiteUuid}
         />
 
         <Select
           value={sortDesc ? "newest" : "oldest"}
-          onValueChange={(value) => setSortDesc(value === "newest")}
+          onValueChange={(value) => {
+            setSortDesc(value === "newest");
+            updateUrl({ sort: value });
+          }}
           disabled={!selectedSiteUuid}
         >
           <SelectTrigger className="w-[150px]">
@@ -110,9 +170,10 @@ export default function ReleasesPage() {
 
         <Select
           value={limit?.toString() || "all"}
-          onValueChange={(value) =>
-            setLimit(value === "all" ? null : parseInt(value, 10))
-          }
+          onValueChange={(value) => {
+            setLimit(value === "all" ? null : parseInt(value, 10));
+            updateUrl({ limit: value });
+          }}
           disabled={!selectedSiteUuid}
         >
           <SelectTrigger className="w-[120px]">
