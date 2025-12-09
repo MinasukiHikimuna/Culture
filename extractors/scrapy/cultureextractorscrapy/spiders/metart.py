@@ -15,16 +15,54 @@ SITE_CONFIGS = {
         "base_url": "https://www.sexart.com",
         "site_short_name": "sexart",
     },
-    # Future expansion:
-    # "metart": {
-    #     "base_url": "https://www.metart.com",
-    #     "site_short_name": "metart",
-    # },
-    # "metartx": {
-    #     "base_url": "https://www.metartx.com",
-    #     "site_short_name": "metartx",
-    # },
-    # etc.
+    "metart": {
+        "base_url": "https://www.metart.com",
+        "site_short_name": "metart",
+    },
+    "vivthomas": {
+        "base_url": "https://www.vivthomas.com",
+        "site_short_name": "vivthomas",
+    },
+    "alsscan": {
+        "base_url": "https://www.alsscan.com",
+        "site_short_name": "alsscan",
+    },
+    "thelifeerotic": {
+        "base_url": "https://www.thelifeerotic.com",
+        "site_short_name": "thelifeerotic",
+    },
+    "eternaldesire": {
+        "base_url": "https://www.eternaldesire.com",
+        "site_short_name": "eternaldesire",
+    },
+    "straplez": {
+        "base_url": "https://www.straplez.com",
+        "site_short_name": "straplez",
+    },
+    "metartx": {
+        "base_url": "https://www.metartx.com",
+        "site_short_name": "metartx",
+    },
+    "lovehairy": {
+        "base_url": "https://www.lovehairy.com",
+        "site_short_name": "lovehairy",
+    },
+    "erroticaarchives": {
+        "base_url": "https://www.errotica-archives.com",
+        "site_short_name": "erroticaarchives",
+    },
+    "goddessnudes": {
+        "base_url": "https://www.goddessnudes.com",
+        "site_short_name": "goddessnudes",
+    },
+    "rylskyart": {
+        "base_url": "https://www.rylskyart.com",
+        "site_short_name": "rylskyart",
+    },
+    "domai": {
+        "base_url": "https://www.domai.com",
+        "site_short_name": "domai",
+    },
 }
 
 # CDN base URL for MetArt network
