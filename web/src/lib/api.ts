@@ -204,6 +204,8 @@ export interface StashappSearchResult {
 }
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+export const STASHAPP_URL = process.env.NEXT_PUBLIC_STASHAPP_URL || "http://localhost:9999";
+export const STASHDB_URL = "https://stashdb.org";
 
 async function fetchApi<T>(
   endpoint: string,

@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useReleasesStore } from "@/stores/releases";
-import { API_BASE_URL } from "@/lib/api";
+import { API_BASE_URL, STASHAPP_URL, STASHDB_URL } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -142,9 +142,16 @@ export default function ReleaseDetailPage() {
           <div className="flex items-center gap-4">
             <span className="w-24 font-medium">Stashapp:</span>
             {currentRelease.external_ids.stashapp ? (
-              <Badge variant="default">
-                {currentRelease.external_ids.stashapp}
-              </Badge>
+              <a
+                href={`${STASHAPP_URL}/scenes/${currentRelease.external_ids.stashapp}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:underline"
+              >
+                <Badge variant="default">
+                  {currentRelease.external_ids.stashapp}
+                </Badge>
+              </a>
             ) : (
               <Badge variant="secondary">Not linked</Badge>
             )}
@@ -152,9 +159,16 @@ export default function ReleaseDetailPage() {
           <div className="flex items-center gap-4">
             <span className="w-24 font-medium">StashDB:</span>
             {currentRelease.external_ids.stashdb ? (
-              <Badge variant="default">
-                {currentRelease.external_ids.stashdb}
-              </Badge>
+              <a
+                href={`${STASHDB_URL}/scenes/${currentRelease.external_ids.stashdb}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:underline"
+              >
+                <Badge variant="default">
+                  {currentRelease.external_ids.stashdb}
+                </Badge>
+              </a>
             ) : (
               <Badge variant="secondary">Not linked</Badge>
             )}
@@ -182,18 +196,32 @@ export default function ReleaseDetailPage() {
                   </TableCell>
                   <TableCell>
                     {performer.ce_performers_stashapp_id ? (
-                      <Badge variant="default">
-                        {performer.ce_performers_stashapp_id}
-                      </Badge>
+                      <a
+                        href={`${STASHAPP_URL}/performers/${performer.ce_performers_stashapp_id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline"
+                      >
+                        <Badge variant="default">
+                          {performer.ce_performers_stashapp_id}
+                        </Badge>
+                      </a>
                     ) : (
                       <Badge variant="secondary">-</Badge>
                     )}
                   </TableCell>
                   <TableCell>
                     {performer.ce_performers_stashdb_id ? (
-                      <Badge variant="default">
-                        {performer.ce_performers_stashdb_id}
-                      </Badge>
+                      <a
+                        href={`${STASHDB_URL}/performers/${performer.ce_performers_stashdb_id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline"
+                      >
+                        <Badge variant="default">
+                          {performer.ce_performers_stashdb_id}
+                        </Badge>
+                      </a>
                     ) : (
                       <Badge variant="secondary">-</Badge>
                     )}

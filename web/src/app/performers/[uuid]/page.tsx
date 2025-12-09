@@ -7,6 +7,8 @@ import { usePerformersStore } from "@/stores/performers";
 import {
   api,
   API_BASE_URL,
+  STASHAPP_URL,
+  STASHDB_URL,
   PerformerRelease,
   StashDBSearchResult,
   StashappSearchResult,
@@ -161,7 +163,14 @@ export default function PerformerDetailPage() {
           <div className="flex items-center gap-4">
             <span className="w-24 font-medium">Stashapp:</span>
             {currentPerformer.external_ids.stashapp ? (
-              <Badge variant="default">{currentPerformer.external_ids.stashapp}</Badge>
+              <a
+                href={`${STASHAPP_URL}/performers/${currentPerformer.external_ids.stashapp}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:underline"
+              >
+                <Badge variant="default">{currentPerformer.external_ids.stashapp}</Badge>
+              </a>
             ) : (
               <Badge variant="secondary">Not linked</Badge>
             )}
@@ -169,7 +178,14 @@ export default function PerformerDetailPage() {
           <div className="flex items-center gap-4">
             <span className="w-24 font-medium">StashDB:</span>
             {currentPerformer.external_ids.stashdb ? (
-              <Badge variant="default">{currentPerformer.external_ids.stashdb}</Badge>
+              <a
+                href={`${STASHDB_URL}/performers/${currentPerformer.external_ids.stashdb}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:underline"
+              >
+                <Badge variant="default">{currentPerformer.external_ids.stashdb}</Badge>
+              </a>
             ) : (
               <Badge variant="secondary">Not linked</Badge>
             )}
