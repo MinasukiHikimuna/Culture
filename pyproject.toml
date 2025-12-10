@@ -4,6 +4,10 @@ version = "0.1.0"
 description = "Culture platform: scrapers, CLI, and data analysis tools"
 readme = "README.md"
 requires-python = ">=3.14"
+dependencies = [
+    "pandas>=2.3.3",
+    "pyarrow>=22.0.0",
+]
 
 [tool.uv.workspace]
 members = ["api", "cli", "extractors/scrapy", "libraries"]
