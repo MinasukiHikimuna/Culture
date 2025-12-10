@@ -150,3 +150,61 @@ class PerformerRelease(BaseModel):
     ce_release_url: str | None = None
     ce_site_uuid: str
     ce_site_name: str
+
+
+# Global performers schemas
+
+
+class SitePerformerInfo(BaseModel):
+    """Site-specific performer info within a global performer."""
+
+    site_uuid: str
+    site_name: str
+    performer_uuid: str
+    performer_name: str
+
+
+class GlobalPerformer(BaseModel):
+    """A global performer grouped by external ID."""
+
+    grouping_id: str
+    grouping_type: str
+    display_name: str
+    site_count: int
+    total_release_count: int
+    site_performers: list[SitePerformerInfo]
+
+
+class PaginatedGlobalPerformersResponse(BaseModel):
+    """Paginated response for global performers list."""
+
+    items: list[GlobalPerformer]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+
+
+class GlobalPerformerSiteRecord(BaseModel):
+    """Detailed site-specific performer record."""
+
+    performer_uuid: str
+    performer_name: str
+    performer_short_name: str | None = None
+    performer_url: str | None = None
+    site_uuid: str
+    site_name: str
+    site_short_name: str | None = None
+    stashdb_id: str | None = None
+    stashapp_id: str | None = None
+    release_count: int = 0
+
+
+class GlobalPerformerDetail(BaseModel):
+    """Detailed view of a global performer with all site records."""
+
+    grouping_id: str
+    grouping_type: str
+    display_name: str
+    site_records: list[GlobalPerformerSiteRecord]
+    total_release_count: int

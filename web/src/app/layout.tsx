@@ -51,6 +51,12 @@ export default function RootLayout({
             >
               Performers
             </Link>
+            <Link
+              href="/global-performers"
+              className="text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Global Performers
+            </Link>
           </div>
         </nav>
         {children}

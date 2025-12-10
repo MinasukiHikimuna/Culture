@@ -203,6 +203,52 @@ export interface StashappSearchResult {
   stashdb_id: string | null;
 }
 
+// Global performers types
+export interface SitePerformerInfo {
+  site_uuid: string;
+  site_name: string;
+  performer_uuid: string;
+  performer_name: string;
+}
+
+export interface GlobalPerformer {
+  grouping_id: string;
+  grouping_type: "stashdb" | "stashapp";
+  display_name: string;
+  site_count: number;
+  total_release_count: number;
+  site_performers: SitePerformerInfo[];
+}
+
+export interface PaginatedGlobalPerformersResponse {
+  items: GlobalPerformer[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
+export interface GlobalPerformerSiteRecord {
+  performer_uuid: string;
+  performer_name: string;
+  performer_short_name: string | null;
+  performer_url: string | null;
+  site_uuid: string;
+  site_name: string;
+  site_short_name: string | null;
+  stashdb_id: string | null;
+  stashapp_id: string | null;
+  release_count: number;
+}
+
+export interface GlobalPerformerDetail {
+  grouping_id: string;
+  grouping_type: "stashdb" | "stashapp";
+  display_name: string;
+  site_records: GlobalPerformerSiteRecord[];
+  total_release_count: number;
+}
+
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 export const STASHAPP_URL = process.env.NEXT_PUBLIC_STASHAPP_URL || "http://localhost:9999";
 export const STASHDB_URL = "https://stashdb.org";
@@ -355,6 +401,25 @@ export const api = {
       return fetchApi(`/face-matching/jobs/${jobId}`, {
         method: "DELETE",
       });
+    },
+  },
+
+  globalPerformers: {
+    list: async (params: {
+      name?: string;
+      page?: number;
+      page_size?: number;
+    }): Promise<PaginatedGlobalPerformersResponse> => {
+      const searchParams = new URLSearchParams();
+      if (params.name) searchParams.set("name", params.name);
+      if (params.page) searchParams.set("page", String(params.page));
+      if (params.page_size) searchParams.set("page_size", String(params.page_size));
+      const query = searchParams.toString();
+      return fetchApi(`/performers/global${query ? `?${query}` : ""}`);
+    },
+
+    get: async (externalId: string): Promise<GlobalPerformerDetail> => {
+      return fetchApi(`/performers/global/${externalId}`);
     },
   },
 };

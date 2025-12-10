@@ -1780,6 +1780,269 @@ class ClientCultureExtractor:
 
             self.connection.commit()
 
+    def get_global_performers(
+        self,
+        name_filter: str | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> pl.DataFrame:
+        """Get performers grouped by external ID (StashDB or Stashapp).
+
+        Groups performers by COALESCE(stashdb_id, stashapp_id) to create
+        a unified view across sites. Only includes performers with at least
+        one external ID.
+
+        Args:
+            name_filter: Optional case-insensitive substring to filter by name
+            limit: Maximum number of results to return
+            offset: Number of results to skip (for pagination)
+
+        Returns:
+            DataFrame with columns:
+            - grouping_id: The external ID used for grouping
+            - grouping_type: 'stashdb' or 'stashapp'
+            - display_name: Representative performer name
+            - site_count: Number of sites this performer appears on
+            - total_release_count: Total releases across all sites
+            - site_performers: JSON array of site-specific performer info
+        """
+        with self.connection.cursor() as cursor:
+            base_query = """
+                WITH performer_external AS (
+                    SELECT
+                        p.uuid AS performer_uuid,
+                        p.name AS performer_name,
+                        s.uuid AS site_uuid,
+                        s.name AS site_name,
+                        MAX(CASE WHEN ts.name = 'stashdb' THEN pei.external_id END) AS stashdb_id,
+                        MAX(CASE WHEN ts.name = 'stashapp' THEN pei.external_id END) AS stashapp_id
+                    FROM performers p
+                    JOIN sites s ON p.site_uuid = s.uuid
+                    JOIN performer_external_ids pei ON p.uuid = pei.performer_uuid
+                    JOIN target_systems ts ON pei.target_system_uuid = ts.uuid
+                    WHERE ts.name IN ('stashdb', 'stashapp')
+                    GROUP BY p.uuid, p.name, s.uuid, s.name
+                ),
+                grouped_performers AS (
+                    SELECT
+                        COALESCE(stashdb_id, stashapp_id) AS grouping_id,
+                        CASE WHEN stashdb_id IS NOT NULL THEN 'stashdb' ELSE 'stashapp' END AS grouping_type,
+                        performer_uuid,
+                        performer_name,
+                        site_uuid,
+                        site_name
+                    FROM performer_external
+                    WHERE COALESCE(stashdb_id, stashapp_id) IS NOT NULL
+                )
+                SELECT
+                    gp.grouping_id,
+                    gp.grouping_type,
+                    MIN(gp.performer_name) AS display_name,
+                    COUNT(DISTINCT gp.site_uuid) AS site_count,
+                    (
+                        SELECT COUNT(DISTINCT resp.releases_uuid)
+                        FROM release_entity_site_performer_entity resp
+                        WHERE resp.performers_uuid IN (
+                            SELECT performer_uuid FROM grouped_performers gp2
+                            WHERE gp2.grouping_id = gp.grouping_id
+                        )
+                    ) AS total_release_count,
+                    json_agg(DISTINCT jsonb_build_object(
+                        'site_uuid', gp.site_uuid,
+                        'site_name', gp.site_name,
+                        'performer_uuid', gp.performer_uuid,
+                        'performer_name', gp.performer_name
+                    )) AS site_performers
+                FROM grouped_performers gp
+                {where_clause}
+                GROUP BY gp.grouping_id, gp.grouping_type
+                ORDER BY MIN(gp.performer_name)
+                {limit_clause}
+                {offset_clause}
+            """
+
+            where_clause = ""
+            params: list = []
+
+            if name_filter:
+                where_clause = "WHERE gp.performer_name ILIKE %s"
+                params.append(f"%{name_filter}%")
+
+            limit_clause = f"LIMIT {limit}" if limit else ""
+            offset_clause = f"OFFSET {offset}" if offset > 0 else ""
+
+            query = base_query.format(
+                where_clause=where_clause,
+                limit_clause=limit_clause,
+                offset_clause=offset_clause,
+            )
+
+            cursor.execute(query, params if params else None)
+            rows = cursor.fetchall()
+
+            results = [
+                {
+                    "grouping_id": str(row[0]),
+                    "grouping_type": row[1],
+                    "display_name": row[2],
+                    "site_count": row[3],
+                    "total_release_count": row[4],
+                    "site_performers": row[5] if isinstance(row[5], list) else json.loads(row[5]),
+                }
+                for row in rows
+            ]
+
+            schema = {
+                "grouping_id": pl.Utf8,
+                "grouping_type": pl.Utf8,
+                "display_name": pl.Utf8,
+                "site_count": pl.Int64,
+                "total_release_count": pl.Int64,
+                "site_performers": pl.List(
+                    pl.Struct(
+                        {
+                            "site_uuid": pl.Utf8,
+                            "site_name": pl.Utf8,
+                            "performer_uuid": pl.Utf8,
+                            "performer_name": pl.Utf8,
+                        }
+                    )
+                ),
+            }
+
+            return pl.DataFrame(results, schema=schema)
+
+    def get_global_performers_count(self, name_filter: str | None = None) -> int:
+        """Get total count of global performers for pagination.
+
+        Args:
+            name_filter: Optional case-insensitive substring to filter by name
+
+        Returns:
+            Total count of unique global performers
+        """
+        with self.connection.cursor() as cursor:
+            base_query = """
+                WITH performer_external AS (
+                    SELECT
+                        p.uuid AS performer_uuid,
+                        p.name AS performer_name,
+                        MAX(CASE WHEN ts.name = 'stashdb' THEN pei.external_id END) AS stashdb_id,
+                        MAX(CASE WHEN ts.name = 'stashapp' THEN pei.external_id END) AS stashapp_id
+                    FROM performers p
+                    JOIN performer_external_ids pei ON p.uuid = pei.performer_uuid
+                    JOIN target_systems ts ON pei.target_system_uuid = ts.uuid
+                    WHERE ts.name IN ('stashdb', 'stashapp')
+                    GROUP BY p.uuid, p.name
+                ),
+                grouped_performers AS (
+                    SELECT
+                        COALESCE(stashdb_id, stashapp_id) AS grouping_id,
+                        performer_name
+                    FROM performer_external
+                    WHERE COALESCE(stashdb_id, stashapp_id) IS NOT NULL
+                )
+                SELECT COUNT(DISTINCT grouping_id)
+                FROM grouped_performers
+                {where_clause}
+            """
+
+            if name_filter:
+                where_clause = "WHERE performer_name ILIKE %s"
+                params = (f"%{name_filter}%",)
+            else:
+                where_clause = ""
+                params = ()
+
+            query = base_query.format(where_clause=where_clause)
+            cursor.execute(query, params if params else None)
+            result = cursor.fetchone()
+            return result[0] if result else 0
+
+    def get_global_performer_detail(self, external_id: str) -> pl.DataFrame:
+        """Get all site-specific performers for a global performer.
+
+        Args:
+            external_id: The StashDB or Stashapp ID to look up
+
+        Returns:
+            DataFrame with all performers sharing this external ID,
+            including their site info and release counts
+        """
+        with self.connection.cursor() as cursor:
+            query = """
+                WITH performer_external AS (
+                    SELECT
+                        p.uuid AS performer_uuid,
+                        p.name AS performer_name,
+                        p.short_name AS performer_short_name,
+                        p.url AS performer_url,
+                        s.uuid AS site_uuid,
+                        s.name AS site_name,
+                        s.short_name AS site_short_name,
+                        MAX(CASE WHEN ts.name = 'stashdb' THEN pei.external_id END) AS stashdb_id,
+                        MAX(CASE WHEN ts.name = 'stashapp' THEN pei.external_id END) AS stashapp_id
+                    FROM performers p
+                    JOIN sites s ON p.site_uuid = s.uuid
+                    JOIN performer_external_ids pei ON p.uuid = pei.performer_uuid
+                    JOIN target_systems ts ON pei.target_system_uuid = ts.uuid
+                    WHERE ts.name IN ('stashdb', 'stashapp')
+                    GROUP BY p.uuid, p.name, p.short_name, p.url, s.uuid, s.name, s.short_name
+                )
+                SELECT
+                    performer_uuid,
+                    performer_name,
+                    performer_short_name,
+                    performer_url,
+                    site_uuid,
+                    site_name,
+                    site_short_name,
+                    stashdb_id,
+                    stashapp_id,
+                    (
+                        SELECT COUNT(*)
+                        FROM release_entity_site_performer_entity resp
+                        WHERE resp.performers_uuid = performer_uuid
+                    ) AS release_count
+                FROM performer_external
+                WHERE stashdb_id = %s OR stashapp_id = %s
+                ORDER BY site_name, performer_name
+            """
+
+            cursor.execute(query, (external_id, external_id))
+            rows = cursor.fetchall()
+
+            results = [
+                {
+                    "performer_uuid": str(row[0]),
+                    "performer_name": row[1],
+                    "performer_short_name": row[2],
+                    "performer_url": row[3],
+                    "site_uuid": str(row[4]),
+                    "site_name": row[5],
+                    "site_short_name": row[6],
+                    "stashdb_id": row[7],
+                    "stashapp_id": row[8],
+                    "release_count": row[9],
+                }
+                for row in rows
+            ]
+
+            schema = {
+                "performer_uuid": pl.Utf8,
+                "performer_name": pl.Utf8,
+                "performer_short_name": pl.Utf8,
+                "performer_url": pl.Utf8,
+                "site_uuid": pl.Utf8,
+                "site_name": pl.Utf8,
+                "site_short_name": pl.Utf8,
+                "stashdb_id": pl.Utf8,
+                "stashapp_id": pl.Utf8,
+                "release_count": pl.Int64,
+            }
+
+            return pl.DataFrame(results, schema=schema)
+
     def get_performer_releases(self, performer_uuid: str) -> pl.DataFrame:
         """Get all releases that feature a specific performer.
 

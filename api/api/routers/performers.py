@@ -12,12 +12,17 @@ from api.schemas.performers import (
     BatchLinkRequest,
     BatchLinkResponse,
     BatchLinkResult,
+    GlobalPerformer,
+    GlobalPerformerDetail,
+    GlobalPerformerSiteRecord,
     LinkPerformerRequest,
+    PaginatedGlobalPerformersResponse,
     PaginatedPerformersResponse,
     PerformerDetail,
     PerformerExternalIds,
     PerformerRelease,
     PerformerWithLinkStatus,
+    SitePerformerInfo,
     StashappSearchResult,
     StashDBSearchResult,
 )
@@ -27,6 +32,129 @@ from libraries.client_culture_extractor import ClientCultureExtractor
 
 
 router = APIRouter()
+
+
+@router.get("/global")
+def list_global_performers(
+    client: Annotated[ClientCultureExtractor, Depends(get_ce_client)],
+    name: Annotated[
+        str | None,
+        Query(description="Filter by performer name (case-insensitive)"),
+    ] = None,
+    page: Annotated[
+        int,
+        Query(description="Page number (1-indexed)", ge=1),
+    ] = 1,
+    page_size: Annotated[
+        int,
+        Query(description="Number of items per page", ge=1, le=100),
+    ] = 50,
+) -> PaginatedGlobalPerformersResponse:
+    """List global performers grouped by external ID.
+
+    Returns performers grouped across sites by their StashDB ID (preferred)
+    or Stashapp ID (fallback). Performers without external IDs are excluded.
+    """
+    # Get count first to avoid unnecessary data query if no results
+    total = client.get_global_performers_count(name_filter=name)
+
+    if total == 0:
+        return PaginatedGlobalPerformersResponse(
+            items=[], total=0, page=page, page_size=page_size, total_pages=0
+        )
+
+    total_pages = (total + page_size - 1) // page_size
+
+    df = client.get_global_performers(
+        name_filter=name,
+        limit=page_size,
+        offset=(page - 1) * page_size,
+    )
+
+    items = [
+        GlobalPerformer(
+            grouping_id=row["grouping_id"],
+            grouping_type=row["grouping_type"],
+            display_name=row["display_name"],
+            site_count=row["site_count"],
+            total_release_count=row["total_release_count"],
+            site_performers=[
+                SitePerformerInfo(
+                    site_uuid=sp["site_uuid"],
+                    site_name=sp["site_name"],
+                    performer_uuid=sp["performer_uuid"],
+                    performer_name=sp["performer_name"],
+                )
+                for sp in row["site_performers"]
+            ],
+        )
+        for row in df.to_dicts()
+    ]
+
+    return PaginatedGlobalPerformersResponse(
+        items=items,
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages,
+    )
+
+
+@router.get("/global/{external_id}")
+def get_global_performer(
+    external_id: str,
+    client: Annotated[ClientCultureExtractor, Depends(get_ce_client)],
+) -> GlobalPerformerDetail:
+    """Get detailed information about a global performer.
+
+    Returns all site-specific performer records that share the given
+    external ID (StashDB or Stashapp).
+    """
+    df = client.get_global_performer_detail(external_id)
+
+    if df.is_empty():
+        raise HTTPException(
+            status_code=404,
+            detail=f"No performers found with external ID '{external_id}'",
+        )
+
+    rows = df.to_dicts()
+    first_row = rows[0]
+
+    # Determine grouping type based on which external ID matches
+    if first_row["stashdb_id"] == external_id:
+        grouping_type = "stashdb"
+    elif first_row["stashapp_id"] == external_id:
+        grouping_type = "stashapp"
+    else:
+        # Fallback: use whichever ID is present (stashdb preferred)
+        grouping_type = "stashdb" if first_row["stashdb_id"] else "stashapp"
+
+    site_records = [
+        GlobalPerformerSiteRecord(
+            performer_uuid=row["performer_uuid"],
+            performer_name=row["performer_name"],
+            performer_short_name=row["performer_short_name"],
+            performer_url=row["performer_url"],
+            site_uuid=row["site_uuid"],
+            site_name=row["site_name"],
+            site_short_name=row["site_short_name"],
+            stashdb_id=row["stashdb_id"],
+            stashapp_id=row["stashapp_id"],
+            release_count=row["release_count"],
+        )
+        for row in rows
+    ]
+
+    total_release_count = sum(r.release_count for r in site_records)
+
+    return GlobalPerformerDetail(
+        grouping_id=external_id,
+        grouping_type=grouping_type,
+        display_name=first_row["performer_name"],
+        site_records=site_records,
+        total_release_count=total_release_count,
+    )
 
 
 @router.get("")
