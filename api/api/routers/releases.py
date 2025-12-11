@@ -14,6 +14,7 @@ from api.schemas.releases import (
     Release,
     ReleaseDetail,
     ReleaseDownload,
+    ReleaseExternalId,
     ReleaseExternalIds,
     ReleasePerformer,
     ReleaseTag,
@@ -214,17 +215,23 @@ def get_release(
         raise HTTPException(status_code=404, detail=f"Release with UUID '{uuid}' not found")
 
     release_data = release_df.to_dicts()[0]
-    external_ids_dict = client.get_release_external_ids(uuid)
+    external_ids_list = client.get_release_external_ids(uuid)
     performers_df = client.get_release_performers(uuid)
     tags_df = client.get_release_tags(uuid)
     downloads_df = client.get_release_downloads(uuid)
 
+    # Build legacy format (first ID per target system)
+    stashapp_id = next(
+        (e["external_id"] for e in external_ids_list if e["target_system"] == "stashapp"), None
+    )
+    stashdb_id = next(
+        (e["external_id"] for e in external_ids_list if e["target_system"] == "stashdb"), None
+    )
+
     return ReleaseDetail(
         **release_data,
-        external_ids=ReleaseExternalIds(
-            stashapp=external_ids_dict.get("stashapp"),
-            stashdb=external_ids_dict.get("stashdb"),
-        ),
+        external_ids=ReleaseExternalIds(stashapp=stashapp_id, stashdb=stashdb_id),
+        external_id_mappings=[ReleaseExternalId(**e) for e in external_ids_list],
         performers=[ReleasePerformer(**row) for row in performers_df.to_dicts()],
         tags=[ReleaseTag(**row) for row in tags_df.to_dicts()],
         downloads=[ReleaseDownload(**row) for row in downloads_df.to_dicts()],

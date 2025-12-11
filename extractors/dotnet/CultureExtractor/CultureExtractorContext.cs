@@ -91,7 +91,13 @@ public class CultureExtractorContext : DbContext, ICultureExtractorContext
             .OnDelete(DeleteBehavior.Cascade);
 
         modelBuilder.Entity<ReleaseExternalIdEntity>()
-            .HasIndex(e => new { e.ReleaseUuid, e.TargetSystemUuid })
+            .HasOne(e => e.Download)
+            .WithMany()
+            .HasForeignKey(e => e.DownloadUuid)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<ReleaseExternalIdEntity>()
+            .HasIndex(e => new { e.ReleaseUuid, e.TargetSystemUuid, e.DownloadUuid })
             .IsUnique();
 
         // Configure PerformerExternalId
@@ -309,6 +315,9 @@ public class ReleaseExternalIdEntity
 
     public required Guid TargetSystemUuid { get; set; }
     public required TargetSystemEntity TargetSystem { get; set; }
+
+    public Guid? DownloadUuid { get; set; }
+    public DownloadEntity? Download { get; set; }
 }
 
 public class PerformerExternalIdEntity

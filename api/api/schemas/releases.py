@@ -22,8 +22,16 @@ class Release(BaseModel):
     ce_release_json_document: str | None = Field(default=None, description="Raw JSON document")
 
 
+class ReleaseExternalId(BaseModel):
+    """External ID mapping for a release."""
+
+    target_system: str = Field(description="Target system name (stashapp, stashdb)")
+    external_id: str = Field(description="External ID value")
+    download_uuid: str | None = Field(default=None, description="Download UUID this ID refers to")
+
+
 class ReleaseExternalIds(BaseModel):
-    """External IDs for a release."""
+    """External IDs for a release (legacy format for backward compatibility)."""
 
     stashapp: str | None = Field(default=None, description="Stashapp scene ID")
     stashdb: str | None = Field(default=None, description="StashDB scene ID")
@@ -69,7 +77,10 @@ class ReleaseDownload(BaseModel):
 class ReleaseDetail(Release):
     """Detailed release information including related data."""
 
-    external_ids: ReleaseExternalIds = Field(description="External system IDs")
+    external_ids: ReleaseExternalIds = Field(description="External system IDs (legacy format)")
+    external_id_mappings: list[ReleaseExternalId] = Field(
+        default_factory=list, description="Full external ID mappings with download_uuid"
+    )
     performers: list[ReleasePerformer] = Field(default_factory=list, description="Performers in the release")
     tags: list[ReleaseTag] = Field(default_factory=list, description="Tags for the release")
     downloads: list[ReleaseDownload] = Field(default_factory=list, description="Downloaded files")

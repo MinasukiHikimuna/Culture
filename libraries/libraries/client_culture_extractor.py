@@ -1684,19 +1684,19 @@ class ClientCultureExtractor:
 
             return pl.DataFrame(downloads, schema=schema)
 
-    def get_release_external_ids(self, release_uuid: str) -> dict:
+    def get_release_external_ids(self, release_uuid: str) -> list[dict]:
         """Get external IDs for a release from the release_external_ids table.
 
         Args:
             release_uuid: UUID of the release
 
         Returns:
-            Dictionary containing external IDs by target system name
+            List of dicts with target_system, external_id, and download_uuid
         """
         with self.connection.cursor() as cursor:
             cursor.execute(
                 """
-                SELECT ts.name, rei.external_id
+                SELECT ts.name, rei.external_id, rei.download_uuid
                 FROM release_external_ids rei
                 JOIN target_systems ts ON rei.target_system_uuid = ts.uuid
                 WHERE rei.release_uuid = %s
@@ -1705,11 +1705,21 @@ class ClientCultureExtractor:
             )
             results = cursor.fetchall()
 
-            # Return as dictionary with target system name as key
-            return {row[0]: row[1] for row in results}
+            return [
+                {
+                    "target_system": row[0],
+                    "external_id": row[1],
+                    "download_uuid": str(row[2]) if row[2] else None,
+                }
+                for row in results
+            ]
 
     def set_release_external_id(
-        self, release_uuid: str, target_system_name: str, external_id: str
+        self,
+        release_uuid: str,
+        target_system_name: str,
+        external_id: str,
+        download_uuid: str | None = None,
     ) -> None:
         """Set an external ID for a release in the release_external_ids table.
 
@@ -1717,6 +1727,7 @@ class ClientCultureExtractor:
             release_uuid: UUID of the release
             target_system_name: Name of the target system (e.g., 'stashapp', 'stashdb')
             external_id: The external ID value (as string)
+            download_uuid: Optional UUID of the specific download this external ID refers to
         """
         with self.connection.cursor() as cursor:
             # Verify release exists
@@ -1725,6 +1736,17 @@ class ClientCultureExtractor:
             )
             if not cursor.fetchone():
                 raise ValueError(f"Release with UUID {release_uuid} does not exist")
+
+            # Verify download exists if provided
+            if download_uuid:
+                cursor.execute(
+                    "SELECT uuid FROM downloads WHERE uuid = %s AND release_uuid = %s",
+                    (download_uuid, release_uuid),
+                )
+                if not cursor.fetchone():
+                    raise ValueError(
+                        f"Download {download_uuid} does not exist or doesn't belong to release {release_uuid}"
+                    )
 
             # Get or create target system
             cursor.execute(
@@ -1746,13 +1768,13 @@ class ClientCultureExtractor:
                     (target_system_uuid, target_system_name, f"External system: {target_system_name}"),
                 )
 
-            # Check if external ID already exists for this release and target system
+            # Check if external ID already exists for this release, target system, and download
             cursor.execute(
                 """
                 SELECT uuid FROM release_external_ids
-                WHERE release_uuid = %s AND target_system_uuid = %s
+                WHERE release_uuid = %s AND target_system_uuid = %s AND download_uuid IS NOT DISTINCT FROM %s
             """,
-                (release_uuid, target_system_uuid),
+                (release_uuid, target_system_uuid, download_uuid),
             )
             existing_row = cursor.fetchone()
 
@@ -1772,10 +1794,10 @@ class ClientCultureExtractor:
                 cursor.execute(
                     """
                     INSERT INTO release_external_ids
-                    (uuid, release_uuid, target_system_uuid, external_id, created, last_updated)
-                    VALUES (%s, %s, %s, %s, NOW(), NOW())
+                    (uuid, release_uuid, target_system_uuid, external_id, download_uuid, created, last_updated)
+                    VALUES (%s, %s, %s, %s, %s, NOW(), NOW())
                 """,
-                    (external_id_uuid, release_uuid, target_system_uuid, external_id),
+                    (external_id_uuid, release_uuid, target_system_uuid, external_id, download_uuid),
                 )
 
             self.connection.commit()
