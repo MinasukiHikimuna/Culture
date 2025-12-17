@@ -307,6 +307,38 @@ class StashDbClient(StashboxClient):
         scene_ids = [scene["stashdb_id"] for scene in scenes]
         return self.query_scenes(scene_ids=scene_ids)
 
+    def query_tag(self, tag_id: str) -> dict | None:
+        """
+        Query a single tag by ID, including deleted status.
+
+        Args:
+            tag_id: The StashDB tag ID
+
+        Returns:
+            dict with tag data including 'deleted' field, or None if not found
+        """
+        query = """
+            query Tag($id: ID!) {
+                findTag(id: $id) {
+                    id
+                    name
+                    description
+                    aliases
+                    deleted
+                    category {
+                        id
+                        name
+                        group
+                        description
+                    }
+                }
+            }
+        """
+        result = self._gql_query(query, {"id": tag_id})
+        if result and "data" in result and "findTag" in result["data"]:
+            return result["data"]["findTag"]
+        return None
+
     def query_tags(self):
         query = """
             query QueryTags($page: Int!, $per_page: Int!) {
