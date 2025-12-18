@@ -10,6 +10,8 @@ dependencies = [
     "stashapp-tools>=0.2.52",
     "numpy>=2.0.0",
     "python-levenshtein>=0.27.3",
+    "sqlalchemy>=2.0.0",
+    "alembic>=1.13.0",
 ]
 
 [build-system]

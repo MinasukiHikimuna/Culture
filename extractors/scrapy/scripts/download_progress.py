@@ -10,8 +10,7 @@ import json
 import sys
 from dataclasses import dataclass, field
 
-import psycopg2
-
+import psycopg
 
 DB_URL = "postgresql://ce_admin:gTmtNikmpEGf26Fb@fraktal.piilukko.fi:5434/cultureextractor"
 
@@ -274,11 +273,11 @@ def main():
     )
     args = parser.parse_args()
 
-    with psycopg2.connect(DB_URL) as conn:
+    with psycopg.connect(DB_URL) as conn:
         if args.list:
             sites = get_sites(conn)
             print("\nAvailable sites:")
-            for uuid, name in sites:
+            for _uuid, name in sites:
                 print(f"  - {name}")
             print()
             return
