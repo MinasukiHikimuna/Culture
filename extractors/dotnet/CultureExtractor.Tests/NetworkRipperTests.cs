@@ -39,7 +39,7 @@ namespace CultureExtractor.Tests
             // Arrange
             var site = new Site(UuidGenerator.Generate(), "shortName", "name", "https://example.com", "username", "password", "storageState");
             var browserSettings = new BrowserSettings(BrowserMode.ClassicHeadless, "browserChannel");
-            var scrapeOptions = new ScrapeOptions { FullScrape = false };
+            var scrapeOptions = new ScrapeOptions { FullScrapeLastUpdated = null };
 
             var pageMock = new Mock<IPage>();
             var contextMock = new Mock<IBrowserContext>();

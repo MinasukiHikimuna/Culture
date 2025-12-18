@@ -26,7 +26,7 @@ public class DownloadPlannerTests
     public async Task Foobar()
     {
         var release = new Release(UuidGenerator.Generate(), site, null, DateOnly.Parse("2023-11-18"), "firstanal", "First Anal", "https://assntits.com/releases/firstanal", "Hot MILF has her first anal experience.", 0.0,
-            new SitePerformer[] { new SitePerformer("toriblack", "Tori Black", "https://assntits.com/models/tori-black") },
+            new SitePerformer[] { new SitePerformer("toriblack", "Tori Black", "https://assntits.com/models/tori-black", "{}") },
             new SiteTag[] { new SiteTag("anal", "Anal", "https://assntits.com/tags/anal") },
             new IAvailableFile[]
             {
