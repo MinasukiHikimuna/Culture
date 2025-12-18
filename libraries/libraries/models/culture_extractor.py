@@ -228,7 +228,7 @@ class Tag(Base):
     name: Mapped[str] = mapped_column(Text, nullable=False)
     url: Mapped[str | None] = mapped_column(Text, nullable=True)
     site_uuid: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
-    json_document: Mapped[str | None] = mapped_column(Text, nullable=True)
+    json_document: Mapped[dict] = mapped_column(JSON, nullable=False, server_default="{}")
 
     # Relationships
     site: Mapped[Site] = relationship(back_populates="tags")
