@@ -1342,3 +1342,88 @@ class PerformerImagePipeline:
 
         with open(filepath, "wb") as f:
             f.write(response.content)
+
+
+class StashDbImagePipeline:
+    """Pipeline to download StashDB images (scenes, performers, studios) to disk.
+
+    Downloads images to: data/stashdb/images/{type}/{entity_id}.jpg
+    """
+
+    def __init__(self, images_store):
+        self.images_store = images_store
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self.downloaded_ids = {"scene": set(), "performer": set(), "studio": set()}
+
+    @classmethod
+    def from_crawler(cls, crawler):
+        images_store = crawler.settings.get("IMAGES_STORE", "data/stashdb/images")
+        return cls(images_store)
+
+    def process_item(self, item, spider):
+        # Import here to avoid circular imports
+        from .spiders.stashdb import StashDbImageItem
+
+        if not isinstance(item, StashDbImageItem):
+            return item
+
+        image_type = item["image_type"]
+        entity_id = item["entity_id"]
+        image_urls = item.get("image_urls", [])
+
+        if not image_urls:
+            return item
+
+        # Skip if already downloaded in this session
+        if entity_id in self.downloaded_ids[image_type]:
+            return item
+
+        # Create directory for this image type
+        type_dir = os.path.join(self.images_store, f"{image_type}s")
+        os.makedirs(type_dir, exist_ok=True)
+
+        # Download first image
+        url = image_urls[0]
+        ext = self._get_extension(url)
+        filename = f"{entity_id}{ext}"
+        filepath = os.path.join(type_dir, filename)
+
+        # Skip if file already exists
+        if os.path.exists(filepath):
+            self.logger.debug(
+                f"[StashDbImagePipeline] Skipping {image_type} {entity_id} (already exists)"
+            )
+            self.downloaded_ids[image_type].add(entity_id)
+            return item
+
+        # Download the image
+        try:
+            self._download_image(url, filepath)
+            self.logger.info(
+                f"[StashDbImagePipeline] Downloaded {image_type} image for {entity_id}"
+            )
+            self.downloaded_ids[image_type].add(entity_id)
+        except Exception as e:
+            self.logger.error(
+                f"[StashDbImagePipeline] Failed to download {image_type} {entity_id}: {e}"
+            )
+
+        return item
+
+    def _get_extension(self, url):
+        """Extract file extension from URL."""
+        parsed = urlparse(url)
+        path = parsed.path
+        path = path.split("?")[0]
+        ext = os.path.splitext(path)[1]
+        return ext if ext else ".jpg"
+
+    def _download_image(self, url, filepath):
+        """Download an image from URL to filepath."""
+        import requests
+
+        response = requests.get(url, timeout=30)
+        response.raise_for_status()
+
+        with open(filepath, "wb") as f:
+            f.write(response.content)
