@@ -6,6 +6,7 @@ from culture_cli import __version__
 from culture_cli.commands import sync
 from culture_cli.modules.ce.cli import ce_app
 from culture_cli.modules.stash.cli import stash_app
+from culture_cli.modules.stashdb.cli import stashdb_app
 
 
 app = typer.Typer(
@@ -20,6 +21,7 @@ app.command("sync")(sync.sync_scene)
 # Register module subcommands
 app.add_typer(ce_app, name="ce", help="Culture Extractor operations")
 app.add_typer(stash_app, name="stash", help="Stashapp operations")
+app.add_typer(stashdb_app, name="stashdb", help="StashDB data lake operations")
 
 
 def version_callback(value: bool) -> None:

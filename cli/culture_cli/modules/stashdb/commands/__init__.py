@@ -1,0 +1,1 @@
+"""StashDB CLI commands."""
