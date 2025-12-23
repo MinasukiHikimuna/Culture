@@ -5,22 +5,26 @@ This tool extracts comprehensive data from [gwasi.com](https://gwasi.com/), whic
 ## Quickstart
 
 ```bash
-# Step 1: Extract post index from GWASI (~2.7GB of post metadata)
+# Step 1: Set up Reddit API credentials (one-time setup)
+#   - Create app at https://www.reddit.com/prefs/apps (choose "script" type)
+#   - Copy .env.example to .env and fill in your credentials:
+cp .env.example .env
+# Edit .env with your REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET
+
+# Step 2: Extract post index from GWASI (~2.7GB of post metadata)
 uv run python gwasi_extractor.py --output my_data
 
-# Step 2: Set up Reddit API credentials (one-time setup, see REDDIT_SETUP.md)
-#   - Create app at https://www.reddit.com/prefs/apps (choose "script" type)
-#   - Create .env file with your credentials:
-echo "REDDIT_CLIENT_ID=your_client_id" >> .env
-echo "REDDIT_CLIENT_SECRET=your_client_secret" >> .env
+# Step 3: Fetch full Reddit post content for a specific user
+uv run python reddit_extractor.py my_data/gwasi_data_*.json --output my_data/reddit --filter-users username
 
-# Step 3: Enrich with full Reddit post content (audio links, performers, scripts)
-uv run python reddit_extractor.py my_data/gwasi_data_*.json --output my_data/reddit
+# Step 4: Analyze posts and download audio files
+node analyze-and-download.js my_data/reddit/username/
 ```
 
 **What you get:**
-- Step 1: Post IDs, titles, tags, dates, scores (from GWASI index)
+- Step 2: Post IDs, titles, tags, dates, scores (from GWASI index)
 - Step 3: Full post content with audio links, performer info, scripts (from Reddit API)
+- Step 4: Downloaded audio files organized by release
 
 ## Features
 
