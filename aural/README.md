@@ -18,7 +18,14 @@ uv run python gwasi_extractor.py --output my_data
 uv run python reddit_extractor.py my_data/gwasi_data_*.json --output my_data/reddit --filter-users username
 
 # Step 4: Analyze posts and download audio files
+# Single post:
+node analyze-and-download.js my_data/reddit/username/postid_title.json
+
+# All posts from a user:
 node analyze-and-download.js my_data/reddit/username/
+
+# Dry run first (see what would be downloaded without downloading):
+node analyze-and-download.js my_data/reddit/username/ --dry-run
 ```
 
 **What you get:**
