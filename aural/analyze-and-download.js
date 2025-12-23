@@ -406,7 +406,7 @@ Examples:
   node analyze-and-download-v2.js --process-analysis analysis_results/
 
   # Custom directories with analysis saving
-  node analyze-and-download-v2.js reddit_data/ --analysis-dir my_analysis --data-dir my_data --save-approved
+  node analyze-and-download-v2.js reddit_data/ --analysis-dir my_analysis --data-dir extracted_data --save-approved
 `);
     return 0;
   }

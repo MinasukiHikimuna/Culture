@@ -241,7 +241,7 @@ Examples:
   node download-orchestrator-v2.js --migrate downloads/
 
   # Custom output directory with verbose logging
-  node download-orchestrator-v2.js test_analysis.json --output my_data --verbose
+  node download-orchestrator-v2.js test_analysis.json --output extracted_data --verbose
 `);
     return 0;
   }

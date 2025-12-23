@@ -12,20 +12,20 @@ cp .env.example .env
 # Edit .env with your REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET
 
 # Step 2: Extract post index from GWASI (~2.7GB of post metadata)
-uv run python gwasi_extractor.py --output my_data
+uv run python gwasi_extractor.py --output extracted_data
 
 # Step 3: Fetch full Reddit post content for a specific user
-uv run python reddit_extractor.py my_data/gwasi_data_*.json --output my_data/reddit --filter-users username
+uv run python reddit_extractor.py extracted_data/gwasi_data_*.json --output extracted_data/reddit --filter-users username
 
 # Step 4: Analyze posts and download audio files
 # Single post:
-node analyze-and-download.js my_data/reddit/username/postid_title.json
+node analyze-and-download.js extracted_data/reddit/username/postid_title.json
 
 # All posts from a user:
-node analyze-and-download.js my_data/reddit/username/
+node analyze-and-download.js extracted_data/reddit/username/
 
 # Dry run first (see what would be downloaded without downloading):
-node analyze-and-download.js my_data/reddit/username/ --dry-run
+node analyze-and-download.js extracted_data/reddit/username/ --dry-run
 ```
 
 **What you get:**
@@ -68,7 +68,7 @@ uv run python gwasi_extractor.py
 ### Advanced Options
 ```bash
 # Specify output directory
-uv run python gwasi_extractor.py --output my_data
+uv run python gwasi_extractor.py --output extracted_data
 
 # Test with limited files (useful for testing)
 uv run python gwasi_extractor.py --max-files 10   # Download only first 10 base files
@@ -102,8 +102,8 @@ uv run python gwasi_extractor.py                  # Will automatically use cache
 
 🔄 Removing duplicates...
 ✅ Final dataset: 227,602 unique entries
-💾 Saved 227,602 entries to my_data/gwasi_data_20251223_134855.json
-📈 Summary saved to my_data/summary_20251223_134855.json
+💾 Saved 227,602 entries to extracted_data/gwasi_data_20251223_134855.json
+📈 Summary saved to extracted_data/summary_20251223_134855.json
 
 📈 EXTRACTION SUMMARY
 ==================================================
@@ -181,7 +181,7 @@ gwasi-extractor/
 ├── requirements.txt          # Python dependencies
 ├── environment.yml           # Conda environment configuration
 ├── README.md                # This file
-└── my_data/                 # Output directory (or extracted_data/ by default)
+└── extracted_data/                 # Output directory (or extracted_data/ by default)
     ├── gwasi_data_*.json        # Extracted data in JSON format
     ├── summary_*.json           # Summary statistics
     ├── current_base_version.txt # Tracks current base version
