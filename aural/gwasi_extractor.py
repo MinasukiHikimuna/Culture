@@ -573,9 +573,8 @@ class GwasiExtractor:
             all_entries.extend(base_entries)
             print(f"✅ Added {len(base_entries)} base entries to dataset")
 
-            # Save the base version and mark download as complete after successful download
+            # Save the base version after successful download
             self.save_base_version(base_dir_name)
-            self.mark_base_download_complete()
 
         else:
             # Load base data from cache since version hasn't changed
