@@ -24,37 +24,39 @@ GWASI maintains multiple data sources:
 ## Installation
 
 1. Clone or download this repository
-2. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
+2. Install [uv](https://docs.astral.sh/uv/) if not already installed
+3. Dependencies will be automatically installed when running with `uv run`
 
 ## Usage
 
 ### Basic Usage
 ```bash
-python gwasi_extractor.py
+uv run python gwasi_extractor.py
 ```
 
 ### Advanced Options
 ```bash
 # Specify output directory
-python gwasi_extractor.py --output my_data
-
-# Choose output format
-python gwasi_extractor.py --format csv      # CSV only
-python gwasi_extractor.py --format json    # JSON only  
-python gwasi_extractor.py --format both    # Both formats (default)
+uv run python gwasi_extractor.py --output my_data
 
 # Test with limited files (useful for testing)
-python gwasi_extractor.py --max-files 10   # Download only first 10 base files
+uv run python gwasi_extractor.py --max-files 10   # Download only first 10 base files
 
 # Caching options
-python gwasi_extractor.py --no-cache       # Always fetch fresh data, don't use cache
-python gwasi_extractor.py --cache-only     # Only process cached files, no network requests
+uv run python gwasi_extractor.py --no-cache       # Always fetch fresh data, don't use cache
+uv run python gwasi_extractor.py --cache-only     # Only process cached files, no network requests
+
+# Only fetch delta updates (skip base files)
+uv run python gwasi_extractor.py --delta-only
+
+# Non-interactive mode (auto-download new base when version changes)
+uv run python gwasi_extractor.py --non-interactive
+
+# Adjust consecutive 404 threshold for file discovery
+uv run python gwasi_extractor.py --consecutive-404s 20
 
 # Resume interrupted download
-python gwasi_extractor.py                  # Will automatically use cached files
+uv run python gwasi_extractor.py                  # Will automatically use cached files
 ```
 
 ### Example Output
