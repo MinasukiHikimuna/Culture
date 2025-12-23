@@ -4,13 +4,7 @@ This guide will help you set up Reddit API access to use the `reddit_extractor.p
 
 ## Prerequisites
 
-1. **Install PRAW**: You need the PRAW library installed in your conda environment
-   ```bash
-   conda install praw
-   # or
-   pip install praw
-   ```
-
+1. **uv**: Dependencies are managed via `uv` and will be installed automatically
 2. **Reddit Account**: You need a Reddit account
 
 ## Step 1: Create a Reddit App
@@ -67,39 +61,34 @@ $env:REDDIT_USER_AGENT="reddit_extractor/1.0 by your_reddit_username"
 Run a small test with limited posts:
 
 ```bash
-python reddit_extractor.py extracted_data/gwasi_data_20250801_185213.csv --max-posts 5
+uv run python reddit_extractor.py extracted_data/gwasi_data_*.json --max-posts 5
 ```
 
 ## Usage Examples
 
 ### Basic usage:
 ```bash
-python reddit_extractor.py extracted_data/gwasi_data_20250801_185213.csv
+uv run python reddit_extractor.py extracted_data/gwasi_data_*.json
 ```
 
 ### With custom output directory:
 ```bash
-python reddit_extractor.py extracted_data/gwasi_data_20250801_185213.csv --output my_reddit_data
+uv run python reddit_extractor.py extracted_data/gwasi_data_*.json --output my_reddit_data
 ```
 
 ### Process only first 10 posts for testing:
 ```bash
-python reddit_extractor.py extracted_data/gwasi_data_20250801_185213.csv --max-posts 10
-```
-
-### Use JSON input file instead of CSV:
-```bash
-python reddit_extractor.py extracted_data/gwasi_data_20250801_185213.json
+uv run python reddit_extractor.py extracted_data/gwasi_data_*.json --max-posts 10
 ```
 
 ### Custom rate limiting (slower requests):
 ```bash
-python reddit_extractor.py extracted_data/gwasi_data_20250801_185213.csv --delay 2.0
+uv run python reddit_extractor.py extracted_data/gwasi_data_*.json --delay 2.0
 ```
 
 ### Pass credentials directly (not recommended for security):
 ```bash
-python reddit_extractor.py gwasi_data.csv --client-id YOUR_ID --client-secret YOUR_SECRET
+uv run python reddit_extractor.py gwasi_data.json --client-id YOUR_ID --client-secret YOUR_SECRET
 ```
 
 ## Output Files

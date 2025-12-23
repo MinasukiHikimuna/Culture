@@ -2,6 +2,26 @@
 
 This tool extracts comprehensive data from [gwasi.com](https://gwasi.com/), which maintains an index of Reddit audio content from various adult audio subreddits.
 
+## Quickstart
+
+```bash
+# Step 1: Extract post index from GWASI (~2.7GB of post metadata)
+uv run python gwasi_extractor.py --output my_data
+
+# Step 2: Set up Reddit API credentials (one-time setup, see REDDIT_SETUP.md)
+#   - Create app at https://www.reddit.com/prefs/apps (choose "script" type)
+#   - Create .env file with your credentials:
+echo "REDDIT_CLIENT_ID=your_client_id" >> .env
+echo "REDDIT_CLIENT_SECRET=your_client_secret" >> .env
+
+# Step 3: Enrich with full Reddit post content (audio links, performers, scripts)
+uv run python reddit_extractor.py my_data/gwasi_data_*.json --output my_data/reddit
+```
+
+**What you get:**
+- Step 1: Post IDs, titles, tags, dates, scores (from GWASI index)
+- Step 3: Full post content with audio links, performer info, scripts (from Reddit API)
+
 ## Features
 
 - ✅ Extracts data from GWASI's JSON API endpoints
@@ -11,15 +31,15 @@ This tool extracts comprehensive data from [gwasi.com](https://gwasi.com/), whic
 - ✅ **Cache-only mode** - process previously downloaded data without network access
 - ✅ Parses metadata including titles, tags, usernames, subreddits, scores
 - ✅ Generates Reddit URLs for further processing with PRAW
-- ✅ Outputs data in CSV and JSON formats
+- ✅ Outputs data in JSON format
 - ✅ Removes duplicates and generates summary statistics
 - ✅ Handles large datasets efficiently with rate limiting
 
 ## Data Sources
 
-GWASI maintains multiple data sources:
+GWASI provides data via:
 - `delta.json` - Recent updates and new posts
-- `base_<hash>/1.json`, `base_<hash>/2.json`, etc. - Complete historical dataset split into numbered files
+- `base_<hash>/` directory containing `1.json`, `2.json`, ... `1000+.json` - Complete historical dataset split into numbered files
 
 ## Installation
 
@@ -62,43 +82,40 @@ uv run python gwasi_extractor.py                  # Will automatically use cache
 ### Example Output
 ```bash
 🚀 Starting GWASI data extraction...
-🔍 Discovering JSON endpoints...
-📄 Found base file: base_37997ef38e.json
-📥 Fetching: https://gwasi.com/delta.json
-✅ Successfully fetched data
-📊 Fetching delta data...
-✅ Processed 1,375 delta entries
-📥 Fetching: https://gwasi.com/base_37997ef38e.json
-✅ Successfully fetched data  
-📊 Fetching base data...
-✅ Processed 226,246 base entries
+📥 Fetching delta.json...
+✅ Fetched delta with 1,375 entries
+📊 Fetching base data from base_22a412729b/...
+📥 Downloading 1022 base files...
+✅ Added 227,602 base entries to dataset
+📝 Saved base version: base_22a412729b
+
 🔄 Removing duplicates...
-✅ Final dataset: 226,246 unique entries
-💾 Saved 226,246 entries to extracted_data/gwasi_data_20250801_143022.csv
-💾 Saved 226,246 entries to extracted_data/gwasi_data_20250801_143022.json
-📈 Summary saved to extracted_data/summary_20250801_143022.json
+✅ Final dataset: 227,602 unique entries
+💾 Saved 227,602 entries to my_data/gwasi_data_20251223_134855.json
+📈 Summary saved to my_data/summary_20251223_134855.json
 
 📈 EXTRACTION SUMMARY
 ==================================================
-Total entries: 226,246
-Date range: 2020-01-15T10:30:45 to 2025-08-01T14:30:22
+Total entries: 227,602
+Date range: 2012-05-18 to 2025-12-23
 
 Top subreddits:
-  gonewildaudio: 84,544
-  pillowtalkaudio: 58,763  
-  GWASapphic: 33,995
+  gonewildaudio: 172,906
+  pillowtalkaudio: 19,690
+  GWASapphic: 8,140
   ...
 
 Content types:
-  audio: 180,234
-  script: 35,678
-  verification: 8,456
-  other: 1,878
+  script: 91,143
+  unknown: 68,499
+  other: 43,070
+  audio: 17,598
+  verification: 7,292
 ```
 
 ## Output Format
 
-### CSV Columns
+### JSON Fields
 - `post_id` - Reddit post ID
 - `subreddit` - Subreddit name
 - `username` - Reddit username
@@ -120,28 +137,29 @@ The extracted data includes Reddit URLs and post IDs that can be used with PRAW:
 
 ```python
 import praw
-import pandas as pd
+import json
 
 # Load extracted data
-df = pd.read_csv('extracted_data/gwasi_data_20250801_143022.csv')
+with open('extracted_data/gwasi_data_20250801_143022.json') as f:
+    data = json.load(f)
 
 # Initialize PRAW
 reddit = praw.Reddit(
     client_id='your_client_id',
-    client_secret='your_client_secret', 
+    client_secret='your_client_secret',
     user_agent='your_user_agent'
 )
 
 # Process posts
-for _, row in df.head(10).iterrows():
+for entry in data[:10]:
     try:
-        submission = reddit.submission(id=row['post_id'])
+        submission = reddit.submission(id=entry['post_id'])
         print(f"Title: {submission.title}")
         print(f"Author: {submission.author}")
         print(f"Score: {submission.score}")
         print("---")
     except Exception as e:
-        print(f"Error processing {row['post_id']}: {e}")
+        print(f"Error processing {entry['post_id']}: {e}")
 ```
 
 ## File Structure
@@ -152,21 +170,17 @@ gwasi-extractor/
 ├── requirements.txt          # Python dependencies
 ├── environment.yml           # Conda environment configuration
 ├── README.md                # This file
-└── extracted_data/          # Output directory (created automatically)
-    ├── gwasi_data_*.csv         # Extracted data in CSV format
+└── my_data/                 # Output directory (or extracted_data/ by default)
     ├── gwasi_data_*.json        # Extracted data in JSON format
     ├── summary_*.json           # Summary statistics
     ├── current_base_version.txt # Tracks current base version
     └── raw_json/                # Cached intermediate JSON files
         ├── delta.json               # Cached delta data
-        ├── base_37997ef38e/         # Base version directory
-        │   ├── 1.json                   # Base file 1
-        │   ├── 2.json                   # Base file 2
-        │   └── ...                      # Additional base files
-        ├── base_12345678ab/         # Different base version (kept for comparison)
-        │   ├── 1.json
-        │   └── ...
-        └── ...                      # Additional base versions
+        └── base_22a412729b/         # Base version directory (~1000+ files)
+            ├── 1.json
+            ├── 2.json
+            ├── ...
+            └── 1022.json
 ```
 
 ## Notes
