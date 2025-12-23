@@ -2,7 +2,6 @@
 
 const fs = require("fs");
 const path = require("path");
-const axios = require("axios");
 
 /**
  * Enhanced Reddit Post Analyzer with Script URL Resolution
@@ -141,9 +140,15 @@ Return JSON:
    */
   async callLLM(prompt) {
     try {
-      const response = await axios.post(
-        this.lmStudioUrl,
-        {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 300000);
+
+      const response = await fetch(this.lmStudioUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
           model: this.model,
           messages: [
             {
@@ -153,26 +158,27 @@ Return JSON:
           ],
           temperature: 0.1,
           max_tokens: 800
-        },
-        {
-          timeout: 300000,
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-      );
+        }),
+        signal: controller.signal
+      });
 
-      return response.data.choices[0].message.content;
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error('API Error Response:', response.status, response.statusText);
+        console.error('Response data:', errorData);
+        throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data.choices[0].message.content;
     } catch (error) {
-      if (error.code === "ECONNREFUSED") {
+      if (error.cause?.code === "ECONNREFUSED" || error.message?.includes("fetch failed")) {
         throw new Error(
           "Could not connect to LM Studio. Make sure LM Studio is running and serving on " +
             this.lmStudioUrl
         );
-      }
-      if (error.response) {
-        console.error('API Error Response:', error.response.status, error.response.statusText);
-        console.error('Response data:', error.response.data);
       }
       throw error;
     }
