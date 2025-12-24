@@ -27,7 +27,6 @@ class AnalyzeAndDownloadPipelineV2 {
     // Initialize release orchestrator
     this.releaseOrchestrator = new ReleaseOrchestrator({
       dataDir: this.dataDir,
-      cacheEnabled: !this.dryRun,
       validateExtractions: true
     });
   }

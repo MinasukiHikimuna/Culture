@@ -1,9 +1,8 @@
-#!/usr/bin/env node
-
 /**
- * Whyp.it Extractor - Refactored for Clean Architecture
- * 
- * Pure audio extractor with platform-agnostic schema
+ * Whyp.it Extractor
+ *
+ * Pure audio extractor - downloads directly to target path provided by caller.
+ * Returns platform-agnostic schema.
  */
 
 const { chromium } = require("playwright");
@@ -12,8 +11,7 @@ const path = require("path");
 const crypto = require('crypto');
 
 class WhypitExtractor {
-  constructor(outputDir = "whypit_data", config = {}) {
-    this.outputDir = path.resolve(outputDir);
+  constructor(config = {}) {
     this.platform = 'whypit';
     this.requestDelay = config.requestDelay || 2000;
     this.lastRequestTime = 0;
@@ -47,26 +45,36 @@ class WhypitExtractor {
 
   /**
    * Extract content from Whyp.it URL
-   * Pure extraction without any external dependencies
+   * @param {string} url - Whyp.it URL to extract
+   * @param {object} targetPath - Target paths for output files
+   * @param {string} targetPath.dir - Directory to save files
+   * @param {string} targetPath.basename - Base filename (without extension)
    */
-  async extract(url) {
+  async extract(url, targetPath) {
     await this.rateLimit();
-    
+
     try {
       console.log(`📥 Processing: ${url}`);
-      
-      // Check cache first
-      const cached = await this.checkCache(url);
-      if (cached) {
+
+      const { dir, basename } = targetPath;
+      await fs.mkdir(dir, { recursive: true });
+
+      // Check if already extracted (JSON exists)
+      const jsonPath = path.join(dir, `${basename}.json`);
+      try {
+        await fs.access(jsonPath);
+        const cached = JSON.parse(await fs.readFile(jsonPath, 'utf8'));
         console.log(`✅ Using cached extraction for: ${url}`);
         return cached;
+      } catch (e) {
+        // Not cached, continue with extraction
       }
-      
+
       await this.page.goto(url, { waitUntil: "networkidle" });
 
       // Extract metadata from the page
       const pageData = await this.extractPageData();
-      
+
       // Extract track info from URL
       const urlMatch = url.match(/\/tracks\/(\d+)\/(.+)$/);
       if (!urlMatch) {
@@ -78,29 +86,23 @@ class WhypitExtractor {
       const performer = pageData.performer || "unknown";
       const title = pageData.title || titleSlug;
 
-      // Setup directories
-      const userDir = path.join(this.outputDir, this.sanitizeFilename(performer));
-      const releaseDir = path.join(userDir, this.sanitizeFilename(titleSlug));
-      await fs.mkdir(releaseDir, { recursive: true });
-
       // Capture audio URL
       const audioUrl = await this.captureAudioUrl();
-      
+
       // Download audio
-      const filename = `${trackId}_${this.sanitizeFilename(titleSlug)}.mp3`;
-      const audioFilePath = path.join(releaseDir, filename);
-      
+      const audioFilePath = path.join(dir, `${basename}.mp3`);
       await this.downloadFile(audioUrl, audioFilePath);
-      
+
       // Calculate checksum
       const checksum = await this.calculateChecksum(audioFilePath);
-      
+
       // Get file stats
       const stats = await fs.stat(audioFilePath);
-      
+
       // Save HTML backup
-      const htmlPath = await this.saveHtmlBackup(releaseDir, filename);
-      
+      const htmlPath = path.join(dir, `${basename}.html`);
+      await this.saveHtmlBackup(htmlPath);
+
       // Build result in platform-agnostic schema
       const result = {
         audio: {
@@ -118,7 +120,7 @@ class WhypitExtractor {
           author: performer,
           description: pageData.description || '',
           tags: pageData.tags || [],
-          duration: null, // Whyp.it doesn't provide duration before playing
+          duration: null,
           platform: {
             name: 'whypit',
             url: 'https://whyp.it'
@@ -130,18 +132,14 @@ class WhypitExtractor {
           extractedAt: new Date().toISOString()
         },
         backupFiles: {
-          html: htmlPath
+          html: htmlPath,
+          metadata: jsonPath
         }
       };
-      
-      // Save metadata
-      const metadataPath = path.join(releaseDir, `${filename.replace('.mp3', '')}.json`);
-      await fs.writeFile(metadataPath, JSON.stringify(result, null, 2));
-      result.backupFiles.metadata = metadataPath;
-      
-      // Create completion marker
-      await this.createCompletionMarker(releaseDir, result);
-      
+
+      // Save metadata (serves as completion marker)
+      await fs.writeFile(jsonPath, JSON.stringify(result, null, 2));
+
       console.log(`✅ Successfully extracted: ${title} by ${performer}`);
       return result;
 
@@ -149,56 +147,6 @@ class WhypitExtractor {
       console.error(`❌ Failed to extract ${url}:`, error.message);
       throw error;
     }
-  }
-
-  async checkCache(url) {
-    try {
-      const urlMatch = url.match(/\/tracks\/(\d+)\/(.+)$/);
-      if (!urlMatch) return null;
-      
-      const [, trackId, titleSlug] = urlMatch;
-      
-      // Try to find existing data in any performer directory
-      const files = await fs.readdir(this.outputDir);
-      
-      for (const file of files) {
-        const filePath = path.join(this.outputDir, file);
-        const stat = await fs.stat(filePath);
-        
-        if (stat.isDirectory()) {
-          const releaseDir = path.join(filePath, this.sanitizeFilename(titleSlug));
-          const markerFile = path.join(releaseDir, '.extracted');
-          
-          try {
-            await fs.access(markerFile);
-            
-            // Found cached extraction
-            const metadataFiles = await fs.readdir(releaseDir);
-            const jsonFile = metadataFiles.find(f => f.endsWith('.json') && f !== '.extracted');
-            
-            if (jsonFile) {
-              const cached = JSON.parse(await fs.readFile(path.join(releaseDir, jsonFile), 'utf8'));
-              return cached;
-            }
-          } catch (e) {
-            // Not in this directory
-          }
-        }
-      }
-    } catch (e) {
-      // Error checking cache
-    }
-    return null;
-  }
-
-  async createCompletionMarker(outputDir, result) {
-    const markerFile = path.join(outputDir, '.extracted');
-    const markerData = {
-      url: result.audio.sourceUrl,
-      extractedAt: result.platformData.extractedAt,
-      checksum: result.audio.checksum.sha256
-    };
-    await fs.writeFile(markerFile, JSON.stringify(markerData, null, 2));
   }
 
   async extractPageData() {
@@ -334,11 +282,9 @@ class WhypitExtractor {
     }
   }
 
-  async saveHtmlBackup(releaseDir, baseFilename) {
+  async saveHtmlBackup(htmlPath) {
     const htmlContent = await this.page.content();
-    const htmlPath = path.join(releaseDir, `${baseFilename.replace('.mp3', '')}.html`);
     await fs.writeFile(htmlPath, htmlContent);
-    return htmlPath;
   }
 
   async calculateChecksum(filePath) {
@@ -367,70 +313,3 @@ class WhypitExtractor {
 }
 
 module.exports = WhypitExtractor;
-
-// CLI Interface
-if (require.main === module) {
-  const { Command } = require("commander");
-  
-  const program = new Command();
-  program
-    .name("whypit-extractor")
-    .description("Extract audio content from Whyp.it - pure extraction with platform-agnostic schema")
-    .version("2.0.0");
-
-  program
-    .argument("[urls...]", "Whyp.it URLs to extract")
-    .option("-o, --output <dir>", "Output directory", "whypit_data")
-    .option("-f, --url-file <file>", "File containing URLs (one per line)")
-    .action(async (urls, options) => {
-      const extractor = new WhypitExtractor(options.output);
-      
-      try {
-        // Get URLs from file if specified
-        if (options.urlFile) {
-          const content = await fs.readFile(options.urlFile, 'utf8');
-          urls = content
-            .split('\n')
-            .map(line => line.trim())
-            .filter(line => line && !line.startsWith('#'));
-          console.log(`📂 Loaded ${urls.length} URLs from ${options.urlFile}`);
-        }
-
-        if (!urls || urls.length === 0) {
-          console.error("❌ No URLs provided");
-          process.exit(1);
-        }
-
-        await extractor.setupPlaywright();
-        
-        const results = [];
-        for (let i = 0; i < urls.length; i++) {
-          const url = urls[i];
-          console.log(`\n[${i + 1}/${urls.length}] Processing: ${url}`);
-          
-          try {
-            const content = await extractor.extract(url);
-            results.push({ success: true, url, title: content.metadata.title });
-          } catch (error) {
-            console.error(`❌ Failed: ${error.message}`);
-            results.push({ success: false, url, error: error.message });
-          }
-        }
-        
-        const successful = results.filter(r => r.success).length;
-        const failed = results.filter(r => !r.success).length;
-        
-        console.log(`\n📊 Summary:`);
-        console.log(`✅ Successful: ${successful}`);
-        console.log(`❌ Failed: ${failed}`);
-        
-      } catch (error) {
-        console.error("❌ Fatal error:", error.message);
-        process.exit(1);
-      } finally {
-        await extractor.closeBrowser();
-      }
-    });
-
-  program.parse();
-}

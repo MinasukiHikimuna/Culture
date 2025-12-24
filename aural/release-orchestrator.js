@@ -1,14 +1,14 @@
-#!/usr/bin/env node
-
 /**
- * Release Orchestrator - New Architecture
- * 
+ * Release Orchestrator
+ *
  * Coordinates the entire release extraction workflow:
  * 1. Discovery (Reddit/Patreon posts)
  * 2. Analysis (LLM enrichment)
  * 3. Audio extraction (platform-agnostic)
  * 4. Release aggregation
  * 5. Storage organization
+ *
+ * All files are stored directly in data/releases/{performer}/{release_dir}/
  */
 
 const fs = require('fs').promises;
@@ -143,38 +143,40 @@ class ReleaseOrchestrator {
   constructor(config = {}) {
     this.config = {
       dataDir: config.dataDir || 'data',
-      cacheEnabled: config.cacheEnabled !== false,
       validateExtractions: config.validateExtractions !== false,
       ...config
     };
-    
+
     // Platform extractors registry
     this.extractors = new Map();
-    
+
     // Initialize default extractors
     this.registerExtractor('soundgasm', {
       pattern: /soundgasm\.net/i,
       module: './soundgasm-extractor.js'
     });
-    
+
     this.registerExtractor('whypit', {
       pattern: /whyp\.it/i,
       module: './whypit-extractor.js'
     });
-    
+
     this.registerExtractor('hotaudio', {
       pattern: /hotaudio\.net/i,
       module: './hotaudio-extractor.js'
     });
+
+    // Track active extractor instances for cleanup
+    this.activeExtractors = new Map();
   }
-  
+
   /**
    * Register a platform extractor
    */
   registerExtractor(platform, config) {
     this.extractors.set(platform, config);
   }
-  
+
   /**
    * Get appropriate extractor for a URL
    */
@@ -186,104 +188,63 @@ class ReleaseOrchestrator {
     }
     return null;
   }
-  
+
   /**
-   * Check if extraction is cached
+   * Extract audio from URL directly to target path
+   * @param {string} url - Audio URL to extract
+   * @param {object} targetPath - Target paths for output files
+   * @param {string} targetPath.dir - Directory to save files
+   * @param {string} targetPath.basename - Base filename (without extension)
    */
-  async isCached(url) {
-    if (!this.config.cacheEnabled) return false;
-    
-    const cacheKey = this.generateCacheKey(url);
-    const cacheDir = path.join(this.config.dataDir, '.cache', cacheKey);
-    const markerFile = path.join(cacheDir, '.extracted');
-    
-    try {
-      await fs.access(markerFile);
-      const marker = JSON.parse(await fs.readFile(markerFile, 'utf8'));
-      
-      // Check if extraction was successful
-      return marker.success === true;
-    } catch {
-      return false;
-    }
-  }
-  
-  /**
-   * Load cached extraction
-   */
-  async loadCachedExtraction(url) {
-    const cacheKey = this.generateCacheKey(url);
-    const cacheDir = path.join(this.config.dataDir, '.cache', cacheKey);
-    const metadataFile = path.join(cacheDir, 'metadata.json');
-    
-    try {
-      const metadata = JSON.parse(await fs.readFile(metadataFile, 'utf8'));
-      console.log(`📦 Loaded cached extraction for: ${url}`);
-      // Find the platform from the cached data
-      const platform = metadata.metadata?.platform?.name || metadata.platform || 'unknown';
-      // Normalize the cached result
-      return this.normalizeExtractorResult(metadata, platform);
-    } catch (error) {
-      throw new Error(`Failed to load cache for ${url}: ${error.message}`);
-    }
-  }
-  
-  /**
-   * Extract audio from URL
-   */
-  async extractAudio(url) {
-    // Check cache first
-    if (await this.isCached(url)) {
-      return await this.loadCachedExtraction(url);
-    }
-    
+  async extractAudio(url, targetPath) {
     // Find appropriate extractor
     const extractorInfo = this.getExtractorForUrl(url);
     if (!extractorInfo) {
       throw new Error(`No extractor found for URL: ${url}`);
     }
-    
+
     const { platform, config } = extractorInfo;
     console.log(`🔧 Using ${platform} extractor for: ${url}`);
-    
+
     try {
-      // Dynamic import of extractor module
-      const ExtractorClass = require(config.module);
-      const extractor = new ExtractorClass(
-        path.join(this.config.dataDir, 'audio', platform),
-        { requestDelay: 2000 }
-      );
-      
-      // Setup if needed (e.g., Playwright)
-      if (extractor.setupPlaywright) {
-        await extractor.setupPlaywright();
-      }
-      
-      try {
-        // Extract audio - extractors should return our unified schema
-        const result = await extractor.extract(url);
-        
-        // Transform to AudioSource if needed
-        const audioSource = this.normalizeExtractorResult(result, platform);
-        
-        // Cache the original result, not the AudioSource
-        if (this.config.cacheEnabled) {
-          await this.cacheExtraction(url, result);
+      // Get or create extractor instance
+      let extractor = this.activeExtractors.get(platform);
+      if (!extractor) {
+        const ExtractorClass = require(config.module);
+        extractor = new ExtractorClass({ requestDelay: 2000 });
+
+        if (extractor.setupPlaywright) {
+          await extractor.setupPlaywright();
         }
-        
-        return audioSource;
-        
-      } finally {
-        // Cleanup
-        if (extractor.closeBrowser) {
-          await extractor.closeBrowser();
-        }
+
+        this.activeExtractors.set(platform, extractor);
       }
-      
+
+      // Extract audio directly to target path
+      const result = await extractor.extract(url, targetPath);
+
+      // Transform to AudioSource
+      const audioSource = this.normalizeExtractorResult(result, platform);
+
+      return audioSource;
+
     } catch (error) {
       console.error(`❌ Extraction failed for ${url}: ${error.message}`);
       throw error;
     }
+  }
+
+  /**
+   * Cleanup all active extractors
+   */
+  async cleanup() {
+    for (const [platform, extractor] of this.activeExtractors) {
+      if (extractor.closeBrowser) {
+        await extractor.closeBrowser();
+        console.log(`🔒 Closed ${platform} extractor`);
+      }
+    }
+    this.activeExtractors.clear();
   }
   
   /**
@@ -323,43 +284,11 @@ class ReleaseOrchestrator {
   }
   
   /**
-   * Cache extraction result
-   */
-  async cacheExtraction(url, audioSource) {
-    const cacheKey = this.generateCacheKey(url);
-    const cacheDir = path.join(this.config.dataDir, '.cache', cacheKey);
-    
-    await fs.mkdir(cacheDir, { recursive: true });
-    
-    // Save metadata
-    const metadataFile = path.join(cacheDir, 'metadata.json');
-    await fs.writeFile(metadataFile, JSON.stringify(audioSource, null, 2));
-    
-    // Create marker file
-    const markerFile = path.join(cacheDir, '.extracted');
-    await fs.writeFile(markerFile, JSON.stringify({
-      url,
-      extractedAt: new Date().toISOString(),
-      platform: audioSource.metadata.platform.name,
-      success: true
-    }));
-    
-    console.log(`💾 Cached extraction for: ${url}`);
-  }
-  
-  /**
-   * Generate cache key from URL
-   */
-  generateCacheKey(url) {
-    return crypto.createHash('sha256').update(url).digest('hex').substring(0, 16);
-  }
-  
-  /**
    * Process a Reddit/Patreon post into a release
    */
   async processPost(post, llmAnalysis = null) {
     console.log(`🎯 Processing post: ${post.title}`);
-    
+
     // Create release object
     const release = new Release({
       title: post.title,
@@ -368,7 +297,7 @@ class ReleaseOrchestrator {
       redditPost: post,
       llmAnalysis: llmAnalysis
     });
-    
+
     // Determine target directory structure
     let releaseDir;
     if (llmAnalysis?.version_naming?.release_directory) {
@@ -386,62 +315,41 @@ class ReleaseOrchestrator {
         release.id
       );
     }
-    
+
     await fs.mkdir(releaseDir, { recursive: true });
-    
+
     // Extract audio URLs from post and analysis
     const audioUrls = this.extractAudioUrls(post, llmAnalysis);
     console.log(`🔗 Found ${audioUrls.length} audio URLs`);
-    
+
     // Process each audio version with proper naming
     if (llmAnalysis?.audio_versions && llmAnalysis.audio_versions.length > 0) {
       for (let i = 0; i < llmAnalysis.audio_versions.length; i++) {
         const audioVersion = llmAnalysis.audio_versions[i];
-        
+
         if (audioVersion.urls && audioVersion.urls.length > 0) {
           for (const urlInfo of audioVersion.urls) {
             try {
               console.log(`📥 Extracting: ${urlInfo.url} (${audioVersion.version_name || `Version ${i+1}`})`);
-              const audioSource = await this.extractAudio(urlInfo.url);
-              
-              // Update file path to use new naming if available
-              if (audioVersion.filename) {
-                const newFilePath = path.join(releaseDir, audioVersion.filename);
-                if (audioSource.audio.filePath && audioSource.audio.filePath !== newFilePath) {
-                  // Move/rename the downloaded file to match new naming
-                  try {
-                    await fs.rename(audioSource.audio.filePath, newFilePath);
-                    audioSource.audio.filePath = newFilePath;
-                    console.log(`📝 Renamed file to: ${audioVersion.filename}`);
-                  } catch (renameError) {
-                    console.warn(`⚠️ Could not rename file: ${renameError.message}`);
-                  }
-                }
-              }
-              
+
+              // Determine basename for this version
+              const basename = audioVersion.filename
+                ? audioVersion.filename.replace(/\.[^.]+$/, '') // Remove extension
+                : `${llmAnalysis.version_naming?.release_slug || release.id}_${audioVersion.slug || i}`;
+
+              const targetPath = { dir: releaseDir, basename };
+              const audioSource = await this.extractAudio(urlInfo.url, targetPath);
+
               // Add version-specific metadata
               audioSource.versionInfo = {
                 slug: audioVersion.slug,
                 version_name: audioVersion.version_name,
                 description: audioVersion.description
               };
-              
+
               release.addAudioSource(audioSource);
               console.log(`✅ Added audio source: ${audioVersion.version_name || 'Version'} from ${audioSource.metadata.platform.name}`);
-              
-              // Save individual version metadata if specified
-              if (audioVersion.metadata_file) {
-                const metadataPath = path.join(releaseDir, audioVersion.metadata_file);
-                const versionMetadata = {
-                  version_info: audioSource.versionInfo,
-                  audio_metadata: audioSource.metadata,
-                  platform_data: audioSource.platformData,
-                  extracted_at: new Date().toISOString()
-                };
-                await fs.writeFile(metadataPath, JSON.stringify(versionMetadata, null, 2));
-                console.log(`📄 Saved version metadata: ${audioVersion.metadata_file}`);
-              }
-              
+
             } catch (error) {
               console.error(`❌ Failed to extract ${urlInfo.url}: ${error.message}`);
               // Continue with other URLs
@@ -451,10 +359,15 @@ class ReleaseOrchestrator {
       }
     } else {
       // Fallback: process URLs directly (old method)
-      for (const url of audioUrls) {
+      for (let i = 0; i < audioUrls.length; i++) {
+        const url = audioUrls[i];
         try {
           console.log(`📥 Extracting: ${url}`);
-          const audioSource = await this.extractAudio(url);
+
+          const basename = `${release.id}_audio_${i}`;
+          const targetPath = { dir: releaseDir, basename };
+          const audioSource = await this.extractAudio(url, targetPath);
+
           release.addAudioSource(audioSource);
           console.log(`✅ Added audio source from ${audioSource.metadata.platform.name}`);
         } catch (error) {
@@ -463,7 +376,7 @@ class ReleaseOrchestrator {
         }
       }
     }
-    
+
     // Extract script if available
     if (llmAnalysis?.script_url) {
       try {
@@ -472,10 +385,13 @@ class ReleaseOrchestrator {
         console.error(`❌ Failed to extract script: ${error.message}`);
       }
     }
-    
+
     // Save release
     await this.saveRelease(release);
-    
+
+    // Cleanup extractors
+    await this.cleanup();
+
     console.log(`✅ Release processed: ${release.id}`);
     return release;
   }
@@ -616,16 +532,8 @@ class ReleaseOrchestrator {
   }
 }
 
-// Export classes and orchestrator
 module.exports = {
   ReleaseOrchestrator,
   Release,
   AudioSource
 };
-
-// CLI interface - no direct execution
-if (require.main === module) {
-  console.log('ReleaseOrchestrator is a library module.');
-  console.log('Use download-orchestrator.js to process analysis files.');
-  console.log('Example: node download-orchestrator.js analysis_results/your_file.json');
-}

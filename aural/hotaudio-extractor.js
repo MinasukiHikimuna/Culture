@@ -1,9 +1,8 @@
-#!/usr/bin/env node
-
 /**
- * HotAudio Extractor - Refactored for Clean Architecture
- * 
- * Pure audio extractor with platform-agnostic schema
+ * HotAudio Extractor
+ *
+ * Pure audio extractor - downloads directly to target path provided by caller.
+ * Returns platform-agnostic schema.
  */
 
 const { chromium } = require("playwright");
@@ -12,8 +11,7 @@ const path = require("path");
 const crypto = require('crypto');
 
 class HotAudioExtractor {
-  constructor(outputDir = "hotaudio_data", config = {}) {
-    this.outputDir = path.resolve(outputDir);
+  constructor(config = {}) {
     this.platform = 'hotaudio';
     this.requestDelay = config.requestDelay || 3000;
     this.lastRequestTime = 0;
@@ -50,73 +48,82 @@ class HotAudioExtractor {
 
   /**
    * Extract content from HotAudio URL
-   * Pure extraction without any external dependencies
+   * @param {string} url - HotAudio URL to extract
+   * @param {object} targetPath - Target paths for output files
+   * @param {string} targetPath.dir - Directory to save files
+   * @param {string} targetPath.basename - Base filename (without extension)
    */
-  async extract(url) {
+  async extract(url, targetPath) {
     await this.rateLimit();
-    
+
     try {
       console.log(`📥 Processing: ${url}`);
-      
+
       // Parse URL
       const urlInfo = this.parseHotAudioUrl(url);
       if (!urlInfo) {
         throw new Error("Invalid HotAudio URL format");
       }
-      
-      // Check cache first
-      const cached = await this.checkCache(url, urlInfo);
-      if (cached) {
+
+      const { dir, basename } = targetPath;
+      await fs.mkdir(dir, { recursive: true });
+
+      // Check if already extracted (JSON exists)
+      const jsonPath = path.join(dir, `${basename}.json`);
+      try {
+        await fs.access(jsonPath);
+        const cached = JSON.parse(await fs.readFile(jsonPath, 'utf8'));
         console.log(`✅ Using cached extraction for: ${url}`);
         return cached;
+      } catch (e) {
+        // Not cached, continue with extraction
       }
-      
-      // Setup directories
-      const userDir = path.join(this.outputDir, urlInfo.user);
-      const releaseDir = path.join(userDir, this.sanitizeFilename(urlInfo.audioId));
-      const tempDir = path.join(releaseDir, '.temp');
+
+      // Setup temp directory for audio capture
+      const tempDir = path.join(dir, '.temp');
       await fs.mkdir(tempDir, { recursive: true });
-      
+
       // Create new page with audio capture
       const page = await this.createNewPage(tempDir);
-      
+
       try {
         await page.goto(url, { waitUntil: "networkidle" });
-        
+
         // Check if player exists
         try {
           await page.waitForSelector('#player-progress-text', { timeout: 10000 });
         } catch (e) {
           throw new Error("No audio player found on page");
         }
-        
+
         // Save HTML backup
-        const htmlPath = await this.saveHtmlBackup(page, releaseDir, urlInfo.audioId);
-        
+        const htmlPath = path.join(dir, `${basename}.html`);
+        await this.saveHtmlBackup(page, htmlPath);
+
         // Extract metadata from page
         const metadata = await this.extractPageMetadata(page, urlInfo);
-        
+
         // Start playback and capture
-        const audioPath = await this.captureAudio(page, tempDir, releaseDir, urlInfo.audioId);
-        
+        const audioPath = await this.captureAudio(page, tempDir, dir, basename);
+
         // Calculate checksum
         const checksum = await this.calculateChecksum(audioPath);
-        
+
         // Get file stats
         const stats = await fs.stat(audioPath);
-        
+
         // Validate audio file
         const validation = await this.validateAudioFile(audioPath);
         if (!validation.valid) {
           await fs.unlink(audioPath);
           throw new Error(`Audio validation failed: ${validation.reason}`);
         }
-        
+
         // Build result in platform-agnostic schema
         const result = {
           audio: {
             sourceUrl: url,
-            downloadUrl: null, // HotAudio doesn't expose direct download URLs
+            downloadUrl: null,
             filePath: audioPath,
             format: 'mp4',
             fileSize: stats.size,
@@ -141,28 +148,24 @@ class HotAudioExtractor {
             extractedAt: new Date().toISOString()
           },
           backupFiles: {
-            html: htmlPath
+            html: htmlPath,
+            metadata: jsonPath
           }
         };
-        
-        // Save metadata
-        const metadataPath = path.join(releaseDir, `${urlInfo.audioId}.json`);
-        await fs.writeFile(metadataPath, JSON.stringify(result, null, 2));
-        result.backupFiles.metadata = metadataPath;
-        
+
+        // Save metadata (serves as completion marker)
+        await fs.writeFile(jsonPath, JSON.stringify(result, null, 2));
+
         // Cleanup temp directory
         try {
           await fs.rm(tempDir, { recursive: true });
         } catch (e) {
           // Ignore cleanup errors
         }
-        
-        // Create completion marker
-        await this.createCompletionMarker(releaseDir, result);
-        
+
         console.log(`✅ Successfully extracted: ${result.metadata.title}`);
         return result;
-        
+
       } finally {
         await page.close();
       }
@@ -171,34 +174,6 @@ class HotAudioExtractor {
       console.error(`❌ Failed to extract ${url}:`, error.message);
       throw error;
     }
-  }
-
-  async checkCache(url, urlInfo) {
-    try {
-      const cacheDir = path.join(this.outputDir, urlInfo.user, this.sanitizeFilename(urlInfo.audioId));
-      const markerFile = path.join(cacheDir, '.extracted');
-      
-      // Check if marker file exists
-      await fs.access(markerFile);
-      
-      // Load and return cached result
-      const metadataPath = path.join(cacheDir, `${urlInfo.audioId}.json`);
-      const cached = JSON.parse(await fs.readFile(metadataPath, 'utf8'));
-      return cached;
-    } catch (e) {
-      // Not cached
-    }
-    return null;
-  }
-
-  async createCompletionMarker(outputDir, result) {
-    const markerFile = path.join(outputDir, '.extracted');
-    const markerData = {
-      url: result.audio.sourceUrl,
-      extractedAt: result.platformData.extractedAt,
-      checksum: result.audio.checksum.sha256
-    };
-    await fs.writeFile(markerFile, JSON.stringify(markerData, null, 2));
   }
 
   parseHotAudioUrl(url) {
@@ -266,18 +241,16 @@ class HotAudioExtractor {
     }
   }
 
-  async saveHtmlBackup(page, releaseDir, audioId) {
+  async saveHtmlBackup(page, htmlPath) {
     const htmlContent = await page.content();
-    const htmlPath = path.join(releaseDir, `${audioId}.html`);
     await fs.writeFile(htmlPath, htmlContent);
-    return htmlPath;
   }
 
-  async captureAudio(page, tempDir, releaseDir, audioId) {
+  async captureAudio(page, tempDir, dir, basename) {
     // Get audio duration
     const durationText = await page.$eval('#player-progress-text', el => el.textContent);
     console.log(`⏱️  Audio duration: ${durationText}`);
-    
+
     // Click play button
     console.log(`▶️  Starting playback...`);
     const playButton = await page.$('#player-playpause');
@@ -285,14 +258,14 @@ class HotAudioExtractor {
       throw new Error("Play button not found");
     }
     await playButton.click();
-    
+
     // Monitor playback progress
     let playbackComplete = false;
     const progressInterval = setInterval(async () => {
       try {
         const progress = await page.$eval('#player-progress-text', el => el.textContent);
         console.log(`📊 [Progress] ${progress}`);
-        
+
         const [current, total] = progress.split(' / ');
         if (current === total || progress.includes('PLAYBACK ERROR')) {
           playbackComplete = true;
@@ -302,12 +275,12 @@ class HotAudioExtractor {
         // Player might have been removed
       }
     }, 5000);
-    
+
     // Wait for playback to complete
     console.log(`⏳ Waiting for playback to complete...`);
     while (!playbackComplete) {
       await new Promise(resolve => setTimeout(resolve, 10000));
-      
+
       try {
         await page.$eval('#player-progress-text', el => el.textContent);
       } catch (e) {
@@ -315,12 +288,12 @@ class HotAudioExtractor {
         break;
       }
     }
-    
+
     clearInterval(progressInterval);
-    
+
     // Wait for capture to finish
     await new Promise(resolve => setTimeout(resolve, 2000));
-    
+
     // Export captured data
     console.log(`📤 Exporting captured audio data...`);
     const capturedData = await page.evaluate(() => {
@@ -329,20 +302,20 @@ class HotAudioExtractor {
       }
       return null;
     });
-    
+
     if (!capturedData || capturedData.segments.length === 0) {
       throw new Error("No audio data was captured");
     }
-    
+
     console.log(`📊 Captured ${capturedData.segmentCount} segments (${(capturedData.totalBytes / 1024 / 1024).toFixed(2)} MB)`);
-    
+
     // Trigger browser-side file combination
     await page.evaluate(() => {
       if (window.reconstructAudio) {
         window.reconstructAudio();
       }
     });
-    
+
     // Get combined temp file
     const combinedTempFile = await page.evaluate(() => {
       if (window.__audioCapture && window.__audioCapture.sessionId) {
@@ -350,16 +323,16 @@ class HotAudioExtractor {
       }
       return null;
     });
-    
+
     if (!combinedTempFile) {
       throw new Error("Failed to combine audio segments");
     }
-    
+
     // Move to final location
     const tempFilePath = path.join(tempDir, combinedTempFile);
-    const audioFilePath = path.join(releaseDir, `${audioId}.mp4`);
+    const audioFilePath = path.join(dir, `${basename}.mp4`);
     await fs.rename(tempFilePath, audioFilePath);
-    
+
     return audioFilePath;
   }
 
@@ -588,51 +561,3 @@ class HotAudioExtractor {
 }
 
 module.exports = HotAudioExtractor;
-
-// CLI Interface
-if (require.main === module) {
-  const { Command } = require("commander");
-  
-  const program = new Command();
-  program
-    .name("hotaudio-extractor")
-    .description("Extract audio content from HotAudio - pure extraction with platform-agnostic schema")
-    .version("2.0.0");
-
-  program
-    .option("-u, --url <url>", "Single HotAudio URL to extract")
-    .option("-o, --output <directory>", "Output directory", "hotaudio_data")
-    .argument("[url]", "HotAudio URL to extract")
-    .action(async (url, options) => {
-      const targetUrl = url || options.url;
-      
-      if (!targetUrl) {
-        console.error("❌ Please provide a HotAudio URL");
-        process.exit(1);
-      }
-      
-      const extractor = new HotAudioExtractor(options.output);
-      
-      try {
-        await extractor.setupPlaywright();
-        
-        const content = await extractor.extract(targetUrl);
-        
-        console.log("\n📊 Extraction Summary:");
-        console.log(`Title: ${content.metadata.title}`);
-        console.log(`Author: ${content.metadata.author}`);
-        console.log(`Audio file: ${content.audio.filePath}`);
-        console.log(`Duration: ${content.metadata.duration}s`);
-        console.log(`File size: ${(content.audio.fileSize / 1024 / 1024).toFixed(2)} MB`);
-        console.log(`Checksum: ${content.audio.checksum.sha256.substring(0, 16)}...`);
-        
-      } catch (error) {
-        console.error("❌ Extraction failed:", error.message);
-        process.exit(1);
-      } finally {
-        await extractor.closeBrowser();
-      }
-    });
-
-  program.parse();
-}
