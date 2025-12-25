@@ -460,6 +460,7 @@ class ReleaseOrchestrator {
 
       // Determine script source and extract content
       let scriptContent = null;
+      let htmlContent = null;
       let scriptMetadata = {
         originalUrl: url,
         resolvedUrl,
@@ -472,11 +473,13 @@ class ReleaseOrchestrator {
         // Extract from scriptbin.works
         const result = await this.extractScriptbinScript(resolvedUrl);
         scriptContent = result.content;
+        htmlContent = result.htmlContent;
         scriptMetadata = { ...scriptMetadata, ...result.metadata };
       } else if (resolvedUrl.includes('reddit.com')) {
         // It's a Reddit script post - extract the post content
         const result = await this.extractRedditScript(resolvedUrl);
         scriptContent = result.content;
+        htmlContent = result.htmlContent;
         scriptMetadata = { ...scriptMetadata, ...result.metadata };
       } else {
         console.log(`⚠️  Unknown script source: ${resolvedUrl}`);
@@ -492,6 +495,15 @@ class ReleaseOrchestrator {
         scriptMetadata.filePath = scriptPath;
         scriptMetadata.status = 'downloaded';
         console.log(`✅ Script saved: ${scriptPath}`);
+      }
+
+      // Save HTML backup if available
+      if (htmlContent) {
+        const htmlFilename = 'script.html';
+        const htmlPath = path.join(releaseDir, htmlFilename);
+        await fs.writeFile(htmlPath, htmlContent);
+        scriptMetadata.htmlFilePath = htmlPath;
+        console.log(`✅ Script HTML saved: ${htmlPath}`);
       }
 
       // Save script metadata
@@ -555,6 +567,7 @@ class ReleaseOrchestrator {
       if (!scriptData || !scriptData.script_content || scriptData.script_content.length === 0) {
         return {
           content: null,
+          htmlContent: scriptData?.html_content || null,
           metadata: {
             source: 'scriptbin.works',
             url,
@@ -568,6 +581,7 @@ class ReleaseOrchestrator {
 
       return {
         content,
+        htmlContent: scriptData.html_content || null,
         metadata: {
           source: 'scriptbin.works',
           title: scriptData.title,
@@ -649,6 +663,7 @@ class ReleaseOrchestrator {
           if (scriptbinResult.content) {
             return {
               content: scriptbinResult.content,
+              htmlContent: scriptbinResult.htmlContent,
               metadata: {
                 ...redditMetadata,
                 ...scriptbinResult.metadata,

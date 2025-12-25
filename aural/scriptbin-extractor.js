@@ -357,10 +357,11 @@ class ScriptBinExtractor {
         content_preview:
           scriptContent.slice(0, 3).join(" ").substring(0, 200) +
           (scriptContent.join(" ").length > 200 ? "..." : ""),
-        html_backup_saved: true
+        html_backup_saved: true,
+        html_content: pageSource  // Include HTML for caller to save
       };
 
-      // Save HTML backup
+      // Save HTML backup to default location
       await this.saveHtmlBackup(scriptData, pageSource);
 
       console.log(
