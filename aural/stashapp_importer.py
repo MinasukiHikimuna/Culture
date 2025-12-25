@@ -508,13 +508,11 @@ def process_release(release_dir: Path, stash_client: StashappClient) -> bool:
             details = re.sub(r"\\", "", details)  # Escape chars
             updates["details"] = details[:5000]  # Limit length
 
-        # Director (script author)
-        script_author = release.get("scriptAuthor")
+        # Director (script author) - from llmAnalysis or top-level
+        llm_analysis = release.get("enrichmentData", {}).get("llmAnalysis", {})
+        script_author = llm_analysis.get("script", {}).get("author")
         if not script_author:
-            # Try to extract from description
-            match = re.search(r"u/(\w+)", source.get("metadata", {}).get("description", ""))
-            if match and match.group(1) != release.get("primaryPerformer"):
-                script_author = match.group(1)
+            script_author = release.get("scriptAuthor")
         if script_author:
             updates["director"] = script_author
             print(f"  Director (script author): {script_author}")
@@ -533,7 +531,12 @@ def process_release(release_dir: Path, stash_client: StashappClient) -> bool:
             )
             performer_ids.append(performer["id"])
 
-        for additional in release.get("additionalPerformers", []):
+        # Get additional performers from llmAnalysis first, then fallback to top-level
+        additional_performers = llm_analysis.get("performers", {}).get("additional", [])
+        if not additional_performers:
+            additional_performers = release.get("additionalPerformers", [])
+
+        for additional in additional_performers:
             avatar_url = get_reddit_avatar(additional)
             if avatar_url:
                 print(f"    Found Reddit avatar for {additional}")
