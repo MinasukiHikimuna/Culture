@@ -289,16 +289,7 @@ class ReleaseOrchestrator {
   async processPost(post, llmAnalysis = null) {
     console.log(`🎯 Processing post: ${post.title}`);
 
-    // Create release object
-    const release = new Release({
-      title: post.title,
-      primaryPerformer: post.author,
-      releaseDate: post.created_utc,
-      redditPost: post,
-      llmAnalysis: llmAnalysis
-    });
-
-    // Determine target directory structure
+    // Determine target directory structure first (before creating release)
     let releaseDir;
     if (llmAnalysis?.version_naming?.release_directory) {
       releaseDir = path.join(
@@ -308,13 +299,46 @@ class ReleaseOrchestrator {
         llmAnalysis.version_naming.release_directory
       );
     } else {
+      // Generate a stable ID based on post ID for fallback
+      const stableId = post.id || crypto.createHash('sha256')
+        .update(`${post.title}-${post.author}`)
+        .digest('hex')
+        .substring(0, 16);
       releaseDir = path.join(
         this.config.dataDir,
         'releases',
         post.author,
-        release.id
+        stableId
       );
     }
+
+    // Check if release already exists
+    const releasePath = path.join(releaseDir, 'release.json');
+    try {
+      await fs.access(releasePath);
+      // Release exists - load and return it
+      const existingData = await fs.readFile(releasePath, 'utf8');
+      const existingRelease = JSON.parse(existingData);
+      console.log(`⏭️  Release already exists: ${releaseDir}`);
+      console.log(`   Audio sources: ${existingRelease.audioSources?.length || 0}`);
+
+      // Return a Release object with the existing data
+      const release = new Release(existingRelease);
+      release.id = existingRelease.id;
+      release.audioSources = existingRelease.audioSources || [];
+      return release;
+    } catch {
+      // Release doesn't exist, proceed with creation
+    }
+
+    // Create release object
+    const release = new Release({
+      title: post.title,
+      primaryPerformer: post.author,
+      releaseDate: post.created_utc,
+      redditPost: post,
+      llmAnalysis: llmAnalysis
+    });
 
     await fs.mkdir(releaseDir, { recursive: true });
 
