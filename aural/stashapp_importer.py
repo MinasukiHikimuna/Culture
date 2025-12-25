@@ -217,6 +217,43 @@ def extract_tags_from_title(title: str) -> list[str]:
     return [tag.strip() for tag in tags]
 
 
+def extract_tags_from_text(text: str) -> list[str]:
+    """Extract bracketed tags from post body text.
+
+    Post body often has escaped brackets like \\[Tag\\]
+    """
+    # Match escaped brackets: \[Tag\]
+    escaped_pattern = r"\\+\[([^\]]+)\\+\]"
+    tags = re.findall(escaped_pattern, text)
+    return [tag.strip() for tag in tags]
+
+
+def extract_all_tags(release: dict) -> list[str]:
+    """Extract all tags from release title and post body."""
+    tags = []
+
+    # Tags from title
+    title = release.get("title", "")
+    tags.extend(extract_tags_from_title(title))
+
+    # Tags from Reddit post body
+    reddit_data = release.get("enrichmentData", {}).get("reddit", {})
+    selftext = reddit_data.get("selftext", "")
+    if selftext:
+        tags.extend(extract_tags_from_text(selftext))
+
+    # Remove duplicates while preserving order
+    seen = set()
+    unique_tags = []
+    for tag in tags:
+        tag_lower = tag.lower()
+        if tag_lower not in seen:
+            seen.add(tag_lower)
+            unique_tags.append(tag)
+
+    return unique_tags
+
+
 def match_tags_with_stash(extracted_tags: list[str], stash_tags: list[dict]) -> list[str]:
     """Match extracted tags with existing Stashapp tags (including aliases)."""
     matched_tag_ids = []
@@ -461,11 +498,10 @@ def process_release(release_dir: Path, stash_client: StashappClient) -> bool:
             studio = stash_client.find_or_create_studio(primary_performer)
             updates["studio_id"] = studio["id"]
 
-        # Tags
+        # Tags (from title and post body)
         print("\n  Processing tags...")
-        title = release.get("title", "")
-        extracted_tags = extract_tags_from_title(title)
-        print(f"    Extracted {len(extracted_tags)} tags from title")
+        extracted_tags = extract_all_tags(release)
+        print(f"    Extracted {len(extracted_tags)} tags from title and post body")
 
         if stash_tags and extracted_tags:
             matched_tag_ids = match_tags_with_stash(extracted_tags, stash_tags)
