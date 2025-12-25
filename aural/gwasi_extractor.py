@@ -40,6 +40,9 @@ class GwasiExtractor:
         self.current_base_dir = None
         self.version_file = self.output_dir / "current_base_version.txt"
 
+        # Consolidated cache for parsed base entries (avoids loading 800+ files)
+        self.consolidated_cache_file = self.output_dir / "base_entries_cache.json"
+
         self.session = requests.Session()
         self.session.headers.update(
             {
@@ -171,6 +174,49 @@ class GwasiExtractor:
         self.current_base_dir.mkdir(exist_ok=True)
         print(f"📁 Using base directory: {self.current_base_dir}")
 
+    def load_consolidated_cache(self, base_version: str) -> Optional[List[Dict]]:
+        """
+        Load parsed base entries from consolidated cache if version matches.
+        Returns None if cache doesn't exist or version mismatch.
+        """
+        if not self.consolidated_cache_file.exists():
+            return None
+
+        try:
+            with open(self.consolidated_cache_file, "r", encoding="utf-8") as f:
+                cache_data = json.load(f)
+
+            cached_version = cache_data.get("base_version")
+            if cached_version != base_version:
+                print(f"📦 Consolidated cache version mismatch ({cached_version} != {base_version})")
+                return None
+
+            entries = cache_data.get("entries", [])
+            print(f"📦 Loaded {len(entries):,} entries from consolidated cache")
+            return entries
+
+        except (IOError, json.JSONDecodeError) as e:
+            print(f"⚠️  Warning: Could not load consolidated cache: {e}")
+            return None
+
+    def save_consolidated_cache(self, base_version: str, entries: List[Dict]):
+        """
+        Save parsed base entries to consolidated cache.
+        """
+        cache_data = {
+            "base_version": base_version,
+            "entry_count": len(entries),
+            "cached_at": datetime.now().isoformat(),
+            "entries": entries,
+        }
+
+        try:
+            with open(self.consolidated_cache_file, "w", encoding="utf-8") as f:
+                json.dump(cache_data, f, ensure_ascii=False)
+            print(f"📦 Saved {len(entries):,} entries to consolidated cache")
+        except IOError as e:
+            print(f"⚠️  Warning: Could not save consolidated cache: {e}")
+
     def prompt_user_for_base_download(self, old_version: str, new_version: str) -> bool:
         """
         Prompt user whether to download the new base data when version has changed.
@@ -266,7 +312,7 @@ class GwasiExtractor:
         except IOError as e:
             print(f"⚠️  Warning: Could not save intermediate file {filename}: {e}")
 
-    def load_intermediate_file(self, directory: Path, filename: str) -> Optional[Dict]:
+    def load_intermediate_file(self, directory: Path, filename: str, silent: bool = False) -> Optional[Dict]:
         """
         Load JSON data from intermediate file if it exists.
         """
@@ -275,7 +321,8 @@ class GwasiExtractor:
             try:
                 with open(filepath, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                print(f"📂 Loaded cached file: {filepath.relative_to(self.output_dir)}")
+                if not silent:
+                    print(f"📂 Loaded cached file: {filepath.relative_to(self.output_dir)}")
                 return data
             except (IOError, json.JSONDecodeError) as e:
                 print(f"⚠️  Warning: Could not load cached file {filename}: {e}")
@@ -572,31 +619,42 @@ class GwasiExtractor:
             all_entries.extend(base_entries)
             print(f"✅ Added {len(base_entries)} base entries to dataset")
 
-            # Save the base version after successful download
+            # Save the base version and consolidated cache after successful download
             self.save_base_version(base_dir_name)
+            self.save_consolidated_cache(base_dir_name, base_entries)
 
         else:
-            # Load base data from cache since version hasn't changed
-            print(f"\n📂 Loading base data from cache...")
-            print(f"🔧 Debug: Looking for files in {self.current_base_dir}")
-            base_files = list(self.current_base_dir.glob("*.json"))
-            print(f"🔧 Debug: Found {len(base_files)} cached files")
-            base_files.sort(key=lambda x: int(x.stem) if x.stem.isdigit() else 0)
+            # Try to load from consolidated cache first (fast path)
+            cached_entries = self.load_consolidated_cache(base_dir_name)
+            if cached_entries is not None:
+                all_entries.extend(cached_entries)
+            else:
+                # Fall back to loading individual files (slow path)
+                print(f"\n📂 Loading base data from individual cached files...")
+                base_files = list(self.current_base_dir.glob("*.json"))
+                print(f"🔧 Found {len(base_files)} cached files to process...")
+                base_files.sort(key=lambda x: int(x.stem) if x.stem.isdigit() else 0)
 
-            for filepath in base_files:
-                filename = filepath.name
-                base_data = self.load_intermediate_file(self.current_base_dir, filename)
-                if base_data and "entries" in base_data:
-                    base_entries = [
-                        self.parse_entry(entry) for entry in base_data["entries"]
-                    ]
-                    base_entries = [e for e in base_entries if e]
-                    all_entries.extend(base_entries)
-                    print(
-                        f"✅ Loaded {len(base_entries)} entries from cached {base_dir_name}/{filename}"
-                    )
+                base_entries = []
+                total_files = len(base_files)
+                for i, filepath in enumerate(base_files, 1):
+                    filename = filepath.name
+                    base_data = self.load_intermediate_file(self.current_base_dir, filename, silent=True)
+                    if base_data and "entries" in base_data:
+                        parsed = [
+                            self.parse_entry(entry) for entry in base_data["entries"]
+                        ]
+                        parsed = [e for e in parsed if e]
+                        base_entries.extend(parsed)
+                    # Progress indicator every 100 files
+                    if i % 100 == 0:
+                        print(f"   Processing file {i}/{total_files}...")
 
-            print(f"✅ Loaded base data from {len(base_files)} cached files")
+                all_entries.extend(base_entries)
+                print(f"✅ Loaded {len(base_entries):,} entries from {len(base_files)} files")
+
+                # Save consolidated cache for next time
+                self.save_consolidated_cache(base_dir_name, base_entries)
 
         # Step 4: Remove duplicates based on post_id
         print("\n🔄 Removing duplicates...")
