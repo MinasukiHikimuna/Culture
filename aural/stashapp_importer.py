@@ -12,6 +12,7 @@ Example:
     python stashapp_importer.py data/releases/SweetnEvil86/1oj6y4p_hitting_on_and_picking_up_your_taken
 """
 
+import html
 import json
 import os
 import re
@@ -71,24 +72,48 @@ class StashappClient:
                 return p
         return None
 
-    def create_performer(self, name: str) -> dict:
+    def create_performer(self, name: str, image_url: str | None = None) -> dict:
         """Create a new performer."""
         query = """
         mutation PerformerCreate($input: PerformerCreateInput!) {
             performerCreate(input: $input) { id name }
         }
         """
-        result = self.query(query, {"input": {"name": name}})
+        input_data = {"name": name}
+        if image_url:
+            input_data["image"] = image_url
+        result = self.query(query, {"input": input_data})
         return result["performerCreate"]
 
-    def find_or_create_performer(self, name: str) -> dict:
-        """Find or create a performer by name."""
+    def update_performer_image(self, performer_id: str, image_url: str) -> dict:
+        """Update performer's image."""
+        query = """
+        mutation PerformerUpdate($input: PerformerUpdateInput!) {
+            performerUpdate(input: $input) { id name image_path }
+        }
+        """
+        result = self.query(query, {"input": {"id": performer_id, "image": image_url}})
+        return result["performerUpdate"]
+
+    def find_or_create_performer(
+        self, name: str, image_url: str | None = None
+    ) -> dict:
+        """Find or create a performer by name, optionally setting their image."""
         performer = self.find_performer(name)
         if performer:
-            print(f"  Found existing performer: {performer['name']} (ID: {performer['id']})")
+            print(
+                f"  Found existing performer: {performer['name']} (ID: {performer['id']})"
+            )
             return performer
-        performer = self.create_performer(name)
-        print(f"  Created new performer: {performer['name']} (ID: {performer['id']})")
+        performer = self.create_performer(name, image_url)
+        if image_url:
+            print(
+                f"  Created new performer: {performer['name']} (ID: {performer['id']}) with avatar"
+            )
+        else:
+            print(
+                f"  Created new performer: {performer['name']} (ID: {performer['id']})"
+            )
         return performer
 
     def find_studio(self, name: str) -> dict | None:
@@ -226,6 +251,23 @@ def extract_tags_from_text(text: str) -> list[str]:
     escaped_pattern = r"\\+\[([^\]]+)\\+\]"
     tags = re.findall(escaped_pattern, text)
     return [tag.strip() for tag in tags]
+
+
+def get_reddit_avatar(username: str) -> str | None:
+    """Fetch the avatar URL for a Reddit user."""
+    try:
+        url = f"https://www.reddit.com/user/{username}/about.json"
+        headers = {"User-Agent": "Mozilla/5.0 (compatible; audio-extractor/1.0)"}
+        response = requests.get(url, headers=headers, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            icon_url = data.get("data", {}).get("icon_img", "")
+            if icon_url:
+                # Unescape HTML entities in URL
+                return html.unescape(icon_url)
+    except Exception as e:
+        print(f"    Warning: Could not fetch Reddit avatar for {username}: {e}")
+    return None
 
 
 def extract_all_tags(release: dict) -> list[str]:
@@ -482,11 +524,22 @@ def process_release(release_dir: Path, stash_client: StashappClient) -> bool:
         performer_ids = []
         primary_performer = release.get("primaryPerformer")
         if primary_performer:
-            performer = stash_client.find_or_create_performer(primary_performer)
+            # Fetch Reddit avatar for new performers
+            avatar_url = get_reddit_avatar(primary_performer)
+            if avatar_url:
+                print(f"    Found Reddit avatar for {primary_performer}")
+            performer = stash_client.find_or_create_performer(
+                primary_performer, image_url=avatar_url
+            )
             performer_ids.append(performer["id"])
 
         for additional in release.get("additionalPerformers", []):
-            performer = stash_client.find_or_create_performer(additional)
+            avatar_url = get_reddit_avatar(additional)
+            if avatar_url:
+                print(f"    Found Reddit avatar for {additional}")
+            performer = stash_client.find_or_create_performer(
+                additional, image_url=avatar_url
+            )
             performer_ids.append(performer["id"])
 
         if performer_ids:
