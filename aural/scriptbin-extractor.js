@@ -28,10 +28,10 @@ class ScriptBinExtractor {
     this.page = null;
   }
 
-  async setupPlaywright() {
+  async setupPlaywright(headless = true) {
     try {
       console.log("🚀 Starting Playwright browser...");
-      this.browser = await chromium.launch({ headless: false });
+      this.browser = await chromium.launch({ headless });
       this.page = await this.browser.newPage();
 
       console.log("✅ Playwright browser initialized successfully");
