@@ -522,9 +522,8 @@ class GwasiExtractor:
         # Step 1: Fetch delta data to get base version and recent updates
         print("\n📊 Fetching delta data...")
         delta_url = f"{self.base_url}/delta.json"
-        # In delta-only mode, always fetch fresh delta.json to get latest updates
-        delta_use_cache = use_cache and not delta_only
-        delta_data = self.fetch_json_data(delta_url, delta_use_cache)
+        # Always fetch fresh delta.json - it contains the latest updates and should never be cached
+        delta_data = self.fetch_json_data(delta_url, use_cache=False)
 
         if not delta_data:
             print("❌ Failed to fetch delta.json - cannot proceed")
