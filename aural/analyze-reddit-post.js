@@ -4,10 +4,10 @@ const fs = require("fs");
 const path = require("path");
 
 /**
- * Enhanced Reddit Post Analyzer with Script URL Resolution
- * 
- * Extends the original analyzer to use the enhanced preprocessor
- * that can resolve indirect script references.
+ * Enhanced Reddit Post Analyzer with LLM-based Metadata Extraction
+ *
+ * Uses LLM for all metadata extraction (performers, script, audio versions)
+ * instead of regex-based preprocessing.
  */
 class EnhancedRedditPostAnalyzer {
   constructor(options = {}) {
@@ -18,53 +18,83 @@ class EnhancedRedditPostAnalyzer {
   }
 
   /**
-   * Creates a simplified prompt using enhanced preprocessed data
+   * Creates a comprehensive metadata extraction prompt
    */
-  createSimplifiedPrompt(postData, enhancedPreprocessedData) {
+  createMetadataExtractionPrompt(postData) {
     const { title, selftext, author, link_flair_text } = postData.reddit_data;
-    
-    // Build script info summary including resolution details
-    let scriptSummary = `${enhancedPreprocessedData.script.fillType} by ${enhancedPreprocessedData.script.author}`;
-    if (enhancedPreprocessedData.script.url) {
-      scriptSummary += ` (URL: ${enhancedPreprocessedData.script.url})`;
-    }
-    if (enhancedPreprocessedData.script.resolution_info) {
-      scriptSummary += ` [Resolved via ${enhancedPreprocessedData.script.resolution_info.resolved_via}]`;
-    }
-    
-    return `Analyze this Reddit post from r/gonewildaudio. 
 
-CRITICAL: Your response must be ONLY valid JSON. Do not include reasoning or explanations.
+    return `Extract metadata from this Reddit post from r/gonewildaudio.
 
-POSTER USERNAME: ${author}
+CRITICAL: Respond with ONLY valid JSON. No explanations or reasoning.
+
+POST AUTHOR (the person who posted this): ${author}
 TITLE: ${title}
 FLAIR: ${link_flair_text || 'No flair'}
 
-POST CONTENT:
+POST BODY:
 ${selftext}
 
-ENHANCED PREPROCESSED DATA (use this as guidance):
-- Performers detected: ${enhancedPreprocessedData.performers.count} (${enhancedPreprocessedData.performers.primary} + ${enhancedPreprocessedData.performers.additional.join(', ')})
-- Script info: ${scriptSummary}
-- Audio versions: ${enhancedPreprocessedData.audio_versions.length} version(s) detected
-- Script resolution: ${enhancedPreprocessedData.enhancement_metadata.script_resolution_successful ? 'Successful' : 'Not needed/failed'}
+EXTRACTION RULES:
 
-Focus only on:
-1. Series information (part of series, sequels, prequels)
-2. Analysis notes about the content and context
-3. Confidence assessment for series detection
+1. PERFORMERS:
+   - The post author "${author}" is ALWAYS the PRIMARY performer
+   - Look for ADDITIONAL performers (collaborators who also performed) in:
+     * Title patterns: "w Username", "w/ Username", "; w Username" at the end
+     * Body patterns: "recorded with u/Username", "collab with u/Username", "live with u/Username"
+   - Do NOT include script authors as performers unless they also voice-acted
 
-Return JSON with this structure:
+2. SCRIPT AUTHOR:
+   - Look for the person who WROTE the script (separate from performers):
+     * Title patterns: "by Username" or "by u/Username" appearing AFTER the tags at the end
+     * Body patterns: "Thanks to u/Username for... script", "script by u/Username"
+   - If flair is "OC", script author = post author
+   - If flair is "Script Fill", someone else wrote the script - find who
+
+3. AUDIO URLS:
+   - Extract all audio platform URLs from the body:
+     * soundgasm.net/u/...
+     * whyp.it/tracks/...
+     * hotaudio.net/u/...
+   - Identify version types from surrounding context (F4M, F4F, SFX, no SFX, bloopers)
+
+4. SCRIPT URL:
+   - Look for script links: scriptbin.works, pastebin, google docs
+   - Pattern: [script](url) or [script here](url)
+
+5. SERIES:
+   - Check if this is part of a series (Part 1, Episode 2, etc.)
+   - Look for "sequel to", "prequel to", "continued from"
+
+Return this exact JSON structure:
 {
-  "series": {
-    "isPartOfSeries": <boolean>,
-    "hasPrequels": <boolean>, 
-    "hasSequels": <boolean>,
-    "seriesName": "<name if mentioned>",
-    "partNumber": <number or null>,
-    "confidence": "<high|medium|low>"
+  "performers": {
+    "primary": "${author}",
+    "additional": ["username1"],
+    "confidence": "high|medium|low",
+    "notes": "how collaborators were identified"
   },
-  "analysis_notes": "<brief observations about the post content>"
+  "script": {
+    "author": "username or null",
+    "url": "script url or null",
+    "fillType": "original|public|private",
+    "notes": "how script author was identified"
+  },
+  "audio_versions": [
+    {
+      "version_name": "Main Audio",
+      "description": "Primary audio version",
+      "urls": [{"platform": "Soundgasm", "url": "https://..."}]
+    }
+  ],
+  "series": {
+    "isPartOfSeries": false,
+    "hasPrequels": false,
+    "hasSequels": false,
+    "seriesName": "",
+    "partNumber": null,
+    "confidence": "high|medium|low"
+  },
+  "analysis_notes": "brief observations"
 }`;
   }
 
@@ -195,19 +225,25 @@ Return JSON:
         .replace(/^[^{]*/, '') // Remove everything before first {
         .replace(/[^}]*$/, '') // Remove everything after last }
         .trim();
-      
+
       // If we still don't have clean JSON, try to extract it
       if (!cleanText.startsWith('{')) {
         const jsonMatch = responseText.match(/\{[\s\S]*\}/);
         cleanText = jsonMatch ? jsonMatch[0] : responseText;
       }
-      
+
       const jsonText = cleanText;
 
       const parsed = JSON.parse(jsonText);
 
-      // For simplified parsing, just validate series and analysis_notes
-      if (parsed.series === undefined) {
+      // Validate required fields for metadata extraction
+      if (!parsed.performers) {
+        throw new Error(`Missing required field: performers`);
+      }
+      if (!parsed.audio_versions) {
+        throw new Error(`Missing required field: audio_versions`);
+      }
+      if (!parsed.series) {
         throw new Error(`Missing required field: series`);
       }
 
@@ -308,7 +344,7 @@ Return JSON:
   }
 
   /**
-   * Analyzes a single Reddit post file with enhanced preprocessing
+   * Analyzes a single Reddit post file using LLM-based metadata extraction
    */
   async analyzePost(filePath) {
     try {
@@ -322,37 +358,14 @@ Return JSON:
 
       console.log(`Analyzing post: ${postData.reddit_data.title}`);
 
-      // Enhanced preprocessing with script resolution
-      const EnhancedRedditPreprocessor = require('./enhanced-reddit-preprocessor.js');
-      const preprocessor = new EnhancedRedditPreprocessor({
-        enableScriptResolution: this.enableScriptResolution
-      });
-      const enhancedPreprocessedData = await preprocessor.preprocessEnhanced(postData);
-
-      // Create simplified prompt with enhanced preprocessed data
-      const prompt = this.createSimplifiedPrompt(postData, enhancedPreprocessedData);
+      // Use LLM for comprehensive metadata extraction
+      const prompt = this.createMetadataExtractionPrompt(postData);
       const llmResponse = await this.callLLM(prompt);
       const analysis = this.parseResponse(llmResponse);
 
-      // Override with enhanced preprocessed data for accuracy
-      analysis.performers = {
-        ...enhancedPreprocessedData.performers,
-        confidence: "high"
-      };
-      
-      analysis.audio_versions = enhancedPreprocessedData.audio_versions;
-
-      analysis.script = enhancedPreprocessedData.script;
-
-      // Use series info from LLM or default from preprocessing
-      if (analysis.series) {
-        // LLM provided series analysis, keep it
-      } else {
-        // Fallback to preprocessed series data
-        analysis.series = {
-          ...enhancedPreprocessedData.series,
-          confidence: "high"
-        };
+      // Ensure performers has count field for compatibility
+      if (analysis.performers) {
+        analysis.performers.count = 1 + (analysis.performers.additional?.length || 0);
       }
 
       // Generate version naming information
@@ -375,7 +388,7 @@ Return JSON:
       // Add version naming metadata
       analysis.version_naming = versionNaming;
 
-      // Add metadata including enhancement info
+      // Add metadata
       analysis.metadata = {
         post_id: postData.post_id,
         username: postData.username,
@@ -383,14 +396,9 @@ Return JSON:
         date: postData.date,
         reddit_url: postData.reddit_url,
         analyzed_at: new Date().toISOString(),
-        preprocessing_used: true,
-        enhanced_preprocessing: true,
-        script_resolution_enabled: this.enableScriptResolution,
-        script_resolution_successful: enhancedPreprocessedData.enhancement_metadata.script_resolution_successful
+        extraction_method: "llm",
+        model: this.model
       };
-
-      // Add enhancement metadata
-      analysis.enhancement_metadata = enhancedPreprocessedData.enhancement_metadata;
 
       return analysis;
     } catch (error) {
