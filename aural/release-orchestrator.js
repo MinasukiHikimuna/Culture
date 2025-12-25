@@ -402,9 +402,9 @@ class ReleaseOrchestrator {
     }
 
     // Extract script if available
-    if (llmAnalysis?.script_url) {
+    if (llmAnalysis?.script?.url) {
       try {
-        release.script = await this.extractScript(llmAnalysis.script_url);
+        release.script = await this.extractScript(llmAnalysis.script, releaseDir);
       } catch (error) {
         console.error(`❌ Failed to extract script: ${error.message}`);
       }
@@ -444,11 +444,235 @@ class ReleaseOrchestrator {
   }
   
   /**
-   * Extract script (placeholder - implement later)
+   * Extract script from URL and save to release directory
+   * @param {object} scriptInfo - Script info object with url, author, fillType
+   * @param {string} releaseDir - Directory to save the script
+   * @returns {object} Script data including content and metadata
    */
-  async extractScript(scriptUrl) {
-    console.log(`📝 Script extraction not yet implemented: ${scriptUrl}`);
-    return null;
+  async extractScript(scriptInfo, releaseDir) {
+    const { url, author, fillType } = scriptInfo;
+    console.log(`📝 Extracting script: ${url}`);
+
+    try {
+      // Resolve the URL (handles Reddit share URLs, redirects, etc.)
+      const resolvedUrl = await this.resolveScriptUrl(url);
+      console.log(`   Resolved URL: ${resolvedUrl}`);
+
+      // Determine script source and extract content
+      let scriptContent = null;
+      let scriptMetadata = {
+        originalUrl: url,
+        resolvedUrl,
+        author,
+        fillType,
+        extractedAt: new Date().toISOString()
+      };
+
+      if (resolvedUrl.includes('scriptbin.works')) {
+        // Extract from scriptbin.works
+        const result = await this.extractScriptbinScript(resolvedUrl);
+        scriptContent = result.content;
+        scriptMetadata = { ...scriptMetadata, ...result.metadata };
+      } else if (resolvedUrl.includes('reddit.com')) {
+        // It's a Reddit script post - extract the post content
+        const result = await this.extractRedditScript(resolvedUrl);
+        scriptContent = result.content;
+        scriptMetadata = { ...scriptMetadata, ...result.metadata };
+      } else {
+        console.log(`⚠️  Unknown script source: ${resolvedUrl}`);
+        scriptMetadata.status = 'unsupported_source';
+        return scriptMetadata;
+      }
+
+      // Save script if we got content
+      if (scriptContent) {
+        const scriptFilename = 'script.txt';
+        const scriptPath = path.join(releaseDir, scriptFilename);
+        await fs.writeFile(scriptPath, scriptContent);
+        scriptMetadata.filePath = scriptPath;
+        scriptMetadata.status = 'downloaded';
+        console.log(`✅ Script saved: ${scriptPath}`);
+      }
+
+      // Save script metadata
+      const metadataPath = path.join(releaseDir, 'script_metadata.json');
+      await fs.writeFile(metadataPath, JSON.stringify(scriptMetadata, null, 2));
+
+      return scriptMetadata;
+
+    } catch (error) {
+      console.error(`❌ Script extraction failed: ${error.message}`);
+      return {
+        originalUrl: url,
+        author,
+        fillType,
+        status: 'failed',
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Resolve script URLs (handle redirects, share links, etc.)
+   */
+  async resolveScriptUrl(url) {
+    // Handle Reddit share URLs (format: reddit.com/r/.../s/xxx)
+    if (url.includes('/s/')) {
+      try {
+        const response = await fetch(url, {
+          method: 'HEAD',
+          redirect: 'follow'
+        });
+        return response.url;
+      } catch (error) {
+        console.warn(`⚠️  Could not resolve redirect for ${url}: ${error.message}`);
+        return url;
+      }
+    }
+    return url;
+  }
+
+  /**
+   * Extract script content from scriptbin.works using ScriptBinExtractor
+   * Uses Playwright to handle terms agreement and JavaScript rendering
+   */
+  async extractScriptbinScript(url) {
+    try {
+      // Use the dedicated ScriptBinExtractor which handles terms agreement via Playwright
+      const { ScriptBinExtractor } = require('./scriptbin-extractor.js');
+
+      // Get or create scriptbin extractor instance
+      let extractor = this.activeExtractors.get('scriptbin');
+      if (!extractor) {
+        extractor = new ScriptBinExtractor();
+        await extractor.setupPlaywright();
+        this.activeExtractors.set('scriptbin', extractor);
+      }
+
+      // Extract script data
+      const scriptData = await extractor.getScriptData(url);
+
+      if (!scriptData || !scriptData.script_content || scriptData.script_content.length === 0) {
+        return {
+          content: null,
+          metadata: {
+            source: 'scriptbin.works',
+            url,
+            note: 'Could not extract script content'
+          }
+        };
+      }
+
+      // Join the script lines into a single content string
+      const content = scriptData.script_content.join('\n');
+
+      return {
+        content,
+        metadata: {
+          source: 'scriptbin.works',
+          title: scriptData.title,
+          author: scriptData.author || scriptData.username,
+          wordCount: scriptData.word_count,
+          characterCount: scriptData.character_count,
+          performers: scriptData.performers,
+          listeners: scriptData.listeners,
+          tags: scriptData.tags,
+          shortLink: scriptData.short_link
+        }
+      };
+
+    } catch (error) {
+      throw new Error(`Scriptbin extraction failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Extract script content from Reddit post
+   * If the post contains a link to scriptbin.works, follows that link to get the actual script
+   */
+  async extractRedditScript(url) {
+    try {
+      // Clean URL - remove query params and ensure proper format
+      const urlObj = new URL(url);
+      const cleanPath = urlObj.pathname.replace(/\/$/, ''); // Remove trailing slash
+      const jsonUrl = `https://www.reddit.com${cleanPath}.json`;
+
+      const response = await fetch(jsonUrl, {
+        headers: {
+          'User-Agent': 'gwasi-extractor/1.0 (audio archival tool)',
+          'Accept': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const contentType = response.headers.get('content-type');
+      if (!contentType?.includes('application/json')) {
+        throw new Error(`Unexpected content type: ${contentType}`);
+      }
+
+      const data = await response.json();
+
+      // Reddit API returns array: [post, comments]
+      const post = data[0]?.data?.children?.[0]?.data;
+
+      if (!post) {
+        throw new Error('Could not find post data');
+      }
+
+      const postContent = post.selftext || '';
+      const title = post.title || '';
+      const postAuthor = post.author || '';
+
+      const redditMetadata = {
+        source: 'reddit',
+        title,
+        postAuthor,
+        postId: post.id,
+        subreddit: post.subreddit,
+        created: post.created_utc ? new Date(post.created_utc * 1000).toISOString() : null,
+        redditPostUrl: url
+      };
+
+      // Check if this Reddit post links to scriptbin.works
+      const scriptbinMatch = postContent.match(/https?:\/\/(?:www\.)?scriptbin\.works\/[^\s\)\]]+/i);
+
+      if (scriptbinMatch) {
+        const scriptbinUrl = scriptbinMatch[0];
+        console.log(`   Found scriptbin.works link: ${scriptbinUrl}`);
+
+        try {
+          const scriptbinResult = await this.extractScriptbinScript(scriptbinUrl);
+
+          if (scriptbinResult.content) {
+            return {
+              content: scriptbinResult.content,
+              metadata: {
+                ...redditMetadata,
+                ...scriptbinResult.metadata,
+                source: 'scriptbin.works',
+                scriptbinUrl,
+                redditScriptOfferPost: postContent // Keep the Reddit post for context
+              }
+            };
+          }
+        } catch (scriptbinError) {
+          console.warn(`   ⚠️  Could not extract from scriptbin.works: ${scriptbinError.message}`);
+          // Fall through to return Reddit content
+        }
+      }
+
+      // No scriptbin link found, or scriptbin extraction failed - return Reddit post content
+      return {
+        content: postContent,
+        metadata: redditMetadata
+      };
+
+    } catch (error) {
+      throw new Error(`Reddit script extraction failed: ${error.message}`);
+    }
   }
   
   /**
