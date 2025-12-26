@@ -1,0 +1,151 @@
+{
+  "case_study_1": {
+    "title": "Short Audio (37 seconds)",
+    "audio_title": "Lurky and Emma Airplane Collab Blooper",
+    "performer": "SweetnEvil86",
+    "url": "https://hotaudio.net/u/SweetnEvil86/Lurky-and-Emma-Airplane-Collab-Blooper",
+    "cdn_url": "https://cdn.hotaudio.net/a/kntvq9q2y25yqn48dqe1ezd300.hax",
+    "hax_file": {
+      "size_bytes": 310092,
+      "magic": "HAX0",
+      "header_bytes_hex": "e4060b0006020000a2000000"
+    },
+    "metadata": {
+      "base_key_hex": "9d75bba6e2f08bebd4886ddc177da300",
+      "codec": "aac",
+      "duration_ms": 37175,
+      "segment_count": 37,
+      "flags": 1,
+      "orig_hash_hex": "0e3e7d6c1127278b2efb5356d35a23e5"
+    },
+    "loudness": {
+      "I": 23693,
+      "LRAH": 33957,
+      "LRAL": 17682,
+      "MH": 42397,
+      "ML": 156
+    },
+    "api_response": {
+      "pid": 2475,
+      "session_key_hex": "9dc11904a74ffb913571ad79d1ccc7bcf801f08188575c9110a5770439ebcf37"
+    },
+    "tree_keys": {
+      "1": "b506d00c5e7fbe600262b656834c12b6a78e0e2a2e7a90ea15b01485234bbc19"
+    },
+    "derived_intermediate_keys": {
+      "2": "6fa9c9039a255f59e1bd441d0c3f744df4515cd2bcd29be63d1a483ec9968961",
+      "4": "4b08ed71fe3af128d9b54cb1dbd8fd638b3366c03886e22c90ca2e7b7013a5f4",
+      "8": "ad4fd0ae575d00e73222d354d8141ce0b6a3fcb8947b31cfcc681b11d3ce49a1",
+      "16": "2c5d3fb139192e68912eb7dc3062b3b7b5f2f47866c0599e72c2893a1a896b98",
+      "32": "1fc0ff0260818e312dcbb14ef76382e927afa8b44ae933f61445f9742f222073",
+      "64": "ea44bb29b86ae3281eeee7bf48342a02a2c51e60ffb949f53705c0b2f27c92d5"
+    },
+    "segment_keys": {
+      "0": "52e594a003fa8177e7433c7af1bb5536f9155cf7270f8220d6d665a5797cc346",
+      "1": "473cc47d6e32c569c15872802ab4691f481ae3a1355e560dd30a14938ba5db6d",
+      "2": "473cc47d6e32c569c15872802ab4691f481ae3a1355e560dd30a14938ba5db6d",
+      "3": "f72ab90981e33b66e3811fcfd38f6c80bd82f351eb0c75108839015e41a54227",
+      "4": "f72ab90981e33b66e3811fcfd38f6c80bd82f351eb0c75108839015e41a54227",
+      "5": "60e810b4f5799483db29aa08f9102d9dc86890c25f8bc48b340ce61a9a95291c",
+      "6": "60e810b4f5799483db29aa08f9102d9dc86890c25f8bc48b340ce61a9a95291c",
+      "7": "87229e59aa494d0a0e4f1a2fa4bf776c990f58331b47bf6638c08877f857faf8",
+      "8": "87229e59aa494d0a0e4f1a2fa4bf776c990f58331b47bf6638c08877f857faf8",
+      "9": "f66b64f590a2ee1bca238b99ab08cfd18b840519c365b13143894e18f0f55735",
+      "10": "f66b64f590a2ee1bca238b99ab08cfd18b840519c365b13143894e18f0f55735",
+      "11": "67f025b74a58c124d40a0708b543762cef6d43611aaeeb995762b08c3e72d5bb",
+      "12": "67f025b74a58c124d40a0708b543762cef6d43611aaeeb995762b08c3e72d5bb",
+      "13": "375e22ffb7d8cd46c5fb71181920e3224c4f51d10dec41c04eff5260ee267096",
+      "14": "375e22ffb7d8cd46c5fb71181920e3224c4f51d10dec41c04eff5260ee267096",
+      "15": "c2890c43dff2462e71758ab0d59ea9e22868a40ddb067c7299a56bcee1731482",
+      "16": "c2890c43dff2462e71758ab0d59ea9e22868a40ddb067c7299a56bcee1731482",
+      "17": "3f0c0a8e05152a93956c97d3680e4c1502061716c7d05d4e1bae78863cd4828f",
+      "18": "3f0c0a8e05152a93956c97d3680e4c1502061716c7d05d4e1bae78863cd4828f",
+      "19": "207133002037c048f30bcacdd67b911e7ef38a512921e9020644ead06942f1e8",
+      "20": "207133002037c048f30bcacdd67b911e7ef38a512921e9020644ead06942f1e8",
+      "21": "f3f7cb199237a2f9c34feb2700abdca5c947de35d412962d834dffba5ec375d2",
+      "22": "f3f7cb199237a2f9c34feb2700abdca5c947de35d412962d834dffba5ec375d2",
+      "23": "60ffe56e73f7678485dbfa3c784db1f5f035ad14bfd24bedda80fee8386a5545",
+      "24": "60ffe56e73f7678485dbfa3c784db1f5f035ad14bfd24bedda80fee8386a5545",
+      "25": "0c32ae964693418cd0cce8c3bd5b403bf8ca65ec46a59988de392a01c773de2e",
+      "26": "0c32ae964693418cd0cce8c3bd5b403bf8ca65ec46a59988de392a01c773de2e",
+      "27": "6415bca16b205da85174e3ee68b79f1ae5be072e47cefae5076c3b265511d40b",
+      "28": "6415bca16b205da85174e3ee68b79f1ae5be072e47cefae5076c3b265511d40b",
+      "29": "bf05e281dadabcf988c5100ac8a64aae57abcd79504d95cadc967923085eccf1",
+      "30": "bf05e281dadabcf988c5100ac8a64aae57abcd79504d95cadc967923085eccf1",
+      "31": "33c3f2ef2527f9a247d792f319b7142489ff3a8737aaae71028e5e7eeaed12ab",
+      "32": "33c3f2ef2527f9a247d792f319b7142489ff3a8737aaae71028e5e7eeaed12ab",
+      "33": "9b145d3eb04af001d88d14970912d46212297143d412e36b373c0794f4da161f",
+      "34": "9b145d3eb04af001d88d14970912d46212297143d412e36b373c0794f4da161f",
+      "35": "c1daa08f04e76e9fdee33eb2ee9ffa4ec22a602dd1b4f99743874e99bdaa7906",
+      "36": "c1daa08f04e76e9fdee33eb2ee9ffa4ec22a602dd1b4f99743874e99bdaa7906"
+    },
+    "ephemeral_x25519_private_key_hex": "7e57e88c36c87d0ac2fac990044d25f2e82654098535160a893bef191fad410b",
+    "key_derivation": {
+      "tree_depth": 6,
+      "segment_key_base": 129,
+      "segment_0_node": 129,
+      "segment_36_node": 165,
+      "derivation_formula": "segmentKey = sha256(ancestorKey || ancestorNodeIndex)",
+      "derivation_path_example": "For segment 0 (node 129): 1->2->4->8->16->32->64->129"
+    },
+    "sample_segments": [
+      {"index": 0, "offset": 680, "pts": 0, "size_bytes": 18155},
+      {"index": 1, "offset": 18835, "pts": 1021, "size_bytes": 8427},
+      {"index": 2, "offset": 27262, "pts": 2046, "size_bytes": 16076},
+      {"index": 3, "offset": 43338, "pts": 3067, "size_bytes": 17269},
+      {"index": 4, "offset": 60607, "pts": 4092, "size_bytes": 14165}
+    ],
+    "output_file": {
+      "path": "data/hotaudio/Lurky-and-Emma-Airplane-Collab-Blooper.m4a",
+      "size_bytes": 721388
+    }
+  },
+  "case_study_2": {
+    "title": "Long Audio (7+ minutes)",
+    "audio_title": "BBW Belly Blowjob Wank",
+    "performer": "Lurkydip",
+    "url": "https://hotaudio.net/u/Lurkydip/BBW-Belly-Blowjob-Wank",
+    "duration_approx_seconds": 432,
+    "segment_count_approx": 432,
+    "key_derivation": {
+      "tree_depth": 9,
+      "segment_key_base": 1025,
+      "note": "Root key (node 1) NOT provided for long files - must collect subtree keys during playback"
+    },
+    "key_collection_pattern": {
+      "description": "Keys are provided progressively during playback",
+      "example_nodes": {
+        "8": "covers segments 0-127 (provided initially)",
+        "9": "covers segments 128-255 (provided ~2 min in)",
+        "5": "covers segments 256-383 (provided ~4 min in)",
+        "11": "covers segments 384-431 (provided ~6 min in)"
+      }
+    },
+    "output_file": {
+      "path": "data/hotaudio/BBW-Belly-Blowjob-Wank.m4a",
+      "size_bytes": 8116321
+    }
+  },
+  "encryption_system": {
+    "key_exchange": "X25519 ECDH",
+    "symmetric_cipher": "ChaCha20-Poly1305",
+    "auth_tag_size_bytes": 16,
+    "nonce": "12 bytes, all zeros",
+    "key_derivation": "SHA256-based tree derivation",
+    "file_format": {
+      "magic": "HAX0",
+      "structure": [
+        "4 bytes: magic (HAX0)",
+        "12 bytes: header",
+        "variable: bencode metadata dict",
+        "8 bytes per segment: segment table (offset LE + pts LE)",
+        "variable: encrypted audio segments"
+      ]
+    }
+  },
+  "notes": {
+    "short_vs_long": "Short files receive root key (node 1), long files receive subtree keys progressively",
+    "extraction_strategy": "For long files, must let audio play through entirely to collect all keys",
+    "cdp_capture": "Use Chrome DevTools Protocol to capture keys from first API response before exposeFunction is ready"
+  }
+}

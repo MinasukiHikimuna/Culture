@@ -33,6 +33,8 @@
   "license": "MIT",
   "dependencies": {
     "@lmstudio/sdk": "^1.4.0",
+    "@noble/ciphers": "^2.1.1",
+    "@noble/curves": "^2.0.1",
     "cheerio": "^1.0.0",
     "commander": "^12.0.0",
     "playwright": "^1.54.1"
