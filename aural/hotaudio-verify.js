@@ -89,7 +89,7 @@ async function sha256File(filePath) {
 
 async function runExtractor(url) {
   return new Promise((resolve, reject) => {
-    const proc = spawn('node', ['hotaudio-extractor-v2.js', url, '--verify'], {
+    const proc = spawn('node', ['hotaudio-extractor.js', url, '--verify'], {
       cwd: process.cwd(),
       stdio: ['ignore', 'pipe', 'pipe']
     });

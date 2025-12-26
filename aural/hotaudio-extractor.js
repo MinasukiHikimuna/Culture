@@ -643,14 +643,14 @@ async function main() {
   const outputName = positionalArgs[1];
 
   if (!url) {
-    console.log('Usage: node hotaudio-extractor-v2.js <hotaudio-url> [output-name] [--verify]');
+    console.log('Usage: node hotaudio-extractor.js <hotaudio-url> [output-name] [--verify]');
     console.log('');
     console.log('Options:');
     console.log('  --verify    Output detailed verification JSON with checksums');
     console.log('');
     console.log('Example:');
-    console.log('  node hotaudio-extractor-v2.js https://hotaudio.net/u/User/Audio-Title');
-    console.log('  node hotaudio-extractor-v2.js https://hotaudio.net/u/User/Audio-Title --verify');
+    console.log('  node hotaudio-extractor.js https://hotaudio.net/u/User/Audio-Title');
+    console.log('  node hotaudio-extractor.js https://hotaudio.net/u/User/Audio-Title --verify');
     process.exit(1);
   }
 
