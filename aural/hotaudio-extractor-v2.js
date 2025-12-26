@@ -13,8 +13,13 @@
 import { chromium } from 'playwright';
 import { chacha20poly1305 } from '@noble/ciphers/chacha.js';
 import { sha256 } from '@noble/hashes/sha2.js';
+import { createHash } from 'crypto';
 import fs from 'fs/promises';
 import path from 'path';
+
+function sha256hex(data) {
+  return createHash('sha256').update(data).digest('hex');
+}
 
 class KeyTree {
   constructor(keys) {
@@ -121,7 +126,17 @@ class HotAudioExtractor {
   }
 
   async extract(url, options = {}) {
-    const { outputDir = './data/hotaudio', outputName } = options;
+    const { outputDir = './data/hotaudio', outputName, verify = false } = options;
+
+    // Verification data collector
+    const verifyData = verify ? {
+      url,
+      hax: {},
+      metadata: {},
+      tree_keys: {},
+      segments: [],
+      output: {}
+    } : null;
 
     console.log('HotAudio Extractor v2');
     console.log('=====================\n');
@@ -467,6 +482,16 @@ class HotAudioExtractor {
       const haxBuffer = Buffer.from(await haxResponse.arrayBuffer());
       console.log(`Downloaded ${(haxBuffer.length / 1024).toFixed(1)} KB`);
 
+      // Collect HAX verification data
+      if (verifyData) {
+        verifyData.hax = {
+          url: this.capturedData.haxUrl,
+          size_bytes: haxBuffer.length,
+          sha256: sha256hex(haxBuffer),
+          header_hex: haxBuffer.slice(0, 16).toString('hex')
+        };
+      }
+
       // Parse HAX file
       console.log('\nParsing HAX file...');
       const magic = haxBuffer.slice(0, 4).toString('utf8');
@@ -484,6 +509,18 @@ class HotAudioExtractor {
       console.log(`  Codec: ${metadata.codec.toString()}`);
       console.log(`  Duration: ${(metadata.durationMs / 1000).toFixed(1)}s`);
       console.log(`  Segments: ${metadata.segmentCount}`);
+
+      // Collect metadata verification data
+      if (verifyData) {
+        verifyData.metadata = {
+          base_key_hex: Buffer.from(metadata.baseKey).toString('hex'),
+          codec: metadata.codec.toString(),
+          duration_ms: metadata.durationMs,
+          segment_count: metadata.segmentCount,
+          orig_hash_hex: metadata.origHash ? Buffer.from(metadata.origHash).toString('hex') : null
+        };
+        verifyData.tree_keys = { ...this.capturedData.segmentKeys };
+      }
 
       // Parse segment table
       const segmentData = metadata.segments;
@@ -520,6 +557,17 @@ class HotAudioExtractor {
 
           decryptedSegments.push(decrypted);
 
+          // Collect segment verification data
+          if (verifyData) {
+            verifyData.segments.push({
+              index: i,
+              offset: seg.offset,
+              size: seg.size,
+              encrypted_sha256: sha256hex(ciphertext),
+              decrypted_sha256: sha256hex(Buffer.from(decrypted))
+            });
+          }
+
           if (i === 0 || i === segments.length - 1) {
             console.log(`  Segment ${i}: ${decrypted.length} bytes`);
           } else if (i === 1) {
@@ -543,18 +591,34 @@ class HotAudioExtractor {
       const fullAudio = Buffer.concat(decryptedSegments);
       await fs.writeFile(outputPath, fullAudio);
 
+      // Collect output verification data
+      if (verifyData) {
+        verifyData.output = {
+          path: outputPath,
+          size_bytes: fullAudio.length,
+          sha256: sha256hex(fullAudio)
+        };
+      }
+
       const result = {
         success: true,
         outputPath,
         duration: metadata.durationMs / 1000,
         size: fullAudio.length,
         segments: decryptedSegments.length,
-        metadata: this.capturedData.metadata
+        metadata: this.capturedData.metadata,
+        verifyData
       };
 
       console.log(`\nSaved: ${outputPath}`);
       console.log(`Size: ${(fullAudio.length / 1024).toFixed(1)} KB`);
       console.log(`Duration: ${(metadata.durationMs / 1000).toFixed(1)}s`);
+
+      // Output verification JSON if requested
+      if (verifyData) {
+        console.log('\n--- VERIFICATION DATA ---');
+        console.log(JSON.stringify(verifyData, null, 2));
+      }
 
       return result;
 
@@ -571,20 +635,27 @@ class HotAudioExtractor {
 
 // CLI
 async function main() {
-  const url = process.argv[2];
+  const args = process.argv.slice(2);
+  const verify = args.includes('--verify');
+  const positionalArgs = args.filter(arg => !arg.startsWith('--'));
+
+  const url = positionalArgs[0];
+  const outputName = positionalArgs[1];
 
   if (!url) {
-    console.log('Usage: node hotaudio-extractor-v2.js <hotaudio-url> [output-name]');
+    console.log('Usage: node hotaudio-extractor-v2.js <hotaudio-url> [output-name] [--verify]');
+    console.log('');
+    console.log('Options:');
+    console.log('  --verify    Output detailed verification JSON with checksums');
     console.log('');
     console.log('Example:');
     console.log('  node hotaudio-extractor-v2.js https://hotaudio.net/u/User/Audio-Title');
+    console.log('  node hotaudio-extractor-v2.js https://hotaudio.net/u/User/Audio-Title --verify');
     process.exit(1);
   }
 
-  const outputName = process.argv[3];
-
   const extractor = new HotAudioExtractor();
-  await extractor.extract(url, { outputName });
+  await extractor.extract(url, { outputName, verify });
 }
 
 main().catch(console.error);
