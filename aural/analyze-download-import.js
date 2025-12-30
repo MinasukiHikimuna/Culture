@@ -15,6 +15,7 @@ const fs = require('fs').promises;
 const path = require('path');
 const { execSync, spawn } = require('child_process');
 const { ReleaseOrchestrator, Release, AudioSource } = require('./release-orchestrator');
+const { RedditResolver } = require('./reddit-resolver');
 
 // Tracking file for processed posts
 const PROCESSED_FILE = 'data/processed_posts.json';
@@ -109,19 +110,50 @@ class AnalyzeDownloadImportPipeline {
 
   /**
    * Check if a post has content that can be analyzed
+   * Attempts to resolve crossposts by fetching the original post
    */
   async hasAnalyzableContent(postFilePath) {
     try {
       const content = await fs.readFile(postFilePath, 'utf8');
       const data = JSON.parse(content);
-      const selftext = data.reddit_data?.selftext || '';
+      const redditData = data.reddit_data;
 
-      // Posts with empty selftext are crossposts or link posts - can't analyze
-      if (!selftext.trim()) {
-        return { ok: false, reason: 'empty selftext (crosspost or link post)' };
+      if (!redditData) {
+        return { ok: false, reason: 'missing reddit_data' };
       }
 
-      return { ok: true };
+      const selftext = redditData.selftext || '';
+
+      // If we have content, we're good
+      if (selftext.trim()) {
+        return { ok: true };
+      }
+
+      // Check if this is a crosspost that we can resolve
+      const resolver = new RedditResolver();
+
+      if (resolver.isCrosspost(redditData)) {
+        console.log(`  🔗 Detected crosspost, attempting to resolve...`);
+
+        const resolved = await resolver.resolve(redditData);
+
+        if (resolved?.selftext?.trim()) {
+          // Update the file with resolved content
+          data.reddit_data.selftext = resolved.selftext;
+          data.reddit_data.resolved_from = resolved.resolved_from;
+          if (resolved.original_post) {
+            data.reddit_data.original_post = resolved.original_post;
+          }
+          await fs.writeFile(postFilePath, JSON.stringify(data, null, 2));
+          console.log(`  ✅ Crosspost resolved successfully`);
+          return { ok: true, resolved: true };
+        }
+
+        return { ok: false, reason: 'crosspost target unavailable or empty' };
+      }
+
+      // Empty selftext and not a resolvable crosspost
+      return { ok: false, reason: 'empty selftext (not a crosspost)' };
     } catch (error) {
       return { ok: false, reason: error.message };
     }

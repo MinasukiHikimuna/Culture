@@ -14,6 +14,7 @@ const { execSync } = require('child_process');
 const fs = require('fs').promises;
 const path = require('path');
 const { ReleaseOrchestrator } = require('./release-orchestrator');
+const { RedditResolver } = require('./reddit-resolver');
 
 class RedditProcessor {
   constructor(config = {}) {
@@ -103,71 +104,72 @@ class RedditProcessor {
   }
 
   /**
-   * Basic Reddit analysis fallback
+   * Basic Reddit analysis fallback - uses RedditResolver for fetching
    */
   async basicRedditAnalysis(redditUrl) {
-    // Extract post ID from URL
-    const postIdMatch = redditUrl.match(/comments\/([a-z0-9]+)/);
-    if (!postIdMatch) {
-      throw new Error('Invalid Reddit URL format');
-    }
-    
-    const postId = postIdMatch[1];
-    
+    const resolver = new RedditResolver();
+
     // First, check if we have local Reddit data
-    const localDataPaths = [
-      path.join('reddit_data', '*', `${postId}_*.json`),
-      path.join('data', 'reddit', '*', `${postId}_*.json`),
-      path.join('H:', 'Git', 'gwasi-extractor', 'reddit_data', '*', `${postId}_*.json`)
-    ];
-    
+    const postIdMatch = redditUrl.match(/comments\/([a-z0-9]+)/);
+    const postId = postIdMatch ? postIdMatch[1] : null;
+
     let post = null;
-    
-    for (const pattern of localDataPaths) {
-      try {
-        const glob = require('glob');
-        const files = glob.sync(pattern);
-        if (files.length > 0) {
-          console.log('  Found local Reddit data:', files[0]);
-          const localData = JSON.parse(await fs.readFile(files[0], 'utf8'));
-          post = localData.reddit_data || localData;
-          break;
+
+    if (postId) {
+      const localDataPaths = [
+        path.join('reddit_data', '*', `${postId}_*.json`),
+        path.join('data', 'reddit', '*', `${postId}_*.json`),
+        path.join('extracted_data', 'reddit', '*', `${postId}_*.json`)
+      ];
+
+      for (const pattern of localDataPaths) {
+        try {
+          const glob = require('glob');
+          const files = glob.sync(pattern);
+          if (files.length > 0) {
+            console.log('  Found local Reddit data:', files[0]);
+            const localData = JSON.parse(await fs.readFile(files[0], 'utf8'));
+            post = localData.reddit_data || localData;
+            break;
+          }
+        } catch (e) {
+          // Continue trying other paths
         }
-      } catch (e) {
-        // Continue trying other paths
       }
     }
-    
-    // If no local data, try Reddit API
+
+    // If no local data, use resolver to fetch from Reddit
     if (!post) {
-      const jsonUrl = redditUrl.replace(/\/$/, '') + '.json';
-      console.log('  Fetching:', jsonUrl);
-      
-      const response = await fetch(jsonUrl, {
-        headers: {
-          'User-Agent': 'GWASIExtractor/1.0'
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch Reddit post: ${response.status}`);
+      console.log('  Fetching from Reddit...');
+      post = await resolver.resolve(redditUrl);
+
+      if (!post) {
+        throw new Error('Failed to fetch Reddit post');
       }
-      
-      const data = await response.json();
-      post = data[0].data.children[0].data;
     }
-    
+
+    // Handle crossposts - resolve if needed
+    if (resolver.isCrosspost(post) && !post.selftext?.trim()) {
+      console.log('  🔗 Resolving crosspost...');
+      const resolved = await resolver.resolve(post);
+      if (resolved?.selftext) {
+        post = resolved;
+      }
+    }
+
     // Extract audio URLs from post content
     const content = post.selftext || '';
     const audioUrls = this.extractAudioUrls(content);
-    
+
     // Build analysis structure
     return {
       metadata: {
         post_id: post.id,
         title: post.title,
         username: post.author,
-        created_utc: new Date(post.created_utc * 1000).toISOString(),
+        created_utc: post.created_utc
+          ? new Date(post.created_utc * 1000).toISOString()
+          : new Date().toISOString(),
         url: redditUrl
       },
       content: {
