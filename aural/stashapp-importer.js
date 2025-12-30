@@ -234,17 +234,47 @@ class StashappClient {
   }
 
   /**
-   * Find a scene by file basename
+   * Find most recently created scenes
    */
-  async findSceneByBasename(basename) {
+  async findRecentScenes(limit = 20) {
     const query = `
       query FindScenes($filter: FindFilterType!) {
         findScenes(filter: $filter) {
+          scenes { id title created_at files { path basename } }
+        }
+      }
+    `;
+    const result = await this.query(query, {
+      filter: { per_page: limit, sort: 'created_at', direction: 'DESC' }
+    });
+    return result.findScenes?.scenes || [];
+  }
+
+  /**
+   * Find a scene by file basename using path filter
+   */
+  async findSceneByBasename(basename) {
+    // Extract the Reddit post ID from the filename (e.g., "1d9uiny" from "SweetnEvil86 - 2024-06-06 - 1d9uiny - Title.mp4")
+    // This is more reliable than searching for the full filename with special characters
+    const postIdMatch = basename.match(/- (\w{7}) -/);
+    const searchValue = postIdMatch ? postIdMatch[1] : basename;
+
+    const query = `
+      query FindScenes($scene_filter: SceneFilterType!, $filter: FindFilterType!) {
+        findScenes(scene_filter: $scene_filter, filter: $filter) {
           scenes { id title files { path basename } }
         }
       }
     `;
-    const result = await this.query(query, { filter: { q: basename, per_page: 10 } });
+    const result = await this.query(query, {
+      scene_filter: {
+        path: {
+          value: searchValue,
+          modifier: 'INCLUDES'
+        }
+      },
+      filter: { per_page: 10 }
+    });
     const scenes = result.findScenes?.scenes || [];
 
     for (const scene of scenes) {
@@ -819,8 +849,22 @@ class StashappImporter {
       console.log('  Waiting for scan to complete...');
       await this.client.waitForScan(60);
 
-      // Find the scene by basename
-      const scene = await this.client.findSceneByBasename(outputFilename);
+      // Find the scene by basename (with retries to allow for database indexing)
+      let scene = null;
+      const maxRetries = 10;
+      const retryDelay = 2000; // 2 seconds between retries
+
+      for (let retry = 0; retry < maxRetries; retry++) {
+        scene = await this.client.findSceneByBasename(outputFilename);
+        if (scene) {
+          break;
+        }
+        if (retry < maxRetries - 1) {
+          console.log(`  Scene not found yet, retrying in ${retryDelay / 1000}s... (${retry + 1}/${maxRetries})`);
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+        }
+      }
+
       if (!scene) {
         console.log('  Warning: Scene not found after scan. May need manual refresh.');
         continue;
