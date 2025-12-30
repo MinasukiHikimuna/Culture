@@ -17,21 +17,64 @@ uv run python gwasi_extractor.py --output extracted_data
 # Step 3: Fetch full Reddit post content for a specific user
 uv run python reddit_extractor.py extracted_data/gwasi_data_*.json --output extracted_data/reddit --filter-users username
 
-# Step 4: Analyze posts and download audio files
+# Step 4: Analyze, download audio, and import to Stashapp
 # Single post:
-node analyze-and-download.js extracted_data/reddit/username/postid_title.json
+node analyze-download-import.js extracted_data/reddit/username/postid_title.json
 
 # All posts from a user:
-node analyze-and-download.js extracted_data/reddit/username/
+node analyze-download-import.js extracted_data/reddit/username/
 
 # Dry run first (see what would be downloaded without downloading):
-node analyze-and-download.js extracted_data/reddit/username/ --dry-run
+node analyze-download-import.js extracted_data/reddit/username/ --dry-run
 ```
 
 **What you get:**
 - Step 2: Post IDs, titles, tags, dates, scores (from GWASI index)
 - Step 3: Full post content with audio links, performer info, scripts (from Reddit API)
-- Step 4: Downloaded audio files organized by release
+- Step 4: Downloaded audio files organized by release, imported to Stashapp
+
+## Entry Points
+
+There are several scripts for different use cases:
+
+| Script | Use Case | Input | Description |
+|--------|----------|-------|-------------|
+| `gwasi_extractor.py` | Initial discovery | GWASI delta/base files | Extracts post index from GWASI (~227k posts) |
+| `reddit_extractor.py` | Post enrichment | GWASI JSON + username filter | Fetches full Reddit post content via PRAW |
+| `analyze-download-import.js` | **Full pipeline** | Directory or JSON file | Analyzes posts, downloads audio, imports to Stashapp |
+| `process-reddit-url.js` | Ad-hoc URL processing | Reddit URL | Processes a single Reddit URL directly |
+
+### When to use each:
+
+**`analyze-download-import.js`** - Main batch processing script
+```bash
+# Process all posts from a user (tracks progress, skips already processed)
+node analyze-download-import.js extracted_data/reddit/SweetnEvil86/
+
+# Process single post
+node analyze-download-import.js extracted_data/reddit/SweetnEvil86/1bdg16n_post.json
+
+# Skip Stashapp import (just download audio)
+node analyze-download-import.js extracted_data/reddit/SweetnEvil86/ --skip-import
+
+# Force re-process already processed posts
+node analyze-download-import.js extracted_data/reddit/SweetnEvil86/ --force
+
+# Check processing status
+node analyze-download-import.js --status
+```
+
+**`process-reddit-url.js`** - For ad-hoc Reddit URLs (not from GWASI)
+```bash
+# Process a single Reddit URL directly
+node process-reddit-url.js "https://www.reddit.com/r/gonewildaudio/comments/xyz123/..."
+```
+
+### Special Features
+
+- **Crosspost resolution**: Automatically fetches content from original posts when encountering crossposts
+- **Duplicate tracking**: Maintains `data/processed_posts.json` to avoid re-processing
+- **Resume support**: Can stop and restart batch processing anytime
 
 ## Features
 
