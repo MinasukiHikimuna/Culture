@@ -117,14 +117,14 @@ class StashappClient {
   /**
    * Find or create a performer by name
    */
-  async findOrCreatePerformer(name, imageUrl = null) {
+  async findOrCreatePerformer(name, imageUrl = null, redditUsername = null) {
     let performer = await this.findPerformer(name);
     if (performer) {
       console.log(`  Found existing performer: ${performer.name} (ID: ${performer.id})`);
       return performer;
     }
 
-    performer = await this.createPerformer(name, imageUrl);
+    performer = await this.createPerformer(name, imageUrl, redditUsername);
     if (imageUrl) {
       console.log(`  Created new performer: ${performer.name} (ID: ${performer.id}) with avatar`);
     } else {
@@ -638,7 +638,7 @@ class StashappImporter {
         if (avatarUrl) {
           console.log(`    Found Reddit avatar for ${primaryPerformer}`);
         }
-        const performer = await this.client.findOrCreatePerformer(primaryPerformer, avatarUrl);
+        const performer = await this.client.findOrCreatePerformer(primaryPerformer, avatarUrl, primaryPerformer);
         performerIds.push(performer.id);
       }
 
@@ -653,7 +653,7 @@ class StashappImporter {
         if (avatarUrl) {
           console.log(`    Found Reddit avatar for ${additional}`);
         }
-        const performer = await this.client.findOrCreatePerformer(additional, avatarUrl);
+        const performer = await this.client.findOrCreatePerformer(additional, avatarUrl, additional);
         performerIds.push(performer.id);
       }
 
