@@ -113,12 +113,12 @@ async function processRelease(client, releasePath, options) {
 
   stats.releasesProcessed++;
 
-  // Get all scenes for this performer and date
+  // Get all scenes for this performer (without date filter due to timezone issues)
   let scenes = [];
-  if (performer && date) {
-    scenes = await client.findScenesByPerformerAndDate(performer, date);
+  if (performer) {
+    scenes = await client.findScenesByPerformer(performer);
     if (options.verbose) {
-      console.log(`  Found ${scenes.length} scenes for ${performer} on ${date}`);
+      console.log(`  Found ${scenes.length} scenes for ${performer}`);
     }
   }
 

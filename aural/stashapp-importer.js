@@ -371,6 +371,49 @@ class StashappClient {
   }
 
   /**
+   * Find scenes by performer name (no date filter)
+   */
+  async findScenesByPerformer(performerName) {
+    // First find the performer ID
+    const performer = await this.findPerformer(performerName);
+    if (!performer) {
+      return [];
+    }
+
+    const query = `
+      query FindScenes($scene_filter: SceneFilterType!, $filter: FindFilterType!) {
+        findScenes(scene_filter: $scene_filter, filter: $filter) {
+          scenes {
+            id
+            title
+            date
+            urls
+            files {
+              id
+              path
+              basename
+              fingerprints {
+                type
+                value
+              }
+            }
+          }
+        }
+      }
+    `;
+    const result = await this.query(query, {
+      scene_filter: {
+        performers: {
+          value: [performer.id],
+          modifier: 'INCLUDES'
+        }
+      },
+      filter: { per_page: -1 }
+    });
+    return result.findScenes?.scenes || [];
+  }
+
+  /**
    * Find a scene by fingerprint
    */
   async findSceneByFingerprint(fingerprintType, fingerprintValue) {
