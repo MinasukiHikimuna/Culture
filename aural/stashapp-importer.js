@@ -278,6 +278,141 @@ class StashappClient {
     const result = await this.query('query { version { version } }');
     return result.version?.version;
   }
+
+  /**
+   * Get a scene with its files and fingerprints
+   */
+  async getSceneWithFiles(sceneId) {
+    const query = `
+      query GetScene($id: ID!) {
+        findScene(id: $id) {
+          id
+          title
+          date
+          urls
+          files {
+            id
+            path
+            basename
+            fingerprints {
+              type
+              value
+            }
+          }
+        }
+      }
+    `;
+    const result = await this.query(query, { id: sceneId });
+    return result.findScene;
+  }
+
+  /**
+   * Set a fingerprint on a file
+   */
+  async setFileFingerprint(fileId, type, value) {
+    const query = `
+      mutation SetFingerprints($input: FileSetFingerprintsInput!) {
+        fileSetFingerprints(input: $input)
+      }
+    `;
+    return this.query(query, {
+      input: {
+        id: fileId,
+        fingerprints: [{ type, value }]
+      }
+    });
+  }
+
+  /**
+   * Find scenes by performer name and date
+   */
+  async findScenesByPerformerAndDate(performerName, date) {
+    // First find the performer ID
+    const performer = await this.findPerformer(performerName);
+    if (!performer) {
+      return [];
+    }
+
+    const query = `
+      query FindScenes($scene_filter: SceneFilterType!, $filter: FindFilterType!) {
+        findScenes(scene_filter: $scene_filter, filter: $filter) {
+          scenes {
+            id
+            title
+            date
+            urls
+            files {
+              id
+              path
+              basename
+              fingerprints {
+                type
+                value
+              }
+            }
+          }
+        }
+      }
+    `;
+    const result = await this.query(query, {
+      scene_filter: {
+        performers: {
+          value: [performer.id],
+          modifier: 'INCLUDES'
+        },
+        date: {
+          value: date,
+          modifier: 'EQUALS'
+        }
+      },
+      filter: { per_page: 100 }
+    });
+    return result.findScenes?.scenes || [];
+  }
+
+  /**
+   * Find a scene by fingerprint
+   */
+  async findSceneByFingerprint(fingerprintType, fingerprintValue) {
+    const query = `
+      query FindScenes($scene_filter: SceneFilterType!, $filter: FindFilterType!) {
+        findScenes(scene_filter: $scene_filter, filter: $filter) {
+          scenes {
+            id
+            title
+            files {
+              id
+              fingerprints {
+                type
+                value
+              }
+            }
+          }
+        }
+      }
+    `;
+
+    // Search for scenes and filter by fingerprint
+    // Note: Stashapp may not have direct fingerprint filtering,
+    // so we fetch recent scenes and check fingerprints
+    const result = await this.query(query, {
+      scene_filter: {},
+      filter: { per_page: -1 }
+    });
+
+    const scenes = result.findScenes?.scenes || [];
+    for (const scene of scenes) {
+      for (const file of scene.files || []) {
+        const fp = file.fingerprints?.find(
+          f => f.type === fingerprintType && f.value === fingerprintValue
+        );
+        if (fp) {
+          return scene;
+        }
+      }
+    }
+    return null;
+  }
 }
 
 /**
@@ -483,8 +618,12 @@ async function convertAudioToVideo(audioPath, outputPath) {
 
 /**
  * Generate output filename in Stashapp format
+ * @param {Object} release - The release data
+ * @param {Object} audioSource - The audio source being processed (optional)
+ * @param {number} index - The index of the audio source (optional)
+ * @param {number} totalSources - Total number of audio sources (optional)
  */
-function formatOutputFilename(release) {
+function formatOutputFilename(release, audioSource = null, index = 0, totalSources = 1) {
   const performer = release.primaryPerformer || 'Unknown';
 
   // Parse date from Unix timestamp
@@ -511,7 +650,14 @@ function formatOutputFilename(release) {
   // Sanitize for filesystem
   cleanTitle = cleanTitle.replace(/[<>:"/\\|?*]/g, '');
 
-  return `${performer} - ${dateStr} - ${postId} - ${cleanTitle}.mp4`;
+  // Add version identifier for multi-version releases
+  let versionSuffix = '';
+  if (totalSources > 1) {
+    const versionSlug = audioSource?.versionInfo?.slug || `v${index + 1}`;
+    versionSuffix = ` - ${versionSlug}`;
+  }
+
+  return `${performer} - ${dateStr} - ${postId} - ${cleanTitle}${versionSuffix}.mp4`;
 }
 
 /**
@@ -591,8 +737,19 @@ class StashappImporter {
 
       console.log(`\n[Audio ${i + 1}/${audioSources.length}] ${path.basename(audioPath)}`);
 
-      // Generate output filename
-      const outputFilename = formatOutputFilename(releaseData);
+      // Check for duplicate audio by fingerprint before converting
+      const audioChecksum = source.audio?.checksum?.sha256;
+      if (audioChecksum) {
+        const existingScene = await this.client.findSceneByFingerprint('audio_sha256', audioChecksum);
+        if (existingScene) {
+          console.log(`  Duplicate detected: audio already imported as scene ${existingScene.id}`);
+          console.log(`  Skipping this audio source...`);
+          continue;
+        }
+      }
+
+      // Generate output filename (with version slug for multi-version releases)
+      const outputFilename = formatOutputFilename(releaseData, source, i, audioSources.length);
       const outputPath = path.join(this.outputDir, outputFilename);
 
       console.log(`  Output: ${outputFilename}`);
@@ -632,8 +789,12 @@ class StashappImporter {
       // Prepare metadata updates
       const updates = {};
 
-      // Title
-      updates.title = releaseData.title || '';
+      // Title (add version name for multi-version releases)
+      let title = releaseData.title || '';
+      if (audioSources.length > 1 && source.versionInfo?.version_name) {
+        title = `${title} [${source.versionInfo.version_name}]`;
+      }
+      updates.title = title;
 
       // Date
       if (releaseData.releaseDate) {
@@ -749,6 +910,16 @@ class StashappImporter {
       console.log('\n  Updating scene metadata...');
       await this.client.updateScene(scene.id, updates);
       console.log('  Scene updated successfully!');
+
+      // Set audio fingerprint for duplicate detection
+      if (audioChecksum) {
+        const sceneWithFiles = await this.client.getSceneWithFiles(scene.id);
+        const fileId = sceneWithFiles?.files?.[0]?.id;
+        if (fileId) {
+          await this.client.setFileFingerprint(fileId, 'audio_sha256', audioChecksum);
+          console.log(`  Set audio fingerprint: ${audioChecksum.substring(0, 16)}...`);
+        }
+      }
     }
 
     return {
