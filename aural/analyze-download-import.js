@@ -289,7 +289,8 @@ class AnalyzeDownloadImportPipeline {
         analysisFile: analysisFilePath,
         release: release,
         releaseDir: releaseDir,
-        audioSourceCount: release.audioSources.length
+        audioSourceCount: release.audioSources.length,
+        cyoaDetection: analysis.cyoa_detection || null
       };
 
     } catch (error) {
@@ -437,6 +438,10 @@ class AnalyzeDownloadImportPipeline {
       // Ignore errors reading post file for URL
     }
 
+    // Check for CYOA
+    const cyoaDetection = processResult.cyoaDetection;
+    const isCYOA = cyoaDetection?.is_cyoa === true;
+
     // Mark as processed
     const result = {
       success: true,
@@ -446,7 +451,9 @@ class AnalyzeDownloadImportPipeline {
       releaseDir: processResult.releaseDir,
       stashSceneId: importResult.stashSceneId,
       redditUrl: redditUrl,
-      importSuccess: importResult.success
+      importSuccess: importResult.success,
+      isCYOA: isCYOA,
+      cyoaDetection: cyoaDetection
     };
 
     await this.markProcessed(postId, result);
@@ -462,6 +469,9 @@ class AnalyzeDownloadImportPipeline {
     if (importResult.stashSceneId) {
       console.log(`🎬 Stashapp: ${STASH_BASE_URL}/scenes/${importResult.stashSceneId}`);
     }
+    if (isCYOA) {
+      console.log(`⚠️  CYOA: Requires manual decision tree mapping in Stashapp`);
+    }
 
     return result;
   }
@@ -476,7 +486,8 @@ class AnalyzeDownloadImportPipeline {
     const results = {
       processed: [],
       skipped: [],
-      failed: []
+      failed: [],
+      cyoa: []
     };
 
     for (let i = 0; i < postFiles.length; i++) {
@@ -490,6 +501,16 @@ class AnalyzeDownloadImportPipeline {
           results.skipped.push({ file: postFile, postId: result.postId });
         } else if (result.success) {
           results.processed.push({ file: postFile, result });
+
+          // Track CYOA releases separately
+          if (result.isCYOA) {
+            results.cyoa.push({
+              file: postFile,
+              releaseDir: result.releaseDir,
+              redditUrl: result.redditUrl,
+              cyoaDetection: result.cyoaDetection
+            });
+          }
         } else {
           results.failed.push({ file: postFile, stage: result.stage, error: result.error });
         }
@@ -517,6 +538,33 @@ class AnalyzeDownloadImportPipeline {
       console.log('\nFailed posts:');
       for (const fail of results.failed) {
         console.log(`  - ${path.basename(fail.file)}: ${fail.error || fail.stage}`);
+      }
+    }
+
+    // CYOA warnings section
+    if (results.cyoa.length > 0) {
+      console.log(`\n${'='.repeat(60)}`);
+      console.log(`⚠️  CYOA Releases Requiring Manual Handling: ${results.cyoa.length}`);
+      console.log(`${'='.repeat(60)}`);
+      console.log('These releases have decision tree structures that require manual');
+      console.log('mapping in Stashapp release descriptions as links.\n');
+
+      for (const cyoa of results.cyoa) {
+        const detection = cyoa.cyoaDetection || {};
+        console.log(`  📂 ${path.basename(cyoa.file)}`);
+        if (cyoa.redditUrl) {
+          console.log(`     Reddit: ${cyoa.redditUrl}`);
+        }
+        if (detection.audio_count) {
+          console.log(`     Audios: ${detection.audio_count}${detection.endings_count ? `, Endings: ${detection.endings_count}` : ''}`);
+        }
+        if (detection.decision_tree_url) {
+          console.log(`     Flowchart: ${detection.decision_tree_url}`);
+        }
+        if (detection.reason) {
+          console.log(`     Reason: ${detection.reason}`);
+        }
+        console.log();
       }
     }
 

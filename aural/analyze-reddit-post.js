@@ -18,6 +18,101 @@ class EnhancedRedditPostAnalyzer {
   }
 
   /**
+   * Creates a prompt to detect Choose Your Own Adventure (CYOA) releases
+   */
+  createCYOADetectionPrompt(postData) {
+    const { title, selftext } = postData.reddit_data;
+
+    return `Analyze this Reddit post from r/gonewildaudio to determine if it is a Choose Your Own Adventure (CYOA) release.
+
+CRITICAL: Respond with ONLY valid JSON. No explanations or reasoning.
+
+TITLE: ${title}
+
+POST BODY:
+${selftext}
+
+WHAT IS A CYOA:
+- Multiple audio files that form a DECISION TREE
+- Listeners make choices that lead to different audio paths
+- Has multiple possible endings based on choices
+- Often includes a visual flowchart/roadmap image showing the paths
+- Audio files are numbered but NOT meant for sequential listening
+- Example: "Audio 0 -> choose Audio 1 OR Audio 2 -> each leads to different endings"
+
+NOT A CYOA (standard releases):
+- Simple multi-part series (Part 1, Part 2, Part 3 - sequential listening)
+- Gender variants (F4M version, F4F version - same content, different target)
+- Audio quality variants (SFX version, no-SFX version)
+- Single audio with multiple hosting platforms
+
+Return this exact JSON structure:
+{
+  "is_cyoa": true|false,
+  "confidence": "high|medium|low",
+  "audio_count": <number of audio files detected>,
+  "endings_count": <number of endings mentioned, or null if not specified>,
+  "has_decision_tree_image": true|false,
+  "decision_tree_url": "url to flowchart image or null",
+  "reason": "brief explanation of why this is or is not a CYOA"
+}`;
+  }
+
+  /**
+   * Detects if a post is a Choose Your Own Adventure (CYOA) release
+   * that requires special handling with decision tree mapping.
+   */
+  async detectCYOA(postData) {
+    try {
+      const prompt = this.createCYOADetectionPrompt(postData);
+      const llmResponse = await this.callLLM(prompt);
+      const result = this.parseCYOADetectionResponse(llmResponse);
+      return result;
+    } catch (error) {
+      console.error(`CYOA detection failed: ${error.message}`);
+      return {
+        is_cyoa: false,
+        confidence: 'low',
+        audio_count: 0,
+        endings_count: null,
+        has_decision_tree_image: false,
+        decision_tree_url: null,
+        reason: `Detection failed: ${error.message}`,
+        detection_error: true
+      };
+    }
+  }
+
+  /**
+   * Parses and validates the CYOA detection response
+   */
+  parseCYOADetectionResponse(responseText) {
+    try {
+      let cleanText = responseText
+        .replace(/<think>[\s\S]*?<\/think>/gi, '')
+        .replace(/^[^{]*/, '')
+        .replace(/[^}]*$/, '')
+        .trim();
+
+      if (!cleanText.startsWith('{')) {
+        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+        cleanText = jsonMatch ? jsonMatch[0] : responseText;
+      }
+
+      const parsed = JSON.parse(cleanText);
+
+      if (typeof parsed.is_cyoa !== 'boolean') {
+        throw new Error('Missing required field: is_cyoa');
+      }
+
+      return parsed;
+    } catch (error) {
+      console.error("Failed to parse CYOA detection response:", responseText);
+      throw new Error("Invalid JSON response from LLM: " + error.message);
+    }
+  }
+
+  /**
    * Creates a comprehensive metadata extraction prompt
    */
   createMetadataExtractionPrompt(postData) {
@@ -387,6 +482,15 @@ Return JSON:
 
       // Add version naming metadata
       analysis.version_naming = versionNaming;
+
+      // Detect CYOA structure
+      console.log(`Checking for CYOA structure...`);
+      const cyoaDetection = await this.detectCYOA(postData);
+      analysis.cyoa_detection = cyoaDetection;
+
+      if (cyoaDetection.is_cyoa) {
+        console.log(`⚠️  CYOA detected (${cyoaDetection.confidence} confidence): ${cyoaDetection.reason}`);
+      }
 
       // Add metadata
       analysis.metadata = {
