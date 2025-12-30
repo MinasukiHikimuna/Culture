@@ -1,5 +1,5 @@
 ---
-name: stash-check
+name: stashapp-check
 description: Check Stashapp releases, scenes, and performers. Use when the user asks to look up a scene, find scenes by performer, check release status, or get Stashapp statistics.
 ---
 
@@ -9,7 +9,7 @@ Check on a Stashapp release by querying the Stashapp GraphQL API.
 
 ## Instructions
 
-Use the Python script at `.claude/skills/stash-check/scripts/stash_check.py` to query Stashapp.
+Use the Python script at `.claude/skills/stashapp-check/scripts/stashapp_check.py` to query Stashapp.
 
 When the user asks about a Stashapp release:
 1. Determine what they're looking for (scene by title, scene by ID, scenes by performer, or stats)
@@ -20,25 +20,25 @@ When the user asks about a Stashapp release:
 
 ```bash
 # Search scenes by title
-uv run python .claude/skills/stash-check/scripts/stash_check.py "shy ghost girl"
+uv run python .claude/skills/stashapp-check/scripts/stashapp_check.py "shy ghost girl"
 
 # Get a specific scene by ID
-uv run python .claude/skills/stash-check/scripts/stash_check.py --id 123
+uv run python .claude/skills/stashapp-check/scripts/stashapp_check.py --id 123
 
 # Find scenes by performer
-uv run python .claude/skills/stash-check/scripts/stash_check.py --performer "SnakeySmut"
+uv run python .claude/skills/stashapp-check/scripts/stashapp_check.py --performer "SnakeySmut"
 
 # Show Stashapp statistics
-uv run python .claude/skills/stash-check/scripts/stash_check.py --stats
+uv run python .claude/skills/stashapp-check/scripts/stashapp_check.py --stats
 
 # Verbose output with details
-uv run python .claude/skills/stash-check/scripts/stash_check.py --id 123 --verbose
+uv run python .claude/skills/stashapp-check/scripts/stashapp_check.py --id 123 --verbose
 
 # JSON output for parsing
-uv run python .claude/skills/stash-check/scripts/stash_check.py "ghost" --json
+uv run python .claude/skills/stashapp-check/scripts/stashapp_check.py "ghost" --json
 
 # Limit results
-uv run python .claude/skills/stash-check/scripts/stash_check.py "ghost" --limit 5
+uv run python .claude/skills/stashapp-check/scripts/stashapp_check.py "ghost" --limit 5
 ```
 
 ## Options
