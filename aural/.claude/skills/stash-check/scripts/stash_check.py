@@ -31,6 +31,31 @@ load_dotenv(project_root / ".env")
 STASH_URL = os.getenv("STASHAPP_URL")
 STASH_API_KEY = os.getenv("STASHAPP_API_KEY")
 
+# GraphQL Field Definitions - Basic fields for terminal output
+PERFORMER_FIELDS_BASIC = "id name disambiguation scene_count url gender"
+SCENE_FIELDS_BASIC = """
+    id title date organized
+    performers { id name }
+    studio { id name }
+    tags { id name }
+"""
+
+# GraphQL Field Definitions - Full fields for JSON export
+PERFORMER_FIELDS_FULL = """
+    id name disambiguation scene_count url gender details
+    twitter instagram birthdate death_date country ethnicity
+    hair_color eye_color height_cm weight measurements
+    favorite ignore_auto_tag image_path created_at updated_at
+"""
+SCENE_FIELDS_FULL = """
+    id title date details urls organized play_count o_counter
+    performers { id name disambiguation }
+    studio { id name }
+    tags { id name }
+    files { path basename duration size }
+    created_at updated_at
+"""
+
 
 class StashappChecker:
     """Stashapp GraphQL client for checking releases."""
@@ -52,59 +77,39 @@ class StashappChecker:
             raise Exception(f"GraphQL errors: {result['errors']}")
         return result.get("data", {})
 
-    def find_scene_by_id(self, scene_id: int) -> dict | None:
+    def find_scene_by_id(self, scene_id: int, full_details: bool = False) -> dict | None:
         """Get a specific scene by ID."""
-        query = """
-        query FindScene($id: ID!) {
-            findScene(id: $id) {
-                id
-                title
-                date
-                details
-                urls
-                organized
-                play_count
-                o_counter
-                performers { id name disambiguation }
-                studio { id name }
-                tags { id name }
-                files { path basename duration size }
-            }
-        }
+        fields = SCENE_FIELDS_FULL if full_details else SCENE_FIELDS_BASIC
+        query = f"""
+        query FindScene($id: ID!) {{
+            findScene(id: $id) {{ {fields} }}
+        }}
         """
         result = self.query(query, {"id": str(scene_id)})
         return result.get("findScene")
 
-    def search_scenes(self, search_query: str, limit: int = 10) -> list[dict]:
+    def search_scenes(self, search_query: str, limit: int = 10, full_details: bool = False) -> list[dict]:
         """Search scenes by title/text."""
-        query = """
-        query FindScenes($filter: FindFilterType!) {
-            findScenes(filter: $filter) {
-                scenes {
-                    id
-                    title
-                    date
-                    urls
-                    organized
-                    performers { id name }
-                    studio { id name }
-                    tags { id name }
-                    files { path basename duration }
-                }
-            }
-        }
+        fields = SCENE_FIELDS_FULL if full_details else SCENE_FIELDS_BASIC
+        query = f"""
+        query FindScenes($filter: FindFilterType!) {{
+            findScenes(filter: $filter) {{
+                scenes {{ {fields} }}
+            }}
+        }}
         """
         result = self.query(query, {"filter": {"q": search_query, "per_page": limit}})
         return result.get("findScenes", {}).get("scenes", [])
 
-    def find_performer(self, name: str) -> dict | None:
+    def find_performer(self, name: str, full_details: bool = False) -> dict | None:
         """Find a performer by name."""
-        query = """
-        query FindPerformers($filter: FindFilterType!) {
-            findPerformers(filter: $filter) {
-                performers { id name disambiguation scene_count }
-            }
-        }
+        fields = PERFORMER_FIELDS_FULL if full_details else PERFORMER_FIELDS_BASIC
+        query = f"""
+        query FindPerformers($filter: FindFilterType!) {{
+            findPerformers(filter: $filter) {{
+                performers {{ {fields} }}
+            }}
+        }}
         """
         result = self.query(query, {"filter": {"q": name, "per_page": 10}})
         performers = result.get("findPerformers", {}).get("performers", [])
@@ -115,22 +120,15 @@ class StashappChecker:
         # Return first result if no exact match
         return performers[0] if performers else None
 
-    def find_scenes_by_performer(self, performer_id: int, limit: int = 20) -> list[dict]:
+    def find_scenes_by_performer(self, performer_id: int, limit: int = 20, full_details: bool = False) -> list[dict]:
         """Find scenes featuring a specific performer."""
-        query = """
-        query FindScenes($filter: SceneFilterType!, $find_filter: FindFilterType!) {
-            findScenes(scene_filter: $filter, filter: $find_filter) {
-                scenes {
-                    id
-                    title
-                    date
-                    organized
-                    performers { id name }
-                    studio { id name }
-                    tags { id name }
-                }
-            }
-        }
+        fields = SCENE_FIELDS_FULL if full_details else SCENE_FIELDS_BASIC
+        query = f"""
+        query FindScenes($filter: SceneFilterType!, $find_filter: FindFilterType!) {{
+            findScenes(scene_filter: $filter, filter: $find_filter) {{
+                scenes {{ {fields} }}
+            }}
+        }}
         """
         result = self.query(
             query,
@@ -292,7 +290,7 @@ def main():
                 print(f"  Total Play Duration: {format_duration(total_duration)}")
 
         elif args.id:
-            scene = client.find_scene_by_id(args.id)
+            scene = client.find_scene_by_id(args.id, full_details=args.json)
             if scene:
                 if args.json:
                     print(json.dumps(scene, indent=2))
@@ -303,29 +301,34 @@ def main():
                 sys.exit(1)
 
         elif args.performer:
-            performer = client.find_performer(args.performer)
+            performer = client.find_performer(args.performer, full_details=args.json)
             if not performer:
                 print(f"Performer '{args.performer}' not found.")
                 sys.exit(1)
 
-            disambiguation = f" ({performer['disambiguation']})" if performer.get("disambiguation") else ""
-            print(f"\nPerformer: {performer['name']}{disambiguation}")
-            print(f"ID: {performer['id']}")
-            print(f"Scene Count: {performer.get('scene_count', 0)}")
+            if args.json:
+                scenes = client.find_scenes_by_performer(int(performer["id"]), limit=args.limit, full_details=True)
+                print(json.dumps({"performer": performer, "scenes": scenes}, indent=2))
+            else:
+                disambiguation = f" ({performer['disambiguation']})" if performer.get("disambiguation") else ""
+                print(f"\nPerformer: {performer['name']}{disambiguation}")
+                print(f"ID: {performer['id']}")
+                print(f"Scene Count: {performer.get('scene_count', 0)}")
+                if performer.get("url"):
+                    print(f"URL: {performer['url']}")
+                if performer.get("gender"):
+                    print(f"Gender: {performer['gender']}")
 
-            scenes = client.find_scenes_by_performer(int(performer["id"]), limit=args.limit)
-            if scenes:
-                if args.json:
-                    print(json.dumps(scenes, indent=2))
-                else:
+                scenes = client.find_scenes_by_performer(int(performer["id"]), limit=args.limit)
+                if scenes:
                     print(f"\nScenes ({len(scenes)}):")
                     for scene in scenes:
                         print_scene_summary(scene)
-            else:
-                print("\nNo scenes found for this performer.")
+                else:
+                    print("\nNo scenes found for this performer.")
 
         elif args.query:
-            scenes = client.search_scenes(args.query, limit=args.limit)
+            scenes = client.search_scenes(args.query, limit=args.limit, full_details=args.json)
             if scenes:
                 if args.json:
                     print(json.dumps(scenes, indent=2))
