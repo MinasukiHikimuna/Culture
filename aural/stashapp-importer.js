@@ -1067,49 +1067,70 @@ class StashappImporter {
         console.log(`  Director (script author): ${scriptAuthor}`);
       }
 
-      // Performers
+      // Performers - use per-audio performers if available, fallback to release-level
       console.log('\n  Processing performers...');
       const performerIds = [];
-      const primaryPerformer = releaseData.primaryPerformer;
 
-      // Get author flair for gender (from Reddit post data)
-      const authorFlairText = redditData.author_flair_text || '';
-      const primaryGender = parseGenderFromFlair(authorFlairText);
-      if (primaryGender) {
-        console.log(`    Detected gender from flair "${authorFlairText}": ${primaryGender}`);
-      }
+      // Check for per-audio performers first
+      const perAudioPerformers = source.versionInfo?.performers || [];
 
-      if (primaryPerformer) {
-        const avatarUrl = await getRedditAvatar(primaryPerformer);
-        if (avatarUrl) {
-          console.log(`    Found Reddit avatar for ${primaryPerformer}`);
+      if (perAudioPerformers.length > 0) {
+        // Use per-audio performers for this specific scene
+        console.log(`    Using per-audio performers: ${perAudioPerformers.join(', ')}`);
+        for (const performerName of perAudioPerformers) {
+          const avatarUrl = await getRedditAvatar(performerName);
+          if (avatarUrl) {
+            console.log(`    Found Reddit avatar for ${performerName}`);
+          }
+          const performer = await this.client.findOrCreatePerformer(performerName, {
+            imageUrl: avatarUrl,
+            redditUsername: performerName
+          });
+          performerIds.push(performer.id);
         }
-        const performer = await this.client.findOrCreatePerformer(primaryPerformer, {
-          imageUrl: avatarUrl,
-          redditUsername: primaryPerformer,
-          gender: primaryGender
-        });
-        performerIds.push(performer.id);
-      }
+      } else {
+        // Fallback to release-level performers
+        const primaryPerformer = releaseData.primaryPerformer;
 
-      // Additional performers
-      let additionalPerformers = llmAnalysis.performers?.additional || [];
-      if (additionalPerformers.length === 0) {
-        additionalPerformers = releaseData.additionalPerformers || [];
-      }
-
-      for (const additional of additionalPerformers) {
-        const avatarUrl = await getRedditAvatar(additional);
-        if (avatarUrl) {
-          console.log(`    Found Reddit avatar for ${additional}`);
+        // Get author flair for gender (from Reddit post data)
+        const authorFlairText = redditData.author_flair_text || '';
+        const primaryGender = parseGenderFromFlair(authorFlairText);
+        if (primaryGender) {
+          console.log(`    Detected gender from flair "${authorFlairText}": ${primaryGender}`);
         }
-        // Note: We don't have flair for additional performers from the post data
-        // Would need separate API call to get their flair
-        const performer = await this.client.findOrCreatePerformer(additional, {
-          imageUrl: avatarUrl,
-          redditUsername: additional
-        });
-        performerIds.push(performer.id);
+
+        if (primaryPerformer) {
+          const avatarUrl = await getRedditAvatar(primaryPerformer);
+          if (avatarUrl) {
+            console.log(`    Found Reddit avatar for ${primaryPerformer}`);
+          }
+          const performer = await this.client.findOrCreatePerformer(primaryPerformer, {
+            imageUrl: avatarUrl,
+            redditUsername: primaryPerformer,
+            gender: primaryGender
+          });
+          performerIds.push(performer.id);
+        }
+
+        // Additional performers
+        let additionalPerformers = llmAnalysis.performers?.additional || [];
+        if (additionalPerformers.length === 0) {
+          additionalPerformers = releaseData.additionalPerformers || [];
+        }
+
+        for (const additional of additionalPerformers) {
+          const avatarUrl = await getRedditAvatar(additional);
+          if (avatarUrl) {
+            console.log(`    Found Reddit avatar for ${additional}`);
+          }
+          // Note: We don't have flair for additional performers from the post data
+          // Would need separate API call to get their flair
+          const performer = await this.client.findOrCreatePerformer(additional, {
+            imageUrl: avatarUrl,
+            redditUsername: additional
+          });
+          performerIds.push(performer.id);
+        }
       }
 
       if (performerIds.length > 0) {
@@ -1118,15 +1139,25 @@ class StashappImporter {
 
       // Studio (same as primary performer for solo releases)
       console.log('\n  Processing studio...');
-      if (primaryPerformer) {
-        const studio = await this.client.findOrCreateStudio(primaryPerformer);
+      if (releaseData.primaryPerformer) {
+        const studio = await this.client.findOrCreateStudio(releaseData.primaryPerformer);
         updates.studio_id = studio.id;
       }
 
-      // Tags
+      // Tags - use per-audio tags if available, fallback to release-level
       console.log('\n  Processing tags...');
-      const extractedTags = extractAllTags(releaseData);
-      console.log(`    Extracted ${extractedTags.length} tags from title and post body`);
+      const perAudioTags = source.versionInfo?.tags || [];
+      let extractedTags;
+
+      if (perAudioTags.length > 0) {
+        // Use per-audio tags for this specific scene
+        console.log(`    Using per-audio tags: ${perAudioTags.length} tags`);
+        extractedTags = perAudioTags;
+      } else {
+        // Fallback to release-level tags
+        extractedTags = extractAllTags(releaseData);
+        console.log(`    Extracted ${extractedTags.length} tags from title and post body`);
+      }
 
       if (stashTags.length > 0 && extractedTags.length > 0) {
         const matchedTagIds = matchTagsWithStash(extractedTags, stashTags);

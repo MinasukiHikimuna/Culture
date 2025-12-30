@@ -145,11 +145,18 @@ EXTRACTION RULES:
    - If flair is "OC", script author = post author
    - If flair is "Script Fill", someone else wrote the script - find who
 
-3. AUDIO URLS:
+3. AUDIO VERSIONS (CRITICAL - extract PER-AUDIO metadata):
    - Extract all audio platform URLs from the body:
      * soundgasm.net/u/...
      * whyp.it/tracks/...
      * hotaudio.net/u/...
+   - For EACH audio version, extract:
+     * version_name: The name/title of this specific audio part
+     * description: What happens in this part
+     * performers: WHO performs in THIS specific audio (NOT all performers)
+       - Look for patterns like "Main Characters: **Name** (u/username) & **Name** (u/username)"
+       - Each part may have DIFFERENT performers
+     * tags: Tags specific to THIS audio version (from nearby **Tags**: sections)
    - Identify version types from surrounding context (F4M, F4F, SFX, no SFX, bloopers)
 
 4. SCRIPT URL:
@@ -178,7 +185,9 @@ Return this exact JSON structure:
     {
       "version_name": "Main Audio",
       "description": "Primary audio version",
-      "urls": [{"platform": "Soundgasm", "url": "https://..."}]
+      "urls": [{"platform": "Soundgasm", "url": "https://..."}],
+      "performers": ["username1", "username2"],
+      "tags": ["tag1", "tag2", "tag3"]
     }
   ],
   "series": {
@@ -218,23 +227,29 @@ RELEASE SLUG RULES:
 - Maximum 40 characters
 - Examples: "sweet_southern_hospitality", "anniversary_date", "let_me_cater_to_you"
 
-VERSION SLUG RULES:
-1. **Multi-scenario projects** (8+ audios, different stories):
+VERSION SLUG RULES (CRITICAL - each audio MUST have a UNIQUE slug):
+1. **Multi-part series** (Part 1, Part 2, Part 3 or named parts):
+   - Use part names: "part1_after_show_edge", "part2_lavish_limo_ride", "part3_final_performance"
+   - Include part number AND descriptive name for uniqueness
+
+2. **Multi-scenario projects** (8+ audios, different stories):
    - Use scenario names: "intro", "learning_to_ride_horse", "southern_cookin"
-   
-2. **Gender variants** (F4M/F4F/M4F/M4M):
+
+3. **Gender variants** (F4M/F4F/M4F/M4M):
    - Use gender tags: "f4m", "f4f", "m4f", "m4m"
-   
-3. **Audio quality variants**:
+
+4. **Audio quality variants**:
    - "sfx + music" → "sfx_music"
-   - "sfx + no music" → "sfx_no_music" 
+   - "sfx + no music" → "sfx_no_music"
    - "just vocals" → "vocals_only"
    - "with wet sounds" → "wet_sounds"
-   
-4. **Combined variants**: Combine with underscore
+
+5. **Combined variants**: Combine with underscore
    - "f4m_sfx_music", "f4f_vocals_only"
 
-5. **Single version**: Use primary gender tag or "default"
+6. **Single version**: Use primary gender tag or "default"
+
+IMPORTANT: Every audio file MUST have a UNIQUE filename. Never use the same slug for multiple audios.
 
 SANITIZATION:
 - Lowercase only
@@ -282,7 +297,7 @@ Return JSON:
             },
           ],
           temperature: 0.1,
-          max_tokens: 800
+          max_tokens: 2000
         }),
         signal: controller.signal
       });

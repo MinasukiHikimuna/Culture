@@ -410,11 +410,13 @@ class ReleaseOrchestrator {
           }
 
           if (audioSource) {
-            // Add version-specific metadata
+            // Add version-specific metadata including per-audio performers and tags
             audioSource.versionInfo = {
               slug: audioVersion.slug,
               version_name: audioVersion.version_name,
-              description: audioVersion.description
+              description: audioVersion.description,
+              performers: audioVersion.performers || [],
+              tags: audioVersion.tags || []
             };
 
             // Store alternate sources that were not used (for future reference)
