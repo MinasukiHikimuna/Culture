@@ -168,6 +168,28 @@ class ReleaseOrchestrator {
 
     // Track active extractor instances for cleanup
     this.activeExtractors = new Map();
+
+    // Platform priority for selecting preferred audio source
+    // When same audio is available on multiple platforms, prefer in this order
+    this.platformPriority = ['soundgasm', 'whypit', 'hotaudio'];
+  }
+
+  /**
+   * Sort URLs by platform priority
+   * @param {Array} urls - Array of {platform, url} objects
+   * @returns {Array} URLs sorted by platform priority (preferred first)
+   */
+  sortUrlsByPriority(urls) {
+    if (!urls || urls.length === 0) return [];
+
+    return [...urls].sort((a, b) => {
+      const aPlatform = a.platform?.toLowerCase() || '';
+      const bPlatform = b.platform?.toLowerCase() || '';
+      const aPriority = this.platformPriority.indexOf(aPlatform);
+      const bPriority = this.platformPriority.indexOf(bPlatform);
+      // Unknown platforms get lowest priority (99)
+      return (aPriority === -1 ? 99 : aPriority) - (bPriority === -1 ? 99 : bPriority);
+    });
   }
 
   /**
@@ -352,32 +374,58 @@ class ReleaseOrchestrator {
         const audioVersion = llmAnalysis.audio_versions[i];
 
         if (audioVersion.urls && audioVersion.urls.length > 0) {
-          for (const urlInfo of audioVersion.urls) {
-            try {
-              console.log(`📥 Extracting: ${urlInfo.url} (${audioVersion.version_name || `Version ${i+1}`})`);
+          // Sort URLs by platform priority (soundgasm > whypit > hotaudio)
+          const sortedUrls = this.sortUrlsByPriority(audioVersion.urls);
+          let audioSource = null;
+          let usedUrl = null;
 
-              // Determine basename for this version
-              const basename = audioVersion.filename
-                ? audioVersion.filename.replace(/\.[^.]+$/, '') // Remove extension
-                : `${llmAnalysis.version_naming?.release_slug || release.id}_${audioVersion.slug || i}`;
+          // Determine basename for this version
+          const basename = audioVersion.filename
+            ? audioVersion.filename.replace(/\.[^.]+$/, '') // Remove extension
+            : `${llmAnalysis.version_naming?.release_slug || release.id}_${audioVersion.slug || i}`;
+          const targetPath = { dir: releaseDir, basename };
 
-              const targetPath = { dir: releaseDir, basename };
-              const audioSource = await this.extractAudio(urlInfo.url, targetPath);
+          // Try each platform in priority order with retries
+          for (const urlInfo of sortedUrls) {
+            const maxRetries = 3;
+            let retryCount = 0;
 
-              // Add version-specific metadata
-              audioSource.versionInfo = {
-                slug: audioVersion.slug,
-                version_name: audioVersion.version_name,
-                description: audioVersion.description
-              };
-
-              release.addAudioSource(audioSource);
-              console.log(`✅ Added audio source: ${audioVersion.version_name || 'Version'} from ${audioSource.metadata.platform.name}`);
-
-            } catch (error) {
-              console.error(`❌ Failed to extract ${urlInfo.url}: ${error.message}`);
-              // Continue with other URLs
+            while (retryCount < maxRetries) {
+              try {
+                console.log(`📥 Extracting: ${urlInfo.url} (${audioVersion.version_name || `Version ${i+1}`})`);
+                audioSource = await this.extractAudio(urlInfo.url, targetPath);
+                usedUrl = urlInfo;
+                break; // Success, exit retry loop
+              } catch (error) {
+                retryCount++;
+                if (retryCount < maxRetries) {
+                  console.log(`⚠️  Retry ${retryCount}/${maxRetries} for ${urlInfo.platform || 'unknown'}: ${error.message}`);
+                } else {
+                  console.error(`❌ Failed ${urlInfo.platform || 'unknown'} after ${maxRetries} retries: ${error.message}`);
+                }
+              }
             }
+
+            if (audioSource) break; // Success, don't try other platforms
+          }
+
+          if (audioSource) {
+            // Add version-specific metadata
+            audioSource.versionInfo = {
+              slug: audioVersion.slug,
+              version_name: audioVersion.version_name,
+              description: audioVersion.description
+            };
+
+            // Store alternate sources that were not used (for future reference)
+            audioSource.alternateSources = sortedUrls
+              .filter(u => u.url !== usedUrl.url)
+              .map(u => ({ platform: u.platform, url: u.url }));
+
+            release.addAudioSource(audioSource);
+            console.log(`✅ Added audio source: ${audioVersion.version_name || 'Version'} from ${audioSource.metadata.platform.name}`);
+          } else {
+            console.error(`❌ All platforms failed for ${audioVersion.version_name || `Version ${i+1}`}`);
           }
         }
       }
