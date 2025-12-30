@@ -279,6 +279,29 @@ class StashappClient {
   }
 
   /**
+   * Find a tag by name (case-insensitive, checks aliases too)
+   */
+  async findTag(name) {
+    const tags = await this.getAllTags();
+    const normalizedName = name.toLowerCase();
+
+    for (const tag of tags) {
+      if (tag.name.toLowerCase() === normalizedName) {
+        return tag;
+      }
+      // Check aliases
+      if (tag.aliases) {
+        for (const alias of tag.aliases) {
+          if (alias.toLowerCase() === normalizedName) {
+            return tag;
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
    * Trigger a metadata scan
    */
   async triggerScan() {

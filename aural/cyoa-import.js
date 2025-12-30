@@ -410,6 +410,28 @@ class CYOAImporter {
       updates.studio_id = studio.id;
     }
 
+    // Add date from CYOA JSON
+    if (cyoaData.release_date) {
+      updates.date = cyoaData.release_date;
+    }
+
+    // Match and add tags
+    if (audioData.tags && audioData.tags.length > 0) {
+      const tagIds = [];
+      for (const tagName of audioData.tags) {
+        const tag = await this.client.findTag(tagName);
+        if (tag) {
+          tagIds.push(tag.id);
+          console.log(`    Matched tag: ${tagName} -> ${tag.id}`);
+        } else {
+          console.log(`    Tag not found: ${tagName}`);
+        }
+      }
+      if (tagIds.length > 0) {
+        updates.tag_ids = tagIds;
+      }
+    }
+
     await this.client.updateScene(sceneId, updates);
   }
 
@@ -467,14 +489,24 @@ class CYOAImporter {
     let sceneMapping = await this.loadSceneMapping(mappingPath);
 
     if (this.updateOnly) {
-      // Only update descriptions
+      // Only update descriptions and metadata
       if (Object.keys(sceneMapping).length === 0) {
         console.error('Error: No scene mapping found. Run import first.');
         return;
       }
 
+      // Update metadata for all scenes
+      console.log('\nUpdating scene metadata...');
+      for (const [audioKey, audioData] of Object.entries(cyoaData.audios)) {
+        const sceneId = sceneMapping[audioKey];
+        if (sceneId) {
+          console.log(`  Updating [${audioKey}] (Scene ${sceneId})`);
+          await this.updateSceneMetadata(sceneId, audioData, cyoaData, cyoaData.performer);
+        }
+      }
+
       await this.updateDescriptions(cyoaData, sceneMapping);
-      console.log('\nDescription update complete!');
+      console.log('\nUpdate complete!');
       return;
     }
 
