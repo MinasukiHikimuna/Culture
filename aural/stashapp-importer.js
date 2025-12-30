@@ -256,7 +256,8 @@ class StashappClient {
   async findSceneByBasename(basename) {
     // Extract the Reddit post ID from the filename (e.g., "1d9uiny" from "SweetnEvil86 - 2024-06-06 - 1d9uiny - Title.mp4")
     // This is more reliable than searching for the full filename with special characters
-    const postIdMatch = basename.match(/- (\w{7}) -/);
+    // Reddit post IDs vary in length: older posts have 6 chars (e.g., "e7yh7q"), newer have 7+ (e.g., "1d9uiny")
+    const postIdMatch = basename.match(/- (\w{6,}) -/);
     const searchValue = postIdMatch ? postIdMatch[1] : basename;
 
     const query = `
