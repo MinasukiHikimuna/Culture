@@ -20,6 +20,9 @@ const { RedditResolver } = require('./reddit-resolver');
 // Tracking file for processed posts
 const PROCESSED_FILE = 'data/processed_posts.json';
 
+// Stashapp configuration
+const STASHAPP_BASE_URL = 'https://stash-aural.chiefsclub.com';
+
 class AnalyzeDownloadImportPipeline {
   constructor(options = {}) {
     this.analysisDir = options.analysisDir || 'analysis_results';
@@ -447,6 +450,16 @@ class AnalyzeDownloadImportPipeline {
     console.log('\n📤 Step 3: Importing to Stashapp...');
     const importResult = await this.importToStashapp(processResult.releaseDir);
 
+    // Get Reddit URL from post file
+    let redditUrl = null;
+    try {
+      const postContent = await fs.readFile(postFilePath, 'utf8');
+      const postData = JSON.parse(postContent);
+      redditUrl = postData.reddit_url || postData.reddit_data?.permalink || null;
+    } catch {
+      // Ignore errors reading post file for URL
+    }
+
     // Mark as processed
     const result = {
       success: true,
@@ -455,6 +468,7 @@ class AnalyzeDownloadImportPipeline {
       release: processResult.release,
       releaseDir: processResult.releaseDir,
       stashSceneId: importResult.stashSceneId,
+      redditUrl: redditUrl,
       importSuccess: importResult.success
     };
 
@@ -465,8 +479,11 @@ class AnalyzeDownloadImportPipeline {
     console.log(`✅ Release: ${processResult.release.id}`);
     console.log(`🎵 Audio sources: ${processResult.audioSourceCount}`);
     console.log(`📁 Directory: ${processResult.releaseDir}`);
+    if (redditUrl) {
+      console.log(`🔗 Reddit: ${redditUrl}`);
+    }
     if (importResult.stashSceneId) {
-      console.log(`🎬 Stashapp scene: ${importResult.stashSceneId}`);
+      console.log(`🎬 Stashapp: ${STASHAPP_BASE_URL}/scenes/${importResult.stashSceneId}`);
     }
 
     return result;
