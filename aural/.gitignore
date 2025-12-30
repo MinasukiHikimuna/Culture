@@ -1,4 +1,5 @@
 .env
+analysis_results/
 data/
 downloads/
 extracted_data/
