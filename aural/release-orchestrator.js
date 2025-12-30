@@ -401,6 +401,13 @@ class ReleaseOrchestrator {
       }
     }
 
+    // Fail early if no audio sources were downloaded
+    if (release.audioSources.length === 0) {
+      // Cleanup extractors before throwing
+      await this.cleanup();
+      throw new Error('No audio sources could be downloaded - all extractions failed');
+    }
+
     // Extract script if available
     if (llmAnalysis?.script?.url) {
       try {
