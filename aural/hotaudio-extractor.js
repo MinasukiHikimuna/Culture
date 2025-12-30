@@ -767,7 +767,10 @@ async function main() {
   await extractor.extract(url, { outputName, verify });
 }
 
-main().catch(console.error);
+// Only run CLI when executed directly (not when required as module)
+if (require.main === module) {
+  main().catch(console.error);
+}
 
 module.exports = HotAudioExtractor;
 module.exports.HotAudioExtractor = HotAudioExtractor;
