@@ -97,7 +97,7 @@ class StashappClient {
   /**
    * Create a new performer
    */
-  async createPerformer(name, imageUrl = null, redditUsername = null) {
+  async createPerformer(name, { imageUrl = null, redditUsername = null, gender = null } = {}) {
     const query = `
       mutation PerformerCreate($input: PerformerCreateInput!) {
         performerCreate(input: $input) { id name }
@@ -110,6 +110,9 @@ class StashappClient {
     if (redditUsername) {
       input.url = `https://www.reddit.com/user/${redditUsername}/`;
     }
+    if (gender) {
+      input.gender = gender;
+    }
     const result = await this.query(query, { input });
     return result.performerCreate;
   }
@@ -117,16 +120,19 @@ class StashappClient {
   /**
    * Find or create a performer by name
    */
-  async findOrCreatePerformer(name, imageUrl = null, redditUsername = null) {
+  async findOrCreatePerformer(name, { imageUrl = null, redditUsername = null, gender = null } = {}) {
     let performer = await this.findPerformer(name);
     if (performer) {
       console.log(`  Found existing performer: ${performer.name} (ID: ${performer.id})`);
       return performer;
     }
 
-    performer = await this.createPerformer(name, imageUrl, redditUsername);
-    if (imageUrl) {
-      console.log(`  Created new performer: ${performer.name} (ID: ${performer.id}) with avatar`);
+    performer = await this.createPerformer(name, { imageUrl, redditUsername, gender });
+    const extras = [];
+    if (imageUrl) extras.push('avatar');
+    if (gender) extras.push(`gender: ${gender}`);
+    if (extras.length > 0) {
+      console.log(`  Created new performer: ${performer.name} (ID: ${performer.id}) with ${extras.join(', ')}`);
     } else {
       console.log(`  Created new performer: ${performer.name} (ID: ${performer.id})`);
     }
@@ -298,6 +304,47 @@ function extractTagsFromText(text) {
     tags.push(match[1].trim());
   }
   return tags;
+}
+
+/**
+ * Parse gender from Reddit flair text
+ * Returns Stashapp GenderEnum value: MALE, FEMALE, TRANSGENDER_MALE, TRANSGENDER_FEMALE, INTERSEX, NON_BINARY
+ */
+function parseGenderFromFlair(flairText) {
+  if (!flairText) return null;
+
+  const flair = flairText.toLowerCase();
+
+  // Check for Reddit emoji placeholders (most common in GWA)
+  if (flair.includes(':female:')) return 'FEMALE';
+  if (flair.includes(':male:')) return 'MALE';
+  if (flair.includes(':nonbinary:') || flair.includes(':non-binary:') || flair.includes(':nb:')) return 'NON_BINARY';
+  if (flair.includes(':trans:')) {
+    if (flair.includes(':transm:') || flair.includes(':ftm:')) return 'TRANSGENDER_MALE';
+    if (flair.includes(':transf:') || flair.includes(':mtf:')) return 'TRANSGENDER_FEMALE';
+    return null; // Can't determine specific type
+  }
+
+  // Check for Unicode symbols
+  if (flairText.includes('♀')) return 'FEMALE';
+  if (flairText.includes('♂')) return 'MALE';
+
+  // Check for pronoun indicators (e.g., "she/her", "he/him", "they/them")
+  if (flair.includes('she/her') || flair.includes('(she)')) return 'FEMALE';
+  if (flair.includes('he/him') || flair.includes('(he)')) return 'MALE';
+  if (flair.includes('they/them')) return 'NON_BINARY';
+
+  // Check for bracketed gender markers [F], [M], [NB]
+  if (/\[f\]/.test(flair)) return 'FEMALE';
+  if (/\[m\]/.test(flair) && !/\[fm\]|\[mf\]/.test(flair)) return 'MALE';
+  if (/\[nb\]/.test(flair)) return 'NON_BINARY';
+
+  // Text patterns
+  if (flair.includes('female')) return 'FEMALE';
+  if (flair.includes('male') && !flair.includes('female')) return 'MALE';
+  if (flair.includes('non-binary') || flair.includes('nonbinary')) return 'NON_BINARY';
+
+  return null;
 }
 
 /**
@@ -633,12 +680,24 @@ class StashappImporter {
       console.log('\n  Processing performers...');
       const performerIds = [];
       const primaryPerformer = releaseData.primaryPerformer;
+
+      // Get author flair for gender (from Reddit post data)
+      const authorFlairText = redditData.author_flair_text || '';
+      const primaryGender = parseGenderFromFlair(authorFlairText);
+      if (primaryGender) {
+        console.log(`    Detected gender from flair "${authorFlairText}": ${primaryGender}`);
+      }
+
       if (primaryPerformer) {
         const avatarUrl = await getRedditAvatar(primaryPerformer);
         if (avatarUrl) {
           console.log(`    Found Reddit avatar for ${primaryPerformer}`);
         }
-        const performer = await this.client.findOrCreatePerformer(primaryPerformer, avatarUrl, primaryPerformer);
+        const performer = await this.client.findOrCreatePerformer(primaryPerformer, {
+          imageUrl: avatarUrl,
+          redditUsername: primaryPerformer,
+          gender: primaryGender
+        });
         performerIds.push(performer.id);
       }
 
@@ -653,7 +712,12 @@ class StashappImporter {
         if (avatarUrl) {
           console.log(`    Found Reddit avatar for ${additional}`);
         }
-        const performer = await this.client.findOrCreatePerformer(additional, avatarUrl, additional);
+        // Note: We don't have flair for additional performers from the post data
+        // Would need separate API call to get their flair
+        const performer = await this.client.findOrCreatePerformer(additional, {
+          imageUrl: avatarUrl,
+          redditUsername: additional
+        });
         performerIds.push(performer.id);
       }
 
