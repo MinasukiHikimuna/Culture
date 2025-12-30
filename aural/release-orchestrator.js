@@ -344,7 +344,7 @@ class ReleaseOrchestrator {
 
     // Extract audio URLs from post and analysis
     const audioUrls = this.extractAudioUrls(post, llmAnalysis);
-    console.log(`🔗 Found ${audioUrls.length} audio URLs`);
+    console.log(`🔗 Found ${audioUrls.length} unique audio URL${audioUrls.length !== 1 ? 's' : ''}`);
 
     // Process each audio version with proper naming
     if (llmAnalysis?.audio_versions && llmAnalysis.audio_versions.length > 0) {
