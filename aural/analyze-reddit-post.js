@@ -175,6 +175,16 @@ EXTRACTION RULES:
    - Check if this is part of a series (Part 1, Episode 2, etc.)
    - Look for "sequel to", "prequel to", "continued from"
 
+6. POST TYPE:
+   - "audio_release": Post contains audio links - this is an audio release (most common)
+   - "script_offer": Post is offering a SCRIPT for others to perform - no audio expected
+     * Typically posted in r/GWAScriptGuild
+     * Flair often says "Script Offer" or similar
+     * Contains script link but NO audio platform URLs
+     * Author is the script WRITER, not a performer
+   - "request": User requesting content (ignore these)
+   - "other": Verification, announcement, etc.
+
 Return this exact JSON structure:
 {
   "performers": {
@@ -209,6 +219,7 @@ Return this exact JSON structure:
     "partNumber": null,
     "confidence": "high|medium|low"
   },
+  "post_type": "audio_release|script_offer|request|other",
   "analysis_notes": "brief observations"
 }`;
   }

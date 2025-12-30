@@ -402,6 +402,52 @@ class AnalyzeDownloadImportPipeline {
     console.log(`${progressPrefix}🔄 Processing: ${path.basename(postFilePath)}`);
     console.log(`${'='.repeat(60)}`);
 
+    // Check if this is a script offer (no audio expected)
+    const analysisContent = await fs.readFile(analysisResult.analysisFile, 'utf8');
+    const analysis = JSON.parse(analysisContent);
+
+    // Also load original post data for heuristic checks
+    let originalPost = null;
+    try {
+      const postContent = await fs.readFile(postFilePath, 'utf8');
+      originalPost = JSON.parse(postContent);
+    } catch {
+      // Ignore errors
+    }
+
+    // Heuristic detection for script offers (fallback for older analyses without post_type)
+    const isScriptOfferHeuristic =
+      analysis.post_type === 'script_offer' ||
+      originalPost?.reddit_data?.link_flair_text?.toLowerCase()?.includes('script offer') ||
+      originalPost?.post_type?.toLowerCase()?.includes('script offer') ||
+      (originalPost?.reddit_data?.subreddit === 'GWAScriptGuild' && !analysis.audio_versions?.some(v => v.urls?.length > 0));
+
+    if (isScriptOfferHeuristic) {
+      console.log(`${progressPrefix}📜 Script Offer: Skipping audio download (script offers don't contain audio)`);
+      await this.markProcessed(postId, { success: true, stage: 'skipped', reason: 'script_offer' });
+      return { success: true, skipped: true, postId, scriptOffer: true };
+    }
+
+    if (analysis.post_type === 'request') {
+      console.log(`${progressPrefix}📋 Request Post: Skipping (content requests don't contain audio)`);
+      await this.markProcessed(postId, { success: true, stage: 'skipped', reason: 'request_post' });
+      return { success: true, skipped: true, postId, requestPost: true };
+    }
+
+    if (analysis.post_type === 'other') {
+      console.log(`${progressPrefix}ℹ️  Other Post: Skipping (verification, announcement, etc.)`);
+      await this.markProcessed(postId, { success: true, stage: 'skipped', reason: 'other_post_type' });
+      return { success: true, skipped: true, postId, otherPost: true };
+    }
+
+    // Check if there are no audio URLs to download
+    const audioUrls = analysis.audio_versions?.flatMap(v => v.urls?.map(u => u.url) || []) || [];
+    if (audioUrls.length === 0) {
+      console.log(`${progressPrefix}⏭️  No Audio URLs: Skipping (no audio links found in post)`);
+      await this.markProcessed(postId, { success: true, stage: 'skipped', reason: 'no_audio_urls' });
+      return { success: true, skipped: true, postId, noAudioUrls: true };
+    }
+
     // Step 2: Download audio through release orchestrator
     console.log('\n📥 Step 2: Downloading audio...');
     const processResult = await this.processAnalysisWithOrchestrator(
@@ -487,7 +533,11 @@ class AnalyzeDownloadImportPipeline {
       processed: [],
       skipped: [],
       failed: [],
-      cyoa: []
+      cyoa: [],
+      scriptOffers: [],
+      requestPosts: [],
+      otherPosts: [],
+      noAudioUrls: []
     };
 
     for (let i = 0; i < postFiles.length; i++) {
@@ -499,6 +549,16 @@ class AnalyzeDownloadImportPipeline {
 
         if (result.skipped) {
           results.skipped.push({ file: postFile, postId: result.postId });
+          // Track specific skip reasons
+          if (result.scriptOffer) {
+            results.scriptOffers.push({ file: postFile, postId: result.postId });
+          } else if (result.requestPost) {
+            results.requestPosts.push({ file: postFile, postId: result.postId });
+          } else if (result.otherPost) {
+            results.otherPosts.push({ file: postFile, postId: result.postId });
+          } else if (result.noAudioUrls) {
+            results.noAudioUrls.push({ file: postFile, postId: result.postId });
+          }
         } else if (result.success) {
           results.processed.push({ file: postFile, result });
 
@@ -531,13 +591,30 @@ class AnalyzeDownloadImportPipeline {
     console.log('📊 Batch Processing Summary');
     console.log(`${'='.repeat(60)}`);
     console.log(`✅ Processed: ${results.processed.length}`);
-    console.log(`⏭️  Skipped (already done): ${results.skipped.length}`);
+    console.log(`⏭️  Skipped: ${results.skipped.length}`);
+    if (results.skipped.length > 0) {
+      const alreadyDone = results.skipped.length - results.scriptOffers.length - results.requestPosts.length - results.otherPosts.length - results.noAudioUrls.length;
+      if (alreadyDone > 0) console.log(`   └─ Already processed: ${alreadyDone}`);
+      if (results.scriptOffers.length > 0) console.log(`   └─ 📜 Script offers: ${results.scriptOffers.length}`);
+      if (results.requestPosts.length > 0) console.log(`   └─ 📋 Request posts: ${results.requestPosts.length}`);
+      if (results.otherPosts.length > 0) console.log(`   └─ ℹ️  Other posts: ${results.otherPosts.length}`);
+      if (results.noAudioUrls.length > 0) console.log(`   └─ 🔇 No audio URLs: ${results.noAudioUrls.length}`);
+    }
     console.log(`❌ Failed: ${results.failed.length}`);
 
     if (results.failed.length > 0) {
       console.log('\nFailed posts:');
       for (const fail of results.failed) {
         console.log(`  - ${path.basename(fail.file)}: ${fail.error || fail.stage}`);
+      }
+    }
+
+    // Script offers section
+    if (results.scriptOffers.length > 0) {
+      console.log(`\n${'─'.repeat(60)}`);
+      console.log(`📜 Script Offers (${results.scriptOffers.length} posts):`);
+      for (const so of results.scriptOffers) {
+        console.log(`  - ${path.basename(so.file)}`);
       }
     }
 
