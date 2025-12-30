@@ -31,6 +31,9 @@ const STASH_BASE_URL = 'https://stash-aural.chiefsclub.com';
 // Static image for audio-to-video conversion
 const STATIC_IMAGE = path.join(__dirname, 'gwa.png');
 
+// LM Studio Configuration
+const LM_STUDIO_URL = process.env.LM_STUDIO_URL || 'http://localhost:1234/v1/chat/completions';
+
 /**
  * Simple Stashapp GraphQL client
  */
@@ -187,6 +190,77 @@ class StashappClient {
     studio = await this.createStudio(name);
     console.log(`  Created new studio: ${studio.name} (ID: ${studio.id})`);
     return studio;
+  }
+
+  /**
+   * Find group by name
+   */
+  async findGroup(name) {
+    const query = `
+      query FindGroups($filter: FindFilterType!) {
+        findGroups(filter: $filter) {
+          groups { id name }
+        }
+      }
+    `;
+    const result = await this.query(query, { filter: { q: name, per_page: 10 } });
+    const groups = result.findGroups?.groups || [];
+
+    // Exact match (case-insensitive)
+    for (const g of groups) {
+      if (g.name.toLowerCase() === name.toLowerCase()) {
+        return g;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Create a new group
+   */
+  async createGroup(input) {
+    const query = `
+      mutation GroupCreate($input: GroupCreateInput!) {
+        groupCreate(input: $input) { id name }
+      }
+    `;
+    const result = await this.query(query, { input });
+    return result.groupCreate;
+  }
+
+  /**
+   * Find or create a group by name
+   */
+  async findOrCreateGroup(name, options = {}) {
+    let group = await this.findGroup(name);
+    if (group) {
+      console.log(`  Found existing group: ${group.name} (ID: ${group.id})`);
+      return group;
+    }
+
+    group = await this.createGroup({ name, ...options });
+    console.log(`  Created new group: ${group.name} (ID: ${group.id})`);
+    return group;
+  }
+
+  /**
+   * Add a scene to a group with optional scene_index
+   */
+  async addSceneToGroup(sceneId, groupId, sceneIndex = null) {
+    const query = `
+      mutation SceneUpdate($input: SceneUpdateInput!) {
+        sceneUpdate(input: $input) { id }
+      }
+    `;
+    const groupInput = { group_id: groupId };
+    if (sceneIndex !== null) {
+      groupInput.scene_index = sceneIndex;
+    }
+    const input = {
+      id: sceneId,
+      groups: [groupInput]
+    };
+    await this.query(query, { input });
   }
 
   /**
@@ -557,6 +631,71 @@ function parseGenderFromFlair(flairText) {
 }
 
 /**
+ * Generate a clean group name using LLM
+ */
+async function generateGroupName(releaseTitle, primaryPerformer) {
+  const prompt = `Generate a short, clean group name for organizing audio files.
+
+Original title: ${releaseTitle}
+Performer: ${primaryPerformer}
+
+Rules:
+- Remove all tags in brackets like [F4A], [2 Parts], [Script Fill], etc.
+- Remove special characters and emoji
+- Keep the core title essence (usually 3-6 words)
+- Don't include performer name (it's stored separately)
+- Don't add quotes around the name
+
+Return ONLY the group name, nothing else.`;
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+    const response = await fetch(LM_STUDIO_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'local-model',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.3,
+        max_tokens: 100
+      }),
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new Error(`LLM request failed: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const groupName = data.choices?.[0]?.message?.content?.trim();
+
+    if (groupName) {
+      // Clean up any remaining quotes or extra whitespace
+      return groupName.replace(/^["']|["']$/g, '').trim();
+    }
+  } catch (error) {
+    console.log(`  Warning: LLM group name generation failed: ${error.message}`);
+  }
+
+  // Fallback: simple regex-based cleanup
+  let fallback = releaseTitle
+    .replace(/\[[^\]]+\]/g, '')  // Remove bracketed tags
+    .replace(/[^\w\s\-\'\,\.\!\?]/g, '')  // Remove special chars
+    .trim();
+
+  // Truncate if too long
+  if (fallback.length > 60) {
+    fallback = fallback.substring(0, 60).replace(/\s+\S*$/, '');
+  }
+
+  return fallback || 'Untitled Group';
+}
+
+/**
  * Fetch Reddit avatar for a user
  */
 async function getRedditAvatar(username) {
@@ -790,6 +929,7 @@ class StashappImporter {
     console.log(`  Found ${stashTags.length} tags in Stashapp`);
 
     let lastSceneId = null;
+    const sceneIds = []; // Track all scene IDs for grouping
 
     // Process each audio source
     for (let i = 0; i < audioSources.length; i++) {
@@ -817,7 +957,8 @@ class StashappImporter {
         const existingScene = await this.client.findSceneByFingerprint('audio_sha256', audioChecksum);
         if (existingScene) {
           console.log(`  Duplicate detected: audio already imported as scene ${existingScene.id}`);
-          console.log(`  Skipping this audio source...`);
+          sceneIds.push({ id: existingScene.id, index: i }); // Record for grouping
+          lastSceneId = existingScene.id;
           continue;
         }
       }
@@ -873,6 +1014,7 @@ class StashappImporter {
 
       console.log(`  Found scene ID: ${scene.id}`);
       lastSceneId = scene.id;
+      sceneIds.push({ id: scene.id, index: i }); // Track for grouping
 
       // Prepare metadata updates
       const updates = {};
@@ -1010,10 +1152,40 @@ class StashappImporter {
       }
     }
 
+    // Create group if multiple scenes were processed
+    let groupId = null;
+    if (sceneIds.length > 1) {
+      console.log('\n  Creating group for multi-audio release...');
+      const groupName = await generateGroupName(releaseData.title, releaseData.primaryPerformer);
+      console.log(`  Group name: "${groupName}"`);
+
+      const groupOptions = {};
+      if (releaseData.releaseDate) {
+        const date = new Date(releaseData.releaseDate * 1000);
+        groupOptions.date = date.toISOString().split('T')[0];
+      }
+      const redditData = releaseData.enrichmentData?.reddit || {};
+      if (redditData.url) {
+        groupOptions.urls = [redditData.url];
+      }
+
+      const group = await this.client.findOrCreateGroup(groupName, groupOptions);
+      groupId = group.id;
+
+      // Associate scenes with group
+      for (const { id, index } of sceneIds) {
+        await this.client.addSceneToGroup(id, group.id, index + 1);
+        console.log(`    Added scene ${id} to group at index ${index + 1}`);
+      }
+      console.log(`  Group created/updated: ${STASH_BASE_URL}/groups/${group.id}`);
+    }
+
     return {
       success: true,
       sceneId: lastSceneId,
-      sceneUrl: lastSceneId ? `${STASH_BASE_URL}/scenes/${lastSceneId}` : null
+      sceneUrl: lastSceneId ? `${STASH_BASE_URL}/scenes/${lastSceneId}` : null,
+      groupId: groupId,
+      groupUrl: groupId ? `${STASH_BASE_URL}/groups/${groupId}` : null
     };
   }
 }
