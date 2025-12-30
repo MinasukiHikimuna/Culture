@@ -19,9 +19,12 @@ const fs = require('fs').promises;
 const path = require('path');
 const { execSync } = require('child_process');
 
+// Load .env from project root (quiet mode suppresses console messages)
+require('dotenv').config({ path: path.join(__dirname, '.env'), quiet: true });
+
 // Stashapp Configuration
-const STASH_URL = process.env.STASHAPP_URL || 'https://stash-aural.chiefsclub.com/graphql';
-const STASH_API_KEY = process.env.STASHAPP_API_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOiJzdGFzaCIsInN1YiI6IkFQSUtleSIsImlhdCI6MTcyMzQ1MzA5OH0.V7_yGP7-07drQoLZsZNJ46WSriQ1NfirT5QjhfZsvNw';
+const STASH_URL = process.env.STASHAPP_URL;
+const STASH_API_KEY = process.env.STASHAPP_API_KEY;
 const STASH_OUTPUT_DIR = '/Volumes/Culture 1/Aural_Stash';
 const STASH_BASE_URL = 'https://stash-aural.chiefsclub.com';
 
@@ -33,6 +36,12 @@ const STATIC_IMAGE = path.join(__dirname, 'gwa.png');
  */
 class StashappClient {
   constructor(url = STASH_URL, apiKey = STASH_API_KEY) {
+    if (!url || !apiKey) {
+      throw new Error(
+        'Missing required Stashapp credentials. ' +
+        'Please set STASHAPP_URL and STASHAPP_API_KEY in your .env file.'
+      );
+    }
     this.url = url;
     this.apiKey = apiKey;
   }
@@ -88,7 +97,7 @@ class StashappClient {
   /**
    * Create a new performer
    */
-  async createPerformer(name, imageUrl = null) {
+  async createPerformer(name, imageUrl = null, redditUsername = null) {
     const query = `
       mutation PerformerCreate($input: PerformerCreateInput!) {
         performerCreate(input: $input) { id name }
@@ -97,6 +106,9 @@ class StashappClient {
     const input = { name };
     if (imageUrl) {
       input.image = imageUrl;
+    }
+    if (redditUsername) {
+      input.url = `https://www.reddit.com/user/${redditUsername}/`;
     }
     const result = await this.query(query, { input });
     return result.performerCreate;

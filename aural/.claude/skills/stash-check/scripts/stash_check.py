@@ -18,16 +18,18 @@ import json
 import os
 import sys
 from datetime import timedelta
+from pathlib import Path
 
 import requests
+from dotenv import load_dotenv
 
+# Load .env from project root
+project_root = Path(__file__).resolve().parents[4]
+load_dotenv(project_root / ".env")
 
 # Stashapp Configuration
-STASH_URL = os.getenv("STASHAPP_URL", "https://stash-aural.chiefsclub.com/graphql")
-STASH_API_KEY = os.getenv(
-    "STASHAPP_API_KEY",
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOiJzdGFzaCIsInN1YiI6IkFQSUtleSIsImlhdCI6MTcyMzQ1MzA5OH0.V7_yGP7-07drQoLZsZNJ46WSriQ1NfirT5QjhfZsvNw",
-)
+STASH_URL = os.getenv("STASHAPP_URL")
+STASH_API_KEY = os.getenv("STASHAPP_API_KEY")
 
 
 class StashappChecker:
@@ -153,7 +155,7 @@ class StashappChecker:
                 performer_count
                 studio_count
                 tag_count
-                total_size
+                scenes_size
                 total_play_duration
             }
         }
@@ -265,6 +267,12 @@ def main():
         parser.print_help()
         sys.exit(1)
 
+    # Validate required environment variables
+    if not STASH_URL or not STASH_API_KEY:
+        print("Error: Missing required Stashapp environment variables.")
+        print("Please set STASHAPP_URL and STASHAPP_API_KEY in your .env file.")
+        sys.exit(1)
+
     # Initialize client
     client = StashappChecker(STASH_URL, STASH_API_KEY)
 
@@ -279,7 +287,7 @@ def main():
                 print(f"  Performers: {stats.get('performer_count', 0)}")
                 print(f"  Studios: {stats.get('studio_count', 0)}")
                 print(f"  Tags: {stats.get('tag_count', 0)}")
-                print(f"  Total Size: {format_size(stats.get('total_size', 0))}")
+                print(f"  Total Size: {format_size(stats.get('scenes_size', 0))}")
                 total_duration = stats.get("total_play_duration", 0)
                 print(f"  Total Play Duration: {format_duration(total_duration)}")
 
