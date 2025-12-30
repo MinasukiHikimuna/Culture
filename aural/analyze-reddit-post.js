@@ -148,19 +148,24 @@ EXTRACTION RULES:
    - If flair is "OC", script author = post author
    - If flair is "Script Fill", someone else wrote the script - find who
 
-3. AUDIO VERSIONS (CRITICAL - extract PER-AUDIO metadata):
-   - Extract all audio platform URLs from the body:
-     * soundgasm.net/u/...
-     * whyp.it/tracks/...
-     * hotaudio.net/u/...
-   - For EACH audio version, extract:
-     * version_name: The name/title of this specific audio part
-     * description: What happens in this part
-     * performers: WHO performs in THIS specific audio (NOT all performers)
-       - Look for patterns like "Main Characters: **Name** (u/username) & **Name** (u/username)"
-       - Each part may have DIFFERENT performers
-     * tags: Tags specific to THIS audio version (from nearby **Tags**: sections)
-   - Identify version types from surrounding context (F4M, F4F, SFX, no SFX, bloopers)
+3. AUDIO VERSIONS (CRITICAL - proper URL grouping):
+   - Extract all audio platform URLs: soundgasm.net, whyp.it, hotaudio.net
+   - IMPORTANT: Group URLs for the SAME AUDIO content together in ONE audio_version:
+     * Look for "alternative link", "backup", "mirror", "if X isn't working"
+     * Same audio on different platforms = ONE audio_version with MULTIPLE urls
+     * Example: "AUDIO HERE (soundgasm)" + "alternative link (whyp.it)" = ONE version
+   - Create SEPARATE audio_versions ONLY for genuinely DIFFERENT content:
+     * Gender variants (F4M vs F4F)
+     * Audio quality variants (SFX vs no-SFX)
+     * Multi-part series (Part 1, Part 2)
+     * Bloopers/extras
+   - version_name rules:
+     * NEVER include platform names (NOT "Main Audio (Soundgasm)")
+     * Use content descriptors: "F4M", "SFX Version", "Part 1", "Bloopers"
+     * For single audio: use primary gender tag from title (e.g., "F4M")
+   - For EACH audio version, also extract:
+     * performers: WHO performs in THIS specific audio
+     * tags: Tags specific to THIS audio version
 
 4. SCRIPT URL:
    - Look for script links: scriptbin.works, pastebin, google docs
@@ -186,11 +191,14 @@ Return this exact JSON structure:
   },
   "audio_versions": [
     {
-      "version_name": "Main Audio",
+      "version_name": "F4M",
       "description": "Primary audio version",
-      "urls": [{"platform": "Soundgasm", "url": "https://..."}],
-      "performers": ["username1", "username2"],
-      "tags": ["tag1", "tag2", "tag3"]
+      "urls": [
+        {"platform": "Soundgasm", "url": "https://soundgasm.net/..."},
+        {"platform": "Whypit", "url": "https://whyp.it/..."}
+      ],
+      "performers": ["username1"],
+      "tags": ["tag1", "tag2"]
     }
   ],
   "series": {
