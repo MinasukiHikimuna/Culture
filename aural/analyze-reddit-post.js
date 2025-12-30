@@ -3,6 +3,9 @@
 const fs = require("fs");
 const path = require("path");
 
+// Load .env from project root
+require('dotenv').config({ path: path.join(__dirname, '.env') });
+
 /**
  * Enhanced Reddit Post Analyzer with LLM-based Metadata Extraction
  *
@@ -12,7 +15,7 @@ const path = require("path");
 class EnhancedRedditPostAnalyzer {
   constructor(options = {}) {
     this.lmStudioUrl =
-      options.lmStudioUrl || "http://localhost:1234/v1/chat/completions";
+      options.lmStudioUrl || process.env.LM_STUDIO_URL || "http://localhost:1234/v1/chat/completions";
     this.model = options.model || "local-model";
     this.enableScriptResolution = options.enableScriptResolution !== false;
   }
