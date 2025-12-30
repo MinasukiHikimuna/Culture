@@ -6,22 +6,20 @@
  * Complete workflow script that:
  * 1. Analyzes Reddit posts using analyze-reddit-post.js
  * 2. Downloads audio files using the release orchestrator
- * 3. Imports to Stashapp using stashapp_importer.py
+ * 3. Imports to Stashapp using stashapp-importer.js
  *
  * Tracks processed posts to avoid duplicate work.
  */
 
 const fs = require('fs').promises;
 const path = require('path');
-const { execSync, spawn } = require('child_process');
+const { execSync } = require('child_process');
 const { ReleaseOrchestrator, Release, AudioSource } = require('./release-orchestrator');
 const { RedditResolver } = require('./reddit-resolver');
+const { StashappImporter, STASH_BASE_URL } = require('./stashapp-importer');
 
 // Tracking file for processed posts
 const PROCESSED_FILE = 'data/processed_posts.json';
-
-// Stashapp configuration
-const STASHAPP_BASE_URL = 'https://stash-aural.chiefsclub.com';
 
 class AnalyzeDownloadImportPipeline {
   constructor(options = {}) {
@@ -340,42 +338,21 @@ class AnalyzeDownloadImportPipeline {
     try {
       console.log(`📤 Importing to Stashapp: ${releaseDir}`);
 
-      return new Promise((resolve, reject) => {
-        const proc = spawn('uv', ['run', 'python', 'stashapp_importer.py', releaseDir], {
-          cwd: __dirname,
-          stdio: this.verbose ? 'inherit' : 'pipe'
-        });
+      // Initialize importer on first use
+      if (!this.stashappImporter) {
+        this.stashappImporter = new StashappImporter({ verbose: this.verbose });
+        await this.stashappImporter.testConnection();
+      }
 
-        let stdout = '';
-        let stderr = '';
+      const result = await this.stashappImporter.processRelease(releaseDir);
 
-        if (!this.verbose) {
-          proc.stdout.on('data', (data) => { stdout += data.toString(); });
-          proc.stderr.on('data', (data) => { stderr += data.toString(); });
-        }
-
-        proc.on('close', (code) => {
-          if (code === 0) {
-            // Try to extract scene ID from output
-            const sceneMatch = stdout.match(/Found scene ID: (\d+)/);
-            const sceneId = sceneMatch ? sceneMatch[1] : null;
-
-            console.log(`✅ Stashapp import completed`);
-            resolve({ success: true, stashSceneId: sceneId });
-          } else {
-            console.error(`❌ Stashapp import failed (exit code ${code})`);
-            if (!this.verbose && stderr) {
-              console.error(stderr);
-            }
-            resolve({ success: false, error: `Exit code ${code}` });
-          }
-        });
-
-        proc.on('error', (error) => {
-          console.error(`❌ Failed to run stashapp_importer.py: ${error.message}`);
-          resolve({ success: false, error: error.message });
-        });
-      });
+      if (result.success) {
+        console.log('✅ Stashapp import completed');
+        return { success: true, stashSceneId: result.sceneId };
+      } else {
+        console.error(`❌ Stashapp import failed: ${result.error}`);
+        return { success: false, error: result.error };
+      }
 
     } catch (error) {
       console.error(`❌ Stashapp import failed: ${error.message}`);
@@ -483,7 +460,7 @@ class AnalyzeDownloadImportPipeline {
       console.log(`🔗 Reddit: ${redditUrl}`);
     }
     if (importResult.stashSceneId) {
-      console.log(`🎬 Stashapp: ${STASHAPP_BASE_URL}/scenes/${importResult.stashSceneId}`);
+      console.log(`🎬 Stashapp: ${STASH_BASE_URL}/scenes/${importResult.stashSceneId}`);
     }
 
     return result;
