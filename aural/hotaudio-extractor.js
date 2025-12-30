@@ -10,12 +10,12 @@
  * 4. Outputs playable M4A file
  */
 
-import { chromium } from 'playwright';
-import { chacha20poly1305 } from '@noble/ciphers/chacha.js';
-import { sha256 } from '@noble/hashes/sha2.js';
-import { createHash } from 'crypto';
-import fs from 'fs/promises';
-import path from 'path';
+const { chromium } = require('playwright');
+const { chacha20poly1305 } = require('@noble/ciphers/chacha.js');
+const { sha256 } = require('@noble/hashes/sha2.js');
+const { createHash } = require('crypto');
+const fs = require('fs').promises;
+const path = require('path');
 
 function sha256hex(data) {
   return createHash('sha256').update(data).digest('hex');
@@ -115,8 +115,10 @@ function parseBencode(buffer, offset = 0) {
 }
 
 class HotAudioExtractor {
-  constructor() {
+  constructor(options = {}) {
     this.browser = null;
+    this.requestDelay = options.requestDelay || 2000;
+    this.lastRequestTime = 0;
     this.capturedData = {
       haxUrl: null,
       segmentKeys: {},  // Accumulate keys from multiple responses
@@ -125,8 +127,79 @@ class HotAudioExtractor {
     };
   }
 
-  async extract(url, options = {}) {
-    const { outputDir = './data/hotaudio', outputName, verify = false } = options;
+  /**
+   * Setup Playwright browser (no-op for HotAudio since it manages its own browser per extraction)
+   * This method exists for interface compatibility with ReleaseOrchestrator
+   */
+  async setupPlaywright() {
+    // HotAudio extractor launches browser per extraction due to key capture requirements
+    // This is a no-op for interface compatibility
+  }
+
+  /**
+   * Close browser if open
+   */
+  async closeBrowser() {
+    if (this.browser) {
+      await this.browser.close();
+      this.browser = null;
+    }
+  }
+
+  /**
+   * Rate limiting
+   */
+  async rateLimit() {
+    const now = Date.now();
+    const timeSinceLastRequest = now - this.lastRequestTime;
+    if (timeSinceLastRequest < this.requestDelay) {
+      const delay = this.requestDelay - timeSinceLastRequest;
+      console.log(`⏳ Rate limiting: waiting ${delay}ms`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+    this.lastRequestTime = Date.now();
+  }
+
+  async extract(url, targetPath = {}) {
+    await this.rateLimit();
+
+    // Support both old options format and new targetPath format
+    let outputDir, outputName, verify;
+    if (targetPath.dir !== undefined) {
+      // New format: { dir, basename }
+      outputDir = targetPath.dir;
+      outputName = targetPath.basename;
+      verify = false;
+    } else {
+      // Old format: { outputDir, outputName, verify }
+      outputDir = targetPath.outputDir || './data/hotaudio';
+      outputName = targetPath.outputName;
+      verify = targetPath.verify || false;
+    }
+
+    // Reset captured data for this extraction
+    this.capturedData = {
+      haxUrl: null,
+      segmentKeys: {},
+      metadata: null,
+      segmentCount: null
+    };
+
+    // Extract audio slug from URL for output filename (early, for cache check)
+    const urlParts = url.split('/');
+    const slug = urlParts[urlParts.length - 1] || 'audio';
+    const finalOutputName = outputName || slug;
+
+    // Check if already extracted (JSON exists)
+    await fs.mkdir(outputDir, { recursive: true });
+    const jsonPath = path.join(outputDir, `${finalOutputName}.json`);
+    try {
+      const cached = JSON.parse(await fs.readFile(jsonPath, 'utf8'));
+      console.log(`✅ Using cached extraction for: ${url}`);
+      return cached;
+    } catch (e) {
+      // Not cached, continue with extraction
+    }
 
     // Verification data collector
     const verifyData = verify ? {
@@ -141,11 +214,6 @@ class HotAudioExtractor {
     console.log('HotAudio Extractor v2');
     console.log('=====================\n');
     console.log(`URL: ${url}\n`);
-
-    // Extract audio slug from URL for output filename
-    const urlParts = url.split('/');
-    const slug = urlParts[urlParts.length - 1] || 'audio';
-    const finalOutputName = outputName || slug;
 
     // Launch browser - use headless:false to capture initial key
     this.browser = await chromium.launch({
@@ -600,15 +668,56 @@ class HotAudioExtractor {
         };
       }
 
+      // Calculate checksum
+      const audioChecksum = sha256hex(fullAudio);
+
+      // Save metadata JSON
+      const jsonPath = path.join(outputDir, `${finalOutputName}.json`);
+
+      // Build result in platform-agnostic schema (matching soundgasm/whypit format)
       const result = {
+        audio: {
+          sourceUrl: url,
+          downloadUrl: this.capturedData.haxUrl,
+          filePath: outputPath,
+          format: 'm4a',
+          fileSize: fullAudio.length,
+          checksum: {
+            sha256: audioChecksum
+          }
+        },
+        metadata: {
+          title: this.capturedData.metadata?.title || finalOutputName,
+          author: this.capturedData.metadata?.artist || null,
+          description: '',
+          tags: [],
+          duration: metadata.durationMs / 1000,
+          platform: {
+            name: 'hotaudio',
+            url: 'https://hotaudio.net'
+          }
+        },
+        platformData: {
+          codec: metadata.codec?.toString(),
+          segmentCount: metadata.segmentCount,
+          decryptedSegments: decryptedSegments.length,
+          pid: this.capturedData.metadata?.pid,
+          extractedAt: new Date().toISOString()
+        },
+        backupFiles: {
+          metadata: jsonPath
+        },
+        // Keep legacy fields for CLI compatibility
         success: true,
         outputPath,
         duration: metadata.durationMs / 1000,
         size: fullAudio.length,
         segments: decryptedSegments.length,
-        metadata: this.capturedData.metadata,
         verifyData
       };
+
+      // Save metadata JSON (serves as completion marker)
+      await fs.writeFile(jsonPath, JSON.stringify(result, null, 2));
 
       console.log(`\nSaved: ${outputPath}`);
       console.log(`Size: ${(fullAudio.length / 1024).toFixed(1)} KB`);
@@ -660,4 +769,7 @@ async function main() {
 
 main().catch(console.error);
 
-export { HotAudioExtractor, KeyTree, parseBencode };
+module.exports = HotAudioExtractor;
+module.exports.HotAudioExtractor = HotAudioExtractor;
+module.exports.KeyTree = KeyTree;
+module.exports.parseBencode = parseBencode;
