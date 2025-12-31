@@ -98,8 +98,9 @@ class WhypitExtractor:
             # Extract metadata from the page
             page_data = self.extract_page_data()
 
-            # Extract track info from URL
-            url_match = re.search(r"/tracks/(\d+)/(.+)$", url)
+            # Extract track info from URL (strip query params first)
+            clean_url = url.split("?")[0]
+            url_match = re.search(r"/tracks/(\d+)/(.+)$", clean_url)
             if not url_match:
                 raise ValueError("Invalid Whyp.it URL format")
 
@@ -126,10 +127,12 @@ class WhypitExtractor:
             self.save_html_backup(html_path)
 
             # Build result in platform-agnostic schema
+            # Strip token from download URL for storage (token is ephemeral)
+            clean_audio_url = audio_url.split("?")[0]
             result = {
                 "audio": {
                     "sourceUrl": url,
-                    "downloadUrl": audio_url,
+                    "downloadUrl": clean_audio_url,
                     "filePath": str(audio_file_path),
                     "format": "mp3",
                     "fileSize": stats.st_size,
@@ -173,31 +176,43 @@ class WhypitExtractor:
             const titleElement = document.querySelector("h1");
             const title = titleElement ? titleElement.textContent.trim() : null;
 
-            // Extract performer
-            const userLinkElement = document.querySelector('a[href*="/users/"]');
-            let performer = null;
-            if (userLinkElement) {
-                const performerElement = userLinkElement.querySelector('div:first-child div:first-child');
-                if (performerElement) {
-                    const fullText = performerElement.textContent.trim();
-                    performer = fullText.split('\\n')[0].trim();
-                }
-            }
-
-            // Extract description and tags
+            // Extract description and tags from meta description
             const metaDescriptionElement = document.querySelector('meta[name="description"]');
             let description = null;
             let tags = [];
+            let performer = null;
 
             if (metaDescriptionElement) {
                 description = metaDescriptionElement.getAttribute('content');
                 if (description) {
                     description = description.trim();
+
+                    // Extract tags from [tag] format
                     const tagMatches = description.match(/\\[([^\\]]+?)\\]/g);
                     if (tagMatches) {
                         tags = tagMatches
                             .map(tag => tag.replace(/[\\[\\]]/g, "").trim())
                             .filter(tag => tag.length > 0);
+                    }
+
+                    // Extract performer from "by username" pattern in description
+                    // Meta description format: "Track title by username - description..."
+                    const byMatch = description.match(/\\bby\\s+([\\w_-]+)/i);
+                    if (byMatch) {
+                        performer = byMatch[1];
+                    }
+                }
+            }
+
+            // Fallback: try to get performer from user link if not found in description
+            if (!performer) {
+                const userLinkElement = document.querySelector('a[href*="/users/"]');
+                if (userLinkElement) {
+                    // Extract username from the href (e.g., /users/alekirser)
+                    const href = userLinkElement.getAttribute('href');
+                    const usernameMatch = href && href.match(/\\/users\\/([^/]+)/);
+                    if (usernameMatch) {
+                        performer = usernameMatch[1];
                     }
                 }
             }
@@ -217,7 +232,7 @@ class WhypitExtractor:
 
         # Use expect_response to wait for the mp3 URL while clicking play
         with self.page.expect_response(
-            lambda r: "cdn.whyp.it" in r.url and ".mp3" in r.url,
+            lambda r: "cdn.whyp.it" in r.url and ".mp3" in r.url.split("?")[0],
             timeout=30000,
         ) as response_info:
             play_button_clicked = self.page.evaluate(
@@ -251,7 +266,9 @@ class WhypitExtractor:
 
         response = response_info.value
         audio_url = response.url
-        print(f"🎵 Found audio URL: {audio_url}")
+        # Strip query parameters for logging (keep full URL for download)
+        clean_url = audio_url.split("?")[0]
+        print(f"🎵 Found audio URL: {clean_url}")
 
         return audio_url
 
@@ -340,7 +357,9 @@ def main():
     # Extract basename from URL if not provided
     basename = args.basename
     if not basename:
-        url_match = re.search(r"/tracks/\d+/(.+)$", args.url)
+        # Strip query parameters before extracting basename
+        clean_url = args.url.split("?")[0]
+        url_match = re.search(r"/tracks/\d+/(.+)$", clean_url)
         if url_match:
             basename = url_match.group(1)
         else:
