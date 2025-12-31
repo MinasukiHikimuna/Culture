@@ -14,6 +14,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+import httpx
 from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
 
@@ -112,8 +113,15 @@ class WhypitExtractor:
             # Capture audio URL
             audio_url = self.capture_audio_url()
 
+            # Determine audio format from URL
+            clean_audio_url = audio_url.split("?")[0]
+            if clean_audio_url.endswith(".flac"):
+                audio_format = "flac"
+            else:
+                audio_format = "mp3"
+
             # Download audio
-            audio_file_path = target_dir / f"{basename}.mp3"
+            audio_file_path = target_dir / f"{basename}.{audio_format}"
             self.download_file(audio_url, audio_file_path)
 
             # Calculate checksum
@@ -127,14 +135,12 @@ class WhypitExtractor:
             self.save_html_backup(html_path)
 
             # Build result in platform-agnostic schema
-            # Strip token from download URL for storage (token is ephemeral)
-            clean_audio_url = audio_url.split("?")[0]
             result = {
                 "audio": {
                     "sourceUrl": url,
                     "downloadUrl": clean_audio_url,
                     "filePath": str(audio_file_path),
-                    "format": "mp3",
+                    "format": audio_format,
                     "fileSize": stats.st_size,
                     "checksum": {"sha256": checksum},
                 },
@@ -176,11 +182,26 @@ class WhypitExtractor:
             const titleElement = document.querySelector("h1");
             const title = titleElement ? titleElement.textContent.trim() : null;
 
+            // Extract performer from uploader link
+            // The uploader link contains "tracks" text (e.g., "598 tracks")
+            let performer = null;
+            const userLinks = document.querySelectorAll('a[href*="/users/"]');
+            for (const link of userLinks) {
+                if (link.textContent.includes('tracks')) {
+                    const href = link.getAttribute('href');
+                    // Format: /users/4994/lurkydip
+                    const match = href.match(/\\/users\\/\\d+\\/([^/?]+)/);
+                    if (match) {
+                        performer = match[1];
+                    }
+                    break;
+                }
+            }
+
             // Extract description and tags from meta description
             const metaDescriptionElement = document.querySelector('meta[name="description"]');
             let description = null;
             let tags = [];
-            let performer = null;
 
             if (metaDescriptionElement) {
                 description = metaDescriptionElement.getAttribute('content');
@@ -193,26 +214,6 @@ class WhypitExtractor:
                         tags = tagMatches
                             .map(tag => tag.replace(/[\\[\\]]/g, "").trim())
                             .filter(tag => tag.length > 0);
-                    }
-
-                    // Extract performer from "by username" pattern in description
-                    // Meta description format: "Track title by username - description..."
-                    const byMatch = description.match(/\\bby\\s+([\\w_-]+)/i);
-                    if (byMatch) {
-                        performer = byMatch[1];
-                    }
-                }
-            }
-
-            // Fallback: try to get performer from user link if not found in description
-            if (!performer) {
-                const userLinkElement = document.querySelector('a[href*="/users/"]');
-                if (userLinkElement) {
-                    // Extract username from the href (e.g., /users/alekirser)
-                    const href = userLinkElement.getAttribute('href');
-                    const usernameMatch = href && href.match(/\\/users\\/([^/]+)/);
-                    if (usernameMatch) {
-                        performer = usernameMatch[1];
                     }
                 }
             }
@@ -230,11 +231,15 @@ class WhypitExtractor:
         """Capture audio URL by clicking play button and intercepting network requests."""
         print("🎯 Looking for play button...")
 
-        # Use expect_response to wait for the mp3 URL while clicking play
-        with self.page.expect_response(
-            lambda r: "cdn.whyp.it" in r.url and ".mp3" in r.url.split("?")[0],
-            timeout=30000,
-        ) as response_info:
+        def is_audio_response(r):
+            """Check if response is an audio file (mp3 or flac)."""
+            if "cdn.whyp.it" not in r.url:
+                return False
+            url_path = r.url.split("?")[0]
+            return url_path.endswith(".mp3") or url_path.endswith(".flac")
+
+        # Use expect_response to wait for audio URL (mp3 or flac) while clicking play
+        with self.page.expect_response(is_audio_response, timeout=30000) as response_info:
             play_button_clicked = self.page.evaluate(
                 """() => {
                 const buttons = document.querySelectorAll('button');
@@ -273,23 +278,25 @@ class WhypitExtractor:
         return audio_url
 
     def download_file(self, url: str, file_path: Path, max_retries: int = 5):
-        """Download file from URL with retries."""
+        """Download file from URL with retries using streaming."""
         for attempt in range(1, max_retries + 1):
             try:
                 print(f"📥 Download attempt {attempt}/{max_retries}...")
 
-                response = self.context.request.get(
+                with httpx.stream(
+                    "GET",
                     url,
                     headers={
                         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
                     },
-                )
+                    follow_redirects=True,
+                    timeout=60.0,
+                ) as response:
+                    response.raise_for_status()
+                    with open(file_path, "wb") as f:
+                        for chunk in response.iter_bytes(chunk_size=8192):
+                            f.write(chunk)
 
-                if not response.ok:
-                    raise ValueError(f"HTTP {response.status}: {response.status_text}")
-
-                buffer = response.body()
-                file_path.write_bytes(buffer)
                 print("✅ Audio download completed successfully")
                 return True
 
