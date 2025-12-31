@@ -32,7 +32,9 @@
       "Bash(find:*)",
       "Bash(test:*)",
       "Bash(uv run python .claude/skills/stashapp-schema/scripts/stash_schema.py:*)",
-      "Bash(uv run python .claude/skills/stash-check/scripts/stash_check.py:*)"
+      "Bash(uv run python .claude/skills/stashapp-check/scripts/stashapp_check.py:*)",
+      "Skill(stashapp-check)",
+      "Skill(stashapp-schema)",
     ],
     "deny": []
   }
