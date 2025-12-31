@@ -121,3 +121,9 @@ All extractors preserve and enrich metadata along the pipeline:
 - Original platform metadata (Soundgasm, Reddit, etc.)
 - LLM analysis results in `content.json`
 - Complete audit trail of processing steps
+
+## Command Line Tools
+
+Use modern alternatives instead of legacy tools:
+- Use `fd` instead of `find`
+- Use `rg` (ripgrep) instead of `grep`
