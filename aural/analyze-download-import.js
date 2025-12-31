@@ -73,11 +73,16 @@ class AnalyzeDownloadImportPipeline {
   }
 
   /**
-   * Check if a post has already been processed
+   * Check if a post has already been successfully processed
+   * Only returns true if the post was fully imported to Stash or intentionally skipped
    */
   async isProcessed(postId) {
     await this.loadProcessedPosts();
-    return !!this.processedPosts.posts[postId];
+    const record = this.processedPosts.posts[postId];
+    if (!record) return false;
+    // Processed if: successful import with scene ID, OR intentionally skipped
+    return (record.success === true && record.stashSceneId != null) ||
+           (record.success === true && record.stage === 'skipped');
   }
 
   /**
@@ -389,7 +394,7 @@ class AnalyzeDownloadImportPipeline {
       console.log(`${progressPrefix}❌ Analysis failed: ${path.basename(postFilePath)}`);
       console.log(`${'='.repeat(60)}`);
       console.log(`Error: ${analysisResult.error}`);
-      await this.markProcessed(postId, { success: false, stage: 'analysis', error: analysisResult.error });
+      // Don't mark as processed - allow retry on next run
       return {
         success: false,
         stage: 'analysis',
@@ -456,7 +461,7 @@ class AnalyzeDownloadImportPipeline {
     );
 
     if (!processResult.success) {
-      await this.markProcessed(postId, { success: false, stage: 'download', error: processResult.error });
+      // Don't mark as processed - allow retry on next run
       return {
         success: false,
         stage: 'download',
@@ -474,6 +479,19 @@ class AnalyzeDownloadImportPipeline {
     console.log('\n📤 Step 3: Importing to Stashapp...');
     const importResult = await this.importToStashapp(processResult.releaseDir);
 
+    // Only mark as processed if import fully succeeded with a scene ID
+    if (!importResult.success || !importResult.stashSceneId) {
+      console.log(`❌ Import failed: ${importResult.error || 'No scene created'}`);
+      // Don't mark as processed - allow retry on next run
+      return {
+        success: false,
+        stage: 'import',
+        postFile: postFilePath,
+        releaseDir: processResult.releaseDir,
+        error: importResult.error || 'No scene created'
+      };
+    }
+
     // Get Reddit URL from post file
     let redditUrl = null;
     try {
@@ -488,7 +506,7 @@ class AnalyzeDownloadImportPipeline {
     const cyoaDetection = processResult.cyoaDetection;
     const isCYOA = cyoaDetection?.is_cyoa === true;
 
-    // Mark as processed
+    // Mark as successfully processed
     const result = {
       success: true,
       postFile: postFilePath,
