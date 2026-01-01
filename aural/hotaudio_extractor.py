@@ -352,22 +352,24 @@ class HotAudioExtractor:
             except Exception:
                 pass  # Page might not be ready yet
 
-        async def set_playback_speed(speed: float = 2.0) -> bool:
+        async def set_playback_speed(speed: float = 4.0) -> bool:
             """Set audio playback speed via HotAudio's speed menu.
 
             HotAudio uses Web Audio API (not standard <audio> element),
-            so we must use their UI speed controls. Max available is 2.0x.
+            so we modify an existing speed option's text to our target speed
+            before clicking it.
             """
             try:
                 result = await page.evaluate(
                     f"""() => {{
-                    // Find and click the speed option in HotAudio's menu
+                    // Find the 2.0x option and change its text to our target speed
                     const speedOptions = document.querySelectorAll('.speed-option');
                     let clicked = false;
-                    let targetSpeed = '{speed}x';
 
                     speedOptions.forEach(opt => {{
-                        if (opt.textContent.trim() === targetSpeed) {{
+                        if (opt.textContent.trim() === '2.0x') {{
+                            // Modify the text to our target speed
+                            opt.textContent = '{speed}x';
                             // Remove active state from all options
                             speedOptions.forEach(o => o.classList.remove('bg-slate-600'));
                             // Set active state and click
@@ -432,8 +434,8 @@ class HotAudioExtractor:
             if play_button:
                 await play_button.click()
                 await page.wait_for_timeout(2000)
-                # Set 2x playback speed (max available in HotAudio UI)
-                await set_playback_speed(2.0)
+                # Set 4x playback speed by modifying the 2.0x option text
+                await set_playback_speed(4.0)
                 # Flush keys captured after play click
                 await flush_captured_keys()
                 await flush_captured_metadata()
@@ -489,22 +491,21 @@ class HotAudioExtractor:
                                 uncovered.append(seg)
                         return uncovered
 
-                    # Let the audio play at 2x speed to collect all keys faster
-                    # (2x is max available in HotAudio's speed menu)
-                    playback_speed = 2.0
+                    # Let the audio play at 4x speed to collect all keys faster
+                    playback_speed = 4.0
                     print(f"  Letting audio play at {playback_speed}x speed to collect all keys...")
                     print(f"  Audio duration: {minutes}:{seconds:02d}")
 
-                    # Make sure audio is playing and set 2x speed
+                    # Make sure audio is playing and set 4x speed
                     play_button = await page.query_selector("#player-playpause")
                     if play_button:
                         await play_button.click()
                         await page.wait_for_timeout(1000)
-                        # Set 2x playback speed (max available)
+                        # Set 4x playback speed by modifying the 2.0x option
                         await set_playback_speed(playback_speed)
 
                     start_time = time.time()
-                    # Adjust timeout for 2x playback
+                    # Adjust timeout for 4x playback
                     max_wait_seconds = (duration / playback_speed) + 60
 
                     while time.time() - start_time < max_wait_seconds:
