@@ -55,6 +55,9 @@ Release (collection of related audio variants)
 |--------|---------|
 | `gwasi_extractor.py` | Extract data from gwasi.com (Reddit audio index) |
 | `reddit_extractor.py` | Extract Reddit post metadata via PRAW |
+| `soundgasm_extractor.py` | Download from Soundgasm |
+| `whypit_extractor.py` | Download from Whyp.it |
+| `hotaudio_extractor.py` | Download from HotAudio (encrypted) |
 | `script_url_extractor.py` | Extract script URLs from posts |
 | `reddit-flair-fetcher.py` | Fetch Reddit flair data |
 | `reset_post.py` | Reset post data for reprocessing |
@@ -67,9 +70,6 @@ Release (collection of related audio variants)
 | `analyze-reddit-post.js` | LLM-powered Reddit post analysis |
 | `release-orchestrator.js` | Orchestrate full release processing |
 | `stashapp-importer.js` | Import releases to Stashapp (FFmpeg conversion + GraphQL) |
-| `soundgasm-extractor.js` | Download from Soundgasm |
-| `whypit-extractor.js` | Download from Whyp.it |
-| `hotaudio-extractor.js` | Download from HotAudio |
 | `scriptbin-extractor.js` | Extract scripts from scriptbin.works |
 | `cyoa-import.js` | Import CYOA (Choose Your Own Adventure) content |
 | `reset-post.js` | Reset post data for reprocessing (JS version) |
