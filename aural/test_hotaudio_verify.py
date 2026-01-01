@@ -2,8 +2,8 @@
 """
 HotAudio Decryption Verification Tests
 
-Pytest-based verification suite that runs the extractor and compares output
-against known good values to validate the decryption implementation.
+Pytest-based verification suite that runs the Python hotaudio_extractor.py
+and compares output against known good values to validate the decryption.
 
 Usage:
     uv run pytest test_hotaudio_verify.py -v                    # Run all tests
@@ -87,12 +87,12 @@ def sha256_file(file_path: Path) -> str:
 
 
 def run_extractor(url: str) -> dict:
-    """Run the HotAudio extractor with --verify flag and return verification data."""
+    """Run the HotAudio Python extractor with --verify flag and return verification data."""
     result = subprocess.run(
-        ["node", "hotaudio-extractor.js", url, "--verify"],
+        ["uv", "run", "python", "hotaudio_extractor.py", url, "--verify"],
         capture_output=True,
         text=True,
-        timeout=300,  # 5 minute timeout
+        timeout=600,  # 10 minute timeout for long audio playback
     )
 
     if result.returncode != 0:
