@@ -14,6 +14,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+import httpx
 from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
 
@@ -243,22 +244,37 @@ class SoundgasmExtractor:
             print(f"Failed to extract audio URL: {error}")
             raise
 
-    def download_audio(self, audio_url: str, audio_file_path: Path):
-        """Download audio file from URL."""
-        try:
-            print(f"⬇️  Downloading audio: {audio_url}")
+    def download_audio(self, audio_url: str, audio_file_path: Path, max_retries: int = 5):
+        """Download audio file from URL with retries using streaming."""
+        for attempt in range(1, max_retries + 1):
+            try:
+                print(f"📥 Download attempt {attempt}/{max_retries}...")
 
-            response = self.context.request.get(audio_url)
-            if not response.ok:
-                raise ValueError(f"HTTP {response.status}: {response.status_text}")
+                with httpx.stream(
+                    "GET",
+                    audio_url,
+                    headers={
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                    },
+                    follow_redirects=True,
+                    timeout=60.0,
+                ) as response:
+                    response.raise_for_status()
+                    with open(audio_file_path, "wb") as f:
+                        for chunk in response.iter_bytes(chunk_size=8192):
+                            f.write(chunk)
 
-            buffer = response.body()
-            audio_file_path.write_bytes(buffer)
+                print(f"✅ Audio saved: {audio_file_path}")
+                return
 
-            print(f"💾 Audio saved: {audio_file_path}")
-        except Exception as error:
-            print(f"Failed to download audio from {audio_url}: {error}")
-            raise
+            except Exception as error:
+                print(f"❌ Download attempt {attempt}/{max_retries} failed: {error}")
+                if attempt < max_retries:
+                    wait_time = 5 * attempt
+                    print(f"⏱️ Waiting {wait_time} seconds before retry...")
+                    time.sleep(wait_time)
+                else:
+                    raise
 
     def save_html_backup(self, html_path: Path):
         """Save HTML content as backup."""
