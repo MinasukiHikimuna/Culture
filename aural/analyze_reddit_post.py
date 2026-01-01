@@ -1,0 +1,660 @@
+#!/usr/bin/env python3
+"""
+Enhanced Reddit Post Analyzer with LLM-based Metadata Extraction
+
+Uses LLM for all metadata extraction (performers, script, audio versions)
+instead of regex-based preprocessing.
+"""
+
+import argparse
+import json
+import os
+import re
+from datetime import datetime
+from pathlib import Path
+
+import httpx
+from dotenv import load_dotenv
+
+# Load .env from project root
+load_dotenv(Path(__file__).parent / ".env")
+
+
+class EnhancedRedditPostAnalyzer:
+    def __init__(
+        self,
+        lm_studio_url: str | None = None,
+        model: str | None = None,
+        enable_script_resolution: bool = True,
+    ):
+        self.lm_studio_url = (
+            lm_studio_url
+            or os.getenv("LM_STUDIO_URL")
+            or "http://localhost:1234/v1/chat/completions"
+        )
+        self.model = model or "local-model"
+        self.enable_script_resolution = enable_script_resolution
+
+    def create_cyoa_detection_prompt(self, post_data: dict) -> str:
+        """Creates a prompt to detect Choose Your Own Adventure (CYOA) releases."""
+        reddit_data = post_data["reddit_data"]
+        title = reddit_data["title"]
+        selftext = reddit_data["selftext"]
+
+        return f"""Analyze this Reddit post from r/gonewildaudio to determine if it is a Choose Your Own Adventure (CYOA) release.
+
+CRITICAL: Respond with ONLY valid JSON. No explanations or reasoning.
+
+TITLE: {title}
+
+POST BODY:
+{selftext}
+
+WHAT IS A CYOA:
+- Multiple audio files that form a DECISION TREE
+- Listeners make choices that lead to different audio paths
+- Has multiple possible endings based on choices
+- Often includes a visual flowchart/roadmap image showing the paths
+- Audio files are numbered but NOT meant for sequential listening
+- Example: "Audio 0 -> choose Audio 1 OR Audio 2 -> each leads to different endings"
+
+NOT A CYOA (standard releases):
+- Simple multi-part series (Part 1, Part 2, Part 3 - sequential listening)
+- Gender variants (F4M version, F4F version - same content, different target)
+- Audio quality variants (SFX version, no-SFX version)
+- Single audio with multiple hosting platforms
+
+Return this exact JSON structure:
+{{
+  "is_cyoa": true|false,
+  "confidence": "high|medium|low",
+  "audio_count": <number of audio files detected>,
+  "endings_count": <number of endings mentioned, or null if not specified>,
+  "has_decision_tree_image": true|false,
+  "decision_tree_url": "url to flowchart image or null",
+  "reason": "brief explanation of why this is or is not a CYOA"
+}}"""
+
+    def detect_cyoa(self, post_data: dict) -> dict:
+        """
+        Detects if a post is a Choose Your Own Adventure (CYOA) release
+        that requires special handling with decision tree mapping.
+        """
+        try:
+            prompt = self.create_cyoa_detection_prompt(post_data)
+            llm_response = self.call_llm(prompt)
+            result = self.parse_cyoa_detection_response(llm_response)
+            return result
+        except Exception as e:
+            print(f"CYOA detection failed: {e}")
+            return {
+                "is_cyoa": False,
+                "confidence": "low",
+                "audio_count": 0,
+                "endings_count": None,
+                "has_decision_tree_image": False,
+                "decision_tree_url": None,
+                "reason": f"Detection failed: {e}",
+                "detection_error": True,
+            }
+
+    def parse_cyoa_detection_response(self, response_text: str) -> dict:
+        """Parses and validates the CYOA detection response."""
+        try:
+            clean_text = re.sub(
+                r"<think>[\s\S]*?</think>", "", response_text, flags=re.IGNORECASE
+            )
+            clean_text = re.sub(r"^[^{]*", "", clean_text)
+            clean_text = re.sub(r"[^}]*$", "", clean_text)
+            clean_text = clean_text.strip()
+
+            if not clean_text.startswith("{"):
+                json_match = re.search(r"\{[\s\S]*\}", response_text)
+                clean_text = json_match.group(0) if json_match else response_text
+
+            parsed = json.loads(clean_text)
+
+            if not isinstance(parsed.get("is_cyoa"), bool):
+                raise ValueError("Missing required field: is_cyoa")
+
+            return parsed
+        except Exception as e:
+            print(f"Failed to parse CYOA detection response: {response_text}")
+            raise ValueError(f"Invalid JSON response from LLM: {e}")
+
+    def create_metadata_extraction_prompt(self, post_data: dict) -> str:
+        """Creates a comprehensive metadata extraction prompt."""
+        reddit_data = post_data["reddit_data"]
+        title = reddit_data["title"]
+        selftext = reddit_data["selftext"]
+        author = reddit_data["author"]
+        link_flair_text = reddit_data.get("link_flair_text") or "No flair"
+
+        return f"""Extract metadata from this Reddit post from r/gonewildaudio.
+
+CRITICAL: Respond with ONLY valid JSON. No explanations or reasoning.
+
+POST AUTHOR (the person who posted this): {author}
+TITLE: {title}
+FLAIR: {link_flair_text}
+
+POST BODY:
+{selftext}
+
+EXTRACTION RULES:
+
+1. PERFORMERS:
+   - The post author "{author}" is ALWAYS the PRIMARY performer
+   - Look for ADDITIONAL performers (collaborators who also performed) in:
+     * Title patterns: "w Username", "w/ Username", "; w Username" at the end
+     * Body patterns: "recorded with u/Username", "collab with u/Username", "live with u/Username"
+   - Do NOT include script authors as performers unless they also voice-acted
+
+2. SCRIPT AUTHOR:
+   - Look for the person who WROTE the script (separate from performers):
+     * Title patterns: "by Username" or "by u/Username" appearing AFTER the tags at the end
+     * Body patterns: "Thanks to u/Username for... script", "script by u/Username"
+   - If flair is "OC", script author = post author
+   - If flair is "Script Fill", someone else wrote the script - find who
+
+3. AUDIO VERSIONS (CRITICAL - proper URL grouping):
+   - Extract all audio platform URLs: soundgasm.net, whyp.it, hotaudio.net
+   - IMPORTANT: Group URLs for the SAME AUDIO content together in ONE audio_version:
+     * Look for "alternative link", "backup", "mirror", "if X isn't working"
+     * Same audio on different platforms = ONE audio_version with MULTIPLE urls
+     * Example: "AUDIO HERE (soundgasm)" + "alternative link (whyp.it)" = ONE version
+   - Create SEPARATE audio_versions ONLY for genuinely DIFFERENT content:
+     * Gender variants (F4M vs F4F)
+     * Audio quality variants (SFX vs no-SFX)
+     * Multi-part series (Part 1, Part 2)
+     * Bloopers/extras
+   - version_name rules:
+     * NEVER include platform names (NOT "Main Audio (Soundgasm)")
+     * Use content descriptors: "F4M", "SFX Version", "Part 1", "Bloopers"
+     * For single audio: use primary gender tag from title (e.g., "F4M")
+   - For EACH audio version, also extract:
+     * performers: WHO performs in THIS specific audio
+     * tags: Tags specific to THIS audio version
+
+4. SCRIPT URL:
+   - Look for script links: scriptbin.works, pastebin, google docs
+   - Pattern: [script](url) or [script here](url)
+
+5. SERIES:
+   - Check if this is part of a series (Part 1, Episode 2, etc.)
+   - Look for "sequel to", "prequel to", "continued from"
+
+6. POST TYPE:
+   - "audio_release": Post contains audio links - this is an audio release (most common)
+   - "script_offer": Post is offering a SCRIPT for others to perform - no audio expected
+     * Typically posted in r/GWAScriptGuild
+     * Flair often says "Script Offer" or similar
+     * Contains script link but NO audio platform URLs
+     * Author is the script WRITER, not a performer
+   - "request": User requesting content (ignore these)
+   - "other": Verification, announcement, etc.
+
+Return this exact JSON structure:
+{{
+  "performers": {{
+    "primary": "{author}",
+    "additional": ["username1"],
+    "confidence": "high|medium|low",
+    "notes": "how collaborators were identified"
+  }},
+  "script": {{
+    "author": "username or null",
+    "url": "script url or null",
+    "fillType": "original|public|private",
+    "notes": "how script author was identified"
+  }},
+  "audio_versions": [
+    {{
+      "version_name": "F4M",
+      "description": "Primary audio version",
+      "urls": [
+        {{"platform": "Soundgasm", "url": "https://soundgasm.net/..."}},
+        {{"platform": "Whypit", "url": "https://whyp.it/..."}}
+      ],
+      "performers": ["username1"],
+      "tags": ["tag1", "tag2"]
+    }}
+  ],
+  "series": {{
+    "isPartOfSeries": false,
+    "hasPrequels": false,
+    "hasSequels": false,
+    "seriesName": "",
+    "partNumber": null,
+    "confidence": "high|medium|low"
+  }},
+  "post_type": "audio_release|script_offer|request|other",
+  "analysis_notes": "brief observations"
+}}"""
+
+    def create_version_naming_prompt(
+        self, post_data: dict, audio_versions: list
+    ) -> str:
+        """Creates version naming prompt for generating file/directory slugs."""
+        reddit_data = post_data["reddit_data"]
+        title = reddit_data["title"]
+        selftext = reddit_data["selftext"]
+        post_id = reddit_data.get("post_id") or post_data.get("post_id")
+
+        versions_text = "\n".join(
+            f"{i + 1}. {v.get('version_name') or f'Version {i + 1}'}: "
+            f"{v.get('description') or ''} | URLs: {', '.join(u['url'] for u in v.get('urls', []))}"
+            for i, v in enumerate(audio_versions)
+        )
+
+        return f"""You are a file naming expert. Analyze this Reddit post and its audio versions to create optimal flat file naming within a single directory.
+
+CRITICAL: Your response must be ONLY valid JSON. No reasoning or explanations.
+
+POST: {title}
+CONTENT: {selftext}
+POST_ID: {post_id}
+
+AUDIO VERSIONS DETECTED:
+{versions_text}
+
+NAMING PATTERN: {{post_id}}_{{release_slug}}_-_{{version_slug}}.{{ext}}
+
+RELEASE SLUG RULES:
+- Extract core title, remove brackets and gender tags
+- Convert to lowercase snake_case
+- Maximum 40 characters
+- Examples: "sweet_southern_hospitality", "anniversary_date", "let_me_cater_to_you"
+
+VERSION SLUG RULES (CRITICAL - each audio MUST have a UNIQUE slug):
+1. **Multi-part series** (Part 1, Part 2, Part 3 or named parts):
+   - Use part names: "part1_after_show_edge", "part2_lavish_limo_ride", "part3_final_performance"
+   - Include part number AND descriptive name for uniqueness
+
+2. **Multi-scenario projects** (8+ audios, different stories):
+   - Use scenario names: "intro", "learning_to_ride_horse", "southern_cookin"
+
+3. **Gender variants** (F4M/F4F/M4F/M4M):
+   - Use gender tags: "f4m", "f4f", "m4f", "m4m"
+
+4. **Audio quality variants**:
+   - "sfx + music" -> "sfx_music"
+   - "sfx + no music" -> "sfx_no_music"
+   - "just vocals" -> "vocals_only"
+   - "with wet sounds" -> "wet_sounds"
+
+5. **Combined variants**: Combine with underscore
+   - "f4m_sfx_music", "f4f_vocals_only"
+
+6. **Single version**: Use primary gender tag or "default"
+
+IMPORTANT: Every audio file MUST have a UNIQUE filename. Never use the same slug for multiple audios.
+
+SANITIZATION:
+- Lowercase only
+- Replace spaces/punctuation with underscores
+- Remove brackets, quotes, emojis
+- Maximum 30 characters per version slug
+
+Return JSON:
+{{
+  "release_directory": "{{post_id}}_{{release_slug}}",
+  "release_slug": "{{sanitized_release_title}}",
+  "audio_files": [
+    {{
+      "filename": "{{post_id}}_{{release_slug}}_-_{{version_slug}}.{{ext}}",
+      "version_slug": "{{sanitized_version_name}}",
+      "display_name": "{{human_readable_version_name}}",
+      "detected_tags": ["{{tag1}}", "{{tag2}}"],
+      "audio_urls": ["{{url1}}", "{{url2}}"],
+      "metadata_file": "{{post_id}}_{{release_slug}}_-_{{version_slug}}.json"
+    }}
+  ],
+  "structure_type": "{{multi_scenario|gender_variants|quality_variants|combined_variants|single_version}}"
+}}"""
+
+    def call_llm(self, prompt: str) -> str:
+        """Calls the local LLM API to analyze the post."""
+        try:
+            with httpx.Client(timeout=300.0) as client:
+                response = client.post(
+                    self.lm_studio_url,
+                    json={
+                        "model": self.model,
+                        "messages": [
+                            {
+                                "role": "user",
+                                "content": "Respond with valid JSON only. No reasoning. "
+                                "No explanations. No text outside JSON.\n\n" + prompt,
+                            },
+                        ],
+                        "temperature": 0.1,
+                        "max_tokens": 2000,
+                    },
+                )
+
+                if response.status_code != 200:
+                    raise ValueError(
+                        f"API request failed: {response.status_code} {response.text}"
+                    )
+
+                data = response.json()
+                return data["choices"][0]["message"]["content"]
+        except httpx.ConnectError:
+            raise ConnectionError(
+                f"Could not connect to LM Studio. Make sure LM Studio is running "
+                f"and serving on {self.lm_studio_url}"
+            )
+
+    def parse_response(self, response_text: str) -> dict:
+        """Parses and validates the LLM response."""
+        try:
+            # Remove any reasoning tokens and other unwanted text
+            clean_text = re.sub(
+                r"<think>[\s\S]*?</think>", "", response_text, flags=re.IGNORECASE
+            )
+            clean_text = re.sub(r"^[^{]*", "", clean_text)  # Remove before first {
+            clean_text = re.sub(r"[^}]*$", "", clean_text)  # Remove after last }
+            clean_text = clean_text.strip()
+
+            # If we still don't have clean JSON, try to extract it
+            if not clean_text.startswith("{"):
+                json_match = re.search(r"\{[\s\S]*\}", response_text)
+                clean_text = json_match.group(0) if json_match else response_text
+
+            parsed = json.loads(clean_text)
+
+            # Validate required fields for metadata extraction
+            if "performers" not in parsed:
+                raise ValueError("Missing required field: performers")
+            if "audio_versions" not in parsed:
+                raise ValueError("Missing required field: audio_versions")
+            if "series" not in parsed:
+                raise ValueError("Missing required field: series")
+
+            return parsed
+        except Exception as e:
+            print(f"Failed to parse LLM response: {response_text}")
+            raise ValueError(f"Invalid JSON response from LLM: {e}")
+
+    def parse_version_naming_response(self, response_text: str) -> dict:
+        """Parses and validates the version naming LLM response."""
+        try:
+            # Remove any reasoning tokens and other unwanted text
+            clean_text = re.sub(
+                r"<think>[\s\S]*?</think>", "", response_text, flags=re.IGNORECASE
+            )
+            clean_text = re.sub(r"^[^{]*", "", clean_text)
+            clean_text = re.sub(r"[^}]*$", "", clean_text)
+            clean_text = clean_text.strip()
+
+            if not clean_text.startswith("{"):
+                json_match = re.search(r"\{[\s\S]*\}", response_text)
+                clean_text = json_match.group(0) if json_match else response_text
+
+            parsed = json.loads(clean_text)
+
+            # Validate version naming response structure
+            if not all(
+                k in parsed
+                for k in ["release_directory", "release_slug", "audio_files"]
+            ):
+                raise ValueError("Missing required fields for version naming")
+
+            return parsed
+        except Exception as e:
+            print(f"Failed to parse version naming LLM response: {response_text}")
+            raise ValueError(f"Invalid JSON response from LLM: {e}")
+
+    def generate_version_naming(self, post_data: dict, audio_versions: list) -> dict:
+        """Generates version naming information using LLM."""
+        try:
+            prompt = self.create_version_naming_prompt(post_data, audio_versions)
+            llm_response = self.call_llm(prompt)
+            naming_data = self.parse_version_naming_response(llm_response)
+            return naming_data
+        except Exception as e:
+            print(f"Version naming generation failed: {e}")
+            # Fallback to simple naming
+            return self.generate_fallback_naming(post_data, audio_versions)
+
+    def generate_fallback_naming(self, post_data: dict, audio_versions: list) -> dict:
+        """Generates fallback naming when LLM fails."""
+        post_id = post_data.get("reddit_data", {}).get("post_id") or post_data.get(
+            "post_id"
+        )
+        title = post_data.get("reddit_data", {}).get("title", "")
+
+        # Simple slug generation
+        release_slug = re.sub(r"\[.*?\]", "", title)  # Remove brackets
+        release_slug = re.sub(r"[^\w\s]", "", release_slug)  # Remove special chars
+        release_slug = release_slug.strip().lower()
+        release_slug = re.sub(r"\s+", "_", release_slug)
+        release_slug = release_slug[:40]
+
+        audio_files = []
+        for index, version in enumerate(audio_versions):
+            version_slug = version.get("version_name")
+            if version_slug:
+                version_slug = version_slug.lower()
+                version_slug = re.sub(r"\s+", "_", version_slug)
+                version_slug = re.sub(r"[^\w_]", "", version_slug)
+            else:
+                version_slug = f"version_{index + 1}"
+
+            audio_files.append(
+                {
+                    "filename": f"{post_id}_{release_slug}_-_{version_slug}.m4a",
+                    "version_slug": version_slug,
+                    "display_name": version.get("version_name")
+                    or f"Version {index + 1}",
+                    "detected_tags": [],
+                    "audio_urls": [u["url"] for u in version.get("urls", [])],
+                    "metadata_file": f"{post_id}_{release_slug}_-_{version_slug}.json",
+                }
+            )
+
+        return {
+            "release_directory": f"{post_id}_{release_slug}",
+            "release_slug": release_slug,
+            "audio_files": audio_files,
+            "structure_type": "multiple_versions"
+            if len(audio_versions) > 1
+            else "single_version",
+        }
+
+    def analyze_post(self, file_path: str | Path) -> dict:
+        """Analyzes a single Reddit post file using LLM-based metadata extraction."""
+        file_path = Path(file_path)
+
+        try:
+            with open(file_path, encoding="utf-8") as f:
+                post_data = json.load(f)
+
+            if not post_data.get("reddit_data") or not post_data["reddit_data"].get(
+                "selftext"
+            ):
+                raise ValueError(
+                    "Post data missing required reddit_data.selftext field"
+                )
+
+            print(f"Analyzing post: {post_data['reddit_data']['title']}")
+
+            # Use LLM for comprehensive metadata extraction
+            prompt = self.create_metadata_extraction_prompt(post_data)
+            llm_response = self.call_llm(prompt)
+            analysis = self.parse_response(llm_response)
+
+            # Ensure performers has count field for compatibility
+            if analysis.get("performers"):
+                analysis["performers"]["count"] = 1 + len(
+                    analysis["performers"].get("additional") or []
+                )
+
+            # Generate version naming information
+            audio_versions = analysis.get("audio_versions", [])
+            print(
+                f"Generating version naming for {len(audio_versions)} audio version(s)..."
+            )
+            version_naming = self.generate_version_naming(post_data, audio_versions)
+
+            # Enhance audio_versions with slug information
+            if version_naming and version_naming.get("audio_files"):
+                enhanced_versions = []
+                for index, version in enumerate(analysis["audio_versions"]):
+                    naming_info = (
+                        version_naming["audio_files"][index]
+                        if index < len(version_naming["audio_files"])
+                        else version_naming["audio_files"][0]
+                    )
+                    enhanced_versions.append(
+                        {
+                            **version,
+                            "slug": naming_info.get("version_slug")
+                            or f"version_{index + 1}",
+                            "filename": naming_info.get("filename")
+                            or f"{post_data.get('post_id')}_audio_{index + 1}.m4a",
+                            "metadata_file": naming_info.get("metadata_file")
+                            or f"{post_data.get('post_id')}_audio_{index + 1}.json",
+                        }
+                    )
+                analysis["audio_versions"] = enhanced_versions
+
+            # Add version naming metadata
+            analysis["version_naming"] = version_naming
+
+            # Detect CYOA structure
+            print("Checking for CYOA structure...")
+            cyoa_detection = self.detect_cyoa(post_data)
+            analysis["cyoa_detection"] = cyoa_detection
+
+            if cyoa_detection.get("is_cyoa"):
+                print(
+                    f"  CYOA detected ({cyoa_detection.get('confidence')} confidence): "
+                    f"{cyoa_detection.get('reason')}"
+                )
+
+            # Add metadata
+            analysis["metadata"] = {
+                "post_id": post_data.get("post_id"),
+                "username": post_data.get("username"),
+                "title": post_data["reddit_data"]["title"],
+                "date": post_data.get("date"),
+                "reddit_url": post_data.get("reddit_url"),
+                "analyzed_at": datetime.now().isoformat(),
+                "extraction_method": "llm",
+                "model": self.model,
+            }
+
+            return analysis
+        except Exception as e:
+            raise RuntimeError(f"Failed to analyze {file_path}: {e}")
+
+    def analyze_directory(
+        self, dir_path: str | Path, output_path: str | Path | None = None
+    ) -> list:
+        """Processes multiple post files in a directory."""
+        dir_path = Path(dir_path)
+        files = sorted(dir_path.glob("*.json"))
+
+        results = []
+
+        for file in files:
+            try:
+                print(f"Processing {file.name}...")
+                analysis = self.analyze_post(file)
+                results.append(analysis)
+
+                # Small delay to avoid overwhelming the LLM
+                import time
+
+                time.sleep(2)
+            except Exception as e:
+                print(f"Error processing {file}: {e}")
+                results.append(
+                    {
+                        "error": str(e),
+                        "file": str(file),
+                        "analyzed_at": datetime.now().isoformat(),
+                    }
+                )
+
+        if output_path:
+            output_path = Path(output_path)
+            with open(output_path, "w", encoding="utf-8") as f:
+                json.dump(results, f, indent=2, ensure_ascii=False)
+            print(f"Results saved to {output_path}")
+
+        return results
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Enhanced Reddit Post Analyzer with LLM-based Metadata Extraction",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  uv run python analyze_reddit_post.py extracted_data/reddit/alekirser/1amzk7q.json
+  uv run python analyze_reddit_post.py extracted_data/reddit/alekirser/ --output results.json
+  uv run python analyze_reddit_post.py post.json --model mistral-7b --no-script-resolution
+""",
+    )
+    parser.add_argument("input_path", help="Path to post JSON file or directory")
+    parser.add_argument(
+        "--output",
+        "-o",
+        help="Output file for results (JSON). If not specified, outputs to stdout",
+    )
+    parser.add_argument(
+        "--url",
+        dest="lm_studio_url",
+        help="LM Studio API URL (default: http://localhost:1234/v1/chat/completions)",
+    )
+    parser.add_argument(
+        "--model",
+        default="local-model",
+        help="Model name (default: local-model)",
+    )
+    parser.add_argument(
+        "--no-script-resolution",
+        action="store_true",
+        help="Disable script URL resolution",
+    )
+
+    args = parser.parse_args()
+
+    input_path = Path(args.input_path)
+
+    if not input_path.exists():
+        print(f"Error: Input path does not exist: {input_path}")
+        return 1
+
+    analyzer = EnhancedRedditPostAnalyzer(
+        lm_studio_url=args.lm_studio_url,
+        model=args.model,
+        enable_script_resolution=not args.no_script_resolution,
+    )
+
+    try:
+        if input_path.is_dir():
+            results = analyzer.analyze_directory(input_path, args.output)
+        else:
+            results = analyzer.analyze_post(input_path)
+
+            if args.output:
+                output_path = Path(args.output)
+                with open(output_path, "w", encoding="utf-8") as f:
+                    json.dump(results, f, indent=2, ensure_ascii=False)
+                print(f"Results saved to {output_path}")
+            else:
+                print(json.dumps(results, indent=2, ensure_ascii=False))
+
+        print("Enhanced analysis complete!")
+        return 0
+    except Exception as e:
+        print(f"Error: {e}")
+        return 1
+
+
+if __name__ == "__main__":
+    exit(main())
