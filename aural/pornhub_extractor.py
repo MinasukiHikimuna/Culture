@@ -6,101 +6,79 @@ This script extracts audio/video files and metadata from Pornhub using yt-dlp.
 It downloads files, extracts metadata, and organizes data similar to other extractors.
 
 Usage: uv run python pornhub_extractor.py <url>
-
-Requirements:
-1. Install yt-dlp: https://github.com/yt-dlp/yt-dlp
 """
 
 import argparse
-import subprocess
 import sys
 from pathlib import Path
+
+import yt_dlp
+
+
+class YtDlpLogger:
+    """Custom logger for yt-dlp that uses emoji prefixes."""
+
+    def debug(self, msg: str) -> None:
+        # yt-dlp passes both debug and info through debug
+        if msg.startswith("[debug] "):
+            pass  # Skip debug messages
+        else:
+            self.info(msg)
+
+    def info(self, msg: str) -> None:
+        print(msg)
+
+    def warning(self, msg: str) -> None:
+        print(f"⚠️  {msg}")
+
+    def error(self, msg: str) -> None:
+        print(f"❌ {msg}")
 
 
 class PornhubExtractor:
     def __init__(self, output_dir: str = "pornhub_data"):
         self.output_dir = Path(output_dir).resolve()
 
-    def ensure_output_dir(self, uploader_dir: Path) -> None:
-        """Create output directory if it doesn't exist."""
-        if not uploader_dir.exists():
-            uploader_dir.mkdir(parents=True, exist_ok=True)
-            print(f"📁 Created output directory: {uploader_dir}")
-
-    def check_yt_dlp(self) -> bool:
-        """Check if yt-dlp is available."""
-        try:
-            result = subprocess.run(
-                ["yt-dlp", "--version"],
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            if result.returncode == 0:
-                print("✅ yt-dlp is available")
-                return True
-            else:
-                print("❌ yt-dlp not found. Please install yt-dlp:")
-                print("   https://github.com/yt-dlp/yt-dlp")
-                return False
-        except FileNotFoundError:
-            print("❌ yt-dlp not found. Please install yt-dlp:")
-            print("   https://github.com/yt-dlp/yt-dlp")
-            return False
+    def _progress_hook(self, d: dict) -> None:
+        """Progress hook for yt-dlp downloads."""
+        if d["status"] == "downloading":
+            total = d.get("total_bytes") or d.get("total_bytes_estimate")
+            downloaded = d.get("downloaded_bytes", 0)
+            if total:
+                percent = downloaded / total * 100
+                speed = d.get("speed")
+                speed_str = f"{speed / 1024 / 1024:.1f}MiB/s" if speed else "N/A"
+                print(f"\r📥 Downloading: {percent:.1f}% at {speed_str}", end="")
+        elif d["status"] == "finished":
+            print("\n✅ Download complete, post-processing...")
 
     def extract_from_url(self, url: str) -> dict:
         """Extract content from Pornhub URL using yt-dlp."""
         print(f"🎯 Processing: {url}")
+        print("🚀 Starting yt-dlp extraction...")
+        print(f"📂 Output directory: {self.output_dir}")
 
-        # yt-dlp command with the exact format specified
         output_template = str(
             self.output_dir
             / "%(uploader)s"
             / "%(upload_date>%Y-%m-%d)s - %(id)s - %(fulltitle)s.%(ext)s"
         )
 
-        args = [
-            "yt-dlp",
-            "--output",
-            output_template,
-            "--write-info-json",
-            url,
-        ]
+        ydl_opts = {
+            "outtmpl": output_template,
+            "writeinfojson": True,
+            "logger": YtDlpLogger(),
+            "progress_hooks": [self._progress_hook],
+        }
 
-        print("🚀 Starting yt-dlp extraction...")
-        print(f"📂 Output directory: {self.output_dir}")
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            error_code = ydl.download([url])
 
-        process = subprocess.Popen(
-            args,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
+        if error_code:
+            raise RuntimeError(f"yt-dlp failed with error code {error_code}")
 
-        stdout_lines = []
-        stderr_lines = []
-
-        # Stream stdout in real-time
-        for line in process.stdout:
-            stdout_lines.append(line)
-            # Show yt-dlp progress
-            if "[download]" in line or "[info]" in line:
-                print(line, end="")
-
-        # Capture stderr
-        for line in process.stderr:
-            stderr_lines.append(line)
-
-        return_code = process.wait()
-
-        if return_code == 0:
-            print("✅ yt-dlp extraction completed successfully")
-            return {"success": True, "stdout": "".join(stdout_lines)}
-        else:
-            stderr = "".join(stderr_lines)
-            print(f"❌ yt-dlp failed with code {return_code}")
-            print(f"STDERR: {stderr}")
-            raise RuntimeError(f"yt-dlp failed: {stderr}")
+        print("✅ yt-dlp extraction completed successfully")
+        return {"success": True}
 
 
 def main() -> int:
@@ -127,9 +105,6 @@ def main() -> int:
         return 1
 
     extractor = PornhubExtractor(output_dir=args.output_dir)
-
-    if not extractor.check_yt_dlp():
-        return 1
 
     try:
         extractor.extract_from_url(args.url)
