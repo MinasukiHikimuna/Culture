@@ -197,6 +197,66 @@ class ReleaseOrchestrator:
         """Register a platform extractor."""
         self.extractors[platform] = config
 
+    def _create_slug(self, text: str, max_length: int = 50) -> str:
+        """
+        Create a URL-safe slug from text.
+
+        Args:
+            text: Text to slugify
+            max_length: Maximum length of the slug
+
+        Returns:
+            Lowercase slug with hyphens instead of spaces
+        """
+        if not text:
+            return "untitled"
+
+        # Convert to lowercase and replace spaces/underscores with hyphens
+        slug = text.lower().strip()
+        slug = re.sub(r"[\s_]+", "-", slug)
+
+        # Remove characters that aren't alphanumeric or hyphens
+        slug = re.sub(r"[^a-z0-9\-]", "", slug)
+
+        # Collapse multiple hyphens
+        slug = re.sub(r"-+", "-", slug)
+
+        # Strip leading/trailing hyphens
+        slug = slug.strip("-")
+
+        # Truncate to max_length, but try to break at a hyphen
+        if len(slug) > max_length:
+            slug = slug[:max_length]
+            # If we cut in the middle of a word, try to find last hyphen
+            last_hyphen = slug.rfind("-")
+            if last_hyphen > max_length // 2:
+                slug = slug[:last_hyphen]
+
+        return slug or "untitled"
+
+    def load_reddit_data(self, file_path: str | Path) -> tuple[dict, dict]:
+        """
+        Load reddit data from extracted_data format.
+
+        The extracted_data files have a nested structure:
+        - Top-level: GWASI index data (post_id, tags, username, etc.)
+        - reddit_data: Full PRAW enrichment (selftext, author_flair_text, comments, etc.)
+
+        Returns:
+            Tuple of (post, full_data):
+            - post: Flat dict for process_post() with id, title, author, selftext
+            - full_data: Original nested structure for enrichment storage
+        """
+        data = json.loads(Path(file_path).read_text(encoding="utf-8"))
+
+        # Extract reddit_data for processing (has selftext with audio links)
+        post = data.get("reddit_data", data).copy()
+
+        # Normalize field names (post_id -> id)
+        post["id"] = post.get("post_id") or data.get("post_id")
+
+        return post, data
+
     def get_extractor_for_url(self, url: str) -> tuple[str, dict] | None:
         """Get appropriate extractor for a URL."""
         for platform, config in self.extractors.items():
@@ -310,8 +370,20 @@ class ReleaseOrchestrator:
 
         return audio_source
 
-    def process_post(self, post: dict, llm_analysis: dict | None = None) -> Release:
-        """Process a Reddit/Patreon post into a release."""
+    def process_post(
+        self,
+        post: dict,
+        llm_analysis: dict | None = None,
+        gwasi_data: dict | None = None
+    ) -> Release:
+        """
+        Process a Reddit/Patreon post into a release.
+
+        Args:
+            post: Flat post dict with id, title, author, selftext, created_utc
+            llm_analysis: Optional LLM analysis results
+            gwasi_data: Optional full GWASI data (preserves nested structure for enrichment)
+        """
         print(f"🎯 Processing post: {post.get('title', 'Unknown')}")
 
         # Determine target directory structure first
@@ -354,15 +426,22 @@ class ReleaseOrchestrator:
                 pass  # Proceed with creation
 
         # Create release object
+        # If gwasi_data provided, use it for enrichment; otherwise use post directly
+        reddit_data = gwasi_data.get("reddit_data", post) if gwasi_data else post
+
+        # Use post ID as release ID for stable directory naming
+        release_id = post.get("id") or stable_id
+
         release = Release(
+            id=release_id,
             title=post.get("title"),
             primary_performer=post.get("author"),
             release_date=post.get("created_utc"),
             enrichment_data={
-                "reddit": post,
+                "reddit": reddit_data,
                 "patreon": None,
                 "llmAnalysis": llm_analysis,
-                "gwasi": None
+                "gwasi": gwasi_data  # Full GWASI data with tags, post_type, etc.
             }
         )
 
@@ -436,11 +515,15 @@ class ReleaseOrchestrator:
                         print(f"❌ All platforms failed for {audio_version.get('version_name') or f'Version {i + 1}'}")
         else:
             # Fallback: process URLs directly (old method)
+            # Create a slug from the title for consistent naming
+            title_slug = self._create_slug(release.title or "audio")
             for i, url in enumerate(audio_urls):
                 try:
                     print(f"📥 Extracting: {url}")
 
-                    basename = f"{release.id}_audio_{i}"
+                    # Match JS naming: {post_id}_{slug}_-_default.ext
+                    version_suffix = "default" if len(audio_urls) == 1 else f"v{i + 1}"
+                    basename = f"{release.id}_{title_slug}_-_{version_suffix}"
                     target_path = {"dir": str(release_dir), "basename": basename}
                     audio_source = self.extract_audio(url, target_path)
 
@@ -508,7 +591,15 @@ class ReleaseOrchestrator:
         # Remove empty strings
         urls.discard("")
 
-        return list(urls)
+        # Clean URLs - strip trailing punctuation that may have been captured
+        cleaned_urls = set()
+        for url in urls:
+            # Strip trailing ), ], or other punctuation that's not part of URL
+            clean_url = url.rstrip(")].,:;!?")
+            if clean_url:
+                cleaned_urls.add(clean_url)
+
+        return list(cleaned_urls)
 
     def extract_script(self, script_info: dict, release_dir: Path) -> dict:
         """
@@ -742,7 +833,8 @@ class ReleaseOrchestrator:
         data_dir = Path(self.config["dataDir"])
 
         # Use version naming if available
-        if release.enrichment_data.get("llmAnalysis", {}).get("version_naming", {}).get("release_directory"):
+        llm_analysis = release.enrichment_data.get("llmAnalysis") or {}
+        if llm_analysis.get("version_naming", {}).get("release_directory"):
             release_dir = (
                 data_dir / "releases" /
                 release.primary_performer /
