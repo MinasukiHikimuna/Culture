@@ -72,7 +72,6 @@ Release (collection of related audio variants)
 | `stashapp-importer.js` | Import releases to Stashapp (FFmpeg conversion + GraphQL) |
 | `scriptbin-extractor.js` | Extract scripts from scriptbin.works |
 | `cyoa-import.js` | Import CYOA (Choose Your Own Adventure) content |
-| `reset-post.js` | Reset post data for reprocessing (JS version) |
 
 ## Directory Structure
 
