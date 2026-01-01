@@ -19,11 +19,10 @@ import csv
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 import argparse
 import os
 import re
-from urllib.parse import urlparse
 from dotenv import load_dotenv
 
 
@@ -86,7 +85,7 @@ class RedditExtractor:
             )
 
             # Test the connection
-            print(f"✅ Connected to Reddit as read-only user")
+            print("✅ Connected to Reddit as read-only user")
             print(f"🔧 User agent: {user_agent}")
 
         except Exception as e:
@@ -119,9 +118,132 @@ class RedditExtractor:
 
         return None
 
-    def get_post_data(self, post_id: str) -> Optional[Dict]:
+    def normalize_reddit_url(self, url: str) -> str:
+        """Normalize Reddit URL to standard format."""
+        if not url:
+            return url
+
+        # Remove query parameters and fragments
+        normalized = url.split("?")[0].split("#")[0]
+
+        # Ensure https://www.reddit.com prefix
+        if normalized.startswith("/r/") or normalized.startswith("/u/"):
+            normalized = f"https://www.reddit.com{normalized}"
+        elif normalized.startswith("reddit.com"):
+            normalized = f"https://www.{normalized}"
+        elif normalized.startswith("www.reddit.com"):
+            normalized = f"https://{normalized}"
+
+        # Remove trailing slash
+        normalized = normalized.rstrip("/")
+
+        return normalized
+
+    def is_crosspost(self, submission) -> bool:
+        """
+        Detect if a PRAW submission is a crosspost that needs resolution.
+
+        Args:
+            submission: PRAW Submission object
+
+        Returns:
+            True if the post is a crosspost needing resolution
+        """
+        # Check if selftext is empty/missing - main indicator we need to resolve
+        selftext = getattr(submission, "selftext", "") or ""
+        if selftext.strip() and selftext not in ("[deleted]", "[removed]"):
+            # Has content, no need to resolve
+            return False
+
+        # Check explicit crosspost indicators
+        if not submission.is_self:
+            url = getattr(submission, "url", "") or ""
+            # Match /r/subreddit/comments/ or /r/u_username/comments/
+            if ("/r/" in url or "/u_" in url) and "/comments/" in url:
+                return True
+
+        # Check domain - crossposts often have domain "reddit.com"
+        domain = getattr(submission, "domain", "") or ""
+        if domain == "reddit.com":
+            return True
+
+        # User profile crossposts: domain is "self.username" but is_self is false
+        if not submission.is_self and domain.startswith("self."):
+            return True
+
+        # Check if we have crosspost_parent_list
+        crosspost_parent_list = getattr(submission, "crosspost_parent_list", None)
+        if crosspost_parent_list and len(crosspost_parent_list) > 0:
+            return True
+
+        return False
+
+    def resolve_crosspost(self, submission) -> Optional[Dict]:
+        """
+        Resolve a crosspost to get the original post content.
+
+        Args:
+            submission: PRAW Submission object that is a crosspost
+
+        Returns:
+            Dict with resolved selftext and metadata, or None if resolution failed
+        """
+        # First, check crosspost_parent_list (fastest - no extra API call)
+        crosspost_parent_list = getattr(submission, "crosspost_parent_list", None)
+        if crosspost_parent_list and len(crosspost_parent_list) > 0:
+            parent = crosspost_parent_list[0]
+            parent_selftext = parent.get("selftext", "")
+            if parent_selftext and parent_selftext not in ("[deleted]", "[removed]"):
+                print("  📋 Using crosspost_parent_list data")
+                return {
+                    "selftext": parent_selftext,
+                    "resolved_from": "crosspost_parent_list",
+                    "original_post_id": parent.get("id"),
+                    "original_author": parent.get("author"),
+                    "original_subreddit": parent.get("subreddit"),
+                }
+
+        # Try to resolve via URL if it points to another Reddit post
+        url = getattr(submission, "url", "") or ""
+        if "/comments/" in url:
+            target_url = self.normalize_reddit_url(url)
+            target_post_id = self.extract_post_id_from_url(target_url)
+
+            if target_post_id and target_post_id != submission.id:
+                print(f"  🔗 Resolving crosspost: {target_url}")
+                try:
+                    self.rate_limit()
+                    original = self.reddit.submission(id=target_post_id)
+                    # Trigger lazy load
+                    _ = original.title
+                    original_selftext = getattr(original, "selftext", "") or ""
+
+                    if original_selftext and original_selftext not in (
+                        "[deleted]",
+                        "[removed]",
+                    ):
+                        return {
+                            "selftext": original_selftext,
+                            "resolved_from": target_url,
+                            "original_post_id": original.id,
+                            "original_author": str(original.author)
+                            if original.author
+                            else "[deleted]",
+                            "original_subreddit": str(original.subreddit),
+                        }
+                except Exception as e:
+                    print(f"  ⚠️ Could not resolve crosspost: {e}")
+
+        return None
+
+    def get_post_data(self, post_id: str, resolve_crossposts: bool = True) -> Optional[Dict]:
         """
         Fetch detailed data for a single Reddit post.
+
+        Args:
+            post_id: Reddit post ID
+            resolve_crossposts: If True, automatically resolve crossposts to get
+                               the original post content
 
         Returns:
             Dictionary with post data or None if post not found/error
@@ -137,6 +259,14 @@ class RedditExtractor:
             # Access submission attributes to trigger API call
             # This is necessary because PRAW uses lazy loading
             _ = submission.title
+
+            # Check for crosspost and resolve if needed
+            crosspost_info = None
+            selftext = submission.selftext
+            if resolve_crossposts and self.is_crosspost(submission):
+                crosspost_info = self.resolve_crosspost(submission)
+                if crosspost_info:
+                    selftext = crosspost_info["selftext"]
 
             # Extract comments
             comments_data = []
@@ -167,7 +297,7 @@ class RedditExtractor:
             post_data = {
                 "post_id": submission.id,
                 "title": submission.title,
-                "selftext": submission.selftext,
+                "selftext": selftext,
                 "subreddit": str(submission.subreddit),
                 "author": str(submission.author) if submission.author else "[deleted]",
                 "created_utc": submission.created_utc,
@@ -213,6 +343,10 @@ class RedditExtractor:
                 ),
                 "comments": comments_data,
             }
+
+            # Add crosspost resolution info if applicable
+            if crosspost_info:
+                post_data["crosspost_resolved"] = crosspost_info
 
             return post_data
 
@@ -328,7 +462,7 @@ class RedditExtractor:
             gwasi_data = filtered_data
 
         # Filter out existing posts and load them
-        print(f"🔍 Checking for existing posts...")
+        print("🔍 Checking for existing posts...")
         new_posts = []
         existing_posts = []
 
@@ -343,7 +477,7 @@ class RedditExtractor:
         print(
             f"📊 Found {len(existing_posts)} existing posts, {len(new_posts)} new posts to process"
         )
-        print(f"🚀 Starting Reddit data extraction for new posts...")
+        print("🚀 Starting Reddit data extraction for new posts...")
 
         enriched_data = existing_posts.copy()  # Start with existing posts
         failed_posts = []
@@ -400,7 +534,7 @@ class RedditExtractor:
                 )
                 print(f"❌ Failed to fetch data for post {post_id}")
 
-        print(f"\n📊 Extraction Summary:")
+        print("\n📊 Extraction Summary:")
         print(f"📂 Existing posts loaded: {len(existing_posts)}")
         print(
             f"🆕 New posts successfully processed: {len(enriched_data) - len(existing_posts)}"
@@ -698,7 +832,7 @@ def main():
             filter_usernames=filter_usernames,
         )
 
-        print(f"\n🎉 Extraction complete!")
+        print("\n🎉 Extraction complete!")
         print(f"📁 Results saved to: {extractor.output_dir}")
         print(f"📊 Processed {len(enriched_data)} posts successfully")
 
