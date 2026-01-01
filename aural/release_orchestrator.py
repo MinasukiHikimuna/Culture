@@ -373,7 +373,7 @@ class ReleaseOrchestrator:
     def process_post(
         self,
         post: dict,
-        llm_analysis: dict | None = None,
+        llm_analysis: dict,
         gwasi_data: dict | None = None
     ) -> Release:
         """
@@ -381,22 +381,34 @@ class ReleaseOrchestrator:
 
         Args:
             post: Flat post dict with id, title, author, selftext, created_utc
-            llm_analysis: Optional LLM analysis results
+            llm_analysis: LLM analysis results (required for proper URL grouping and naming)
             gwasi_data: Optional full GWASI data (preserves nested structure for enrichment)
+
+        Raises:
+            ValueError: If llm_analysis is not provided or has no audio_versions
         """
+        if not llm_analysis:
+            raise ValueError("LLM analysis is required. Run analyze_reddit_post.py first.")
+
+        if not llm_analysis.get("audio_versions"):
+            raise ValueError("LLM analysis has no audio_versions. Cannot process post.")
+
         print(f"🎯 Processing post: {post.get('title', 'Unknown')}")
 
         # Determine target directory structure first
         data_dir = Path(self.config["dataDir"])
 
-        if llm_analysis and llm_analysis.get("version_naming", {}).get("release_directory"):
-            release_dir = data_dir / "releases" / post.get("author", "unknown") / llm_analysis["version_naming"]["release_directory"]
+        # Use version naming from LLM analysis for directory structure
+        version_naming = llm_analysis.get("version_naming", {})
+        if version_naming.get("release_directory"):
+            release_dir_name = version_naming["release_directory"]
         else:
-            # Generate a stable ID based on post ID for fallback
-            stable_id = post.get("id") or hashlib.sha256(
-                f"{post.get('title', '')}-{post.get('author', '')}".encode()
-            ).hexdigest()[:16]
-            release_dir = data_dir / "releases" / post.get("author", "unknown") / stable_id
+            # Fallback: generate directory name as {post_id}_{slug}
+            post_id = post.get("id") or llm_analysis.get("metadata", {}).get("post_id") or "unknown"
+            title_slug = self._create_slug(post.get("title", ""), max_length=40)
+            release_dir_name = f"{post_id}_{title_slug}" if title_slug else post_id
+
+        release_dir = data_dir / "releases" / post.get("author", "unknown") / release_dir_name
 
         # Check if release already exists
         release_path = release_dir / "release.json"
@@ -429,8 +441,8 @@ class ReleaseOrchestrator:
         # If gwasi_data provided, use it for enrichment; otherwise use post directly
         reddit_data = gwasi_data.get("reddit_data", post) if gwasi_data else post
 
-        # Use post ID as release ID for stable directory naming
-        release_id = post.get("id") or stable_id
+        # Use post ID as release ID
+        release_id = post.get("id") or llm_analysis.get("metadata", {}).get("post_id") or release_dir_name
 
         release = Release(
             id=release_id,
@@ -452,85 +464,68 @@ class ReleaseOrchestrator:
         print(f"🔗 Found {len(audio_urls)} unique audio URL{'s' if len(audio_urls) != 1 else ''}")
 
         # Process each audio version with proper naming
-        if llm_analysis and llm_analysis.get("audio_versions"):
-            for i, audio_version in enumerate(llm_analysis["audio_versions"]):
-                if audio_version.get("urls"):
-                    # Sort URLs by platform priority
-                    sorted_urls = self.sort_urls_by_priority(audio_version["urls"])
-                    audio_source = None
-                    used_url = None
+        for i, audio_version in enumerate(llm_analysis["audio_versions"]):
+            if not audio_version.get("urls"):
+                continue
 
-                    # Determine basename for this version
-                    if audio_version.get("filename"):
-                        # Remove extension
-                        basename = re.sub(r"\.[^.]+$", "", audio_version["filename"])
-                    else:
-                        release_slug = llm_analysis.get("version_naming", {}).get("release_slug") or release.id
-                        basename = f"{release_slug}_{audio_version.get('slug', i)}"
+            # Sort URLs by platform priority
+            sorted_urls = self.sort_urls_by_priority(audio_version["urls"])
+            audio_source = None
+            used_url = None
 
-                    target_path = {"dir": str(release_dir), "basename": basename}
+            # Determine basename for this version
+            if audio_version.get("filename"):
+                # Remove extension
+                basename = re.sub(r"\.[^.]+$", "", audio_version["filename"])
+            else:
+                release_slug = llm_analysis.get("version_naming", {}).get("release_slug") or release.id
+                basename = f"{release_slug}_{audio_version.get('slug', i)}"
 
-                    # Try each platform in priority order with retries
-                    for url_info in sorted_urls:
-                        max_retries = 3
-                        retry_count = 0
+            target_path = {"dir": str(release_dir), "basename": basename}
 
-                        while retry_count < max_retries:
-                            try:
-                                version_name = audio_version.get("version_name") or f"Version {i + 1}"
-                                print(f"📥 Extracting: {url_info['url']} ({version_name})")
-                                audio_source = self.extract_audio(url_info["url"], target_path)
-                                used_url = url_info
-                                break  # Success, exit retry loop
-                            except Exception as error:
-                                retry_count += 1
-                                if retry_count < max_retries:
-                                    print(f"⚠️  Retry {retry_count}/{max_retries} for {url_info.get('platform', 'unknown')}: {error}")
-                                else:
-                                    print(f"❌ Failed {url_info.get('platform', 'unknown')} after {max_retries} retries: {error}")
+            # Try each platform in priority order with retries
+            for url_info in sorted_urls:
+                max_retries = 3
+                retry_count = 0
 
-                        if audio_source:
-                            break  # Success, don't try other platforms
+                while retry_count < max_retries:
+                    try:
+                        version_name = audio_version.get("version_name") or f"Version {i + 1}"
+                        print(f"📥 Extracting: {url_info['url']} ({version_name})")
+                        audio_source = self.extract_audio(url_info["url"], target_path)
+                        used_url = url_info
+                        break  # Success, exit retry loop
+                    except Exception as error:
+                        retry_count += 1
+                        if retry_count < max_retries:
+                            print(f"⚠️  Retry {retry_count}/{max_retries} for {url_info.get('platform', 'unknown')}: {error}")
+                        else:
+                            print(f"❌ Failed {url_info.get('platform', 'unknown')} after {max_retries} retries: {error}")
 
-                    if audio_source:
-                        # Add version-specific metadata
-                        audio_source.version_info = {
-                            "slug": audio_version.get("slug"),
-                            "version_name": audio_version.get("version_name"),
-                            "description": audio_version.get("description"),
-                            "performers": audio_version.get("performers", []),
-                            "tags": audio_version.get("tags", [])
-                        }
+                if audio_source:
+                    break  # Success, don't try other platforms
 
-                        # Store alternate sources
-                        audio_source.alternate_sources = [
-                            {"platform": u.get("platform"), "url": u.get("url")}
-                            for u in sorted_urls
-                            if u.get("url") != used_url.get("url")
-                        ]
+            if audio_source:
+                # Add version-specific metadata
+                audio_source.version_info = {
+                    "slug": audio_version.get("slug"),
+                    "version_name": audio_version.get("version_name"),
+                    "description": audio_version.get("description"),
+                    "performers": audio_version.get("performers", []),
+                    "tags": audio_version.get("tags", [])
+                }
 
-                        release.add_audio_source(audio_source)
-                        print(f"✅ Added audio source: {audio_version.get('version_name', 'Version')} from {audio_source.metadata['platform']['name']}")
-                    else:
-                        print(f"❌ All platforms failed for {audio_version.get('version_name') or f'Version {i + 1}'}")
-        else:
-            # Fallback: process URLs directly (old method)
-            # Create a slug from the title for consistent naming
-            title_slug = self._create_slug(release.title or "audio")
-            for i, url in enumerate(audio_urls):
-                try:
-                    print(f"📥 Extracting: {url}")
+                # Store alternate sources
+                audio_source.alternate_sources = [
+                    {"platform": u.get("platform"), "url": u.get("url")}
+                    for u in sorted_urls
+                    if u.get("url") != used_url.get("url")
+                ]
 
-                    # Match JS naming: {post_id}_{slug}_-_default.ext
-                    version_suffix = "default" if len(audio_urls) == 1 else f"v{i + 1}"
-                    basename = f"{release.id}_{title_slug}_-_{version_suffix}"
-                    target_path = {"dir": str(release_dir), "basename": basename}
-                    audio_source = self.extract_audio(url, target_path)
-
-                    release.add_audio_source(audio_source)
-                    print(f"✅ Added audio source from {audio_source.metadata['platform']['name']}")
-                except Exception as error:
-                    print(f"❌ Failed to extract {url}: {error}")
+                release.add_audio_source(audio_source)
+                print(f"✅ Added audio source: {audio_version.get('version_name', 'Version')} from {audio_source.metadata['platform']['name']}")
+            else:
+                print(f"❌ All platforms failed for {audio_version.get('version_name') or f'Version {i + 1}'}")
 
         # Fail early if no audio sources were downloaded
         if not release.audio_sources:
@@ -929,19 +924,28 @@ class ReleaseOrchestrator:
 
 
 def main():
-    """CLI entry point for testing."""
+    """CLI entry point."""
     parser = argparse.ArgumentParser(
-        description="Release Orchestrator - Process posts into releases"
+        description="Release Orchestrator - Process posts into releases",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Process with automatic LLM analysis (default):
+  uv run python release_orchestrator.py extracted_data/reddit/performer/post.json
+
+  # Process with pre-computed analysis:
+  uv run python release_orchestrator.py post.json --analysis analysis.json
+"""
     )
     parser.add_argument(
         "post_file",
         nargs="?",
-        help="JSON file containing post data"
+        help="JSON file containing post data (from extracted_data/reddit/...)"
     )
     parser.add_argument(
         "--analysis",
         "-a",
-        help="JSON file containing LLM analysis"
+        help="JSON file containing pre-computed LLM analysis (skips LLM call)"
     )
     parser.add_argument(
         "--output-dir",
@@ -954,8 +958,6 @@ def main():
 
     if not args.post_file:
         parser.print_help()
-        print("\nExample:")
-        print("  uv run python release_orchestrator.py post.json --analysis analysis.json")
         return 1
 
     try:
@@ -965,18 +967,29 @@ def main():
             print(f"❌ Post file not found: {args.post_file}")
             return 1
 
-        post = json.loads(post_path.read_text(encoding="utf-8"))
+        # Create orchestrator
+        orchestrator = ReleaseOrchestrator({"dataDir": args.output_dir})
 
-        # Load analysis if provided
-        llm_analysis = None
+        # Use load_reddit_data for proper nested data handling
+        post, gwasi_data = orchestrator.load_reddit_data(post_path)
+
+        # Load pre-computed analysis or run LLM analysis
         if args.analysis:
             analysis_path = Path(args.analysis)
-            if analysis_path.exists():
-                llm_analysis = json.loads(analysis_path.read_text(encoding="utf-8"))
+            if not analysis_path.exists():
+                print(f"❌ Analysis file not found: {args.analysis}")
+                return 1
+            llm_analysis = json.loads(analysis_path.read_text(encoding="utf-8"))
+            print(f"📋 Loaded analysis from: {args.analysis}")
+        else:
+            print("🤖 Running LLM analysis...")
+            from analyze_reddit_post import EnhancedRedditPostAnalyzer
+            analyzer = EnhancedRedditPostAnalyzer()
+            llm_analysis = analyzer.analyze_post(post_path)
+            print("✅ LLM analysis complete")
 
-        # Create orchestrator and process
-        orchestrator = ReleaseOrchestrator({"dataDir": args.output_dir})
-        release = orchestrator.process_post(post, llm_analysis)
+        # Process the post
+        release = orchestrator.process_post(post, llm_analysis, gwasi_data=gwasi_data)
 
         print("\n✅ Processing complete!")
         print(f"📁 Release ID: {release.id}")
@@ -986,6 +999,8 @@ def main():
 
     except Exception as e:
         print(f"\n❌ Error: {e}")
+        import traceback
+        traceback.print_exc()
         return 1
 
 
