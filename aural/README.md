@@ -1,5 +1,71 @@
 # GWASI Reddit Audio Data Extractor
 
+Audio content extraction and Stashapp import system for GoneWildAudio content.
+
+## Domain Model
+
+### Core Concepts
+
+| Concept | Description |
+|---------|-------------|
+| **Release** | Root aggregate - a complete content release with all its metadata, variants, and enrichment data |
+| **Release Variant** | A specific version of the content (e.g., F4M, F4F, with-SFX). Can exist on multiple platforms |
+| **Media Platform** | Where media files are hosted: Soundgasm, Whyp.it, HotAudio, YouTube, Pornhub |
+| **Performer** | Voice actor/content creator. A release has one primary performer (the publisher) and optionally additional performers |
+| **Script** | Optional written content that performers execute (from scriptbin.works, etc.) |
+| **Reddit Post** | Source of enrichment metadata - contains links to audio, performer info, tags, comments |
+| **Indexer** | Discovery service that indexes content. GWASI (pure indexer), HotAudio, Pornhub (have indexer logic) |
+| **Stashapp** | Destination archive system for organized releases |
+
+### Entity Relationships
+
+```
+                              ┌─────────────┐
+                              │   Indexer   │
+                              │ (GWASI,     │
+                              │  HotAudio,  │
+                              │  Pornhub)   │
+                              └──────┬──────┘
+                                     │ discovers
+                                     ▼
+┌─────────────┐    1:N      ┌─────────────┐
+│  Performer  │◄────────────│   Release   │
+│             │  publishes  │             │
+└─────────────┘             └──────┬──────┘
+      ▲                            │
+      │ additional                 │ 1:N
+      │ performers                 ▼
+      │                     ┌─────────────────┐
+      └─────────────────────│ Release Variant │
+                            │ (F4M, F4F,      │
+                            │  with-SFX, etc) │
+                            └────────┬────────┘
+                                     │ N:M
+                                     ▼
+                            ┌─────────────────┐
+                            │ Media Platform  │
+                            │ (Soundgasm,     │
+                            │  Whyp.it,       │
+                            │  HotAudio,      │
+                            │  YouTube,       │
+                            │  Pornhub)       │
+                            └─────────────────┘
+```
+
+### Cardinalities
+
+| Relationship | Cardinality | Notes |
+|--------------|-------------|-------|
+| Performer → Release | 1:N | One performer publishes many releases |
+| Release → Performer | N:M | One primary + optional additional performers |
+| Release → Reddit Post | 1:N | A release may be listed on multiple posts |
+| Release → Release Variant | 1:N | One release has one or more variants |
+| Release Variant → Media Platform | N:M | Same variant can exist on multiple platforms |
+| Release → Script | 1:0..1 | A release may have an optional script |
+| Indexer → Release | 1:N | An indexer discovers many releases |
+
+---
+
 This tool extracts comprehensive data from [gwasi.com](https://gwasi.com/), which maintains an index of Reddit audio content from various adult audio subreddits.
 
 ## Quickstart
