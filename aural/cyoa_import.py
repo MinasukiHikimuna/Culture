@@ -17,7 +17,6 @@ Options:
 import argparse
 import json
 import re
-import subprocess
 import sys
 import time
 from datetime import datetime, timezone
@@ -26,14 +25,15 @@ from pathlib import Path
 import httpx
 from dotenv import load_dotenv
 
-from stashapp_importer import STASH_BASE_URL, StashappClient
+from stashapp_importer import (
+    STASH_BASE_URL,
+    STASH_OUTPUT_DIR,
+    StashappClient,
+    convert_audio_to_video,
+)
 
 # Load .env from project root
 load_dotenv(Path(__file__).parent / ".env")
-
-# Configuration
-STASH_OUTPUT_DIR = Path("/Volumes/Culture 1/Aural_Stash")
-STATIC_IMAGE = Path(__file__).parent / "gwa.png"
 
 
 def download_soundgasm_audio(url: str, output_path: Path) -> Path:
@@ -67,63 +67,6 @@ def download_soundgasm_audio(url: str, output_path: Path) -> Path:
         print(f"  Downloaded: {output_path}")
 
     return output_path
-
-
-def convert_audio_to_video(audio_path: Path, output_path: Path) -> bool:
-    """Convert audio to video with static image."""
-    static_image = STATIC_IMAGE
-
-    # Check if static image exists
-    if not static_image.exists():
-        print(f"  Warning: Static image not found at {static_image}")
-        print("  Creating a simple black image...")
-        subprocess.run(
-            [
-                "ffmpeg",
-                "-f",
-                "lavfi",
-                "-i",
-                "color=c=black:s=1280x720:d=1",
-                "-frames:v",
-                "1",
-                str(static_image),
-            ],
-            capture_output=True,
-            check=False,
-        )
-
-    cmd = [
-        "ffmpeg",
-        "-y",
-        "-loop",
-        "1",
-        "-i",
-        str(static_image),
-        "-i",
-        str(audio_path),
-        "-c:v",
-        "libx264",
-        "-tune",
-        "stillimage",
-        "-c:a",
-        "aac",
-        "-b:a",
-        "192k",
-        "-pix_fmt",
-        "yuv420p",
-        "-shortest",
-        str(output_path),
-    ]
-
-    print("  Running ffmpeg conversion...")
-
-    try:
-        subprocess.run(cmd, capture_output=True, check=True)
-    except subprocess.CalledProcessError as e:
-        print(f"  ffmpeg error: {e}")
-        return False
-
-    return output_path.exists()
 
 
 def generate_description(
