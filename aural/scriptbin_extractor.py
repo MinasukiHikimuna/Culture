@@ -273,6 +273,26 @@ class ScriptBinExtractor:
                     if len(lines) > 5:  # Looks like script content
                         script_lines.extend(lines)
 
+            # Try main content area with paragraphs (scriptbin new layout)
+            if not script_lines:
+                main_tag = soup.find("main")
+                if main_tag:
+                    # Find all paragraphs in main, skip metadata at the start
+                    paragraphs = main_tag.find_all("p")
+                    in_script_content = False
+                    for p in paragraphs:
+                        text = p.get_text(strip=True)
+                        # Skip metadata paragraphs
+                        if text.startswith("Performers:") or text.startswith("Listeners:"):
+                            continue
+                        if text.startswith("Short link:") or "scriptbin.works" in text:
+                            continue
+                        if "words" in text and "characters" in text:
+                            in_script_content = True  # Script content starts after this
+                            continue
+                        if in_script_content and len(text) > 2:
+                            script_lines.append(text)
+
             # Last resort: look for divs with substantial dialogue-like content
             if not script_lines:
                 skip_patterns = [

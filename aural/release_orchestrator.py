@@ -891,9 +891,12 @@ class ReleaseOrchestrator:
                             }
                         }
                 except Exception as scriptbin_error:
-                    print(f"   ⚠️  Could not extract from scriptbin.works: {scriptbin_error}")
+                    # Don't fall back to Reddit post - propagate the failure
+                    raise ValueError(
+                        f"Found scriptbin.works link but extraction failed: {scriptbin_error}"
+                    )
 
-            # No scriptbin link found, or extraction failed - return Reddit post content
+            # No scriptbin link found - return Reddit post content as the script
             return {
                 "content": post_content,
                 "metadata": reddit_metadata
