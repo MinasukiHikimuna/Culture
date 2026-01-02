@@ -353,6 +353,30 @@ class StashappClient:
         result = self.query("query { version { version } }")
         return result.get("version", {}).get("version", "unknown")
 
+    def generate_covers(self) -> str:
+        """Generate cover images for scenes."""
+        query = """
+            mutation MetadataGenerate($input: GenerateMetadataInput!) {
+                metadataGenerate(input: $input)
+            }
+        """
+        input_data = {
+            "covers": True,
+            "markers": False,
+            "phashes": False,
+            "previewOptions": {
+                "previewPreset": "slow",
+                "previewSegmentDuration": 0.75,
+                "previewSegments": 12,
+                "previewExcludeStart": "0",
+                "previewExcludeEnd": "0",
+            },
+            "previews": False,
+            "sprites": False,
+        }
+        result = self.query(query, {"input": input_data})
+        return result.get("metadataGenerate", "")
+
     def get_scene_with_files(self, scene_id: str) -> dict | None:
         """Get a scene with its files and fingerprints."""
         query = """
@@ -1099,6 +1123,12 @@ class StashappImporter:
             print("\n  Updating scene metadata...")
             self.client.update_scene(scene["id"], updates)
             print("  Scene updated successfully!")
+
+            # Generate cover image
+            print("  Generating cover image...")
+            self.client.generate_covers()
+            self.client.wait_for_scan(30)
+            print("  Cover generated!")
 
             # Set audio fingerprint for duplicate detection
             if audio_checksum:

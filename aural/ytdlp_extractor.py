@@ -210,6 +210,7 @@ class YtDlpExtractor:
             **self.BASE_OPTS,
             "outtmpl": output_template,
             "writeinfojson": True,
+            "noplaylist": True,  # Only download single video, not playlist
             "logger": YtDlpLogger(),
             "progress_hooks": [self._progress_hook],
         }
@@ -234,6 +235,9 @@ class YtDlpExtractor:
             if info_json_path.exists():
                 result["backupFiles"]["metadata"] = str(info_json_path)
 
+        # Cache the result for duplicate detection
+        self._save_to_cache(url, result)
+
         print("✅ Download completed successfully")
         return result
 
@@ -248,6 +252,7 @@ class YtDlpExtractor:
 
         ydl_opts = {
             **self.BASE_OPTS,
+            "noplaylist": True,  # Only extract single video, not playlist
             "logger": YtDlpLogger(),
         }
 
@@ -269,7 +274,7 @@ class YtDlpExtractor:
 
         ydl_opts = {
             **self.BASE_OPTS,
-            "extract_flat": True,
+            "extract_flat": "in_playlist",
             "logger": YtDlpLogger(),
         }
 
@@ -284,12 +289,12 @@ class YtDlpExtractor:
             print("❌ Failed to extract playlist info")
             return []
 
+        entries = info.get("entries", [])
+
         # Handle single video vs playlist
-        if info.get("_type") != "playlist":
+        if not entries:
             # Single video, just extract its info
             return [self.extract_info(url)]
-
-        entries = info.get("entries", [])
         print(f"🔍 Found {len(entries)} videos")
 
         results = []
@@ -301,22 +306,42 @@ class YtDlpExtractor:
             if not video_url:
                 continue
 
-            print(
-                f"📥 Processing {i + 1}/{len(entries)}: {entry.get('title', video_url)}"
-            )
-
-            try:
-                result = self.extract_info(video_url)
-                result["playlist_info"] = {
+            # Build minimal result from flat entry (no full extraction)
+            result = {
+                "video": {
+                    "sourceUrl": video_url,
+                    "filePath": None,
+                    "format": None,
+                    "fileSize": None,
+                    "checksum": None,
+                },
+                "metadata": {
+                    "title": entry.get("title", ""),
+                    "author": entry.get("uploader", info.get("uploader", "")),
+                    "description": "",
+                    "tags": [],
+                    "duration": entry.get("duration"),
+                    "platform": {
+                        "name": info.get("extractor", ""),
+                        "url": "",
+                    },
+                    "performers": {
+                        "primary": entry.get("uploader", info.get("uploader", "")),
+                        "additional": [],
+                    },
+                },
+                "platformData": {
+                    "id": entry.get("id", ""),
+                    "upload_date": entry.get("upload_date"),
+                },
+                "playlist_info": {
                     "title": info.get("title"),
                     "id": info.get("id"),
                     "uploader": info.get("uploader"),
                     "index": i + 1,
-                }
-                results.append(result)
-            except Exception as e:
-                print(f"❌ Failed to extract {video_url}: {e}")
-                continue
+                },
+            }
+            results.append(result)
 
         return results
 

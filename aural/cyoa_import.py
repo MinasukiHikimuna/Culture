@@ -466,6 +466,13 @@ class CYOAImporter:
 
         self.update_descriptions(cyoa_data, scene_mapping)
 
+        # Generate cover images
+        print("\nGenerating cover images...")
+        if not self.dry_run:
+            self.client.generate_covers()
+            self.client.wait_for_scan(60)
+            print("Covers generated!")
+
         # Summary
         print(f"\n{'=' * 60}")
         print("CYOA Import Complete!")

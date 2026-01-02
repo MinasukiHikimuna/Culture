@@ -54,6 +54,11 @@ class YtDlpImporter:
             )
         return self._extractor
 
+    def is_cached(self, url: str) -> bool:
+        """Check if URL is already in the yt-dlp cache."""
+        cache_path = self.extractor._get_cache_path(url)
+        return cache_path.exists()
+
     def test_connection(self) -> str:
         """Test Stashapp connection."""
         print("Testing Stashapp connection...")
@@ -204,11 +209,72 @@ class YtDlpImporter:
         self.stash_client.update_scene(scene["id"], updates)
         print("  Scene updated successfully!")
 
+        # Generate cover image
+        print("  Generating cover image...")
+        self.stash_client.generate_covers()
+        self.stash_client.wait_for_scan(30)
+        print("  Cover generated!")
+
         return {
             "success": True,
             "sceneId": scene["id"],
             "sceneUrl": f"{STASH_BASE_URL}/scenes/{scene['id']}",
             "videoFile": str(output_path),
+        }
+
+    def process_channel(self, url: str, limit: int | None = None) -> dict:
+        """Process all videos from a channel/playlist URL."""
+        print(f"\nIndexing channel: {url}")
+        entries = self.extractor.index_playlist(url, max_videos=limit)
+        print(f"Found {len(entries)} videos")
+
+        # Check duplicates
+        print("\nChecking duplicates...")
+        new_videos = []
+        cached_count = 0
+
+        for entry in entries:
+            video_url = entry.get("video", {}).get("sourceUrl")
+            title = entry.get("metadata", {}).get("title", "Unknown")[:50]
+
+            if not video_url:
+                print(f"  ? {title} - no URL found")
+                continue
+
+            if self.is_cached(video_url):
+                print(f"  ✓ {title} - cached")
+                cached_count += 1
+            else:
+                print(f"  ○ {title} - new")
+                new_videos.append(video_url)
+
+        print(f"\n{len(new_videos)} new, {cached_count} cached")
+
+        if not new_videos:
+            return {"success": True, "imported": 0, "skipped": cached_count}
+
+        # Process new videos
+        print(f"\nProcessing {len(new_videos)} new videos...")
+        imported = 0
+        failed = 0
+
+        for video_url in new_videos:
+            try:
+                result = self.process_url(video_url)
+                if result["success"]:
+                    imported += 1
+                else:
+                    failed += 1
+                    print(f"  Failed: {result.get('error')}")
+            except Exception as e:
+                failed += 1
+                print(f"  Error: {e}")
+
+        return {
+            "success": True,
+            "imported": imported,
+            "skipped": cached_count,
+            "failed": failed,
         }
 
 
@@ -220,9 +286,12 @@ def main() -> int:
         epilog="""
 Examples:
   uv run python ytdlp_import.py https://www.pornhub.com/view_video.php?viewkey=...
+  uv run python ytdlp_import.py https://www.pornhub.com/model/username
+  uv run python ytdlp_import.py https://www.pornhub.com/model/username --limit 5
 """,
     )
-    parser.add_argument("url", help="Video URL to download and import")
+    parser.add_argument("url", help="Video or channel URL to download and import")
+    parser.add_argument("--limit", "-l", type=int, help="Max videos to process (for channels)")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
 
     args = parser.parse_args()
@@ -235,18 +304,21 @@ Examples:
     try:
         importer = YtDlpImporter(verbose=args.verbose)
         importer.test_connection()
-        result = importer.process_url(args.url)
 
-        if result["success"]:
-            print(f"\n{'=' * 60}")
+        # Always use process_channel - it handles both single videos and channels
+        result = importer.process_channel(args.url, limit=args.limit)
+
+        print(f"\n{'=' * 60}")
+        if result.get("imported", 0) == 1 and result.get("skipped", 0) == 0:
             print("Import completed successfully!")
-            if result.get("sceneUrl"):
-                print(f"Scene URL: {result['sceneUrl']}")
-            print("=" * 60)
-            return 0
         else:
-            print(f"\nImport failed: {result.get('error')}")
-            return 1
+            print("Import completed!")
+            print(f"  Imported: {result.get('imported', 0)}")
+            print(f"  Skipped (cached): {result.get('skipped', 0)}")
+        if result.get("failed"):
+            print(f"  Failed: {result.get('failed')}")
+        print("=" * 60)
+        return 0
 
     except Exception as e:
         print(f"Error: {e}")
