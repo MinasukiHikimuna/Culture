@@ -1,7 +1,7 @@
 [project]
-name = "gwasi-extractor"
+name = "aural"
 version = "0.1.0"
-description = "Extract and process audio content metadata from GWASI and related platforms"
+description = "Audio content extraction and Stashapp import system for GoneWildAudio content"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

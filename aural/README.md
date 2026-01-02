@@ -1,4 +1,4 @@
-# GWASI Reddit Audio Data Extractor
+# Aural
 
 Audio content extraction and Stashapp import system for GoneWildAudio content.
 

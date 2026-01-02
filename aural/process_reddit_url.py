@@ -56,7 +56,7 @@ class RedditProcessor:
 
             client_id = os.getenv("REDDIT_CLIENT_ID")
             client_secret = os.getenv("REDDIT_CLIENT_SECRET")
-            user_agent = os.getenv("REDDIT_USER_AGENT", "gwasi-extractor/1.0")
+            user_agent = os.getenv("REDDIT_USER_AGENT", "Aural/1.0")
 
             if not client_id or not client_secret:
                 raise ValueError(
@@ -443,7 +443,7 @@ class RedditProcessor:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Process Reddit URL - Complete GWASI Extraction Pipeline",
+        description="Process Reddit URL - Complete Aural Extraction Pipeline",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Arguments:

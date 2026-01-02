@@ -2,7 +2,7 @@
 
 ## Overview
 
-The transformation system provides a unified way to process audio and video files across all extractors in the GWASI system. It supports chained transformations with full provenance tracking.
+The transformation system provides a unified way to process audio and video files across all extractors in Aural. It supports chained transformations with full provenance tracking.
 
 ## Key Features
 

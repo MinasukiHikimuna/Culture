@@ -1,4 +1,4 @@
-# Data Structure Recommendations for GWASI Extractor
+# Data Structure Recommendations for Aural
 
 ## Executive Summary
 
@@ -386,4 +386,4 @@ The recommended data structure better reflects the reality of audio release comp
 3. Series with complex relationships
 4. Proper attribution for all contributors
 
-This structure will make the GWASI extractor more accurate, flexible, and useful for organizing audio content.
+This structure will make Aural more accurate, flexible, and useful for organizing audio content.

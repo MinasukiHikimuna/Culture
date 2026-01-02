@@ -750,7 +750,7 @@ class ReleaseOrchestrator:
             response = httpx.get(
                 json_url,
                 headers={
-                    "User-Agent": "gwasi-extractor/1.0 (audio archival tool)",
+                    "User-Agent": "Aural/1.0 (audio archival tool)",
                     "Accept": "application/json"
                 },
                 timeout=30.0

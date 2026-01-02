@@ -33,7 +33,7 @@ class RedditResolver:
     def __init__(self):
         self.client = httpx.Client(
             timeout=30.0,
-            headers={"User-Agent": "gwasi-extractor/1.0 (audio archival tool)"},
+            headers={"User-Agent": "Aural/1.0 (audio archival tool)"},
         )
 
     def is_crosspost(self, reddit_data: dict) -> bool:

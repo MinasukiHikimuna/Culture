@@ -23,7 +23,7 @@ def get_reddit_client():
 
     client_id = os.getenv("REDDIT_CLIENT_ID")
     client_secret = os.getenv("REDDIT_CLIENT_SECRET")
-    user_agent = os.getenv("REDDIT_USER_AGENT", "GWASIExtractor/1.0")
+    user_agent = os.getenv("REDDIT_USER_AGENT", "Aural/1.0")
 
     if not client_id or not client_secret:
         print(json.dumps({
