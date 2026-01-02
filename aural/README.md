@@ -15,6 +15,7 @@ Audio content extraction and Stashapp import system for GoneWildAudio content.
 | **Script** | Optional written content that performers execute (from scriptbin.works, etc.) |
 | **Reddit Post** | Source of enrichment metadata - contains links to audio, performer info, tags, comments |
 | **Indexer** | Discovery service that indexes content. GWASI (pure indexer), HotAudio, Pornhub (have indexer logic) |
+| **Tag** | Content descriptor (e.g., "gentle", "rough", "friends to lovers"). Releases have many tags |
 | **Stashapp** | Destination archive system for organized releases |
 
 ### Entity Relationships
@@ -62,6 +63,7 @@ Audio content extraction and Stashapp import system for GoneWildAudio content.
 | Release → Release Variant | 1:N | One release has one or more variants |
 | Release Variant → Media Platform | N:M | Same variant can exist on multiple platforms |
 | Release → Script | 1:0..1 | A release may have an optional script |
+| Release → Tag | N:M | A release has many tags; tags apply to many releases |
 | Indexer → Release | 1:N | An indexer discovers many releases |
 
 ---
