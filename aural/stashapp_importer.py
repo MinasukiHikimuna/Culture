@@ -285,7 +285,7 @@ class StashappClient:
         start_time = time.time()
         while time.time() - start_time < timeout:
             result = self.query("query { jobQueue { id status } }")
-            jobs = result.get("jobQueue", [])
+            jobs = result.get("jobQueue") or []
             if len(jobs) == 0:
                 return True
             time.sleep(1)
@@ -788,9 +788,9 @@ def format_output_filename(
         date = datetime.fromtimestamp(release_date, tz=timezone.utc)
         date_str = date.strftime("%Y-%m-%d")
 
-    # Get Reddit post ID
+    # Get Reddit post ID (try both 'id' and 'post_id' keys)
     reddit_data = release.get("enrichmentData", {}).get("reddit", {})
-    post_id = reddit_data.get("id", "unknown")
+    post_id = reddit_data.get("id") or reddit_data.get("post_id") or release.get("id") or "unknown"
 
     # Get clean title (remove emoji and brackets)
     title = release.get("title", "Unknown")
