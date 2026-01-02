@@ -23,6 +23,7 @@ from typing import Any
 
 import httpx
 
+from ao3_extractor import AO3Extractor
 from hotaudio_extractor import HotAudioExtractor
 from scriptbin_extractor import ScriptBinExtractor
 from soundgasm_extractor import SoundgasmExtractor
@@ -633,6 +634,11 @@ class ReleaseOrchestrator:
                 script_content = result.get("content")
                 html_content = result.get("htmlContent")
                 script_metadata.update(result.get("metadata", {}))
+            elif "archiveofourown.org" in resolved_url:
+                result = self.extract_ao3_script(resolved_url)
+                script_content = result.get("content")
+                html_content = result.get("htmlContent")
+                script_metadata.update(result.get("metadata", {}))
             elif "reddit.com" in resolved_url:
                 result = self.extract_reddit_script(resolved_url)
                 script_content = result.get("content")
@@ -734,6 +740,64 @@ class ReleaseOrchestrator:
 
         except Exception as error:
             raise ValueError(f"Scriptbin extraction failed: {error}")
+
+    def extract_ao3_script(self, url: str) -> dict:
+        """Extract script content from archiveofourown.org using AO3Extractor."""
+        try:
+            # Get or create AO3 extractor instance
+            extractor = self.active_extractors.get("ao3")
+            if not extractor:
+                extractor = AO3Extractor()
+                extractor.setup_playwright()
+                self.active_extractors["ao3"] = extractor
+
+            # Extract work data
+            work_data = extractor.get_work_data(url)
+
+            if not work_data or not work_data.get("script_content"):
+                return {
+                    "content": None,
+                    "htmlContent": work_data.get("html_content") if work_data else None,
+                    "metadata": {
+                        "source": "archiveofourown.org",
+                        "url": url,
+                        "note": "Could not extract work content"
+                    }
+                }
+
+            # Join the content lines into a single string
+            content = "\n".join(work_data["script_content"])
+
+            return {
+                "content": content,
+                "htmlContent": work_data.get("html_content"),
+                "metadata": {
+                    "source": "archiveofourown.org",
+                    "workId": work_data.get("work_id"),
+                    "title": work_data.get("title"),
+                    "author": work_data.get("author"),
+                    "authors": work_data.get("authors"),
+                    "username": work_data.get("username"),
+                    "wordCount": work_data.get("word_count"),
+                    "rating": work_data.get("rating"),
+                    "archiveWarnings": work_data.get("archive_warnings"),
+                    "categories": work_data.get("categories"),
+                    "fandoms": work_data.get("fandoms"),
+                    "relationships": work_data.get("relationships"),
+                    "characters": work_data.get("characters"),
+                    "additionalTags": work_data.get("additional_tags"),
+                    "language": work_data.get("language"),
+                    "published": work_data.get("published"),
+                    "updated": work_data.get("updated"),
+                    "chapters": work_data.get("chapters"),
+                    "kudos": work_data.get("kudos"),
+                    "summary": work_data.get("summary"),
+                    "series": work_data.get("series")
+                }
+            }
+
+        except Exception as error:
+            raise ValueError(f"AO3 extraction failed: {error}")
 
     def extract_reddit_script(self, url: str) -> dict:
         """

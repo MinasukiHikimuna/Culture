@@ -27,6 +27,7 @@ class ScriptUrlExtractor:
         # Common script hosting platforms
         self.script_platforms = [
             'scriptbin.works',
+            'archiveofourown.org',
             'pastebin.com',
             'github.com',
             'gitlab.com',
