@@ -32,15 +32,25 @@ class ScriptBinExtractor:
         self.page = None
         self.playwright = None
         self.context = None
+        self._owns_browser = False  # Track if we own the browser instance
 
-    def setup_playwright(self, headless: bool = True):
-        """Initialize Playwright browser."""
+    def setup_playwright(self, headless: bool = True, page=None, context=None):
+        """Initialize Playwright browser or use provided page/context."""
+        if page is not None:
+            # Use externally provided page (shared browser)
+            self.page = page
+            self.context = context
+            self._owns_browser = False
+            print("Using shared Playwright browser")
+            return
+
         try:
             print("Starting Playwright browser...")
             self.playwright = sync_playwright().start()
             self.browser = self.playwright.chromium.launch(headless=headless)
             self.context = self.browser.new_context()
             self.page = self.context.new_page()
+            self._owns_browser = True
             print("Playwright browser initialized successfully")
         except Exception as error:
             print(f"Failed to initialize Playwright: {error}")
@@ -48,7 +58,13 @@ class ScriptBinExtractor:
             raise
 
     def close_browser(self):
-        """Close Playwright browser."""
+        """Close Playwright browser if we own it."""
+        if not self._owns_browser:
+            # Don't close shared browser
+            self.page = None
+            self.context = None
+            return
+
         if self.page:
             self.page.close()
             self.page = None

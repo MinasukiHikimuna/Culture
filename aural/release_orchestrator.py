@@ -198,6 +198,17 @@ class ReleaseOrchestrator:
         """Register a platform extractor."""
         self.extractors[platform] = config
 
+    def _get_shared_playwright(self) -> tuple:
+        """Get page and context from an active extractor for browser sharing.
+
+        Returns:
+            Tuple of (page, context) from an active extractor, or (None, None) if none available.
+        """
+        for extractor in self.active_extractors.values():
+            if hasattr(extractor, "page") and extractor.page is not None:
+                return extractor.page, extractor.context
+        return None, None
+
     def _create_slug(self, text: str, max_length: int = 50) -> str:
         """
         Create a URL-safe slug from text.
@@ -702,7 +713,9 @@ class ReleaseOrchestrator:
             extractor = self.active_extractors.get("scriptbin")
             if not extractor:
                 extractor = ScriptBinExtractor()
-                extractor.setup_playwright()
+                # Try to share browser from an active audio extractor
+                page, context = self._get_shared_playwright()
+                extractor.setup_playwright(page=page, context=context)
                 self.active_extractors["scriptbin"] = extractor
 
             # Extract script data
@@ -748,7 +761,9 @@ class ReleaseOrchestrator:
             extractor = self.active_extractors.get("ao3")
             if not extractor:
                 extractor = AO3Extractor()
-                extractor.setup_playwright()
+                # Try to share browser from an active audio extractor
+                page, context = self._get_shared_playwright()
+                extractor.setup_playwright(page=page, context=context)
                 self.active_extractors["ao3"] = extractor
 
             # Extract work data
