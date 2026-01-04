@@ -1155,6 +1155,11 @@ class StashappImporter:
                     )
                     print(f"  Set audio fingerprint: {audio_checksum[:16]}...")
 
+            # Clean up source audio file after successful import
+            if audio_path.exists():
+                audio_path.unlink()
+                print(f"  Cleaned up source audio: {audio_path.name}")
+
         # Create group if multiple scenes were processed
         group_id: str | None = None
         if len(scene_ids) > 1:
@@ -1187,6 +1192,16 @@ class StashappImporter:
                     f"{scene_info['index'] + 1}"
                 )
             print(f"  Group created/updated: {STASH_BASE_URL}/groups/{group['id']}")
+
+        # Save Stashapp scene IDs to release.json for idempotency
+        if scene_ids:
+            release_data["stashapp_scene_ids"] = [s["id"] for s in scene_ids]
+            release_data["stashapp_scene_id"] = last_scene_id
+            if group_id:
+                release_data["stashapp_group_id"] = group_id
+            release_json_path.write_text(
+                json.dumps(release_data, indent=2, ensure_ascii=False), encoding="utf-8"
+            )
 
         return {
             "success": True,

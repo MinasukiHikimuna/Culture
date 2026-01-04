@@ -467,6 +467,21 @@ class AnalyzeDownloadImportPipeline:
         try:
             print(f"  Importing to Stashapp: {release_dir}")
 
+            # Check if already imported by looking for stashapp_scene_id in release.json
+            release_path = Path(release_dir) / "release.json"
+            if release_path.exists():
+                try:
+                    release_data = json.loads(release_path.read_text(encoding="utf-8"))
+                    existing_scene_id = release_data.get("stashapp_scene_id")
+                    if existing_scene_id:
+                        print(
+                            f"  Already imported to Stashapp: "
+                            f"{STASH_BASE_URL}/scenes/{existing_scene_id}"
+                        )
+                        return {"success": True, "stashSceneId": existing_scene_id}
+                except (json.JSONDecodeError, KeyError):
+                    pass  # Continue with import if we can't read the file
+
             # Initialize importer on first use
             if self._stashapp_importer is None:
                 self._stashapp_importer = StashappImporter(verbose=self.verbose)
