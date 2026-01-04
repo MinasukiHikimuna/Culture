@@ -24,7 +24,7 @@ import httpx
 
 from analyze_reddit_post import EnhancedRedditPostAnalyzer
 from release_orchestrator import ReleaseOrchestrator
-from stashapp_importer import STASH_BASE_URL, StashappImporter
+from stashapp_importer import STASH_BASE_URL, StashappImporter, StashScanStuckError
 
 
 class RedditResolver:
@@ -454,7 +454,12 @@ class AnalyzeDownloadImportPipeline:
             }
 
     def import_to_stashapp(self, release_dir: str) -> dict:
-        """Import release to Stashapp."""
+        """Import release to Stashapp.
+
+        Raises:
+            StashScanStuckError: If Stashapp scan is stuck and not completing.
+                This exception is NOT caught here - it propagates up to abort the batch.
+        """
         if self.skip_import:
             print("  Skipping Stashapp import (--skip-import)")
             return {"success": True, "skipped": True}
@@ -476,8 +481,81 @@ class AnalyzeDownloadImportPipeline:
                 print(f"  Stashapp import failed: {result.get('error')}")
                 return {"success": False, "error": result.get("error")}
 
+        except StashScanStuckError:
+            # Let this propagate up to abort the batch
+            raise
+
         except Exception as e:
             print(f"  Stashapp import failed: {e}")
+            return {"success": False, "error": str(e)}
+
+    def reextract_script(self, release_dir: Path) -> dict:
+        """
+        Re-extract only the script for an existing release.
+
+        Args:
+            release_dir: Path to the release directory containing release.json
+
+        Returns:
+            dict with success status and script info
+        """
+        from release_orchestrator import ReleaseOrchestrator
+
+        release_path = release_dir / "release.json"
+        if not release_path.exists():
+            print(f"  Error: No release.json found in {release_dir}")
+            return {"success": False, "error": "release.json not found"}
+
+        try:
+            release_data = json.loads(release_path.read_text(encoding="utf-8"))
+            llm_analysis = release_data.get("enrichmentData", {}).get("llmAnalysis", {})
+            script_info = llm_analysis.get("script", {})
+
+            if not script_info.get("url"):
+                print("  No script URL found in release metadata")
+                return {"success": False, "error": "No script URL in metadata"}
+
+            print(f"  Re-extracting script for: {release_dir.name}")
+            print(f"  Script URL: {script_info['url']}")
+
+            # Delete existing script files
+            for script_file in ["script.txt", "script.html", "script_metadata.json"]:
+                script_path = release_dir / script_file
+                if script_path.exists():
+                    script_path.unlink()
+                    print(f"  Deleted: {script_file}")
+
+            # Use release orchestrator to extract the script
+            orchestrator = ReleaseOrchestrator({"dataDir": str(self.data_dir)})
+
+            try:
+                script_result = orchestrator.extract_script(script_info, release_dir)
+
+                if script_result.get("status") == "downloaded":
+                    print(f"  Script saved: {script_result.get('filePath')}")
+
+                    # Update release.json with new script info
+                    release_data["script"] = script_result
+                    release_path.write_text(
+                        json.dumps(release_data, indent=2, ensure_ascii=False),
+                        encoding="utf-8",
+                    )
+                    print("  Updated release.json")
+
+                    return {"success": True, "script": script_result}
+                else:
+                    print(f"  Script extraction failed: {script_result.get('error')}")
+                    return {"success": False, "error": script_result.get("error")}
+
+            finally:
+                orchestrator.cleanup()
+
+        except Exception as e:
+            print(f"  Script re-extraction failed: {e}")
+            if self.verbose:
+                import traceback
+
+                traceback.print_exc()
             return {"success": False, "error": str(e)}
 
     def process_post(self, post_file_path: Path, progress_prefix: str = "") -> dict:
@@ -794,6 +872,21 @@ class AnalyzeDownloadImportPipeline:
                     print("\n  Waiting 3 seconds before next post...")
                     time.sleep(3)
 
+            except StashScanStuckError as e:
+                # Stash is stuck - abort the entire batch immediately
+                print(f"\n{'!' * 60}")
+                print("  ABORTING BATCH: Stashapp scan is stuck!")
+                print(f"  {e}")
+                print(f"{'!' * 60}")
+                print("\nPlease check Stashapp and restart the scan manually.")
+                print("Then re-run this script to continue processing.\n")
+                results["failed"].append(
+                    {"file": str(post_file), "error": str(e), "aborted": True}
+                )
+                results["aborted"] = True
+                results["abort_reason"] = str(e)
+                break  # Exit the batch loop immediately
+
             except Exception as e:
                 print(f"  Unexpected error: {e}")
                 results["failed"].append({"file": str(post_file), "error": str(e)})
@@ -802,6 +895,8 @@ class AnalyzeDownloadImportPipeline:
         print(f"\n{'=' * 60}")
         print("  Batch Processing Summary")
         print(f"{'=' * 60}")
+        if results.get("aborted"):
+            print("  STATUS: ABORTED (Stashapp scan stuck)")
         print(f"  Processed: {len(results['processed'])}")
         print(f"  Skipped: {len(results['skipped'])}")
         if results["skipped"]:
@@ -942,6 +1037,9 @@ Examples:
 
   # Show current processing status
   uv run python analyze_download_import.py --status
+
+  # Re-extract only the script for an existing release
+  uv run python analyze_download_import.py data/releases/performer/release_dir --script-only
 """,
     )
     parser.add_argument(
@@ -990,6 +1088,11 @@ Examples:
         action="store_true",
         help="Show processing status and exit",
     )
+    parser.add_argument(
+        "--script-only",
+        action="store_true",
+        help="Re-extract only the script for an existing release (use with release directory path)",
+    )
 
     args = parser.parse_args()
 
@@ -1001,6 +1104,7 @@ Examples:
         "skip_analysis": args.skip_analysis,
         "skip_import": args.skip_import,
         "force": args.force,
+        "script_only": args.script_only,
     }
 
     try:
@@ -1010,6 +1114,14 @@ Examples:
         if args.status:
             pipeline.show_status()
             return 0
+
+        # Script-only mode
+        if args.script_only:
+            if not args.input_path:
+                print("  Please provide a release directory path")
+                return 1
+            result = pipeline.reextract_script(Path(args.input_path))
+            return 0 if result.get("success") else 1
 
         if not args.input_path:
             print("  Please provide a Reddit post file or directory")

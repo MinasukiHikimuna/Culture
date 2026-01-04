@@ -29,6 +29,12 @@ from dotenv import load_dotenv
 # Load .env from project root
 load_dotenv(Path(__file__).parent / ".env")
 
+
+class StashScanStuckError(Exception):
+    """Raised when Stashapp scan appears to be stuck and not completing."""
+
+    pass
+
 # Stashapp Configuration
 STASH_URL = os.getenv("STASHAPP_URL")
 STASH_API_KEY = os.getenv("STASHAPP_API_KEY")
@@ -951,7 +957,13 @@ class StashappImporter:
 
             # Wait for scan to complete
             print("  Waiting for scan to complete...")
-            self.client.wait_for_scan(60)
+            scan_completed = self.client.wait_for_scan(60)
+
+            if not scan_completed:
+                raise StashScanStuckError(
+                    f"Stashapp scan job {job_id} did not complete within 60 seconds. "
+                    "The scan may be stuck. Please check Stashapp and restart if needed."
+                )
 
             # Find the scene by basename (with retries to allow for database indexing)
             scene = None
@@ -970,8 +982,10 @@ class StashappImporter:
                     time.sleep(retry_delay)
 
             if not scene:
-                print("  Warning: Scene not found after scan. May need manual refresh.")
-                continue
+                raise StashScanStuckError(
+                    f"Scene not found after scan completed. File: {output_filename}. "
+                    "Stashapp may not be scanning the expected directory, or the scan is stuck."
+                )
 
             print(f"  Found scene ID: {scene['id']}")
             last_scene_id = scene["id"]
