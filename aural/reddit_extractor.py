@@ -757,13 +757,13 @@ def main():
         description="Extract detailed Reddit data using PRAW"
     )
     parser.add_argument(
-        "gwasi_file", help="Path to gwasi_extractor output file (CSV or JSON)"
+        "input", help="Reddit post URL/ID, or path to gwasi_extractor output file (CSV or JSON)"
     )
     parser.add_argument(
         "--output",
         "-o",
-        default="reddit_data",
-        help="Output directory (default: reddit_data)",
+        default="extracted_data/reddit",
+        help="Output directory (default: extracted_data/reddit)",
     )
     parser.add_argument(
         "--format",
@@ -814,9 +814,56 @@ def main():
             user_agent=args.user_agent,
         )
 
-        # Load gwasi data
-        print(f"📂 Loading gwasi data from {args.gwasi_file}...")
-        gwasi_data = extractor.load_gwasi_data(args.gwasi_file)
+        # Check if input is a Reddit URL/ID or a file
+        input_path = Path(args.input)
+        is_file = input_path.exists() and input_path.is_file()
+
+        # Also check if it looks like a Reddit URL or post ID
+        is_reddit_url = "reddit.com" in args.input or args.input.startswith("/r/")
+        is_post_id = not is_file and not is_reddit_url and re.match(r'^[a-z0-9]+$', args.input, re.IGNORECASE)
+
+        if is_reddit_url or is_post_id:
+            # Single post mode
+            if is_reddit_url:
+                post_id = extractor.extract_post_id_from_url(args.input)
+                if not post_id:
+                    print(f"❌ Could not extract post ID from URL: {args.input}")
+                    return 1
+                print(f"🔗 Extracted post ID: {post_id} from URL")
+            else:
+                post_id = args.input
+                print(f"📝 Using post ID: {post_id}")
+
+            # Fetch the single post
+            print(f"📥 Fetching Reddit post {post_id}...")
+            reddit_data = extractor.get_post_data(post_id)
+
+            if reddit_data:
+                # Create enriched entry (minimal gwasi data for single post)
+                enriched_entry = {
+                    "post_id": post_id,
+                    "reddit_url": f"https://www.reddit.com/comments/{post_id}",
+                    "username": reddit_data.get("author", "unknown"),
+                    "reddit_data": reddit_data,
+                }
+
+                # Save individual post
+                extractor.save_individual_post(enriched_entry)
+
+                print(f"\n✅ Successfully extracted post {post_id}")
+                print(f"📁 Title: {reddit_data.get('title', 'N/A')}")
+                print(f"👤 Author: {reddit_data.get('author', 'N/A')}")
+                print(f"📊 Score: {reddit_data.get('score', 'N/A')}")
+                print(f"💬 Comments: {reddit_data.get('num_comments', 'N/A')}")
+            else:
+                print(f"❌ Failed to fetch post {post_id}")
+                return 1
+
+            return 0
+
+        # File mode - load gwasi data
+        print(f"📂 Loading gwasi data from {args.input}...")
+        gwasi_data = extractor.load_gwasi_data(args.input)
 
         # Parse filter usernames if provided
         filter_usernames = None
