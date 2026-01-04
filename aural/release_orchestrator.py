@@ -864,6 +864,38 @@ class ReleaseOrchestrator:
                 "redditPostUrl": url
             }
 
+            # Check if this Reddit post links to AO3 (preferred)
+            ao3_match = re.search(
+                r"https?://(?:www\.)?archiveofourown\.org/works/[^\s\)\]]+",
+                post_content,
+                re.IGNORECASE
+            )
+
+            if ao3_match:
+                ao3_url = ao3_match.group(0)
+                print(f"   Found archiveofourown.org link: {ao3_url}")
+
+                try:
+                    ao3_result = self.extract_ao3_script(ao3_url)
+
+                    if ao3_result.get("content"):
+                        return {
+                            "content": ao3_result["content"],
+                            "htmlContent": ao3_result.get("htmlContent"),
+                            "metadata": {
+                                **reddit_metadata,
+                                **ao3_result.get("metadata", {}),
+                                "source": "archiveofourown.org",
+                                "ao3Url": ao3_url,
+                                "redditScriptOfferPost": post_content
+                            }
+                        }
+                except Exception as ao3_error:
+                    # Don't fall back to Reddit post - propagate the failure
+                    raise ValueError(
+                        f"Found archiveofourown.org link but extraction failed: {ao3_error}"
+                    )
+
             # Check if this Reddit post links to scriptbin.works
             scriptbin_match = re.search(
                 r"https?://(?:www\.)?scriptbin\.works/[^\s\)\]]+",
