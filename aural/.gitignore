@@ -1,5 +1,7 @@
 .env
 analysis_results/
+ao3_data/
+saved_posts/
 data/
 downloads/
 extracted_data/
