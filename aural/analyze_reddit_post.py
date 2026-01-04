@@ -176,9 +176,15 @@ EXTRACTION RULES:
      * performers: WHO performs in THIS specific audio
      * tags: Tags specific to THIS audio version
 
-4. SCRIPT URL:
-   - Look for script links: scriptbin.works, pastebin, google docs
-   - Pattern: [script](url) or [script here](url)
+4. SCRIPT URL (CRITICAL - find the ACTUAL script, not the announcement):
+   - The script URL is where the SCRIPT TEXT lives, NOT a Reddit "script offer" post
+   - Valid script platforms: scriptbin.works, archiveofourown.org (AO3)
+   - Look for patterns like:
+     * "script is available [here](https://archiveofourown.org/works/...)"
+     * "script [here](https://scriptbin.works/...)"
+     * "[script](url)" linking to scriptbin or AO3
+   - If post links to BOTH a Reddit "script offer" post AND a scriptbin/AO3 URL, use the scriptbin/AO3 URL
+   - Do NOT use Reddit URLs as script URLs - those are announcements, not the script itself
 
 5. SERIES:
    - Check if this is part of a series (Part 1, Episode 2, etc.)
@@ -471,12 +477,20 @@ Return JSON:
             with open(file_path, encoding="utf-8") as f:
                 post_data = json.load(f)
 
-            if not post_data.get("reddit_data") or not post_data["reddit_data"].get(
-                "selftext"
-            ):
-                raise ValueError(
-                    "Post data missing required reddit_data.selftext field"
-                )
+            if not post_data.get("reddit_data"):
+                raise ValueError("Post data missing required reddit_data")
+
+            reddit_data = post_data["reddit_data"]
+
+            # Handle link posts (is_self=False) that have no selftext but link to audio
+            if not reddit_data.get("selftext"):
+                if not reddit_data.get("is_self", True) and reddit_data.get("url"):
+                    # Create synthetic selftext from the link post URL
+                    reddit_data["selftext"] = reddit_data["url"]
+                else:
+                    raise ValueError(
+                        "Post data missing required reddit_data.selftext field"
+                    )
 
             print(f"Analyzing post: {post_data['reddit_data']['title']}")
 

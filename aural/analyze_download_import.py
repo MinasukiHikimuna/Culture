@@ -43,9 +43,8 @@ class RedditResolver:
             return True
         if reddit_data.get("crosspost_parent_list"):
             return True
-        # Empty selftext might indicate a crosspost
-        if not reddit_data.get("selftext", "").strip():
-            return True
+        # Note: Empty selftext alone does NOT indicate a crosspost.
+        # Link posts (is_self=False) legitimately have no selftext.
         return False
 
     def resolve(self, reddit_data: dict) -> dict | None:
@@ -240,6 +239,13 @@ class AnalyzeDownloadImportPipeline:
             # If we have content, we're good
             if selftext.strip():
                 return {"ok": True}
+
+            # Check if this is a link post with an audio URL (no selftext needed)
+            if not reddit_data.get("is_self", True):
+                url = reddit_data.get("url", "")
+                audio_domains = ["soundgasm.net", "whyp.it", "hotaudio.net"]
+                if any(domain in url for domain in audio_domains):
+                    return {"ok": True, "link_post": True}
 
             # Check if this is a crosspost that we can resolve
             if self.reddit_resolver.is_crosspost(reddit_data):
