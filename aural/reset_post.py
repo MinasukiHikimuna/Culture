@@ -189,7 +189,7 @@ Examples:
 
         if source_file:
             reimport_commands.append(
-                f"node analyze-download-import.js ./{source_file} --force"
+                f"uv run python analyze_download_import.py ./{source_file} --force"
             )
 
     if len(args.post_ids) > 1:
