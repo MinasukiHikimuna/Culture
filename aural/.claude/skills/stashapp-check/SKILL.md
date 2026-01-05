@@ -16,6 +16,8 @@ When the user asks about a Stashapp release:
 2. Run the appropriate command from the examples below
 3. Present the results clearly to the user
 
+If the basic information doesn't include what you were looking for, use --json.
+
 ## Usage Examples
 
 ```bash
