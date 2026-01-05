@@ -62,16 +62,12 @@ Release (collection of related audio variants)
 | `reddit-flair-fetcher.py` | Fetch Reddit flair data |
 | `reset_post.py` | Reset post data for reprocessing |
 
-### JavaScript Scripts (run with `node`)
-
-| Script | Purpose |
-|--------|---------|
-| `analyze-download-import.js` | Main workflow: analyze Reddit post → download → import to Stashapp |
-| `analyze-reddit-post.js` | LLM-powered Reddit post analysis |
-| `release-orchestrator.js` | Orchestrate full release processing |
-| `stashapp-importer.js` | Import releases to Stashapp (FFmpeg conversion + GraphQL) |
-| `scriptbin-extractor.js` | Extract scripts from scriptbin.works |
-| `cyoa-import.js` | Import CYOA (Choose Your Own Adventure) content |
+| `analyze_download_import.py` | Main workflow: analyze Reddit post → download → import to Stashapp |
+| `analyze_reddit_post.py` | LLM-powered Reddit post analysis |
+| `release_orchestrator.py` | Orchestrate full release processing |
+| `stashapp_importer.py` | Import releases to Stashapp (FFmpeg conversion + GraphQL) |
+| `scriptbin_extractor.py` | Extract scripts from scriptbin.works |
+| `cyoa_import.py` | Import CYOA (Choose Your Own Adventure) content |
 
 ## Directory Structure
 
@@ -105,13 +101,13 @@ Copy `.env.example` to `.env` and fill in the required values.
 ## Typical Workflow
 
 1. **Discover content** via GWASI or direct Reddit URL
-2. **Analyze post** with `analyze-reddit-post.js` (LLM extracts metadata)
+2. **Analyze post** with `analyze_reddit_post.py` (LLM extracts metadata)
 3. **Download audio** from Soundgasm/Whyp.it/HotAudio
-4. **Import to Stashapp** with `stashapp-importer.js` (converts audio→video, uploads metadata)
+4. **Import to Stashapp** with `stashapp_importer.py` (converts audio→video, uploads metadata)
 
-Or use `analyze-download-import.js` for the complete workflow:
+Or use `analyze_download_import.py` for the complete workflow:
 ```bash
-node analyze-download-import.js <reddit_url>
+uv run python analyze_download_import.py <reddit_post_file>
 ```
 
 ## Metadata Collection

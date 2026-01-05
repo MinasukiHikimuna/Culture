@@ -12,7 +12,7 @@ CYOA releases have a decision tree structure where:
 
 ## Detection
 
-The `analyze-reddit-post.js` script automatically detects CYOA releases using LLM analysis. When a CYOA is detected, the batch processor shows a warning indicating manual handling is required.
+The `analyze_reddit_post.py` script automatically detects CYOA releases using LLM analysis. When a CYOA is detected, the batch processor shows a warning indicating manual handling is required.
 
 ## Import Process
 
@@ -59,16 +59,16 @@ Create a JSON file with the complete decision tree structure:
 
 ```bash
 # Full import (download, convert, import, update descriptions)
-node cyoa-import.js data/cyoa/your_cyoa.json
+uv run python cyoa_import.py data/cyoa/your_cyoa.json
 
 # Download only (useful for testing)
-node cyoa-import.js data/cyoa/your_cyoa.json --download-only
+uv run python cyoa_import.py data/cyoa/your_cyoa.json --download-only
 
 # Update descriptions only (after manual scene ID mapping)
-node cyoa-import.js data/cyoa/your_cyoa.json --update-only
+uv run python cyoa_import.py data/cyoa/your_cyoa.json --update-only
 
 # Dry run (show what would be done)
-node cyoa-import.js data/cyoa/your_cyoa.json --dry-run
+uv run python cyoa_import.py data/cyoa/your_cyoa.json --dry-run
 ```
 
 ## Data Structure

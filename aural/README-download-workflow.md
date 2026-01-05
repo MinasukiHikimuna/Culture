@@ -5,9 +5,9 @@ This guide explains how to use the analyze-reddit-post results to download audio
 ## Overview
 
 The complete workflow consists of:
-1. **analyze-reddit-post.js** - Analyzes Reddit posts and extracts audio URLs, metadata
-2. **download-orchestrator.js** - Coordinates downloads using platform-specific extractors  
-3. **analyze-and-download.js** - Integrated pipeline that runs both steps
+1. **analyze_reddit_post.py** - Analyzes Reddit posts and extracts audio URLs, metadata
+2. **release_orchestrator.py** - Coordinates downloads using platform-specific extractors
+3. **analyze_download_import.py** - Integrated pipeline that runs both steps
 
 ## Quick Start
 
@@ -15,26 +15,26 @@ The complete workflow consists of:
 
 ```bash
 # Complete workflow - analyze and download in one command
-npm run analyze-and-download reddit_data/alekirser/1lxhwbd_post.json
+uv run python analyze_download_import.py extracted_data/reddit/alekirser/1lxhwbd_post.json
 
 # Or step by step:
-npm run analyze-reddit reddit_data/alekirser/1lxhwbd_post.json --output analysis.json
-npm run download-orchestrator analysis.json
+uv run python analyze_reddit_post.py extracted_data/reddit/alekirser/1lxhwbd_post.json
+uv run python release_orchestrator.py analysis_results/1lxhwbd_*_analysis.json
 ```
 
 ### Batch Processing
 
 ```bash
 # Process all posts in a directory
-npm run analyze-and-download reddit_data/alekirser/
+uv run python analyze_download_import.py extracted_data/reddit/alekirser/
 
 # Dry run to see what would be processed
-npm run analyze-and-download reddit_data/alekirser/ --dry-run --verbose
+uv run python analyze_download_import.py extracted_data/reddit/alekirser/ --dry-run --verbose
 ```
 
 ## Workflow Details
 
-### Step 1: Analysis (analyze-reddit-post.js)
+### Step 1: Analysis (analyze_reddit_post.py)
 
 Extracts structured data from Reddit posts:
 
@@ -64,12 +64,12 @@ Extracts structured data from Reddit posts:
 }
 ```
 
-### Step 2: Download Orchestration (download-orchestrator.js)
+### Step 2: Download Orchestration (release_orchestrator.py)
 
 Routes URLs to appropriate extractors:
-- **Soundgasm** → `soundgasm-extractor.js`
-- **Whyp.it** → `whypit-extractor.js` 
-- **HotAudio** → `hotaudio-extractor.js`
+- **Soundgasm** → `soundgasm_extractor.py`
+- **Whyp.it** → `whypit_extractor.py`
+- **HotAudio** → `hotaudio_extractor.py`
 
 Creates organized directory structure:
 ```
@@ -126,30 +126,31 @@ The complete metadata saved in the final JSON includes:
 
 ## Command Reference
 
-### analyze-and-download.js
+### analyze_download_import.py
 
 **Complete integrated workflow**
 
 ```bash
-node analyze-and-download.js <post_file_or_directory> [options]
+uv run python analyze_download_import.py <post_file_or_directory> [options]
 
 Options:
   --analysis-dir <dir>     Directory for analysis results (default: analysis_results)
-  --download-dir <dir>     Directory for downloads (default: downloads)
+  --data-dir <dir>         Directory for releases (default: data)
   --dry-run               Analyze posts but don't download files
   --verbose               Show detailed progress
-  --save-approved         Save analysis as approved (for LLM training)
+  --skip-import           Skip Stashapp import step
+  --force                 Re-process already processed posts
 ```
 
-### download-orchestrator.js
+### release_orchestrator.py
 
 **Download from existing analysis**
 
 ```bash
-node download-orchestrator.js <analysis_file_or_directory> [options]
+uv run python release_orchestrator.py <analysis_file> [options]
 
 Options:
-  --output <dir>          Output directory (default: downloads)
+  --data-dir <dir>        Output directory (default: data)
   --dry-run              Show what would be downloaded
   --verbose              Show detailed download progress
 ```
@@ -159,16 +160,16 @@ Options:
 ### Example 1: Single Post with Custom Directories
 
 ```bash
-npm run analyze-and-download reddit_data/performer/post.json \
+uv run python analyze_download_import.py extracted_data/reddit/performer/post.json \
   --analysis-dir my_analysis \
-  --download-dir my_downloads \
+  --data-dir my_data \
   --verbose
 ```
 
 ### Example 2: Batch Processing with Dry Run
 
 ```bash
-npm run analyze-and-download reddit_data/ \
+uv run python analyze_download_import.py extracted_data/reddit/ \
   --dry-run \
   --verbose
 ```
@@ -176,7 +177,7 @@ npm run analyze-and-download reddit_data/ \
 ### Example 3: Download from Existing Analysis
 
 ```bash
-npm run download-orchestrator analysis_results/ --verbose
+uv run python release_orchestrator.py analysis_results/post_analysis.json --verbose
 ```
 
 ## Directory Structure
@@ -259,7 +260,7 @@ This workflow implements the **Technical Implementation Workflow** outlined in C
 
 Use `--verbose` flag for detailed logging:
 ```bash
-npm run analyze-and-download post.json --verbose
+uv run python analyze_download_import.py post.json --verbose
 ```
 
 ## Next Steps

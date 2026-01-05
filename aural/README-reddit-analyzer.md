@@ -1,6 +1,6 @@
 # Reddit Post Analyzer
 
-This NodeJS script analyzes Reddit post data from r/gonewildaudio using a local LLM (via LM Studio) to extract structured information about audio releases.
+This Python script analyzes Reddit post data from r/gonewildaudio using a local LLM (via LM Studio) to extract structured information about audio releases.
 
 ## What it analyzes
 
@@ -15,8 +15,8 @@ The script examines Reddit post content to determine:
 
 1. **LM Studio**: Download and install [LM Studio](https://lmstudio.ai/)
 2. **Local LLM**: Download a suitable model (e.g., Llama 3, Mistral, etc.)
-3. **Node.js**: Version 22.0.0 or higher
-4. **Dependencies**: Run `npm install` to install required packages
+3. **Python**: Version 3.11 or higher
+4. **uv**: Install [uv](https://docs.astral.sh/uv/) for dependency management
 
 ## Setup
 
@@ -29,25 +29,19 @@ The script examines Reddit post content to determine:
 ### Analyze a single post
 
 ```bash
-node analyze-reddit-post.js reddit_data/alekirser/1amzk7q.json
+uv run python analyze_reddit_post.py extracted_data/reddit/alekirser/1amzk7q.json
 ```
 
 ### Analyze all posts in a directory
 
 ```bash
-node analyze-reddit-post.js reddit_data/alekirser/ --output analysis_results.json
+uv run python analyze_reddit_post.py extracted_data/reddit/alekirser/ --output analysis_results.json
 ```
 
 ### Use custom LM Studio URL or model
 
 ```bash
-node analyze-reddit-post.js reddit_data/alekirser/1amzk7q.json --url http://localhost:8080/v1/chat/completions --model my-custom-model
-```
-
-### Using npm script
-
-```bash
-npm run analyze-reddit reddit_data/alekirser/1amzk7q.json
+uv run python analyze_reddit_post.py extracted_data/reddit/alekirser/1amzk7q.json --url http://localhost:8080/v1/chat/completions --model my-custom-model
 ```
 
 ## Output Format
@@ -234,19 +228,19 @@ analyses/
 2. **Test Local LLM**: Run your local model on the same post (output only, don't save yet)
    ```bash
    # Test local LLM analysis - review output in terminal
-   node analyze-reddit-post.js post.json
+   uv run python analyze_reddit_post.py post.json
    ```
 
 3. **Compare Results**: Check LLM output against reference standard
    - Identify specific areas where local LLM failed
    - Note patterns in errors (script detection, performer counting, etc.)
 
-4. **Iterate and Improve**: 
+4. **Iterate and Improve**:
    - **If LLM failed**: Update prompts based on failures, test again (don't save)
    - **If LLM succeeded**: Save as approved analysis
    ```bash
    # Only save when LLM analysis meets the reference standard
-   node analyze-reddit-post.js post.json --save-approved
+   uv run python analyze_reddit_post.py post.json --save-approved
    ```
 
 ### Benefits of This Approach

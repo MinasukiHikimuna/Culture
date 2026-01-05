@@ -87,13 +87,13 @@ uv run python reddit_extractor.py extracted_data/gwasi_data_*.json --output extr
 
 # Step 4: Analyze, download audio, and import to Stashapp
 # Single post:
-node analyze-download-import.js extracted_data/reddit/username/postid_title.json
+uv run python analyze_download_import.py extracted_data/reddit/username/postid_title.json
 
 # All posts from a user:
-node analyze-download-import.js extracted_data/reddit/username/
+uv run python analyze_download_import.py extracted_data/reddit/username/
 
 # Dry run first (see what would be downloaded without downloading):
-node analyze-download-import.js extracted_data/reddit/username/ --dry-run
+uv run python analyze_download_import.py extracted_data/reddit/username/ --dry-run
 ```
 
 **What you get:**
@@ -109,33 +109,33 @@ There are several scripts for different use cases:
 |--------|----------|-------|-------------|
 | `gwasi_extractor.py` | Initial discovery | GWASI delta/base files | Extracts post index from GWASI (~227k posts) |
 | `reddit_extractor.py` | Post enrichment | GWASI JSON + username filter | Fetches full Reddit post content via PRAW |
-| `analyze-download-import.js` | **Full pipeline** | Directory or JSON file | Analyzes posts, downloads audio, imports to Stashapp |
-| `process-reddit-url.js` | Ad-hoc URL processing | Reddit URL | Processes a single Reddit URL directly |
+| `analyze_download_import.py` | **Full pipeline** | Directory or JSON file | Analyzes posts, downloads audio, imports to Stashapp |
+| `process_reddit_url.py` | Ad-hoc URL processing | Reddit URL | Processes a single Reddit URL directly |
 
 ### When to use each:
 
-**`analyze-download-import.js`** - Main batch processing script
+**`analyze_download_import.py`** - Main batch processing script
 ```bash
 # Process all posts from a user (tracks progress, skips already processed)
-node analyze-download-import.js extracted_data/reddit/SweetnEvil86/
+uv run python analyze_download_import.py extracted_data/reddit/SweetnEvil86/
 
 # Process single post
-node analyze-download-import.js extracted_data/reddit/SweetnEvil86/1bdg16n_post.json
+uv run python analyze_download_import.py extracted_data/reddit/SweetnEvil86/1bdg16n_post.json
 
 # Skip Stashapp import (just download audio)
-node analyze-download-import.js extracted_data/reddit/SweetnEvil86/ --skip-import
+uv run python analyze_download_import.py extracted_data/reddit/SweetnEvil86/ --skip-import
 
 # Force re-process already processed posts
-node analyze-download-import.js extracted_data/reddit/SweetnEvil86/ --force
+uv run python analyze_download_import.py extracted_data/reddit/SweetnEvil86/ --force
 
 # Check processing status
-node analyze-download-import.js --status
+uv run python analyze_download_import.py --status
 ```
 
-**`process-reddit-url.js`** - For ad-hoc Reddit URLs (not from GWASI)
+**`process_reddit_url.py`** - For ad-hoc Reddit URLs (not from GWASI)
 ```bash
 # Process a single Reddit URL directly
-node process-reddit-url.js "https://www.reddit.com/r/gonewildaudio/comments/xyz123/..."
+uv run python process_reddit_url.py "https://www.reddit.com/r/gonewildaudio/comments/xyz123/..."
 ```
 
 ### Special Features

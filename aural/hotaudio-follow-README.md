@@ -10,19 +10,19 @@ Many CYOA audios on HotAudio only have a single link posted on Reddit, but the a
 
 ```bash
 # Extract and download all audio files
-node hotaudio-follow-extractor.js https://hotaudio.net/u/The_LUST_Project/T1-Wake-Up
+uv run python hotaudio_follow_extractor.py https://hotaudio.net/u/The_LUST_Project/T1-Wake-Up
 
 # Extract without downloading (metadata only)
-node hotaudio-follow-extractor.js --no-download https://hotaudio.net/u/The_LUST_Project/T1-Wake-Up
+uv run python hotaudio_follow_extractor.py --no-download https://hotaudio.net/u/The_LUST_Project/T1-Wake-Up
 
 # Show browser window for debugging
-node hotaudio-follow-extractor.js --show-browser https://hotaudio.net/u/The_LUST_Project/T1-Wake-Up
+uv run python hotaudio_follow_extractor.py --show-browser https://hotaudio.net/u/The_LUST_Project/T1-Wake-Up
 
 # Limit recursion depth
-node hotaudio-follow-extractor.js --max-depth 3 https://hotaudio.net/u/The_LUST_Project/T1-Wake-Up
+uv run python hotaudio_follow_extractor.py --max-depth 3 https://hotaudio.net/u/The_LUST_Project/T1-Wake-Up
 
 # Specify output directories
-node hotaudio-follow-extractor.js --output-dir ./audio --enrichment-dir ./metadata https://hotaudio.net/u/The_LUST_Project/T1-Wake-Up
+uv run python hotaudio_follow_extractor.py --output-dir ./audio --enrichment-dir ./metadata https://hotaudio.net/u/The_LUST_Project/T1-Wake-Up
 ```
 
 ## Output
