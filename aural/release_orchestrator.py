@@ -24,6 +24,7 @@ from typing import Any
 import httpx
 
 from ao3_extractor import AO3Extractor
+from audiochan_extractor import AudiochanExtractor
 from hotaudio_extractor import HotAudioExtractor
 from scriptbin_extractor import ScriptBinExtractor
 from soundgasm_extractor import SoundgasmExtractor
@@ -188,11 +189,16 @@ class ReleaseOrchestrator:
             "class": HotAudioExtractor
         })
 
+        self.register_extractor("audiochan", {
+            "pattern": re.compile(r"audiochan\.com", re.IGNORECASE),
+            "class": AudiochanExtractor
+        })
+
         # Track active extractor instances for cleanup
         self.active_extractors: dict[str, Any] = {}
 
         # Platform priority for selecting preferred audio source
-        self.platform_priority = ["soundgasm", "whypit", "hotaudio"]
+        self.platform_priority = ["soundgasm", "whypit", "hotaudio", "audiochan"]
 
     def register_extractor(self, platform: str, config: dict):
         """Register a platform extractor."""
@@ -566,7 +572,7 @@ class ReleaseOrchestrator:
 
         # From post content
         url_regex = re.compile(
-            r"https?://(?:www\.)?(soundgasm\.net|whyp\.it|hotaudio\.net)[^\s\]]+",
+            r"https?://(?:www\.)?(soundgasm\.net|whyp\.it|hotaudio\.net|audiochan\.com)[^\s\]]+",
             re.IGNORECASE
         )
         post_content = post.get("content") or post.get("selftext") or ""
@@ -582,7 +588,7 @@ class ReleaseOrchestrator:
 
         # Better approach: find all URLs directly
         all_urls = re.findall(
-            r"https?://(?:www\.)?(?:soundgasm\.net|whyp\.it|hotaudio\.net)[^\s\]\)]+",
+            r"https?://(?:www\.)?(?:soundgasm\.net|whyp\.it|hotaudio\.net|audiochan\.com)[^\s\]\)]+",
             post_content,
             re.IGNORECASE
         )

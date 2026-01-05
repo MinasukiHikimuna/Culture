@@ -158,7 +158,7 @@ EXTRACTION RULES:
    - If flair is "Script Fill", someone else wrote the script - find who
 
 3. AUDIO VERSIONS (CRITICAL - proper URL grouping):
-   - Extract all audio platform URLs: soundgasm.net, whyp.it, hotaudio.net
+   - Extract all audio platform URLs: soundgasm.net, whyp.it, hotaudio.net, audiochan.com
    - IMPORTANT: Group URLs for the SAME AUDIO content together in ONE audio_version:
      * Look for "alternative link", "backup", "mirror", "if X isn't working"
      * Same audio on different platforms = ONE audio_version with MULTIPLE urls
@@ -224,7 +224,8 @@ Return this exact JSON structure:
       "description": "Primary audio version",
       "urls": [
         {{"platform": "Soundgasm", "url": "https://soundgasm.net/..."}},
-        {{"platform": "Whypit", "url": "https://whyp.it/..."}}
+        {{"platform": "Whypit", "url": "https://whyp.it/..."}},
+        {{"platform": "Audiochan", "url": "https://audiochan.com/a/..."}}
       ],
       "performers": ["username1"],
       "tags": ["tag1", "tag2"]

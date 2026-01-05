@@ -243,7 +243,7 @@ class AnalyzeDownloadImportPipeline:
             # Check if this is a link post with an audio URL (no selftext needed)
             if not reddit_data.get("is_self", True):
                 url = reddit_data.get("url", "")
-                audio_domains = ["soundgasm.net", "whyp.it", "hotaudio.net"]
+                audio_domains = ["soundgasm.net", "whyp.it", "hotaudio.net", "audiochan.com"]
                 if any(domain in url for domain in audio_domains):
                     return {"ok": True, "link_post": True}
 
@@ -336,7 +336,7 @@ class AnalyzeDownloadImportPipeline:
 
         # Get full URLs
         full_urls = re.findall(
-            r"https?://(?:www\.)?(?:soundgasm\.net|whyp\.it|hotaudio\.net)[^\s\]\)]+",
+            r"https?://(?:www\.)?(?:soundgasm\.net|whyp\.it|hotaudio\.net|audiochan\.com)[^\s\]\)]+",
             post_content,
             re.IGNORECASE,
         )
