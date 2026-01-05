@@ -192,13 +192,17 @@ EXTRACTION RULES:
 
 6. POST TYPE:
    - "audio_release": Post contains audio links - this is an audio release (most common)
+   - "verification": Verification post where a performer introduces themselves
+     * Title contains [Verification] tag
+     * Flair often says "Verification"
+     * Usually contains an audio link (treat as audio content)
    - "script_offer": Post is offering a SCRIPT for others to perform - no audio expected
      * Typically posted in r/GWAScriptGuild
      * Flair often says "Script Offer" or similar
      * Contains script link but NO audio platform URLs
      * Author is the script WRITER, not a performer
    - "request": User requesting content (ignore these)
-   - "other": Verification, announcement, etc.
+   - "other": Announcements, meta posts, discussions without audio content
 
 Return this exact JSON structure:
 {{
@@ -234,7 +238,7 @@ Return this exact JSON structure:
     "partNumber": null,
     "confidence": "high|medium|low"
   }},
-  "post_type": "audio_release|script_offer|request|other",
+  "post_type": "audio_release|verification|script_offer|request|other",
   "analysis_notes": "brief observations"
 }}"""
 

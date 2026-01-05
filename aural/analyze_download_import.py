@@ -596,6 +596,29 @@ class AnalyzeDownloadImportPipeline:
             )
             return {"success": True, "skipped": True, "postId": post_id}
 
+        # Early detection for deleted/removed content
+        try:
+            post_data = json.loads(post_file_path.read_text(encoding="utf-8"))
+            reddit_data = post_data.get("reddit_data", {})
+            selftext = reddit_data.get("selftext", "")
+
+            if selftext in ("[removed]", "[deleted]"):
+                removal_type = "removed" if selftext == "[removed]" else "deleted"
+                print(
+                    f"{progress_prefix}  Content {removal_type}: {post_id} "
+                    f"(post content is no longer available on Reddit)"
+                )
+                # Don't mark as processed - these need manual curation
+                return {
+                    "success": False,
+                    "skipped": True,
+                    "postId": post_id,
+                    "contentDeleted": True,
+                    "reason": f"content_{removal_type}",
+                }
+        except (json.JSONDecodeError, FileNotFoundError):
+            pass  # Continue with analysis if we can't read the file
+
         # Step 1: Analyze the post
         analysis_result = self.analyze_post(post_file_path)
         if not analysis_result.get("success"):
@@ -699,7 +722,7 @@ class AnalyzeDownloadImportPipeline:
 
         if analysis.get("post_type") == "other":
             print(
-                f"{progress_prefix}  Other Post: Skipping (verification, announcement, etc.)"
+                f"{progress_prefix}  Other Post: Skipping (announcement, meta post, etc.)"
             )
             self.mark_processed(
                 post_id,
@@ -711,6 +734,10 @@ class AnalyzeDownloadImportPipeline:
                 "postId": post_id,
                 "otherPost": True,
             }
+
+        # Verification posts should be processed normally (they contain audio)
+        if analysis.get("post_type") == "verification":
+            print(f"{progress_prefix}  Verification post - processing as audio content")
 
         # Check if there are no audio URLs to download
         audio_urls = [

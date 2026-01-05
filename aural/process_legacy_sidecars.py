@@ -120,6 +120,7 @@ def process_legacy_sidecars(
         "skipped": [],
         "failed": [],
         "deleted": [],
+        "content_unavailable": [],  # Posts where Reddit content was deleted/removed
     }
 
     # Find all sidecar files
@@ -263,10 +264,18 @@ def process_legacy_sidecars(
                         results["deleted"].append(str(json_path))
 
             elif result.get("skipped"):
-                results["skipped"].append({
-                    "file": str(json_path),
-                    "reason": result.get("reason", "already processed"),
-                })
+                if result.get("contentDeleted"):
+                    # Reddit content is deleted/removed - keep legacy files for manual curation
+                    results["content_unavailable"].append({
+                        "file": str(json_path),
+                        "mp4_file": str(mp4_path) if mp4_path else None,
+                        "reason": result.get("reason"),
+                    })
+                else:
+                    results["skipped"].append({
+                        "file": str(json_path),
+                        "reason": result.get("reason", "already processed"),
+                    })
             else:
                 results["failed"].append({
                     "file": str(json_path),
@@ -287,8 +296,14 @@ def process_legacy_sidecars(
     print(f"{'=' * 60}")
     print(f"Processed: {len(results['processed'])}")
     print(f"Skipped: {len(results['skipped'])}")
+    print(f"Content unavailable: {len(results['content_unavailable'])} (kept for manual curation)")
     print(f"Failed: {len(results['failed'])}")
     print(f"Files deleted: {len(results['deleted'])}")
+
+    if results["content_unavailable"]:
+        print("\nContent unavailable (Reddit post deleted/removed - legacy files kept):")
+        for item in results["content_unavailable"]:
+            print(f"  - {Path(item['file']).name}")
 
     if results["failed"]:
         print("\nFailed files:")
