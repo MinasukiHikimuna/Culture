@@ -87,24 +87,3 @@ def validate_stash_config() -> bool:
     if not STASH_OUTPUT_DIR.exists():
         raise ValueError(f"STASH_OUTPUT_DIR does not exist: {STASH_OUTPUT_DIR}")
     return True
-
-
-# Legacy path mappings for migration reference
-LEGACY_PATH_MAPPINGS = {
-    # Old path -> New path
-    "extracted_data/raw_json": GWASI_INDEX_DIR / "raw_json",
-    "extracted_data/base_entries_cache.json": GWASI_INDEX_DIR / "base_entries_cache.json",
-    "extracted_data/current_base_version.txt": GWASI_INDEX_DIR / "current_base_version.txt",
-    "extracted_data/reddit": REDDIT_INDEX_DIR,
-    "data/releases": RELEASES_DIR,
-    "data/cyoa": CYOA_DIR,
-    "data/processed_posts.json": PROCESSED_POSTS_FILE,
-    "analysis_results": ANALYSIS_DIR,
-    "saved_posts": REDDIT_SAVED_PENDING_DIR,
-    "saved_posts_archived": REDDIT_SAVED_ARCHIVED_DIR,
-    "ao3_data": AO3_DIR,
-    "scriptbin_data": SCRIPTBIN_DIR,
-    "hotaudio_data": HOTAUDIO_DIR,
-    "ytdlp_data": YTDLP_DIR,
-    "pornhub_data": YTDLP_DIR,  # Merged into ytdlp
-}
