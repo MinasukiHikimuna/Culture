@@ -18,6 +18,7 @@ import re
 import sys
 from pathlib import Path
 
+from config import REDDIT_INDEX_DIR
 from reddit_extractor import RedditExtractor
 from analyze_download_import import AnalyzeDownloadImportPipeline
 
@@ -136,8 +137,7 @@ def process_legacy_sidecars(
     print("=" * 60)
 
     # Initialize extractors
-    reddit_output_dir = Path("extracted_data/reddit")
-    extractor = RedditExtractor(str(reddit_output_dir))
+    extractor = RedditExtractor(str(REDDIT_INDEX_DIR))
 
     if not dry_run:
         print("Setting up Reddit API connection...")
@@ -196,7 +196,7 @@ def process_legacy_sidecars(
                 continue
 
             # Check if already extracted
-            existing_post = find_extracted_post(author, post_id, reddit_output_dir)
+            existing_post = find_extracted_post(author, post_id, REDDIT_INDEX_DIR)
 
             if existing_post:
                 print(f"  Reddit post already extracted: {existing_post.name}")
@@ -226,7 +226,7 @@ def process_legacy_sidecars(
 
                 # Find the saved file
                 actual_author = reddit_data.get("author", author)
-                post_json_path = find_extracted_post(actual_author, post_id, reddit_output_dir)
+                post_json_path = find_extracted_post(actual_author, post_id, REDDIT_INDEX_DIR)
 
                 if not post_json_path:
                     print(f"  Could not find saved post file")

@@ -19,6 +19,7 @@ import unicodedata
 from pathlib import Path
 
 from analyze_download_import import AnalyzeDownloadImportPipeline
+from config import REDDIT_INDEX_DIR
 from stashapp_importer import StashappClient
 
 
@@ -160,7 +161,7 @@ def main() -> int:
     args = parser.parse_args()
 
     directory = Path(args.directory)
-    reddit_dir = Path("extracted_data/reddit")
+    reddit_dir = REDDIT_INDEX_DIR
 
     if not directory.exists():
         print(f"Error: Directory not found: {directory}")
