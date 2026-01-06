@@ -255,9 +255,9 @@ class ReleaseOrchestrator:
 
     def load_reddit_data(self, file_path: str | Path) -> tuple[dict, dict]:
         """
-        Load reddit data from extracted_data format.
+        Load reddit data from aural_data/index/reddit format.
 
-        The extracted_data files have a nested structure:
+        The reddit index files have a nested structure:
         - Top-level: GWASI index data (post_id, tags, username, etc.)
         - reddit_data: Full PRAW enrichment (selftext, author_flair_text, comments, etc.)
 
@@ -1178,7 +1178,7 @@ def main():
         epilog="""
 Examples:
   # Process with automatic LLM analysis (default):
-  uv run python release_orchestrator.py extracted_data/reddit/performer/post.json
+  uv run python release_orchestrator.py aural_data/index/reddit/performer/post.json
 
   # Process with pre-computed analysis:
   uv run python release_orchestrator.py post.json --analysis analysis.json
@@ -1187,7 +1187,7 @@ Examples:
     parser.add_argument(
         "post_file",
         nargs="?",
-        help="JSON file containing post data (from extracted_data/reddit/...)"
+        help="JSON file containing post data (from aural_data/index/reddit/...)"
     )
     parser.add_argument(
         "--analysis",

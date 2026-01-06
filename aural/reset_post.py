@@ -14,19 +14,91 @@ Use --execute to actually delete the files.
 
 import argparse
 import json
+import os
 import shutil
 from pathlib import Path
 
+import httpx
+from dotenv import load_dotenv
+
 import config as aural_config
+
+load_dotenv()
 
 AURAL_STASH_PATH = aural_config.STASH_OUTPUT_DIR
 DATA_DIR = aural_config.RELEASES_DIR.parent
 ANALYSIS_DIR = aural_config.ANALYSIS_DIR
 EXTRACTED_DATA_DIR = aural_config.REDDIT_INDEX_DIR
 
+# Stashapp configuration
+STASH_URL = os.getenv("STASHAPP_URL")
+STASH_API_KEY = os.getenv("STASHAPP_API_KEY")
+
+
+def stashapp_query(query: str, variables: dict | None = None) -> dict | None:
+    """Execute a GraphQL query against Stashapp."""
+    if not STASH_URL or not STASH_API_KEY:
+        return None
+
+    try:
+        with httpx.Client(timeout=30.0) as client:
+            response = client.post(
+                STASH_URL,
+                json={"query": query, "variables": variables or {}},
+                headers={"ApiKey": STASH_API_KEY, "Content-Type": "application/json"},
+            )
+            if response.status_code == 200:
+                return response.json()
+    except Exception:
+        pass
+    return None
+
+
+def find_stashapp_scenes(post_id: str) -> list[dict]:
+    """Find Stashapp scenes that have a URL containing the post ID."""
+    query = """
+    query FindScenes($filter: FindFilterType, $scene_filter: SceneFilterType) {
+        findScenes(filter: $filter, scene_filter: $scene_filter) {
+            scenes {
+                id
+                title
+                urls
+            }
+        }
+    }
+    """
+    variables = {
+        "filter": {"per_page": 100},
+        "scene_filter": {"url": {"modifier": "INCLUDES", "value": post_id}},
+    }
+
+    result = stashapp_query(query, variables)
+    if result and "data" in result:
+        return result["data"]["findScenes"]["scenes"]
+    return []
+
+
+def delete_stashapp_scene(scene_id: str, delete_file: bool = True) -> bool:
+    """Delete a scene from Stashapp."""
+    mutation = """
+    mutation SceneDestroy($input: SceneDestroyInput!) {
+        sceneDestroy(input: $input)
+    }
+    """
+    variables = {
+        "input": {
+            "id": scene_id,
+            "delete_file": delete_file,
+            "delete_generated": True,
+        }
+    }
+
+    result = stashapp_query(mutation, variables)
+    return result is not None and "data" in result
+
 
 def find_source_post_file(post_id: str) -> Path | None:
-    """Search extracted_data/reddit/<author>/<postId>_*.json"""
+    """Search aural_data/index/reddit/<author>/<postId>_*.json"""
     if not EXTRACTED_DATA_DIR.exists():
         return None
 
@@ -52,6 +124,7 @@ def find_files_for_post(post_id: str) -> dict:
         "release_dir": None,
         "aural_stash_files": [],
         "processed_entry": False,
+        "stashapp_scenes": [],
     }
 
     # 1. Find analysis files matching the post ID
@@ -91,6 +164,9 @@ def find_files_for_post(post_id: str) -> dict:
                 files["processed_entry"] = True
         except (json.JSONDecodeError, IOError):
             pass
+
+    # 5. Find Stashapp scenes with URLs containing the post ID
+    files["stashapp_scenes"] = find_stashapp_scenes(post_id)
 
     return files
 
@@ -133,6 +209,18 @@ def delete_files(files: dict, post_id: str, dry_run: bool) -> int:
                 json.dump(processed, f, indent=2)
         count += 1
 
+    # Stashapp scenes
+    for scene in files["stashapp_scenes"]:
+        scene_id = scene["id"]
+        title = scene.get("title", "Untitled")[:50]
+        print(f"  {action}: Stashapp scene {scene_id} ({title}...)")
+        if not dry_run:
+            if delete_stashapp_scene(scene_id, delete_file=True):
+                pass  # Success
+            else:
+                print(f"    ⚠️  Failed to delete scene {scene_id}")
+        count += 1
+
     return count
 
 
@@ -146,6 +234,7 @@ Files checked:
   - data/releases/<author>/<post_id>_*/
   - /Volumes/Culture 1/Aural_Stash/*<post_id>*.mp4
   - data/processed_posts.json entry
+  - Stashapp scenes with URLs containing the post ID
 
 Examples:
   python reset_post.py 1e1olrf              # Show what would be deleted
@@ -179,6 +268,7 @@ Examples:
             or files["release_dir"]
             or files["aural_stash_files"]
             or files["processed_entry"]
+            or files["stashapp_scenes"]
         )
 
         if not has_files:

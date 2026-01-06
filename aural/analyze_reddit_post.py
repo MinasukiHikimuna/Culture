@@ -429,6 +429,77 @@ Return JSON:
             # Fallback to simple naming
             return self.generate_fallback_naming(post_data, audio_versions)
 
+    def expand_cyoa_audio_versions(
+        self, audio_versions: list, post_data: dict
+    ) -> list:
+        """
+        Expand CYOA audio_versions where multiple URLs were incorrectly grouped.
+
+        For CYOA releases, each audio URL should be its own audio_version since
+        they represent different audio files (intro, endings, etc.), not mirrors
+        of the same audio on different platforms.
+        """
+        expanded = []
+        selftext = post_data.get("reddit_data", {}).get("selftext", "")
+
+        for version in audio_versions:
+            urls = version.get("urls", [])
+
+            # Check if this version has multiple URLs from the same platform
+            # That's the signal that URLs were incorrectly grouped
+            platforms = [u.get("platform", "").lower() for u in urls]
+            platform_counts = {}
+            for p in platforms:
+                platform_counts[p] = platform_counts.get(p, 0) + 1
+
+            # If any platform appears more than once, these are separate audios
+            has_duplicate_platforms = any(count > 1 for count in platform_counts.values())
+
+            if not has_duplicate_platforms or len(urls) <= 1:
+                # No expansion needed
+                expanded.append(version)
+                continue
+
+            # Expand each URL into its own audio_version
+            print(f"  Expanding CYOA version with {len(urls)} URLs into separate audio_versions")
+
+            for url_info in urls:
+                url = url_info.get("url", "")
+
+                # Try to extract a descriptive name from the URL or post body
+                version_name = self._extract_cyoa_version_name(url, selftext)
+
+                expanded_version = {
+                    "version_name": version_name,
+                    "description": version.get("description", ""),
+                    "urls": [url_info],
+                    "performers": version.get("performers", []),
+                    "tags": version.get("tags", []),
+                }
+                expanded.append(expanded_version)
+
+        return expanded
+
+    def _extract_cyoa_version_name(self, url: str, selftext: str) -> str:
+        """Extract a descriptive name for a CYOA audio from its URL or context."""
+        import urllib.parse
+
+        # Try to get name from URL path
+        parsed = urllib.parse.urlparse(url)
+        path_parts = parsed.path.strip("/").split("/")
+
+        if path_parts:
+            # Last part is usually the audio identifier
+            url_name = path_parts[-1]
+            # Convert URL slug to readable name
+            url_name = url_name.replace("-", " ").replace("_", " ")
+            # Capitalize words
+            url_name = " ".join(word.capitalize() for word in url_name.split())
+            if url_name and len(url_name) > 3:
+                return url_name
+
+        return "CYOA Audio"
+
     def generate_fallback_naming(self, post_data: dict, audio_versions: list) -> dict:
         """Generates fallback naming when LLM fails."""
         post_id = post_data.get("reddit_data", {}).get("post_id") or post_data.get(
@@ -553,6 +624,48 @@ Return JSON:
                     f"{cyoa_detection.get('reason')}"
                 )
 
+                # Expand CYOA audio_versions if URLs were incorrectly grouped
+                original_count = len(analysis["audio_versions"])
+                expanded_versions = self.expand_cyoa_audio_versions(
+                    analysis["audio_versions"], post_data
+                )
+
+                if len(expanded_versions) > original_count:
+                    print(
+                        f"  Expanded {original_count} audio_version(s) to "
+                        f"{len(expanded_versions)} for CYOA"
+                    )
+                    analysis["audio_versions"] = expanded_versions
+
+                    # Regenerate version naming for expanded versions
+                    print("  Regenerating version naming for expanded CYOA...")
+                    version_naming = self.generate_version_naming(
+                        post_data, expanded_versions
+                    )
+                    analysis["version_naming"] = version_naming
+
+                    # Re-enhance audio_versions with new slug information
+                    if version_naming and version_naming.get("audio_files"):
+                        enhanced_versions = []
+                        for index, version in enumerate(expanded_versions):
+                            naming_info = (
+                                version_naming["audio_files"][index]
+                                if index < len(version_naming["audio_files"])
+                                else version_naming["audio_files"][0]
+                            )
+                            enhanced_versions.append(
+                                {
+                                    **version,
+                                    "slug": naming_info.get("version_slug")
+                                    or f"version_{index + 1}",
+                                    "filename": naming_info.get("filename")
+                                    or f"{post_data.get('post_id')}_audio_{index + 1}.m4a",
+                                    "metadata_file": naming_info.get("metadata_file")
+                                    or f"{post_data.get('post_id')}_audio_{index + 1}.json",
+                                }
+                            )
+                        analysis["audio_versions"] = enhanced_versions
+
             # Add metadata
             analysis["metadata"] = {
                 "post_id": post_data.get("post_id"),
@@ -613,8 +726,8 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  uv run python analyze_reddit_post.py extracted_data/reddit/alekirser/1amzk7q.json
-  uv run python analyze_reddit_post.py extracted_data/reddit/alekirser/ --output results.json
+  uv run python analyze_reddit_post.py aural_data/index/reddit/alekirser/1amzk7q.json
+  uv run python analyze_reddit_post.py aural_data/index/reddit/alekirser/ --output results.json
   uv run python analyze_reddit_post.py post.json --model mistral-7b --no-script-resolution
 """,
     )

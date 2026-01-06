@@ -29,19 +29,19 @@ The script examines Reddit post content to determine:
 ### Analyze a single post
 
 ```bash
-uv run python analyze_reddit_post.py extracted_data/reddit/alekirser/1amzk7q.json
+uv run python analyze_reddit_post.py aural_data/index/reddit/alekirser/1amzk7q.json
 ```
 
 ### Analyze all posts in a directory
 
 ```bash
-uv run python analyze_reddit_post.py extracted_data/reddit/alekirser/ --output analysis_results.json
+uv run python analyze_reddit_post.py aural_data/index/reddit/alekirser/ --output analysis_results.json
 ```
 
 ### Use custom LM Studio URL or model
 
 ```bash
-uv run python analyze_reddit_post.py extracted_data/reddit/alekirser/1amzk7q.json --url http://localhost:8080/v1/chat/completions --model my-custom-model
+uv run python analyze_reddit_post.py aural_data/index/reddit/alekirser/1amzk7q.json --url http://localhost:8080/v1/chat/completions --model my-custom-model
 ```
 
 ## Output Format

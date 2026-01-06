@@ -15,10 +15,10 @@ The complete workflow consists of:
 
 ```bash
 # Complete workflow - analyze and download in one command
-uv run python analyze_download_import.py extracted_data/reddit/alekirser/1lxhwbd_post.json
+uv run python analyze_download_import.py aural_data/index/reddit/alekirser/1lxhwbd_post.json
 
 # Or step by step:
-uv run python analyze_reddit_post.py extracted_data/reddit/alekirser/1lxhwbd_post.json
+uv run python analyze_reddit_post.py aural_data/index/reddit/alekirser/1lxhwbd_post.json
 uv run python release_orchestrator.py analysis_results/1lxhwbd_*_analysis.json
 ```
 
@@ -26,10 +26,10 @@ uv run python release_orchestrator.py analysis_results/1lxhwbd_*_analysis.json
 
 ```bash
 # Process all posts in a directory
-uv run python analyze_download_import.py extracted_data/reddit/alekirser/
+uv run python analyze_download_import.py aural_data/index/reddit/alekirser/
 
 # Dry run to see what would be processed
-uv run python analyze_download_import.py extracted_data/reddit/alekirser/ --dry-run --verbose
+uv run python analyze_download_import.py aural_data/index/reddit/alekirser/ --dry-run --verbose
 ```
 
 ## Workflow Details
@@ -160,7 +160,7 @@ Options:
 ### Example 1: Single Post with Custom Directories
 
 ```bash
-uv run python analyze_download_import.py extracted_data/reddit/performer/post.json \
+uv run python analyze_download_import.py aural_data/index/reddit/performer/post.json \
   --analysis-dir my_analysis \
   --data-dir my_data \
   --verbose
@@ -169,7 +169,7 @@ uv run python analyze_download_import.py extracted_data/reddit/performer/post.js
 ### Example 2: Batch Processing with Dry Run
 
 ```bash
-uv run python analyze_download_import.py extracted_data/reddit/ \
+uv run python analyze_download_import.py aural_data/index/reddit/ \
   --dry-run \
   --verbose
 ```

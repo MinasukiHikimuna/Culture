@@ -3,7 +3,7 @@
 Match Legacy Audio Files to Extracted Reddit Posts
 
 For legacy M4A files without sidecars, find matching Reddit posts in
-extracted_data/reddit by comparing filenames to post titles.
+aural_data/index/reddit by comparing filenames to post titles.
 
 Usage:
     uv run python match_legacy_to_reddit.py "/Volumes/Culture 1/Aural/GWA/"

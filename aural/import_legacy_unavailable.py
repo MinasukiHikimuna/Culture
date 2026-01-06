@@ -77,7 +77,7 @@ def extract_post_id_from_url(url: str) -> str | None:
 
 def is_content_unavailable(post_id: str, reddit_dir: Path) -> bool:
     """Check if Reddit content for this post is unavailable."""
-    # Search for post in extracted_data/reddit
+    # Search for post in aural_data/index/reddit
     for author_dir in reddit_dir.iterdir():
         if not author_dir.is_dir():
             continue

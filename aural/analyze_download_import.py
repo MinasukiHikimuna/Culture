@@ -1070,19 +1070,19 @@ Complete workflow that analyzes Reddit posts, downloads audio, and imports to St
 
 Examples:
   # Process single Reddit post
-  uv run python analyze_download_import.py extracted_data/reddit/SweetnEvil86/1bdg16n_post.json
+  uv run python analyze_download_import.py aural_data/index/reddit/SweetnEvil86/1bdg16n_post.json
 
   # Process all posts in directory
-  uv run python analyze_download_import.py extracted_data/reddit/SweetnEvil86/
+  uv run python analyze_download_import.py aural_data/index/reddit/SweetnEvil86/
 
   # Dry run to see what would be processed
-  uv run python analyze_download_import.py extracted_data/reddit/SweetnEvil86/ --dry-run
+  uv run python analyze_download_import.py aural_data/index/reddit/SweetnEvil86/ --dry-run
 
   # Re-process a specific post (ignore tracking)
-  uv run python analyze_download_import.py extracted_data/reddit/SweetnEvil86/1bdg16n_post.json --force
+  uv run python analyze_download_import.py aural_data/index/reddit/SweetnEvil86/1bdg16n_post.json --force
 
   # Process without importing to Stashapp
-  uv run python analyze_download_import.py extracted_data/reddit/SweetnEvil86/ --skip-import
+  uv run python analyze_download_import.py aural_data/index/reddit/SweetnEvil86/ --skip-import
 
   # Show current processing status
   uv run python analyze_download_import.py --status

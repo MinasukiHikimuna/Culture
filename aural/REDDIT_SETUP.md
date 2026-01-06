@@ -61,29 +61,29 @@ $env:REDDIT_USER_AGENT="reddit_extractor/1.0 by your_reddit_username"
 Run a small test with limited posts:
 
 ```bash
-uv run python reddit_extractor.py extracted_data/gwasi_data_*.json --max-posts 5
+uv run python reddit_extractor.py aural_data/index/gwasi/gwasi_data_*.json --max-posts 5
 ```
 
 ## Usage Examples
 
 ### Basic usage:
 ```bash
-uv run python reddit_extractor.py extracted_data/gwasi_data_*.json
+uv run python reddit_extractor.py aural_data/index/gwasi/gwasi_data_*.json
 ```
 
 ### With custom output directory:
 ```bash
-uv run python reddit_extractor.py extracted_data/gwasi_data_*.json --output my_reddit_data
+uv run python reddit_extractor.py aural_data/index/gwasi/gwasi_data_*.json --output my_reddit_data
 ```
 
 ### Process only first 10 posts for testing:
 ```bash
-uv run python reddit_extractor.py extracted_data/gwasi_data_*.json --max-posts 10
+uv run python reddit_extractor.py aural_data/index/gwasi/gwasi_data_*.json --max-posts 10
 ```
 
 ### Custom rate limiting (slower requests):
 ```bash
-uv run python reddit_extractor.py extracted_data/gwasi_data_*.json --delay 2.0
+uv run python reddit_extractor.py aural_data/index/gwasi/gwasi_data_*.json --delay 2.0
 ```
 
 ### Pass credentials directly (not recommended for security):
