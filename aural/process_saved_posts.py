@@ -137,11 +137,25 @@ def archive_saved_post(post_file: Path, dry_run: bool = False) -> bool:
         return False
 
 
+def find_extracted_post_files(post_ids: list[str], username: str) -> list[Path]:
+    """Find the extracted JSON files for specific post IDs."""
+    user_dir = REDDIT_OUTPUT_DIR / username
+    if not user_dir.exists():
+        return []
+
+    found_files = []
+    for post_id in post_ids:
+        # Check for any file starting with the post_id
+        matches = list(user_dir.glob(f"{post_id}*.json"))
+        found_files.extend(matches)
+    return found_files
+
+
 def run_analyze_download_import(
     users: list[str], posts_by_user: dict[str, list[dict]], dry_run: bool = False
 ) -> dict:
     """
-    Run analyze_download_import.py for each user's extracted data.
+    Run analyze_download_import.py for each user's saved posts only.
 
     Args:
         users: List of usernames to process
@@ -158,52 +172,60 @@ def run_analyze_download_import(
     results = {"success": [], "failed": [], "skipped": [], "archived": 0}
 
     for username in sorted(users):
-        user_dir = REDDIT_OUTPUT_DIR / username
-
-        if not user_dir.exists():
-            print(f"\n[SKIP] {username}: No extracted data in {user_dir}")
+        user_posts = posts_by_user.get(username, [])
+        if not user_posts:
+            print(f"\n[SKIP] {username}: No saved posts")
             results["skipped"].append(username)
             continue
 
-        # Check if there are any JSON files
-        json_files = list(user_dir.glob("*.json"))
-        if not json_files:
-            print(f"\n[SKIP] {username}: No JSON files in {user_dir}")
+        # Find the extracted JSON files for the saved post IDs only
+        post_ids = [p["id"] for p in user_posts]
+        post_files = find_extracted_post_files(post_ids, username)
+
+        if not post_files:
+            print(f"\n[SKIP] {username}: No extracted data found for saved posts")
             results["skipped"].append(username)
             continue
 
-        cmd = [
-            "uv",
-            "run",
-            "python",
-            "analyze_download_import.py",
-            str(user_dir),
-        ]
-
-        print(f"\n[PROCESS] {username} ({len(json_files)} posts)")
-        print(f"Command: {' '.join(cmd)}")
+        print(f"\n[PROCESS] {username} ({len(post_files)} posts)")
 
         if dry_run:
-            print("[DRY RUN] Skipping execution")
+            for pf in post_files:
+                print(f"  [DRY RUN] Would process: {pf.name}")
             results["success"].append(username)
             continue
 
-        try:
-            result = subprocess.run(cmd, check=False)
-            if result.returncode == 0:
-                results["success"].append(username)
-                # Archive the saved post files for this user
-                user_posts = posts_by_user.get(username, [])
-                for post in user_posts:
-                    post_file = post.get("file")
-                    if post_file and post_file.exists():
-                        if archive_saved_post(post_file, dry_run):
-                            results["archived"] += 1
-                            print(f"  Archived: {post_file.name}")
-            else:
-                results["failed"].append(username)
-        except Exception as e:
-            print(f"Error processing {username}: {e}", file=sys.stderr)
+        # Process each post file individually
+        user_success = True
+        for post_file in post_files:
+            cmd = [
+                "uv",
+                "run",
+                "python",
+                "analyze_download_import.py",
+                str(post_file),
+            ]
+            print(f"  Processing: {post_file.name}")
+
+            try:
+                result = subprocess.run(cmd, check=False)
+                if result.returncode != 0:
+                    print(f"    Failed to process {post_file.name}")
+                    user_success = False
+            except Exception as e:
+                print(f"    Error: {e}")
+                user_success = False
+
+        if user_success:
+            results["success"].append(username)
+            # Archive the saved post files for this user
+            for post in user_posts:
+                saved_post_file = post.get("file")
+                if saved_post_file and saved_post_file.exists():
+                    if archive_saved_post(saved_post_file, dry_run):
+                        results["archived"] += 1
+                        print(f"  Archived: {saved_post_file.name}")
+        else:
             results["failed"].append(username)
 
     return results
