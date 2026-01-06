@@ -26,6 +26,9 @@ from pathlib import Path
 import httpx
 from dotenv import load_dotenv
 
+from config import STASH_BASE_URL as CONFIG_STASH_BASE_URL
+from config import STASH_OUTPUT_DIR as CONFIG_STASH_OUTPUT_DIR
+
 # Load .env from project root
 load_dotenv(Path(__file__).parent / ".env")
 
@@ -38,8 +41,8 @@ class StashScanStuckError(Exception):
 # Stashapp Configuration
 STASH_URL = os.getenv("STASHAPP_URL")
 STASH_API_KEY = os.getenv("STASHAPP_API_KEY")
-STASH_OUTPUT_DIR = Path("/Volumes/Culture 1/Aural_Stash")
-STASH_BASE_URL = "https://stash-aural.chiefsclub.com"
+STASH_OUTPUT_DIR = CONFIG_STASH_OUTPUT_DIR
+STASH_BASE_URL = CONFIG_STASH_BASE_URL or "https://stash-aural.chiefsclub.com"
 
 # Static image for audio-to-video conversion
 STATIC_IMAGE = Path(__file__).parent / "gwa.png"

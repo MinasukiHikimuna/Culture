@@ -17,10 +17,12 @@ import json
 import shutil
 from pathlib import Path
 
-AURAL_STASH_PATH = Path("/Volumes/Culture 1/Aural_Stash")
-DATA_DIR = Path("data")
-ANALYSIS_DIR = Path("analysis_results")
-EXTRACTED_DATA_DIR = Path("extracted_data/reddit")
+import config as aural_config
+
+AURAL_STASH_PATH = aural_config.STASH_OUTPUT_DIR
+DATA_DIR = aural_config.RELEASES_DIR.parent
+ANALYSIS_DIR = aural_config.ANALYSIS_DIR
+EXTRACTED_DATA_DIR = aural_config.REDDIT_INDEX_DIR
 
 
 def find_source_post_file(post_id: str) -> Path | None:

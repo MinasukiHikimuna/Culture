@@ -8,6 +8,8 @@ from datetime import datetime
 
 import dotenv
 
+import config as aural_config
+
 def format_filename(author, created_utc, post_id):
     # Convert UTC timestamp to datetime
     date_str = datetime.fromtimestamp(created_utc).strftime('%Y-%m-%d')
@@ -33,11 +35,12 @@ def save_post_data(post):
     # Create filename using post metadata
     filename = format_filename(post_data['author'], post_data['created_utc'], post_data['id'])
 
-    # Create 'saved_posts' directory if it doesn't exist
-    os.makedirs('saved_posts', exist_ok=True)
+    # Create saved posts directory if it doesn't exist
+    save_dir = aural_config.REDDIT_SAVED_PENDING_DIR
+    save_dir.mkdir(parents=True, exist_ok=True)
 
     # Save to JSON file
-    filepath = os.path.join('saved_posts', filename)
+    filepath = save_dir / filename
     with open(filepath, 'w', encoding='utf-8') as f:
         json.dump(post_data, f, indent=2)
 

@@ -6,6 +6,7 @@ import re
 import sys
 from pathlib import Path
 
+import config as aural_config
 from scriptbin_extractor import ScriptBinExtractor
 
 
@@ -226,7 +227,7 @@ def main() -> None:
         download_single_url(url, release_dir)
         return
 
-    releases_dir = Path("data/releases")
+    releases_dir = aural_config.RELEASES_DIR
     if not releases_dir.exists():
         print(f"Error: {releases_dir} does not exist")
         return

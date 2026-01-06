@@ -22,10 +22,12 @@ import subprocess
 import sys
 from pathlib import Path
 
-SAVED_POSTS_DIR = Path("saved_posts")
-SAVED_POSTS_ARCHIVE_DIR = Path("saved_posts_archived")
-EXTRACTED_DATA_DIR = Path("extracted_data")
-REDDIT_OUTPUT_DIR = EXTRACTED_DATA_DIR / "reddit"
+import config as aural_config
+
+SAVED_POSTS_DIR = aural_config.REDDIT_SAVED_PENDING_DIR
+SAVED_POSTS_ARCHIVE_DIR = aural_config.REDDIT_SAVED_ARCHIVED_DIR
+EXTRACTED_DATA_DIR = aural_config.INDEX_DIR
+REDDIT_OUTPUT_DIR = aural_config.REDDIT_INDEX_DIR
 
 
 def get_posts_from_saved_posts() -> dict[str, list[dict]]:

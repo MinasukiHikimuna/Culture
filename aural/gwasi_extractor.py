@@ -21,11 +21,15 @@ from typing import Dict, List, Optional, Tuple
 import argparse
 from urllib.parse import urlparse, parse_qs
 
+import config as aural_config
+
 
 class GwasiExtractor:
     def __init__(
-        self, output_dir: str = "extracted_data", consecutive_404_limit: int = 5
+        self, output_dir: str | None = None, consecutive_404_limit: int = 5
     ):
+        if output_dir is None:
+            output_dir = str(aural_config.GWASI_INDEX_DIR)
         self.base_url = "https://gwasi.com"
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(exist_ok=True)
@@ -748,8 +752,8 @@ def main():
     parser.add_argument(
         "--output",
         "-o",
-        default="extracted_data",
-        help="Output directory (default: extracted_data)",
+        default=str(aural_config.GWASI_INDEX_DIR),
+        help=f"Output directory (default: {aural_config.GWASI_INDEX_DIR})",
     )
     parser.add_argument(
         "--max-files",

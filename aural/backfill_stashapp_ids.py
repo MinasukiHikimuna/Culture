@@ -13,6 +13,7 @@ import argparse
 import json
 from pathlib import Path
 
+import config as aural_config
 from stashapp_importer import StashappClient
 
 
@@ -23,7 +24,7 @@ def backfill_stashapp_ids(dry_run: bool = False) -> dict:
     Returns:
         Summary dict with counts and details
     """
-    releases_dir = Path("data/releases")
+    releases_dir = aural_config.RELEASES_DIR
     if not releases_dir.exists():
         print(f"Error: Releases directory not found: {releases_dir}")
         return {"error": "Releases directory not found"}

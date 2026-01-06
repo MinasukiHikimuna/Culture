@@ -23,6 +23,7 @@ from typing import Any
 
 import httpx
 
+import config as aural_config
 from ao3_extractor import AO3Extractor
 from audiochan_extractor import AudiochanExtractor
 from hotaudio_extractor import HotAudioExtractor
@@ -165,7 +166,7 @@ class ReleaseOrchestrator:
     def __init__(self, config: dict | None = None):
         config = config or {}
         self.config = {
-            "dataDir": config.get("dataDir", "data"),
+            "dataDir": config.get("dataDir", str(aural_config.RELEASES_DIR.parent)),
             "validateExtractions": config.get("validateExtractions", True),
             **config
         }
@@ -339,6 +340,95 @@ class ReleaseOrchestrator:
             print(f"❌ Extraction failed for {url}: {error}")
             raise
 
+    def extract_audio_multi_track(self, url: str, target_path: dict) -> list[AudioSource]:
+        """
+        Extract all audio tracks from a multi-track HotAudio CYOA page.
+
+        Args:
+            url: HotAudio URL to extract
+            target_path: Dict with 'dir' key for output directory
+
+        Returns:
+            List of AudioSource objects, one for each track
+        """
+        extractor_info = self.get_extractor_for_url(url)
+        if not extractor_info:
+            raise ValueError(f"No extractor found for URL: {url}")
+
+        platform, config = extractor_info
+
+        if platform != "hotaudio":
+            # Only HotAudio supports multi-track extraction
+            return [self.extract_audio(url, target_path)]
+
+        print(f"🔧 Using {platform} multi-track extractor for: {url}")
+
+        try:
+            extractor = self.active_extractors.get(platform)
+            if not extractor:
+                extractor_class = config["class"]
+                extractor = extractor_class({"request_delay": 2.0})
+                self.active_extractors[platform] = extractor
+
+            # Use extract_all for multi-track extraction
+            result = extractor.extract_all(url, target_path)
+
+            audio_sources = []
+
+            if result.get("isCYOA") and result.get("tracks"):
+                # Multi-track CYOA result
+                for track in result["tracks"]:
+                    if "error" not in track:
+                        audio_source = self.normalize_extractor_result(track, platform)
+                        # Add track-specific metadata
+                        audio_source.platform_data["trackIndex"] = track.get("trackIndex")
+                        audio_source.platform_data["trackTitle"] = track.get("trackTitle")
+                        audio_source.platform_data["tid"] = track.get("tid")
+                        audio_source.platform_data["isCYOATrack"] = True
+                        audio_sources.append(audio_source)
+            else:
+                # Single track or fallback
+                if result.get("tracks"):
+                    for track in result["tracks"]:
+                        if "error" not in track:
+                            audio_sources.append(
+                                self.normalize_extractor_result(track, platform)
+                            )
+                else:
+                    audio_sources.append(
+                        self.normalize_extractor_result(result, platform)
+                    )
+
+            return audio_sources
+
+        except Exception as error:
+            print(f"❌ Multi-track extraction failed for {url}: {error}")
+            raise
+
+    def discover_hotaudio_tracks(self, url: str) -> list[dict]:
+        """
+        Discover all tracks on a HotAudio page without extracting.
+
+        Args:
+            url: HotAudio URL to scan
+
+        Returns:
+            List of track info dicts with tid, title, index
+        """
+        if "hotaudio.net" not in url.lower():
+            return []
+
+        try:
+            extractor = self.active_extractors.get("hotaudio")
+            if not extractor:
+                extractor = HotAudioExtractor({"request_delay": 2.0})
+                self.active_extractors["hotaudio"] = extractor
+
+            return extractor.discover_tracks(url)
+        except Exception as e:
+            print(f"Warning: Failed to discover tracks: {e}")
+            return []
+
     def cleanup(self):
         """Cleanup all active extractors."""
         for platform, extractor in self.active_extractors.items():
@@ -481,69 +571,106 @@ class ReleaseOrchestrator:
         audio_urls = self.extract_audio_urls(post, llm_analysis)
         print(f"🔗 Found {len(audio_urls)} unique audio URL{'s' if len(audio_urls) != 1 else ''}")
 
-        # Process each audio version with proper naming
-        for i, audio_version in enumerate(llm_analysis["audio_versions"]):
-            if not audio_version.get("urls"):
-                continue
+        # Check if this is a HotAudio CYOA with multiple tracks
+        hotaudio_urls = [
+            u for u in audio_urls
+            if "hotaudio.net" in u.lower()
+        ]
 
-            # Sort URLs by platform priority
-            sorted_urls = self.sort_urls_by_priority(audio_version["urls"])
-            audio_source = None
-            used_url = None
+        # If there's exactly one HotAudio URL, check if it's a multi-track CYOA
+        if len(hotaudio_urls) == 1:
+            hotaudio_url = hotaudio_urls[0]
+            tracks = self.discover_hotaudio_tracks(hotaudio_url)
 
-            # Determine basename for this version
-            if audio_version.get("filename"):
-                # Remove extension
-                basename = re.sub(r"\.[^.]+$", "", audio_version["filename"])
-            else:
-                release_slug = llm_analysis.get("version_naming", {}).get("release_slug") or release.id
-                basename = f"{release_slug}_{audio_version.get('slug', i)}"
+            if len(tracks) > 1:
+                print(f"🎭 Detected HotAudio CYOA with {len(tracks)} tracks")
 
-            target_path = {"dir": str(release_dir), "basename": basename}
+                # Use multi-track extraction
+                target_path = {"dir": str(release_dir)}
 
-            # Try each platform in priority order with retries
-            for url_info in sorted_urls:
-                max_retries = 3
-                retry_count = 0
+                try:
+                    audio_sources = self.extract_audio_multi_track(hotaudio_url, target_path)
 
-                while retry_count < max_retries:
-                    try:
-                        version_name = audio_version.get("version_name") or f"Version {i + 1}"
-                        print(f"📥 Extracting: {url_info['url']} ({version_name})")
-                        audio_source = self.extract_audio(url_info["url"], target_path)
-                        used_url = url_info
-                        break  # Success, exit retry loop
-                    except Exception as error:
-                        retry_count += 1
-                        if retry_count < max_retries:
-                            print(f"⚠️  Retry {retry_count}/{max_retries} for {url_info.get('platform', 'unknown')}: {error}")
-                        else:
-                            print(f"❌ Failed {url_info.get('platform', 'unknown')} after {max_retries} retries: {error}")
+                    for audio_source in audio_sources:
+                        # Add version info from track metadata
+                        track_title = audio_source.platform_data.get("trackTitle", "")
+                        audio_source.version_info = {
+                            "version_name": track_title,
+                            "description": f"CYOA Track: {track_title}",
+                            "isCYOATrack": True,
+                        }
+                        release.add_audio_source(audio_source)
+                        print(f"✅ Added CYOA track: {track_title}")
+
+                except Exception as error:
+                    print(f"❌ Multi-track extraction failed: {error}")
+                    # Fall through to standard extraction below
+
+        # Process each audio version with proper naming (standard flow)
+        # Skip if we already extracted multi-track CYOA content
+        if not release.audio_sources:
+            for i, audio_version in enumerate(llm_analysis["audio_versions"]):
+                if not audio_version.get("urls"):
+                    continue
+
+                # Sort URLs by platform priority
+                sorted_urls = self.sort_urls_by_priority(audio_version["urls"])
+                audio_source = None
+                used_url = None
+
+                # Determine basename for this version
+                if audio_version.get("filename"):
+                    # Remove extension
+                    basename = re.sub(r"\.[^.]+$", "", audio_version["filename"])
+                else:
+                    release_slug = llm_analysis.get("version_naming", {}).get("release_slug") or release.id
+                    basename = f"{release_slug}_{audio_version.get('slug', i)}"
+
+                target_path = {"dir": str(release_dir), "basename": basename}
+
+                # Try each platform in priority order with retries
+                for url_info in sorted_urls:
+                    max_retries = 3
+                    retry_count = 0
+
+                    while retry_count < max_retries:
+                        try:
+                            version_name = audio_version.get("version_name") or f"Version {i + 1}"
+                            print(f"📥 Extracting: {url_info['url']} ({version_name})")
+                            audio_source = self.extract_audio(url_info["url"], target_path)
+                            used_url = url_info
+                            break  # Success, exit retry loop
+                        except Exception as error:
+                            retry_count += 1
+                            if retry_count < max_retries:
+                                print(f"⚠️  Retry {retry_count}/{max_retries} for {url_info.get('platform', 'unknown')}: {error}")
+                            else:
+                                print(f"❌ Failed {url_info.get('platform', 'unknown')} after {max_retries} retries: {error}")
+
+                    if audio_source:
+                        break  # Success, don't try other platforms
 
                 if audio_source:
-                    break  # Success, don't try other platforms
+                    # Add version-specific metadata
+                    audio_source.version_info = {
+                        "slug": audio_version.get("slug"),
+                        "version_name": audio_version.get("version_name"),
+                        "description": audio_version.get("description"),
+                        "performers": audio_version.get("performers", []),
+                        "tags": audio_version.get("tags", [])
+                    }
 
-            if audio_source:
-                # Add version-specific metadata
-                audio_source.version_info = {
-                    "slug": audio_version.get("slug"),
-                    "version_name": audio_version.get("version_name"),
-                    "description": audio_version.get("description"),
-                    "performers": audio_version.get("performers", []),
-                    "tags": audio_version.get("tags", [])
-                }
+                    # Store alternate sources
+                    audio_source.alternate_sources = [
+                        {"platform": u.get("platform"), "url": u.get("url")}
+                        for u in sorted_urls
+                        if u.get("url") != used_url.get("url")
+                    ]
 
-                # Store alternate sources
-                audio_source.alternate_sources = [
-                    {"platform": u.get("platform"), "url": u.get("url")}
-                    for u in sorted_urls
-                    if u.get("url") != used_url.get("url")
-                ]
-
-                release.add_audio_source(audio_source)
-                print(f"✅ Added audio source: {audio_version.get('version_name', 'Version')} from {audio_source.metadata['platform']['name']}")
-            else:
-                print(f"❌ All platforms failed for {audio_version.get('version_name') or f'Version {i + 1}'}")
+                    release.add_audio_source(audio_source)
+                    print(f"✅ Added audio source: {audio_version.get('version_name', 'Version')} from {audio_source.metadata['platform']['name']}")
+                else:
+                    print(f"❌ All platforms failed for {audio_version.get('version_name') or f'Version {i + 1}'}")
 
         # Fail early if no audio sources were downloaded
         if not release.audio_sources:
@@ -1070,8 +1197,8 @@ Examples:
     parser.add_argument(
         "--output-dir",
         "-o",
-        default="data",
-        help="Output directory (default: data)"
+        default=str(aural_config.RELEASES_DIR.parent),
+        help=f"Output directory (default: {aural_config.RELEASES_DIR.parent})"
     )
 
     args = parser.parse_args()

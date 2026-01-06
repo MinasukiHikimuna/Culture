@@ -1,17 +1,17 @@
+# Environment
 .env
-analysis_results/
-ao3_data/
-saved_posts/
-saved_posts_archived/
-data/
-downloads/
-extracted_data/
-hotaudio_data/
-node_modules/
-pornhub_data/
-reddit_data/
-scriptbin_data/
-soundgasm_data/
-ytdlp_data/
-whypit_data/
-__pycache__
+
+# Data directory (all data consolidated here)
+aural_data/
+
+# Build artifacts
+dist/
+
+# Python
+__pycache__/
+.venv/
+*.pyc
+
+# Temporary
+temp/
+*.tmp

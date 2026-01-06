@@ -71,28 +71,44 @@ Release (collection of related audio variants)
 
 ## Directory Structure
 
+All data is consolidated under `aural_data/` for easy backup with restic:
+
 ```
-project_root/
-├── data/
-│   ├── releases/                   # Releases organized by performer
-│   │   └── {performer}/
-│   │       └── {post_id}_{slug}/
-│   │           ├── release.json           # Full release metadata (LLM analysis, sources)
-│   │           ├── {audio_name}.m4a       # Downloaded audio file
-│   │           ├── {audio_name}.json      # Audio-specific metadata
-│   │           ├── script.txt             # Extracted script (if available)
-│   │           ├── script.html            # Script HTML source
-│   │           └── script_metadata.json   # Script source metadata
-│   ├── cyoa/                       # CYOA (Choose Your Own Adventure) imports
-│   ├── hotaudio/                   # HotAudio-specific data
-│   └── processed_posts.json        # Tracking of processed Reddit posts
-├── extracted_data/                 # GWASI index cache
-│   ├── raw_json/                   # Raw GWASI JSON files
-│   ├── reddit/                     # Reddit post data from PRAW
-│   └── base_entries_cache.json     # Consolidated GWASI entries (~5.6GB)
-└── analysis_results/               # LLM analysis results for Reddit posts
-    └── {post_id}_{slug}_analysis.json
+aural_data/                              # Single backup root
+├── index/                               # Discovery and indexing data
+│   ├── gwasi/                           # GWASI index cache
+│   │   ├── raw_json/                    # Raw GWASI JSON partitions
+│   │   ├── base_entries_cache.json      # Consolidated entries (~5.6GB)
+│   │   └── current_base_version.txt     # Version tracker
+│   └── reddit/                          # Reddit post metadata from PRAW
+│       └── {author}/{post_id}_*.json
+│
+├── sources/                             # Platform-specific downloads
+│   ├── reddit_saved/                    # Reddit saved posts
+│   │   ├── pending/                     # Posts awaiting processing
+│   │   └── archived/                    # Successfully imported posts
+│   ├── ao3/                             # AO3 content
+│   ├── scriptbin/                       # Scripts from scriptbin.works
+│   ├── hotaudio/                        # HotAudio downloads
+│   └── ytdlp/                           # yt-dlp downloads (YouTube, PornHub, etc.)
+│
+├── releases/                            # Processed releases by performer
+│   └── {performer}/
+│       └── {post_id}_{slug}/
+│           ├── release.json             # Full release metadata
+│           ├── {audio_name}.m4a         # Downloaded audio file
+│           ├── {audio_name}.json        # Audio-specific metadata
+│           ├── script.txt               # Extracted script (if available)
+│           └── script_metadata.json     # Script source metadata
+│
+├── analysis/                            # LLM analysis results
+│   └── {post_id}_{slug}_analysis.json
+│
+└── tracking/
+    └── processed_posts.json             # Processing state tracker
 ```
+
+Configuration is centralized in `config.py` with paths configurable via `.env`.
 
 ## Environment Configuration
 

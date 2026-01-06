@@ -5,6 +5,8 @@ import json
 import re
 from pathlib import Path
 
+import config as aural_config
+
 
 def script_is_incomplete(script_file: Path) -> str | None:
     """
@@ -131,7 +133,7 @@ def find_missing_scripts(releases_dir: Path) -> None:
 
 
 def main() -> None:
-    releases_dir = Path("data/releases")
+    releases_dir = aural_config.RELEASES_DIR
     if not releases_dir.exists():
         print(f"Error: {releases_dir} does not exist")
         return

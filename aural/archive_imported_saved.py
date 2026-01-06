@@ -17,12 +17,13 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+import config as aural_config
 from stashapp_importer import StashappClient
 
 load_dotenv(Path(__file__).parent / ".env")
 
-SAVED_POSTS_DIR = Path("saved_posts")
-ARCHIVE_DIR = Path("saved_posts_archived")
+SAVED_POSTS_DIR = aural_config.REDDIT_SAVED_PENDING_DIR
+ARCHIVE_DIR = aural_config.REDDIT_SAVED_ARCHIVED_DIR
 
 
 def get_all_scenes_with_post_ids(client: StashappClient) -> dict[str, dict]:

@@ -22,6 +22,7 @@ from pathlib import Path
 
 import httpx
 
+import config as aural_config
 from analyze_reddit_post import EnhancedRedditPostAnalyzer
 from release_orchestrator import ReleaseOrchestrator
 from stashapp_importer import STASH_BASE_URL, StashappImporter, StashScanStuckError
@@ -110,8 +111,8 @@ class AnalyzeDownloadImportPipeline:
 
     def __init__(self, options: dict | None = None):
         options = options or {}
-        self.analysis_dir = Path(options.get("analysis_dir", "analysis_results"))
-        self.data_dir = Path(options.get("data_dir", "data"))
+        self.analysis_dir = Path(options.get("analysis_dir", str(aural_config.ANALYSIS_DIR)))
+        self.data_dir = Path(options.get("data_dir", str(aural_config.RELEASES_DIR.parent)))
         self.dry_run = options.get("dry_run", False)
         self.verbose = options.get("verbose", False)
         self.skip_analysis = options.get("skip_analysis", False)
@@ -1097,13 +1098,13 @@ Examples:
     )
     parser.add_argument(
         "--analysis-dir",
-        default="analysis_results",
-        help="Directory for analysis results (default: analysis_results)",
+        default=str(aural_config.ANALYSIS_DIR),
+        help=f"Directory for analysis results (default: {aural_config.ANALYSIS_DIR})",
     )
     parser.add_argument(
         "--data-dir",
-        default="data",
-        help="Directory for all data (default: data)",
+        default=str(aural_config.RELEASES_DIR.parent),
+        help=f"Directory for all data (default: {aural_config.RELEASES_DIR.parent})",
     )
     parser.add_argument(
         "--dry-run",
