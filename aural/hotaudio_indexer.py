@@ -15,12 +15,14 @@ from pathlib import Path
 
 from playwright.sync_api import sync_playwright
 
+import config as aural_config
+
 
 class HotAudioIndexer:
     """Index HotAudio releases by crawling user profiles."""
 
-    def __init__(self, output_dir: str = "hotaudio_data"):
-        self.output_dir = Path(output_dir).resolve()
+    def __init__(self, output_dir: str | None = None):
+        self.output_dir = Path(output_dir).resolve() if output_dir else aural_config.HOTAUDIO_DIR
         self.request_delay = 2.0  # Seconds between requests
         self.last_request_time = 0.0
         self.browser = None
@@ -258,8 +260,8 @@ def main():
     parser.add_argument(
         "-o",
         "--output",
-        default="hotaudio_data",
-        help="Output directory (default: hotaudio_data)",
+        default=None,
+        help=f"Output directory (default: {aural_config.HOTAUDIO_DIR})",
     )
 
     args = parser.parse_args()

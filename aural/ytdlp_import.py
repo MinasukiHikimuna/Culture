@@ -16,6 +16,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+import config as aural_config
 from stashapp_importer import (
     STASH_BASE_URL,
     STASH_OUTPUT_DIR,
@@ -50,7 +51,7 @@ class YtDlpImporter:
         """Lazy-load yt-dlp extractor."""
         if self._extractor is None:
             self._extractor = YtDlpExtractor(
-                output_dir=str(Path.cwd() / "ytdlp_data"), use_cache=True
+                output_dir=str(aural_config.YTDLP_DIR), use_cache=True
             )
         return self._extractor
 

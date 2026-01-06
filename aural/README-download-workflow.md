@@ -19,7 +19,7 @@ uv run python analyze_download_import.py aural_data/index/reddit/alekirser/1lxhw
 
 # Or step by step:
 uv run python analyze_reddit_post.py aural_data/index/reddit/alekirser/1lxhwbd_post.json
-uv run python release_orchestrator.py analysis_results/1lxhwbd_*_analysis.json
+uv run python release_orchestrator.py aural_data/analysis/1lxhwbd_*_analysis.json
 ```
 
 ### Batch Processing
@@ -134,8 +134,8 @@ The complete metadata saved in the final JSON includes:
 uv run python analyze_download_import.py <post_file_or_directory> [options]
 
 Options:
-  --analysis-dir <dir>     Directory for analysis results (default: analysis_results)
-  --data-dir <dir>         Directory for releases (default: data)
+  --analysis-dir <dir>     Directory for analysis results (default: aural_data/analysis)
+  --data-dir <dir>         Directory for releases (default: aural_data)
   --dry-run               Analyze posts but don't download files
   --verbose               Show detailed progress
   --skip-import           Skip Stashapp import step
@@ -150,7 +150,7 @@ Options:
 uv run python release_orchestrator.py <analysis_file> [options]
 
 Options:
-  --data-dir <dir>        Output directory (default: data)
+  --data-dir <dir>        Output directory (default: aural_data)
   --dry-run              Show what would be downloaded
   --verbose              Show detailed download progress
 ```
@@ -177,7 +177,7 @@ uv run python analyze_download_import.py aural_data/index/reddit/ \
 ### Example 3: Download from Existing Analysis
 
 ```bash
-uv run python release_orchestrator.py analysis_results/post_analysis.json --verbose
+uv run python release_orchestrator.py aural_data/analysis/post_analysis.json --verbose
 ```
 
 ## Directory Structure
@@ -195,21 +195,22 @@ reddit_data/
 
 ### Output Structure
 ```
-analysis_results/              # Analysis outputs
-├── postid1_title_analysis.json
-├── postid2_title_analysis.json
-└── ...
-
-downloads/                     # Downloaded content
-├── username1/
-│   ├── postid1_title/
-│   │   ├── soundgasm_files/
-│   │   ├── metadata.json
-│   │   └── analysis.json
-│   └── postid2_title/
-│       └── ...
-└── username2/
-    └── ...
+aural_data/
+├── analysis/                  # Analysis outputs
+│   ├── postid1_title_analysis.json
+│   ├── postid2_title_analysis.json
+│   └── ...
+│
+└── releases/                  # Downloaded content
+    ├── username1/
+    │   ├── postid1_title/
+    │   │   ├── soundgasm_files/
+    │   │   ├── metadata.json
+    │   │   └── analysis.json
+    │   └── postid2_title/
+    │       └── ...
+    └── username2/
+        └── ...
 ```
 
 ## Supported Platforms

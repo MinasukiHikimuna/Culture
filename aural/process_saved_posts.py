@@ -3,7 +3,7 @@
 Process saved posts through the full pipeline.
 
 Workflow:
-1. Extract posts from saved_posts/ (read post IDs directly from JSON files)
+1. Extract posts from aural_data/sources/reddit_saved/pending/ (read post IDs directly from JSON files)
 2. Run reddit_extractor.py for each post ID (batch)
 3. Run analyze_download_import.py for each user
 
@@ -32,7 +32,7 @@ REDDIT_OUTPUT_DIR = aural_config.REDDIT_INDEX_DIR
 
 def get_posts_from_saved_posts() -> dict[str, list[dict]]:
     """
-    Scan saved_posts/ and extract posts grouped by username.
+    Scan reddit_saved/pending/ and extract posts grouped by username.
 
     Returns:
         Dict mapping username to list of post info dicts with 'id' and 'file' keys
@@ -237,7 +237,7 @@ def main() -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Process all users from saved_posts
+  # Process all users from reddit_saved/pending
   uv run python process_saved_posts.py
 
   # Process specific users
@@ -255,7 +255,7 @@ Examples:
     )
     parser.add_argument(
         "--users",
-        help="Comma-separated list of usernames to process (default: all from saved_posts)",
+        help="Comma-separated list of usernames to process (default: all from reddit_saved/pending)",
     )
     parser.add_argument(
         "--dry-run",
@@ -281,14 +281,14 @@ Examples:
 
     args = parser.parse_args()
 
-    # Stage 1: Get posts from saved_posts
+    # Stage 1: Get posts from reddit_saved/pending
     print(f"{'=' * 60}")
     print("Stage 1: Discovering Posts")
     print(f"{'=' * 60}")
 
     all_users = get_posts_from_saved_posts()
     if not all_users:
-        print("No posts found in saved_posts/", file=sys.stderr)
+        print("No posts found in reddit_saved/pending/", file=sys.stderr)
         return 1
 
     total_posts = sum(len(posts) for posts in all_users.values())
@@ -300,7 +300,7 @@ Examples:
         users_to_process = {u: all_users[u] for u in filter_users if u in all_users}
         missing = [u for u in filter_users if u not in all_users]
         if missing:
-            print(f"Warning: Users not found in saved_posts: {missing}")
+            print(f"Warning: Users not found in reddit_saved/pending: {missing}")
         if not users_to_process:
             print("No matching users to process", file=sys.stderr)
             return 1

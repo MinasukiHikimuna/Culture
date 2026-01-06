@@ -22,6 +22,8 @@ from pathlib import Path
 
 import yt_dlp
 
+import config as aural_config
+
 
 class YtDlpLogger:
     """Custom logger for yt-dlp with emoji prefixes."""
@@ -56,8 +58,8 @@ class YtDlpExtractor:
         "merge_output_format": "mp4",
     }
 
-    def __init__(self, output_dir: str = "ytdlp_data", use_cache: bool = True):
-        self.output_dir = Path(output_dir).resolve()
+    def __init__(self, output_dir: str | None = None, use_cache: bool = True):
+        self.output_dir = Path(output_dir).resolve() if output_dir else aural_config.YTDLP_DIR
         self.cache_dir = self.output_dir / "cache"
         self.use_cache = use_cache
         self._ensure_dirs()
@@ -410,7 +412,7 @@ def main() -> int:
     )
     download_parser.add_argument("url", help="Video URL to download")
     download_parser.add_argument(
-        "--output-dir", "-o", default="ytdlp_data", help="Output directory"
+        "--output-dir", "-o", default=None, help=f"Output directory (default: {aural_config.YTDLP_DIR})"
     )
 
     # Info subcommand
@@ -419,7 +421,7 @@ def main() -> int:
     )
     info_parser.add_argument("url", help="Video URL to extract info from")
     info_parser.add_argument(
-        "--output-dir", "-o", default="ytdlp_data", help="Output directory"
+        "--output-dir", "-o", default=None, help=f"Output directory (default: {aural_config.YTDLP_DIR})"
     )
     info_parser.add_argument("--no-cache", action="store_true", help="Skip cache")
 
@@ -429,7 +431,7 @@ def main() -> int:
     )
     index_parser.add_argument("url", help="Playlist/channel URL to index")
     index_parser.add_argument(
-        "--output-dir", "-o", default="ytdlp_data", help="Output directory"
+        "--output-dir", "-o", default=None, help=f"Output directory (default: {aural_config.YTDLP_DIR})"
     )
     index_parser.add_argument(
         "--max-videos", "-n", type=int, help="Maximum videos to index"

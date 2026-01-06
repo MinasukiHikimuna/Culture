@@ -2,9 +2,9 @@
 """
 Archive saved posts that have already been imported to Stashapp.
 
-Checks each JSON file in saved_posts/ to see if its Reddit post ID
+Checks each JSON file in reddit_saved/pending/ to see if its Reddit post ID
 exists in Stashapp (by searching filenames), and moves matched files
-to saved_posts_archived/.
+to reddit_saved/archived/.
 
 Usage:
     uv run python archive_imported_saved.py [--dry-run]
@@ -84,7 +84,7 @@ def main():
     args = parser.parse_args()
 
     if not SAVED_POSTS_DIR.exists():
-        print(f"No saved_posts directory found at {SAVED_POSTS_DIR}")
+        print(f"No reddit_saved/pending directory found at {SAVED_POSTS_DIR}")
         return
 
     # Create archive directory

@@ -21,10 +21,12 @@ from pathlib import Path
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
 
+import config as aural_config
+
 
 class AO3Extractor:
-    def __init__(self, output_dir: str = "ao3_data"):
-        self.output_dir = Path(output_dir).resolve()
+    def __init__(self, output_dir: str | None = None):
+        self.output_dir = Path(output_dir).resolve() if output_dir else aural_config.AO3_DIR
         self.request_delay = 2.0  # Seconds between requests
         self.last_request_time = 0.0
 
@@ -610,8 +612,8 @@ def main():
     parser.add_argument(
         "--output",
         "-o",
-        default="ao3_data",
-        help="Output directory (default: ao3_data)",
+        default=None,
+        help=f"Output directory (default: {aural_config.AO3_DIR})",
     )
     parser.add_argument(
         "--max-works",

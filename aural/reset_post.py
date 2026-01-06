@@ -230,10 +230,10 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Files checked:
-  - analysis_results/<post_id>_*_analysis.json
-  - data/releases/<author>/<post_id>_*/
+  - aural_data/analysis/<post_id>_*_analysis.json
+  - aural_data/releases/<author>/<post_id>_*/
   - /Volumes/Culture 1/Aural_Stash/*<post_id>*.mp4
-  - data/processed_posts.json entry
+  - aural_data/tracking/processed_posts.json entry
   - Stashapp scenes with URLs containing the post ID
 
 Examples:
