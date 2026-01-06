@@ -479,6 +479,10 @@ class StashappClient:
                         title
                         date
                         urls
+                        performers {
+                            id
+                            name
+                        }
                         files {
                             id
                             path
