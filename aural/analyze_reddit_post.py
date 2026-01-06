@@ -112,7 +112,12 @@ Return this exact JSON structure:
                 json_match = re.search(r"\{[\s\S]*\}", response_text)
                 clean_text = json_match.group(0) if json_match else response_text
 
-            parsed = json.loads(clean_text)
+            # Try to parse, and if it fails, attempt repair
+            try:
+                parsed = json.loads(clean_text)
+            except json.JSONDecodeError:
+                repaired = self._repair_json(clean_text)
+                parsed = json.loads(repaired)
 
             if not isinstance(parsed.get("is_cyoa"), bool):
                 raise ValueError("Missing required field: is_cyoa")
@@ -357,6 +362,41 @@ Return JSON:
                 f"and serving on {self.lm_studio_url}"
             )
 
+    def _repair_json(self, json_str: str) -> str:
+        """Attempts to repair common JSON malformations from LLM output."""
+        # Count brackets to detect mismatches
+        open_braces = json_str.count("{")
+        close_braces = json_str.count("}")
+        open_brackets = json_str.count("[")
+        close_brackets = json_str.count("]")
+
+        # Add missing closing brackets/braces at the end
+        missing_brackets = open_brackets - close_brackets
+        missing_braces = open_braces - close_braces
+
+        if missing_brackets > 0 or missing_braces > 0:
+            # Find the position just before the final closing braces
+            # We need to insert missing ] before the final }
+            repaired = json_str.rstrip()
+
+            # Remove trailing braces temporarily
+            trailing_braces = ""
+            while repaired.endswith("}"):
+                trailing_braces = "}" + trailing_braces
+                repaired = repaired[:-1]
+
+            # Add missing brackets
+            repaired += "]" * missing_brackets
+
+            # Add back the trailing braces, plus any missing ones
+            repaired += trailing_braces
+            if missing_braces > 0:
+                repaired += "}" * missing_braces
+
+            return repaired
+
+        return json_str
+
     def parse_response(self, response_text: str) -> dict:
         """Parses and validates the LLM response."""
         try:
@@ -373,7 +413,12 @@ Return JSON:
                 json_match = re.search(r"\{[\s\S]*\}", response_text)
                 clean_text = json_match.group(0) if json_match else response_text
 
-            parsed = json.loads(clean_text)
+            # Try to parse, and if it fails, attempt repair
+            try:
+                parsed = json.loads(clean_text)
+            except json.JSONDecodeError:
+                repaired = self._repair_json(clean_text)
+                parsed = json.loads(repaired)
 
             # Validate required fields for metadata extraction
             if "performers" not in parsed:
@@ -403,7 +448,12 @@ Return JSON:
                 json_match = re.search(r"\{[\s\S]*\}", response_text)
                 clean_text = json_match.group(0) if json_match else response_text
 
-            parsed = json.loads(clean_text)
+            # Try to parse, and if it fails, attempt repair
+            try:
+                parsed = json.loads(clean_text)
+            except json.JSONDecodeError:
+                repaired = self._repair_json(clean_text)
+                parsed = json.loads(repaired)
 
             # Validate version naming response structure
             if not all(
