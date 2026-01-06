@@ -159,9 +159,9 @@ class StashappTagAnalyzer:
             title = scene.get("title") or ""
             details = scene.get("details") or ""
 
-            # Get existing linked tags for this scene (lowercase for comparison)
-            scene_linked_tags = {
-                t["name"].lower() for t in scene.get("tags") or []
+            # Get existing linked tag IDs for this scene
+            scene_linked_tag_ids = {
+                t["id"] for t in scene.get("tags") or []
             }
 
             # Extract tags from both title and details
@@ -181,7 +181,7 @@ class StashappTagAnalyzer:
                 seen_in_scene.add(normalized)
 
                 if normalized not in tag_data:
-                    # Check if exists in Stashapp
+                    # Check if exists in Stashapp (by name or alias)
                     stash_tag = stash_tags.get(normalized)
                     tag_data[normalized] = TagOccurrence(
                         normalized_name=normalized,
@@ -193,8 +193,9 @@ class StashappTagAnalyzer:
                 tag_data[normalized].count += 1
                 tag_data[normalized].scene_ids.append(scene_id)
 
-                # Check if this scene already has this tag linked
-                if normalized in scene_linked_tags:
+                # Check if this scene already has this tag linked (by ID)
+                stash_tag_id = tag_data[normalized].stash_tag_id
+                if stash_tag_id and stash_tag_id in scene_linked_tag_ids:
                     tag_data[normalized].linked_count += 1
 
         return tag_data
@@ -313,6 +314,7 @@ class StashappTagAnalyzer:
 def print_analysis(
     tag_data: dict[str, TagOccurrence],
     total_scenes: int,
+    stash_tags: dict[str, dict],
     limit: int | None = None,
     min_count: int = 1,
 ):
@@ -322,32 +324,39 @@ def print_analysis(
     sorted_tags = sorted(filtered, key=lambda t: (-t.unlinked_count, -t.count, t.normalized_name))
 
     print("\nStashapp Bracketed Tag Analysis")
-    print("=" * 85)
+    print("=" * 95)
     print(f"Total scenes analyzed: {total_scenes:,}")
     print(f"Unique tags found: {len(tag_data):,}")
     if min_count > 1:
         print(f"Tags with {min_count}+ occurrences: {len(filtered):,}")
     print()
     print("Tags sorted by unlinked count (scenes with [tag] but not yet linked):")
-    print("-" * 85)
-    print(f"{'#':>4}  | {'Total':>5} | {'Linked':>6} | {'Unlinked':>8} | {'Tag':<28} | In Stash?")
-    print("-" * 85)
+    print("-" * 95)
+    print(f"{'Total':>5} | {'Linked':>6} | {'Unlinked':>8} | {'Tag':<28} | Stash Tag")
+    print("-" * 95)
 
     display_tags = sorted_tags[:limit] if limit and limit > 0 else sorted_tags
 
-    for i, tag in enumerate(display_tags, 1):
-        in_stash = "Yes" if tag.exists_in_stash else "No"
-        # Truncate long tags
+    for tag in display_tags:
+        # Get matched Stashapp tag name (could be different if matched via alias)
+        stash_tag_info = stash_tags.get(tag.normalized_name)
+        stash_tag_name = stash_tag_info["name"] if stash_tag_info else ""
+        # Truncate long names
         display_name = (
             tag.display_name[:26] + ".."
             if len(tag.display_name) > 28
             else tag.display_name
         )
+        stash_display = (
+            stash_tag_name[:18] + ".."
+            if len(stash_tag_name) > 20
+            else stash_tag_name
+        )
         print(
-            f"{i:>4}  | {tag.count:>5} | {tag.linked_count:>6} | {tag.unlinked_count:>8} | {display_name:<28} | {in_stash}"
+            f"{tag.count:>5} | {tag.linked_count:>6} | {tag.unlinked_count:>8} | {display_name:<28} | {stash_display}"
         )
 
-    print("-" * 85)
+    print("-" * 95)
     if limit and limit > 0 and len(sorted_tags) > limit:
         print(f"Showing {limit} of {len(sorted_tags)} tags (use --limit 0 for all)")
 
@@ -460,10 +469,11 @@ def main():
             )
         else:
             # Analysis mode: display results
+            stash_tags = analyzer.fetch_all_tags(verbose=args.verbose)
             if args.json:
                 print_json(tag_analysis, len(scenes), args.limit, args.min_count)
             else:
-                print_analysis(tag_analysis, len(scenes), args.limit, args.min_count)
+                print_analysis(tag_analysis, len(scenes), stash_tags, args.limit, args.min_count)
 
     except requests.exceptions.RequestException as e:
         print(f"Error connecting to Stashapp: {e}")
