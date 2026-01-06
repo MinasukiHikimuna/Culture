@@ -28,6 +28,26 @@ SAVED_POSTS_DIR = aural_config.REDDIT_SAVED_PENDING_DIR
 SAVED_POSTS_ARCHIVE_DIR = aural_config.REDDIT_SAVED_ARCHIVED_DIR
 EXTRACTED_DATA_DIR = aural_config.INDEX_DIR
 REDDIT_OUTPUT_DIR = aural_config.REDDIT_INDEX_DIR
+PROCESSED_POSTS_FILE = aural_config.RELEASES_DIR.parent / "processed_posts.json"
+
+
+def load_processed_posts() -> dict:
+    """Load processed posts tracking data."""
+    try:
+        return json.loads(PROCESSED_POSTS_FILE.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {"posts": {}, "lastUpdated": None}
+
+
+def is_post_processed(post_id: str, processed_data: dict) -> bool:
+    """Check if a post has already been successfully processed."""
+    record = processed_data.get("posts", {}).get(post_id)
+    if not record:
+        return False
+    # Processed if: successful import with scene ID, OR intentionally skipped
+    return (
+        record.get("success") is True and record.get("stashSceneId") is not None
+    ) or (record.get("success") is True and record.get("stage") == "skipped")
 
 
 def get_posts_from_saved_posts() -> dict[str, list[dict]]:
@@ -171,6 +191,9 @@ def run_analyze_download_import(
 
     results = {"success": [], "failed": [], "skipped": [], "archived": 0}
 
+    # Load processed posts once for checking already-processed posts
+    processed_data = load_processed_posts()
+
     for username in sorted(users):
         user_posts = posts_by_user.get(username, [])
         if not user_posts:
@@ -178,8 +201,30 @@ def run_analyze_download_import(
             results["skipped"].append(username)
             continue
 
-        # Find the extracted JSON files for the saved post IDs only
-        post_ids = [p["id"] for p in user_posts]
+        # Build a mapping from post_id to saved post info
+        post_id_to_saved = {p["id"]: p for p in user_posts}
+
+        # Archive already-processed posts first
+        posts_to_process = []
+        for post in user_posts:
+            post_id = post["id"]
+            if is_post_processed(post_id, processed_data):
+                saved_post_file = post.get("file")
+                if saved_post_file and saved_post_file.exists():
+                    if archive_saved_post(saved_post_file, dry_run):
+                        results["archived"] += 1
+                        print(f"  [ALREADY PROCESSED] Archived: {saved_post_file.name}")
+            else:
+                posts_to_process.append(post)
+
+        # Update user_posts to only include unprocessed posts
+        if not posts_to_process:
+            print(f"\n[SKIP] {username}: All posts already processed and archived")
+            results["success"].append(username)
+            continue
+
+        # Find the extracted JSON files for the remaining post IDs only
+        post_ids = [p["id"] for p in posts_to_process]
         post_files = find_extracted_post_files(post_ids, username)
 
         if not post_files:
@@ -195,9 +240,13 @@ def run_analyze_download_import(
             results["success"].append(username)
             continue
 
-        # Process each post file individually
-        user_success = True
+        # Process each post file individually and archive on success
+        user_had_success = False
+        user_had_failure = False
         for post_file in post_files:
+            # Extract post_id from filename (format: {post_id}_*.json)
+            post_id = post_file.stem.split("_")[0]
+
             cmd = [
                 "uv",
                 "run",
@@ -209,24 +258,32 @@ def run_analyze_download_import(
 
             try:
                 result = subprocess.run(cmd, check=False)
-                if result.returncode != 0:
+                if result.returncode == 0:
+                    user_had_success = True
+                    # Archive this specific saved post on success
+                    saved_post = post_id_to_saved.get(post_id)
+                    if saved_post:
+                        saved_post_file = saved_post.get("file")
+                        if saved_post_file and saved_post_file.exists():
+                            if archive_saved_post(saved_post_file, dry_run):
+                                results["archived"] += 1
+                                print(f"  Archived: {saved_post_file.name}")
+                else:
                     print(f"    Failed to process {post_file.name}")
-                    user_success = False
+                    user_had_failure = True
             except Exception as e:
                 print(f"    Error: {e}")
-                user_success = False
+                user_had_failure = True
 
-        if user_success:
+        # Track user-level results (a user can be in both if some posts succeeded and others failed)
+        if user_had_success and not user_had_failure:
             results["success"].append(username)
-            # Archive the saved post files for this user
-            for post in user_posts:
-                saved_post_file = post.get("file")
-                if saved_post_file and saved_post_file.exists():
-                    if archive_saved_post(saved_post_file, dry_run):
-                        results["archived"] += 1
-                        print(f"  Archived: {saved_post_file.name}")
-        else:
+        elif user_had_failure and not user_had_success:
             results["failed"].append(username)
+        elif user_had_success and user_had_failure:
+            # Partial success - count as success but note in output
+            results["success"].append(username)
+            print(f"  Note: Some posts for {username} failed but others succeeded")
 
     return results
 
