@@ -21,6 +21,7 @@ from pathlib import Path
 from config import REDDIT_INDEX_DIR
 from reddit_extractor import RedditExtractor
 from analyze_download_import import AnalyzeDownloadImportPipeline
+from stashapp_importer import StashScanStuckError
 
 
 def normalize_reddit_url(url: str) -> str:
@@ -283,6 +284,23 @@ def process_legacy_sidecars(
                     "stage": result.get("stage"),
                 })
 
+        except StashScanStuckError as e:
+            # Stash is stuck - abort immediately
+            print(f"\n{'!' * 60}")
+            print("  ABORTING: Stashapp scan is stuck!")
+            print(f"  {e}")
+            print(f"{'!' * 60}")
+            print("\nPlease check Stashapp and restart the scan manually.")
+            print("Then re-run this script to continue processing.\n")
+            results["failed"].append({
+                "file": str(json_path),
+                "error": str(e),
+                "aborted": True,
+            })
+            results["aborted"] = True
+            results["abort_reason"] = str(e)
+            break
+
         except Exception as e:
             print(f"  Error: {e}")
             results["failed"].append({
@@ -294,6 +312,8 @@ def process_legacy_sidecars(
     print(f"\n{'=' * 60}")
     print("Summary")
     print(f"{'=' * 60}")
+    if results.get("aborted"):
+        print("STATUS: ABORTED (Stashapp scan stuck)")
     print(f"Processed: {len(results['processed'])}")
     print(f"Skipped: {len(results['skipped'])}")
     print(f"Content unavailable: {len(results['content_unavailable'])} (kept for manual curation)")
@@ -378,7 +398,9 @@ Examples:
             verbose=args.verbose,
         )
 
-        # Return non-zero if any failures
+        # Return appropriate exit code
+        if results.get("aborted"):
+            return 2  # Special exit code for scan stuck
         return 1 if results["failed"] else 0
 
     except KeyboardInterrupt:
