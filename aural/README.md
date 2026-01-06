@@ -73,33 +73,33 @@ This tool extracts comprehensive data from [gwasi.com](https://gwasi.com/), whic
 ## Quickstart
 
 ```bash
-# Step 1: Set up Reddit API credentials (one-time setup)
-#   - Create app at https://www.reddit.com/prefs/apps (choose "script" type)
+# Step 1: Set up credentials (one-time setup)
+#   - Create Reddit app at https://www.reddit.com/prefs/apps (choose "script" type)
 #   - Copy .env.example to .env and fill in your credentials:
 cp .env.example .env
-# Edit .env with your REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET
+# Edit .env with REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET, STASH_OUTPUT_DIR, etc.
 
 # Step 2: Extract post index from GWASI (~2.7GB of post metadata)
-uv run python gwasi_extractor.py --output extracted_data
+uv run python gwasi_extractor.py
 
 # Step 3: Fetch full Reddit post content for a specific user
-uv run python reddit_extractor.py extracted_data/gwasi_data_*.json --output extracted_data/reddit --filter-users username
+uv run python reddit_extractor.py aural_data/index/gwasi/gwasi_data_*.json --output aural_data/index/reddit --filter-users username
 
 # Step 4: Analyze, download audio, and import to Stashapp
 # Single post:
-uv run python analyze_download_import.py extracted_data/reddit/username/postid_title.json
+uv run python analyze_download_import.py aural_data/index/reddit/username/postid_title.json
 
 # All posts from a user:
-uv run python analyze_download_import.py extracted_data/reddit/username/
+uv run python analyze_download_import.py aural_data/index/reddit/username/
 
 # Dry run first (see what would be downloaded without downloading):
-uv run python analyze_download_import.py extracted_data/reddit/username/ --dry-run
+uv run python analyze_download_import.py aural_data/index/reddit/username/ --dry-run
 ```
 
 **What you get:**
-- Step 2: Post IDs, titles, tags, dates, scores (from GWASI index)
-- Step 3: Full post content with audio links, performer info, scripts (from Reddit API)
-- Step 4: Downloaded audio files organized by release, imported to Stashapp
+- Step 2: Post IDs, titles, tags, dates, scores (from GWASI index) → `aural_data/index/gwasi/`
+- Step 3: Full post content with audio links, performer info, scripts → `aural_data/index/reddit/`
+- Step 4: Downloaded audio files organized by release → `aural_data/releases/`
 
 ## Entry Points
 
@@ -117,16 +117,16 @@ There are several scripts for different use cases:
 **`analyze_download_import.py`** - Main batch processing script
 ```bash
 # Process all posts from a user (tracks progress, skips already processed)
-uv run python analyze_download_import.py extracted_data/reddit/SweetnEvil86/
+uv run python analyze_download_import.py aural_data/index/reddit/SweetnEvil86/
 
 # Process single post
-uv run python analyze_download_import.py extracted_data/reddit/SweetnEvil86/1bdg16n_post.json
+uv run python analyze_download_import.py aural_data/index/reddit/SweetnEvil86/1bdg16n_post.json
 
 # Skip Stashapp import (just download audio)
-uv run python analyze_download_import.py extracted_data/reddit/SweetnEvil86/ --skip-import
+uv run python analyze_download_import.py aural_data/index/reddit/SweetnEvil86/ --skip-import
 
 # Force re-process already processed posts
-uv run python analyze_download_import.py extracted_data/reddit/SweetnEvil86/ --force
+uv run python analyze_download_import.py aural_data/index/reddit/SweetnEvil86/ --force
 
 # Check processing status
 uv run python analyze_download_import.py --status
@@ -141,7 +141,7 @@ uv run python process_reddit_url.py "https://www.reddit.com/r/gonewildaudio/comm
 ### Special Features
 
 - **Crosspost resolution**: Automatically fetches content from original posts when encountering crossposts
-- **Duplicate tracking**: Maintains `data/processed_posts.json` to avoid re-processing
+- **Duplicate tracking**: Maintains `aural_data/tracking/processed_posts.json` to avoid re-processing
 - **Resume support**: Can stop and restart batch processing anytime
 
 ## Features
@@ -178,8 +178,8 @@ uv run python gwasi_extractor.py
 
 ### Advanced Options
 ```bash
-# Specify output directory
-uv run python gwasi_extractor.py --output extracted_data
+# Specify output directory (defaults to aural_data/index/gwasi/)
+uv run python gwasi_extractor.py --output custom_output
 
 # Test with limited files (useful for testing)
 uv run python gwasi_extractor.py --max-files 10   # Download only first 10 base files
@@ -213,8 +213,8 @@ uv run python gwasi_extractor.py                  # Will automatically use cache
 
 🔄 Removing duplicates...
 ✅ Final dataset: 227,602 unique entries
-💾 Saved 227,602 entries to extracted_data/gwasi_data_20251223_134855.json
-📈 Summary saved to extracted_data/summary_20251223_134855.json
+💾 Saved 227,602 entries to aural_data/index/gwasi/gwasi_data_20251223_134855.json
+📈 Summary saved to aural_data/index/gwasi/summary_20251223_134855.json
 
 📈 EXTRACTION SUMMARY
 ==================================================
@@ -262,7 +262,7 @@ import praw
 import json
 
 # Load extracted data
-with open('extracted_data/gwasi_data_20250801_143022.json') as f:
+with open('aural_data/index/gwasi/gwasi_data_20250801_143022.json') as f:
     data = json.load(f)
 
 # Initialize PRAW
@@ -284,26 +284,49 @@ for entry in data[:10]:
         print(f"Error processing {entry['post_id']}: {e}")
 ```
 
-## File Structure
+## Directory Structure
+
+All data is consolidated under `aural_data/` for easy backup with restic:
 
 ```
-gwasi-extractor/
-├── gwasi_extractor.py        # Main extraction script
-├── requirements.txt          # Python dependencies
-├── environment.yml           # Conda environment configuration
-├── README.md                # This file
-└── extracted_data/                 # Output directory (or extracted_data/ by default)
-    ├── gwasi_data_*.json        # Extracted data in JSON format
-    ├── summary_*.json           # Summary statistics
-    ├── current_base_version.txt # Tracks current base version
-    └── raw_json/                # Cached intermediate JSON files
-        ├── delta.json               # Cached delta data
-        └── base_22a412729b/         # Base version directory (~1000+ files)
-            ├── 1.json
-            ├── 2.json
-            ├── ...
-            └── 1022.json
+aural_data/                              # Single backup root
+├── index/                               # Discovery and indexing data
+│   ├── gwasi/                           # GWASI index cache
+│   │   ├── raw_json/                    # Raw GWASI JSON partitions
+│   │   │   ├── delta.json               # Incremental updates
+│   │   │   └── base_22a412729b/         # Base version directory (~1000+ files)
+│   │   ├── base_entries_cache.json      # Consolidated entries (~5.6GB)
+│   │   ├── gwasi_data_*.json            # Extracted data snapshots
+│   │   └── current_base_version.txt     # Version tracker
+│   └── reddit/                          # Reddit post metadata from PRAW
+│       └── {author}/{post_id}_*.json
+│
+├── sources/                             # Platform-specific downloads
+│   ├── reddit_saved/                    # Reddit saved posts
+│   │   ├── pending/                     # Posts awaiting processing
+│   │   └── archived/                    # Successfully imported posts
+│   ├── ao3/                             # AO3 content
+│   ├── scriptbin/                       # Scripts from scriptbin.works
+│   ├── hotaudio/                        # HotAudio downloads
+│   └── ytdlp/                           # yt-dlp downloads (YouTube, PornHub, etc.)
+│
+├── releases/                            # Processed releases by performer
+│   └── {performer}/
+│       └── {post_id}_{slug}/
+│           ├── release.json             # Full release metadata
+│           ├── {audio_name}.m4a         # Downloaded audio file
+│           ├── {audio_name}.json        # Audio-specific metadata
+│           ├── script.txt               # Extracted script (if available)
+│           └── script_metadata.json     # Script source metadata
+│
+├── analysis/                            # LLM analysis results
+│   └── {post_id}_{slug}_analysis.json
+│
+└── tracking/
+    └── processed_posts.json             # Processing state tracker
 ```
+
+Configuration is centralized in `config.py` with paths configurable via `.env`.
 
 ## Notes
 
@@ -399,24 +422,11 @@ Direct URLs  ─┘                                     ─→ Stashapp Integrat
 ```
 
 ### Output Structure
-```
-processed_releases/
-├── performers/           # Organized by voice actor
-│   ├── performer_name/
-│   │   ├── audio/       # Processed audio files
-│   │   ├── scripts/     # Associated scripts
-│   │   ├── artwork/     # Cover art and images
-│   │   └── metadata.json
-├── releases/            # Organized by release
-│   ├── release_id/
-│   │   ├── variants/    # Different versions (M4F, F4M, etc.)
-│   │   ├── extras/      # Scripts, artwork, etc.
-│   │   └── release.json
-└── stashapp_import/     # Ready for Stashapp import
-    ├── videos/          # Audio wrapped as video files
-    ├── performers.json  # Performer database
-    └── scenes.json      # Scene metadata
-```
+
+See [Directory Structure](#directory-structure) above. All output is organized under `aural_data/`:
+- `releases/{performer}/{post_id}_{slug}/` - Audio files, metadata, scripts
+- `analysis/` - LLM analysis results
+- `tracking/processed_posts.json` - Processing state
 
 ## License
 
