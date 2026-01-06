@@ -3,6 +3,7 @@ import praw
 import sys
 import json
 import os
+import time
 from datetime import datetime
 
 import dotenv
@@ -83,13 +84,33 @@ def main():
         me = reddit.user.me()
         items = me.saved(limit=None)
 
+        saved_count = 0
+        failed_count = 0
+        skipped_count = 0
+
         for item in items:
             if isinstance(item, praw.models.Submission):
-                save_post_data(item)
-                if args.unsave:
-                    item.unsave()
+                try:
+                    filepath = save_post_data(item)
+                    print(f"Saved: {filepath}")
+                    saved_count += 1
+                    if args.unsave:
+                        item.unsave()
+                    time.sleep(0.5)  # Rate limit delay
+                except Exception as e:
+                    print(f"Failed to save {item.id}: {e}", file=sys.stderr)
+                    failed_count += 1
             else:
-                print(f"Skipping non-submission item: {type(item)}", file=sys.stderr)
+                skipped_count += 1
+
+        # Get remaining saved count
+        remaining_saved = sum(1 for _ in me.saved(limit=None))
+
+        print(f"\n--- Summary ---")
+        print(f"Saved: {saved_count}")
+        print(f"Failed: {failed_count}")
+        print(f"Skipped (non-submissions): {skipped_count}")
+        print(f"Remaining saved on Reddit: {remaining_saved}")
 
     except Exception as e:
         print(f"Authentication error: {str(e)}", file=sys.stderr)
