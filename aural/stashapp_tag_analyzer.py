@@ -2,8 +2,15 @@
 """
 Stashapp Tag Analyzer - Analyze and manage bracketed tags from scene titles/descriptions.
 
-Extracts [bracketed] tags from Stashapp scenes, displays frequency counts,
-and optionally creates/links tags to matching scenes.
+Extracts [bracketed] tags from Stashapp scenes, shows frequency counts with
+linked/unlinked breakdown, and optionally creates/links tags to matching scenes.
+
+Columns explained:
+  - Total: Number of scenes with [tag] in title or description
+  - Linked: Scenes that already have this tag linked in Stashapp
+  - Unlinked: Scenes with [tag] text but tag not yet linked (Total - Linked)
+
+Results are sorted by Unlinked count to prioritize tags that need attention.
 
 Usage:
     uv run python stashapp_tag_analyzer.py                    # Analyze tags
@@ -31,8 +38,9 @@ load_dotenv(project_root / ".env")
 STASH_URL = os.getenv("STASHAPP_URL")
 STASH_API_KEY = os.getenv("STASHAPP_API_KEY")
 
-# Regex for bracketed tags (from stashapp_importer.py)
-BRACKET_PATTERN = re.compile(r"\[([^\]]+)\]")
+# Regex for bracketed tags - excludes markdown links [text](url)
+# Uses negative lookahead (?!\() to skip brackets followed by (
+BRACKET_PATTERN = re.compile(r"\[([^\]]+)\](?!\()")
 
 
 @dataclass
@@ -41,10 +49,16 @@ class TagOccurrence:
 
     normalized_name: str  # lowercase for matching
     display_name: str  # Original case (first occurrence)
-    count: int = 0
+    count: int = 0  # Total scenes with [tag] in title/details
+    linked_count: int = 0  # Scenes already linked to this tag
     scene_ids: list[str] = field(default_factory=list)
     exists_in_stash: bool = False
     stash_tag_id: str | None = None
+
+    @property
+    def unlinked_count(self) -> int:
+        """Number of scenes with [tag] but not yet linked."""
+        return self.count - self.linked_count
 
 
 class StashappTagAnalyzer:
@@ -145,6 +159,11 @@ class StashappTagAnalyzer:
             title = scene.get("title") or ""
             details = scene.get("details") or ""
 
+            # Get existing linked tags for this scene (lowercase for comparison)
+            scene_linked_tags = {
+                t["name"].lower() for t in scene.get("tags") or []
+            }
+
             # Extract tags from both title and details
             tags_from_title = self.extract_bracketed_tags(title)
             tags_from_details = self.extract_bracketed_tags(details)
@@ -173,6 +192,10 @@ class StashappTagAnalyzer:
 
                 tag_data[normalized].count += 1
                 tag_data[normalized].scene_ids.append(scene_id)
+
+                # Check if this scene already has this tag linked
+                if normalized in scene_linked_tags:
+                    tag_data[normalized].linked_count += 1
 
         return tag_data
 
@@ -294,21 +317,21 @@ def print_analysis(
     min_count: int = 1,
 ):
     """Print formatted terminal summary."""
-    # Filter and sort
+    # Filter and sort by unlinked count (prioritize tags that need linking)
     filtered = [t for t in tag_data.values() if t.count >= min_count]
-    sorted_tags = sorted(filtered, key=lambda t: (-t.count, t.normalized_name))
+    sorted_tags = sorted(filtered, key=lambda t: (-t.unlinked_count, -t.count, t.normalized_name))
 
     print("\nStashapp Bracketed Tag Analysis")
-    print("=" * 70)
+    print("=" * 85)
     print(f"Total scenes analyzed: {total_scenes:,}")
     print(f"Unique tags found: {len(tag_data):,}")
     if min_count > 1:
         print(f"Tags with {min_count}+ occurrences: {len(filtered):,}")
     print()
-    print("Top Tags by Frequency:")
-    print("-" * 70)
-    print(f"{'#':>4}  | {'Count':>5} | {'Tag':<32} | In Stash?")
-    print("-" * 70)
+    print("Tags sorted by unlinked count (scenes with [tag] but not yet linked):")
+    print("-" * 85)
+    print(f"{'#':>4}  | {'Total':>5} | {'Linked':>6} | {'Unlinked':>8} | {'Tag':<28} | In Stash?")
+    print("-" * 85)
 
     display_tags = sorted_tags[:limit] if limit and limit > 0 else sorted_tags
 
@@ -316,13 +339,15 @@ def print_analysis(
         in_stash = "Yes" if tag.exists_in_stash else "No"
         # Truncate long tags
         display_name = (
-            tag.display_name[:30] + ".."
-            if len(tag.display_name) > 32
+            tag.display_name[:26] + ".."
+            if len(tag.display_name) > 28
             else tag.display_name
         )
-        print(f"{i:>4}  | {tag.count:>5} | {display_name:<32} | {in_stash}")
+        print(
+            f"{i:>4}  | {tag.count:>5} | {tag.linked_count:>6} | {tag.unlinked_count:>8} | {display_name:<28} | {in_stash}"
+        )
 
-    print("-" * 70)
+    print("-" * 85)
     if limit and limit > 0 and len(sorted_tags) > limit:
         print(f"Showing {limit} of {len(sorted_tags)} tags (use --limit 0 for all)")
 
@@ -335,7 +360,7 @@ def print_json(
 ):
     """Print JSON output."""
     filtered = [t for t in tag_data.values() if t.count >= min_count]
-    sorted_tags = sorted(filtered, key=lambda t: (-t.count, t.normalized_name))
+    sorted_tags = sorted(filtered, key=lambda t: (-t.unlinked_count, -t.count, t.normalized_name))
     display_tags = sorted_tags[:limit] if limit and limit > 0 else sorted_tags
 
     output = {
@@ -345,7 +370,9 @@ def print_json(
             {
                 "tag": t.display_name,
                 "normalized": t.normalized_name,
-                "count": t.count,
+                "total_count": t.count,
+                "linked_count": t.linked_count,
+                "unlinked_count": t.unlinked_count,
                 "exists_in_stash": t.exists_in_stash,
                 "stash_tag_id": t.stash_tag_id,
                 "scene_ids": t.scene_ids[:5],  # Limit for readability
