@@ -103,6 +103,26 @@ class StashappClient:
                 return p
         return None
 
+    def find_performer_by_url(self, url: str) -> dict | None:
+        """Find performer by URL (checks if any of their URLs contain the given string)."""
+        query = """
+            query FindPerformers($performer_filter: PerformerFilterType!) {
+                findPerformers(performer_filter: $performer_filter) {
+                    performers { id name disambiguation urls }
+                }
+            }
+        """
+        result = self.query(
+            query,
+            {
+                "performer_filter": {
+                    "url": {"value": url, "modifier": "INCLUDES"}
+                }
+            },
+        )
+        performers = result.get("findPerformers", {}).get("performers", [])
+        return performers[0] if performers else None
+
     def create_performer(
         self,
         name: str,
@@ -317,9 +337,10 @@ class StashappClient:
 
     def find_scene_by_basename(self, basename: str) -> dict | None:
         """Find a scene by file basename using path filter."""
-        # Extract the Reddit post ID from the filename
-        # Reddit post IDs vary in length: older posts have 6 chars, newer have 7+
-        post_id_match = re.search(r"- (\w{6,}) -", basename)
+        # Extract the video/post ID from the filename
+        # Format: "Author - YYYY-MM-DD - ID - Title.mp4"
+        # IDs can be: Reddit (alphanumeric), YouTube (with hyphens/underscores), etc.
+        post_id_match = re.search(r"- ([\w\-]{6,}) -", basename)
         search_value = post_id_match.group(1) if post_id_match else basename
 
         query = """

@@ -55,10 +55,21 @@ class YtDlpImporter:
             )
         return self._extractor
 
-    def is_cached(self, url: str) -> bool:
-        """Check if URL is already in the yt-dlp cache."""
-        cache_path = self.extractor._get_cache_path(url)
-        return cache_path.exists()
+    def is_imported(self, url: str) -> bool:
+        """Check if URL is already imported to Stashapp."""
+        query = """
+            query FindScenes($scene_filter: SceneFilterType!) {
+                findScenes(scene_filter: $scene_filter) {
+                    count
+                }
+            }
+        """
+        result = self.stash_client.query(
+            query,
+            {"scene_filter": {"url": {"value": url, "modifier": "INCLUDES"}}},
+        )
+        count = result.get("findScenes", {}).get("count", 0)
+        return count > 0
 
     def test_connection(self) -> str:
         """Test Stashapp connection."""
@@ -123,12 +134,13 @@ class YtDlpImporter:
         if output_path.exists():
             print(f"  File already exists: {output_path}")
         else:
-            print(f"  Moving to: {output_path}")
-            shutil.move(str(source_path), str(output_path))
-            # Also move the .info.json if it exists
-            info_json = source_path.with_suffix(".info.json")
-            if info_json.exists():
-                shutil.move(str(info_json), str(output_path.with_suffix(".info.json")))
+            print(f"  Copying to: {output_path}")
+            shutil.copy2(str(source_path), str(output_path))
+
+        # Clean up source video file after successful copy/verification
+        if output_path.exists() and source_path.exists():
+            source_path.unlink()
+            print(f"  Cleaned up source: {source_path.name}")
 
         # Step 3: Trigger Stashapp scan
         print("\nStep 3: Triggering Stashapp scan...")
@@ -181,18 +193,31 @@ class YtDlpImporter:
         if description:
             updates["details"] = description[:5000]
 
-        # Performer
+        # Performer - try URL match first, then fall back to name
         print("\n  Processing performer...")
+        performer = None
         performer_name = metadata.get("author")
-        if performer_name:
+        channel_url = metadata.get("platform", {}).get("url")
+
+        # Try to find performer by channel URL first
+        if channel_url:
+            print(f"    Looking up by URL: {channel_url}")
+            performer = self.stash_client.find_performer_by_url(channel_url)
+            if performer:
+                print(f"    Found by URL: {performer['name']} (ID: {performer['id']})")
+
+        # Fall back to name-based lookup/creation
+        if not performer and performer_name:
             thumbnail = platform_data.get("thumbnail")
             performer = self.stash_client.find_or_create_performer(
                 performer_name, image_url=thumbnail
             )
+
+        if performer:
             updates["performer_ids"] = [performer["id"]]
 
             print("\n  Processing studio...")
-            studio = self.stash_client.find_or_create_studio(performer_name)
+            studio = self.stash_client.find_or_create_studio(performer["name"])
             updates["studio_id"] = studio["id"]
 
         # Tags
@@ -242,8 +267,8 @@ class YtDlpImporter:
                 print(f"  ? {title} - no URL found")
                 continue
 
-            if self.is_cached(video_url):
-                print(f"  ✓ {title} - cached")
+            if self.is_imported(video_url):
+                print(f"  ✓ {title} - already imported")
                 cached_count += 1
             else:
                 print(f"  ○ {title} - new")

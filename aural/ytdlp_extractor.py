@@ -116,6 +116,22 @@ class YtDlpExtractor:
         elif d["status"] == "finished":
             print("\n✅ Download complete, post-processing...")
 
+    def _get_uploader_url(self, info: dict) -> str:
+        """Get uploader URL, constructing it for platforms that don't provide it."""
+        # Use provided URL if available
+        uploader_url = info.get("uploader_url") or info.get("channel_url")
+        if uploader_url:
+            return uploader_url
+
+        # Construct URL for known platforms
+        extractor = (info.get("extractor_key") or "").lower()
+        uploader_id = info.get("uploader_id") or info.get("uploader")
+
+        if extractor == "pornhub" and uploader_id:
+            return f"https://www.pornhub.com/model/{uploader_id}"
+
+        return ""
+
     def _extract_performers(self, title: str, uploader: str) -> dict:
         """Extract performer information from title and uploader."""
         performers = {
@@ -173,7 +189,7 @@ class YtDlpExtractor:
                 "duration": info.get("duration"),
                 "platform": {
                     "name": info.get("extractor_key", "").lower(),
-                    "url": info.get("uploader_url", ""),
+                    "url": self._get_uploader_url(info),
                 },
                 "performers": self._extract_performers(title, uploader),
             },
