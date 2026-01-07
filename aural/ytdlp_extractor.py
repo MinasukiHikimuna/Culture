@@ -28,6 +28,12 @@ import config as aural_config
 class YtDlpLogger:
     """Custom logger for yt-dlp with emoji prefixes."""
 
+    # ANSI escape: clear from cursor to end of line
+    CLEAR_LINE = "\033[K"
+
+    def __init__(self) -> None:
+        self._in_progress = False
+
     def debug(self, msg: str) -> None:
         # yt-dlp passes both debug and info through debug
         if msg.startswith("[debug] "):
@@ -36,12 +42,27 @@ class YtDlpLogger:
             self.info(msg)
 
     def info(self, msg: str) -> None:
-        print(msg)
+        if msg.startswith("[download]"):
+            # Print progress on single updating line, clear to end of line
+            print(f"\r{msg}{self.CLEAR_LINE}", end="", flush=True)
+            self._in_progress = True
+        else:
+            # Print newline first if we were showing progress
+            if self._in_progress:
+                print()
+                self._in_progress = False
+            print(msg)
 
     def warning(self, msg: str) -> None:
+        if self._in_progress:
+            print()
+            self._in_progress = False
         print(f"⚠️  {msg}")
 
     def error(self, msg: str) -> None:
+        if self._in_progress:
+            print()
+            self._in_progress = False
         print(f"❌ {msg}")
 
 
@@ -102,19 +123,6 @@ class YtDlpExtractor:
             json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8"
         )
         print(f"💾 Cached metadata for: {url}")
-
-    def _progress_hook(self, d: dict) -> None:
-        """Progress hook for downloads."""
-        if d["status"] == "downloading":
-            total = d.get("total_bytes") or d.get("total_bytes_estimate")
-            downloaded = d.get("downloaded_bytes", 0)
-            if total:
-                percent = downloaded / total * 100
-                speed = d.get("speed")
-                speed_str = f"{speed / 1024 / 1024:.1f}MiB/s" if speed else "N/A"
-                print(f"\r📥 Downloading: {percent:.1f}% at {speed_str}", end="")
-        elif d["status"] == "finished":
-            print("\n✅ Download complete, post-processing...")
 
     def _get_uploader_url(self, info: dict) -> str:
         """Get uploader URL, constructing it for platforms that don't provide it."""
@@ -233,7 +241,6 @@ class YtDlpExtractor:
             "writeinfojson": True,
             "noplaylist": True,  # Only download single video, not playlist
             "logger": YtDlpLogger(),
-            "progress_hooks": [self._progress_hook],
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
