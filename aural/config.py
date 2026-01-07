@@ -45,6 +45,7 @@ ANALYSIS_DIR = AURAL_DATA_DIR / "analysis"
 # Tracking directory - processing state
 TRACKING_DIR = AURAL_DATA_DIR / "tracking"
 PROCESSED_POSTS_FILE = TRACKING_DIR / "processed_posts.json"
+PROCESSED_URLS_FILE = TRACKING_DIR / "processed_urls.json"
 
 # External paths (from .env) - Stashapp library on external volume
 STASH_OUTPUT_DIR = (

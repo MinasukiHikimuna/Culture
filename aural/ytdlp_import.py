@@ -10,6 +10,7 @@ Usage:
 """
 
 import argparse
+import json
 import re
 import shutil
 import time
@@ -17,6 +18,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import config as aural_config
+from config import PROCESSED_URLS_FILE
 from stashapp_importer import (
     STASH_BASE_URL,
     STASH_OUTPUT_DIR,
@@ -38,6 +40,7 @@ class YtDlpImporter:
         self.verbose = verbose
         self._stash_client: StashappClient | None = None
         self._extractor: YtDlpExtractor | None = None
+        self._processed_urls: dict | None = None
 
     @property
     def stash_client(self) -> StashappClient:
@@ -71,6 +74,55 @@ class YtDlpImporter:
         count = result.get("findScenes", {}).get("count", 0)
         return count > 0
 
+    def load_processed_urls(self) -> dict:
+        """Load processed URLs tracking data."""
+        if self._processed_urls is not None:
+            return self._processed_urls
+
+        try:
+            self._processed_urls = json.loads(
+                PROCESSED_URLS_FILE.read_text(encoding="utf-8")
+            )
+        except (FileNotFoundError, json.JSONDecodeError):
+            self._processed_urls = {"urls": {}, "lastUpdated": None}
+
+        return self._processed_urls
+
+    def save_processed_urls(self) -> None:
+        """Save processed URLs tracking data."""
+        if self._processed_urls is None:
+            return
+
+        self._processed_urls["lastUpdated"] = (
+            datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        )
+        PROCESSED_URLS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        PROCESSED_URLS_FILE.write_text(
+            json.dumps(self._processed_urls, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+
+    def is_url_processed(self, url: str) -> bool:
+        """Check if URL has already been successfully processed."""
+        processed = self.load_processed_urls()
+        record = processed.get("urls", {}).get(url)
+        if not record:
+            return False
+        return record.get("success") is True and record.get("sceneId") is not None
+
+    def mark_url_processed(self, url: str, result: dict) -> None:
+        """Mark a URL as successfully processed."""
+        processed = self.load_processed_urls()
+        processed["urls"][url] = {
+            "processedAt": datetime.now(timezone.utc)
+            .isoformat()
+            .replace("+00:00", "Z"),
+            "sceneId": result.get("sceneId"),
+            "videoFile": result.get("videoFile"),
+            "success": result.get("success", False),
+        }
+        self.save_processed_urls()
+
     def test_connection(self) -> str:
         """Test Stashapp connection."""
         print("Testing Stashapp connection...")
@@ -103,11 +155,23 @@ class YtDlpImporter:
 
         return f"{author} - {date_str} - {video_id} - {clean_title}.mp4"
 
-    def process_url(self, url: str) -> dict:
+    def process_url(self, url: str, force: bool = False) -> dict:
         """Download video and import to Stashapp."""
         print(f"\n{'=' * 60}")
         print(f"Processing: {url}")
         print("=" * 60)
+
+        # Check if already processed (unless force flag)
+        if not force and self.is_url_processed(url):
+            tracked = self.load_processed_urls().get("urls", {}).get(url, {})
+            print("  Already processed (tracked)")
+            if tracked.get("sceneId"):
+                print(f"  Scene: {STASH_BASE_URL}/scenes/{tracked['sceneId']}")
+            return {
+                "success": True,
+                "skipped": True,
+                "sceneId": tracked.get("sceneId"),
+            }
 
         # Step 1: Download
         print("\nStep 1: Downloading video...")
@@ -241,14 +305,21 @@ class YtDlpImporter:
         self.stash_client.wait_for_scan(30)
         print("  Cover generated!")
 
-        return {
+        result = {
             "success": True,
             "sceneId": scene["id"],
             "sceneUrl": f"{STASH_BASE_URL}/scenes/{scene['id']}",
             "videoFile": str(output_path),
         }
 
-    def process_channel(self, url: str, limit: int | None = None) -> dict:
+        # Track successful import
+        source_url = video_info.get("sourceUrl")
+        if source_url:
+            self.mark_url_processed(source_url, result)
+
+        return result
+
+    def process_channel(self, url: str, limit: int | None = None, force: bool = False) -> dict:
         """Process all videos from a channel/playlist URL."""
         print(f"\nIndexing channel: {url}")
         entries = self.extractor.index_playlist(url, max_videos=limit)
@@ -267,7 +338,8 @@ class YtDlpImporter:
                 print(f"  ? {title} - no URL found")
                 continue
 
-            if self.is_imported(video_url):
+            # Check both Stashapp and local tracking (unless force)
+            if not force and (self.is_imported(video_url) or self.is_url_processed(video_url)):
                 print(f"  ✓ {title} - already imported")
                 cached_count += 1
             else:
@@ -286,8 +358,10 @@ class YtDlpImporter:
 
         for video_url in new_videos:
             try:
-                result = self.process_url(video_url)
-                if result["success"]:
+                result = self.process_url(video_url, force=force)
+                if result.get("skipped"):
+                    cached_count += 1
+                elif result["success"]:
                     imported += 1
                 else:
                     failed += 1
@@ -318,6 +392,7 @@ Examples:
     )
     parser.add_argument("url", help="Video or channel URL to download and import")
     parser.add_argument("--limit", "-l", type=int, help="Max videos to process (for channels)")
+    parser.add_argument("--force", "-f", action="store_true", help="Re-process even if already tracked")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
 
     args = parser.parse_args()
@@ -332,7 +407,7 @@ Examples:
         importer.test_connection()
 
         # Always use process_channel - it handles both single videos and channels
-        result = importer.process_channel(args.url, limit=args.limit)
+        result = importer.process_channel(args.url, limit=args.limit, force=args.force)
 
         print(f"\n{'=' * 60}")
         if result.get("imported", 0) == 1 and result.get("skipped", 0) == 0:
