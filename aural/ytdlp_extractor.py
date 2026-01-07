@@ -128,6 +128,9 @@ class YtDlpExtractor:
         uploader_id = info.get("uploader_id") or info.get("uploader")
 
         if extractor == "pornhub" and uploader_id:
+            # uploader_id may be path-style (/pornstar/xxx) or just username
+            if uploader_id.startswith("/"):
+                return f"https://www.pornhub.com{uploader_id}"
             return f"https://www.pornhub.com/model/{uploader_id}"
 
         return ""

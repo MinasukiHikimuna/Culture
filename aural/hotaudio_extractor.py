@@ -8,6 +8,9 @@ Complete extractor that:
 3. Decrypts all segments using tree-based key derivation
 4. Outputs playable M4A file
 
+Supports single-page CYOA content with multiple embedded tracks.
+Tracks are identified via data-tid attributes on heading elements.
+
 Uses async Playwright API for reliable CDP console message capture.
 """
 
@@ -167,6 +170,611 @@ class HotAudioExtractor:
             time.sleep(delay)
 
         self.last_request_time = time.time()
+
+    def discover_tracks(self, url: str) -> list[dict]:
+        """
+        Discover all audio tracks on a HotAudio page.
+
+        Single-page CYOA content embeds multiple tracks identified by data-tid
+        attributes on heading elements (h1, h2).
+
+        Args:
+            url: HotAudio URL to scan
+
+        Returns:
+            List of track dicts with keys: tid, title, tag (h1/h2), index
+        """
+        return asyncio.run(self._discover_tracks_async(url))
+
+    async def _discover_tracks_async(self, url: str) -> list[dict]:
+        """Async implementation of track discovery."""
+        playwright = await async_playwright().start()
+        browser = await playwright.chromium.launch(
+            headless=True,
+            channel="chrome",
+            args=["--disable-blink-features=AutomationControlled"],
+        )
+
+        try:
+            context = await browser.new_context(
+                viewport={"width": 1920, "height": 1080},
+                user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+            )
+            page = await context.new_page()
+
+            await page.goto(url, wait_until="networkidle", timeout=60000)
+
+            # Extract all tracks with data-tid attributes
+            tracks = await page.evaluate(
+                """() => {
+                const tracks = [];
+                const elements = document.querySelectorAll('[data-tid]');
+
+                elements.forEach((el, index) => {
+                    const tid = el.getAttribute('data-tid');
+                    const title = el.textContent.trim();
+                    const tag = el.tagName.toLowerCase();
+                    const parentTag = el.parentElement?.tagName.toLowerCase();
+
+                    tracks.push({
+                        tid: tid,
+                        title: title,
+                        tag: parentTag || tag,
+                        index: index
+                    });
+                });
+
+                return tracks;
+            }"""
+            )
+
+            # Also get page metadata
+            page_meta = await page.evaluate(
+                """() => {
+                const title = document.querySelector('.text-4xl')?.textContent.trim();
+                const byLink = document.querySelector('a[href^="/u/"]');
+                const author = byLink?.textContent.trim();
+
+                return { pageTitle: title, author: author };
+            }"""
+            )
+
+            # Enrich tracks with page metadata
+            for track in tracks:
+                track["pageTitle"] = page_meta.get("pageTitle")
+                track["author"] = page_meta.get("author")
+                track["sourceUrl"] = url
+
+            return tracks
+
+        finally:
+            await browser.close()
+            await playwright.stop()
+
+    def extract_all(self, url: str, target_path: dict) -> dict:
+        """
+        Extract ALL audio tracks from a HotAudio page (for CYOA content).
+
+        This method discovers all tracks on the page and extracts each one.
+
+        Args:
+            url: HotAudio URL to extract
+            target_path: Dict with 'dir' key for output directory
+
+        Returns:
+            Dict with 'tracks' list containing results for each extracted track
+        """
+        return asyncio.run(self._extract_all_async(url, target_path))
+
+    async def _extract_all_async(self, url: str, target_path: dict) -> dict:
+        """Async implementation of extract_all."""
+        output_dir = Path(target_path.get("dir", "./data/hotaudio"))
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        # Check for cached multi-track result
+        url_parts = url.rstrip("/").split("/")
+        slug = url_parts[-1] or "audio"
+        multi_json_path = output_dir / f"{slug}_tracks.json"
+
+        if multi_json_path.exists():
+            try:
+                cached = json.loads(multi_json_path.read_text(encoding="utf-8"))
+                if cached.get("tracks") and len(cached["tracks"]) > 0:
+                    print(f"  Using cached multi-track extraction for: {url}")
+                    return cached
+            except json.JSONDecodeError:
+                pass
+
+        print("HotAudio Multi-Track Extractor")
+        print("==============================\n")
+        print(f"URL: {url}\n")
+
+        # Launch browser
+        playwright = await async_playwright().start()
+        browser = await playwright.chromium.launch(
+            headless=False,
+            channel="chrome",
+            args=["--disable-blink-features=AutomationControlled"],
+        )
+
+        context = await browser.new_context(
+            viewport={"width": 1920, "height": 1080},
+            user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+        )
+
+        # Add init script for key capture
+        await context.add_init_script(
+            script="""
+            window.__pendingKeyCaptures = window.__pendingKeyCaptures || [];
+            window.__pendingMetadataCaptures = window.__pendingMetadataCaptures || [];
+            window.__capturedHaxUrls = window.__capturedHaxUrls || [];
+            window.__hookInstalled = true;
+
+            const originalJSONParse = JSON.parse.bind(JSON);
+            JSON.parse = function(text) {
+                const result = originalJSONParse(text);
+                if (result && typeof result === 'object') {
+                    if (result.keys && typeof result.keys === 'object' && !result.tracks) {
+                        window.__pendingKeyCaptures.push(result.keys);
+                    }
+                    if (result.tracks && Array.isArray(result.tracks)) {
+                        const track = result.tracks[0];
+                        window.__pendingMetadataCaptures.push({
+                            title: track?.title,
+                            artist: track?.artist,
+                            duration: track?.duration,
+                            pid: result.pid,
+                            src: track?.src
+                        });
+                    }
+                }
+                return result;
+            };
+            """
+        )
+
+        page = await context.new_page()
+
+        # Capture HAX URLs from network
+        captured_hax_urls: list[str] = []
+
+        async def handle_route(route, request):
+            req_url = request.url
+            if ".hax" in req_url or ("/a/" in req_url and "cdn.hotaudio" in req_url):
+                if req_url not in captured_hax_urls:
+                    captured_hax_urls.append(req_url)
+            await route.continue_()
+
+        await page.route("**/*", handle_route)
+
+        try:
+            # Navigate to page
+            print("Navigating to page...")
+            await page.goto(url, wait_until="networkidle", timeout=60000)
+
+            # Discover all tracks
+            tracks_info = await page.evaluate(
+                """() => {
+                const tracks = [];
+                const elements = document.querySelectorAll('[data-tid]');
+
+                elements.forEach((el, index) => {
+                    const tid = el.getAttribute('data-tid');
+                    const title = el.textContent.trim();
+                    const parentTag = el.parentElement?.tagName.toLowerCase();
+
+                    tracks.push({
+                        tid: tid,
+                        title: title,
+                        tag: parentTag,
+                        index: index,
+                        element_selector: `[data-tid="${tid}"]`
+                    });
+                });
+
+                // Also get page metadata
+                const pageTitle = document.querySelector('.text-4xl')?.textContent.trim();
+                const byLink = document.querySelector('a[href^="/u/"]');
+                const author = byLink?.textContent.trim();
+
+                return { tracks, pageTitle, author };
+            }"""
+            )
+
+            tracks = tracks_info.get("tracks", [])
+            page_title = tracks_info.get("pageTitle", slug)
+            author = tracks_info.get("author")
+
+            print(f"Found {len(tracks)} tracks on page:")
+            for t in tracks:
+                print(f"  [{t['index']}] tid={t['tid']}: {t['title'][:50]}...")
+
+            if len(tracks) <= 1:
+                # Single track - use standard extraction
+                print("\nSingle track detected, using standard extraction...")
+                await browser.close()
+                await playwright.stop()
+                result = await self._extract_async(url, target_path)
+                return {"tracks": [result], "isCYOA": False, "pageTitle": page_title}
+
+            print(f"\nMulti-track CYOA detected! Extracting {len(tracks)} tracks...\n")
+
+            results = []
+
+            for i, track_info in enumerate(tracks):
+                tid = track_info["tid"]
+                track_title = track_info["title"]
+                safe_title = "".join(
+                    c if c.isalnum() or c in " -_" else "" for c in track_title
+                )[:40].strip()
+                track_basename = f"{slug}_{i:02d}_{safe_title}".replace(" ", "-")
+
+                print(f"\n{'=' * 60}")
+                print(f"Track {i + 1}/{len(tracks)}: {track_title}")
+                print(f"{'=' * 60}")
+
+                # Reset captured data for this track
+                self.captured_data = {
+                    "hax_url": None,
+                    "segment_keys": {},
+                    "metadata": None,
+                }
+
+                # Clear any pending keys from previous track before switching
+                await page.evaluate("() => { window.__pendingKeyCaptures = []; }")
+
+                # Record the current HAX URL count so we can detect new ones
+                hax_count_before = len(captured_hax_urls)
+
+                # Click on the track heading to switch to it
+                print(f"  Switching to track (tid={tid})...")
+                await page.click(f'[data-tid="{tid}"]')
+                await page.wait_for_timeout(3000)
+
+                # Check if player is currently playing (need to ensure it starts fresh)
+                is_paused = await page.evaluate(
+                    """() => {
+                    const btn = document.querySelector('#player-playpause');
+                    return btn && btn.classList.contains('paused');
+                }"""
+                )
+
+                # If already playing, pause first to reset state
+                if not is_paused:
+                    play_button = await page.query_selector("#player-playpause")
+                    if play_button:
+                        await play_button.click()
+                        await page.wait_for_timeout(500)
+
+                # Click play to trigger key exchange for this track
+                print("  Starting playback to capture keys...")
+                play_button = await page.query_selector("#player-playpause")
+                if play_button:
+                    await play_button.click()
+                    # Wait for key exchange to complete
+                    await page.wait_for_timeout(4000)
+
+                # Get track duration to know how long to wait
+                track_duration = await page.evaluate(
+                    """() => {
+                    const progressEl = document.querySelector('#player-progress-text');
+                    if (progressEl) {
+                        const parts = progressEl.textContent.split('/');
+                        if (parts.length === 2) {
+                            const [min, sec] = parts[1].trim().split(':').map(Number);
+                            return min * 60 + sec;
+                        }
+                    }
+                    return 60;  // Default to 60 seconds if we can't parse
+                }"""
+                )
+                print(f"  Track duration: {int(track_duration // 60)}:{int(track_duration % 60):02d}")
+
+                # Estimate segment count from duration (approx 1 segment per second)
+                estimated_segments = math.ceil(track_duration)
+
+                # Helper to find uncovered segments using tree key derivation
+                def find_uncovered_segments(segment_count: int) -> list[int]:
+                    tree_depth = math.ceil(math.log2(segment_count))
+                    segment_key_base = 1 + (1 << (tree_depth + 1))
+                    keys = [int(k) for k in self.captured_data["segment_keys"]]
+
+                    uncovered = []
+                    for seg in range(segment_count):
+                        node = segment_key_base + seg
+                        n = int(math.log2(node))
+                        covered = False
+
+                        for d in range(n + 1):
+                            ancestor = node >> (n - d)
+                            if ancestor in keys:
+                                covered = True
+                                break
+
+                        if not covered:
+                            uncovered.append(seg)
+                    return uncovered
+
+                # Set 4x playback speed to speed up key collection
+                # Find the highest speed option (2.0x or our previously modified 4.0x)
+                await page.evaluate(
+                    """() => {
+                    const speedOptions = document.querySelectorAll('.speed-option');
+                    let targetOpt = null;
+
+                    // Find 2.0x or 4.0x option
+                    speedOptions.forEach(opt => {
+                        const text = opt.textContent.trim();
+                        if (text === '2.0x' || text === '4.0x') {
+                            targetOpt = opt;
+                        }
+                    });
+
+                    if (targetOpt) {
+                        targetOpt.textContent = '4.0x';
+                        speedOptions.forEach(o => o.classList.remove('bg-slate-600'));
+                        targetOpt.classList.add('bg-slate-600');
+                        targetOpt.click();
+                    }
+                }"""
+                )
+
+                # Wait for all segments to be covered by keys
+                playback_speed = 4.0
+                max_wait = (track_duration / playback_speed) + 60  # Add 60s buffer
+                start_time = time.time()
+
+                print(f"  Collecting keys at {playback_speed}x speed...")
+
+                while time.time() - start_time < max_wait:
+                    await page.wait_for_timeout(10000)  # Check every 10 seconds
+
+                    # Flush any captured keys
+                    pending_keys = await page.evaluate(
+                        """() => {
+                        const pending = window.__pendingKeyCaptures || [];
+                        window.__pendingKeyCaptures = [];
+                        return pending;
+                    }"""
+                    )
+                    for keys in pending_keys:
+                        self.captured_data["segment_keys"].update(keys)
+
+                    # Check coverage
+                    current_keys = len(self.captured_data["segment_keys"])
+                    uncovered = find_uncovered_segments(estimated_segments)
+                    elapsed = int(time.time() - start_time)
+
+                    # Get current playback position
+                    time_info = await page.evaluate(
+                        """() => {
+                        const progressText = document.querySelector('#player-progress-text');
+                        return progressText ? progressText.textContent : 'unknown';
+                    }"""
+                    )
+
+                    covered_count = estimated_segments - len(uncovered)
+                    print(
+                        f"  {elapsed}s: {time_info} - {current_keys} keys, "
+                        f"{covered_count}/{estimated_segments} covered"
+                    )
+
+                    if not uncovered:
+                        print("  All segments covered!")
+                        break
+
+                # Final key flush
+                pending_keys = await page.evaluate(
+                    """() => {
+                    const pending = window.__pendingKeyCaptures || [];
+                    window.__pendingKeyCaptures = [];
+                    return pending;
+                }"""
+                )
+                for keys in pending_keys:
+                    self.captured_data["segment_keys"].update(keys)
+
+                final_uncovered = find_uncovered_segments(estimated_segments)
+                covered_count = estimated_segments - len(final_uncovered)
+                print(f"  Captured {len(self.captured_data['segment_keys'])} keys")
+                print(f"  Coverage: {covered_count}/{estimated_segments} segments")
+
+                # Get the current HAX URL - find the one that was loaded for this track
+                # Look for new HAX URLs captured after we switched to this track
+                if len(captured_hax_urls) > hax_count_before:
+                    # Use the first new HAX URL (the one loaded when we switched tracks)
+                    self.captured_data["hax_url"] = captured_hax_urls[hax_count_before]
+                elif captured_hax_urls:
+                    self.captured_data["hax_url"] = captured_hax_urls[-1]
+
+                if self.captured_data["hax_url"]:
+                    print(f"  HAX URL: {self.captured_data['hax_url'][:60]}...")
+
+                # Get current track metadata
+                track_meta = await page.evaluate(
+                    """() => {
+                    const titleEl = document.querySelector('#player-title');
+                    const progressEl = document.querySelector('#player-progress-text');
+                    let duration = null;
+                    if (progressEl) {
+                        const parts = progressEl.textContent.split('/');
+                        if (parts.length === 2) {
+                            const [min, sec] = parts[1].trim().split(':').map(Number);
+                            duration = min * 60 + sec;
+                        }
+                    }
+                    return {
+                        title: titleEl?.textContent.trim(),
+                        duration: duration
+                    };
+                }"""
+                )
+                self.captured_data["metadata"] = track_meta
+
+                if not self.captured_data["hax_url"]:
+                    print(f"  ERROR: No HAX URL captured for track {i}")
+                    results.append({"error": "No HAX URL", "track": track_info})
+                    continue
+
+                if not self.captured_data["segment_keys"]:
+                    print(f"  ERROR: No keys captured for track {i}")
+                    results.append({"error": "No keys", "track": track_info})
+                    continue
+
+                # Download and decrypt this track
+                try:
+                    track_result = await self._download_and_decrypt_track(
+                        output_dir, track_basename, url, track_info
+                    )
+                    track_result["trackIndex"] = i
+                    track_result["trackTitle"] = track_title
+                    track_result["tid"] = tid
+                    results.append(track_result)
+                    print(f"  ✓ Track {i + 1} extracted successfully")
+                except Exception as e:
+                    print(f"  ERROR extracting track {i}: {e}")
+                    results.append({"error": str(e), "track": track_info})
+
+            # Build final result
+            final_result = {
+                "isCYOA": True,
+                "pageTitle": page_title,
+                "author": author,
+                "sourceUrl": url,
+                "trackCount": len(tracks),
+                "extractedCount": sum(1 for r in results if "error" not in r),
+                "tracks": results,
+                "extractedAt": datetime.now(timezone.utc)
+                .isoformat()
+                .replace("+00:00", "Z"),
+            }
+
+            # Save multi-track metadata
+            multi_json_path.write_text(
+                json.dumps(final_result, indent=2, ensure_ascii=False), encoding="utf-8"
+            )
+
+            print(f"\n{'=' * 60}")
+            print("Multi-Track Extraction Complete")
+            print(f"{'=' * 60}")
+            print(f"Total tracks: {len(tracks)}")
+            print(f"Successfully extracted: {final_result['extractedCount']}")
+            print(f"Metadata saved: {multi_json_path}")
+
+            return final_result
+
+        finally:
+            await browser.close()
+            await playwright.stop()
+
+    async def _download_and_decrypt_track(
+        self, output_dir: Path, basename: str, source_url: str, track_info: dict
+    ) -> dict:
+        """Download and decrypt a single track using captured data."""
+        hax_url = self.captured_data["hax_url"]
+        segment_keys = self.captured_data["segment_keys"]
+
+        # Download HAX file
+        print("  Downloading HAX file...")
+        with httpx.Client() as client:
+            hax_response = client.get(hax_url)
+            hax_response.raise_for_status()
+
+        hax_buffer = hax_response.content
+        print(f"  Downloaded {len(hax_buffer) / 1024:.1f} KB")
+
+        # Parse HAX file
+        magic = hax_buffer[:4].decode("utf-8")
+        if magic != "HAX0":
+            raise ValueError(f"Invalid HAX magic: {magic}")
+
+        meta_start = 16
+        while meta_start < 64 and hax_buffer[meta_start] != 0x64:
+            meta_start += 1
+
+        metadata, _ = parse_bencode(hax_buffer, meta_start)
+
+        codec = (
+            metadata["codec"].decode("utf-8")
+            if isinstance(metadata["codec"], bytes)
+            else metadata["codec"]
+        )
+
+        # Parse segment table
+        segment_data = metadata["segments"]
+        segments = []
+        for i in range(metadata["segmentCount"]):
+            offset = int.from_bytes(
+                segment_data[i * 8 : i * 8 + 4], byteorder="little"
+            )
+            pts = int.from_bytes(
+                segment_data[i * 8 + 4 : i * 8 + 8], byteorder="little"
+            )
+            segments.append({"offset": offset, "pts": pts, "index": i})
+
+        for i in range(len(segments) - 1):
+            segments[i]["size"] = segments[i + 1]["offset"] - segments[i]["offset"]
+        segments[-1]["size"] = len(hax_buffer) - segments[-1]["offset"]
+
+        # Decrypt segments
+        print(f"  Decrypting {len(segments)} segments...")
+        key_tree = KeyTree(segment_keys)
+        decrypted_segments = []
+
+        for i, seg in enumerate(segments):
+            if seg["size"] == 0:
+                continue
+            try:
+                seg_key = key_tree.get_segment_key(i, metadata["segmentCount"])
+                ciphertext = hax_buffer[seg["offset"] : seg["offset"] + seg["size"]]
+                nonce = bytes(12)
+                cipher = ChaCha20Poly1305(seg_key)
+                decrypted = cipher.decrypt(nonce, ciphertext, None)
+                decrypted_segments.append(decrypted)
+            except Exception as e:
+                print(f"  Warning: Segment {i} failed: {e}")
+                break
+
+        print(f"  Decrypted {len(decrypted_segments)}/{len(segments)} segments")
+
+        # Save audio file
+        output_path = output_dir / f"{basename}.m4a"
+        full_audio = b"".join(decrypted_segments)
+        output_path.write_bytes(full_audio)
+
+        # Save track metadata
+        json_path = output_dir / f"{basename}.json"
+        track_result = {
+            "audio": {
+                "sourceUrl": source_url,
+                "downloadUrl": hax_url,
+                "filePath": str(output_path),
+                "format": "m4a",
+                "fileSize": len(full_audio),
+                "checksum": {"sha256": sha256_hex(full_audio)},
+            },
+            "metadata": {
+                "title": track_info.get("title") or basename,
+                "author": self.captured_data.get("metadata", {}).get("artist"),
+                "duration": metadata["durationMs"] / 1000,
+                "platform": {"name": "hotaudio", "url": "https://hotaudio.net"},
+            },
+            "platformData": {
+                "codec": codec,
+                "segmentCount": metadata["segmentCount"],
+                "decryptedSegments": len(decrypted_segments),
+                "tid": track_info.get("tid"),
+            },
+            "backupFiles": {"metadata": str(json_path)},
+            "success": True,
+        }
+
+        json_path.write_text(
+            json.dumps(track_result, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
+
+        print(f"  Saved: {output_path}")
+        return track_result
 
     def extract(self, url: str, target_path: dict) -> dict:
         """
@@ -811,22 +1419,54 @@ def main():
         action="store_true",
         help="Output detailed verification JSON with checksums",
     )
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        help="Extract ALL tracks from CYOA pages (multi-track support)",
+    )
+    parser.add_argument(
+        "--discover",
+        action="store_true",
+        help="Only discover tracks on the page without extracting",
+    )
 
     args = parser.parse_args()
 
     if not args.url:
         parser.print_help()
-        print("\nExample:")
+        print("\nExamples:")
         print(
             "  uv run python hotaudio_extractor.py https://hotaudio.net/u/User/Audio-Title"
         )
         print(
-            "  uv run python hotaudio_extractor.py https://hotaudio.net/u/User/Audio-Title --verify"
+            "  uv run python hotaudio_extractor.py https://hotaudio.net/u/User/CYOA-Audio --all"
+        )
+        print(
+            "  uv run python hotaudio_extractor.py https://hotaudio.net/u/User/Audio --discover"
         )
         return 1
 
     # Load environment variables
     load_dotenv()
+
+    extractor = HotAudioExtractor()
+
+    # Discovery mode - just list tracks
+    if args.discover:
+        try:
+            tracks = extractor.discover_tracks(args.url)
+            print(f"\nDiscovered {len(tracks)} tracks on page:\n")
+            for t in tracks:
+                print(f"  [{t['index']}] tid={t['tid']}")
+                print(f"      Title: {t['title']}")
+                print(f"      Tag: {t['tag']}")
+                print()
+            if len(tracks) > 1:
+                print("This is a CYOA page. Use --all to extract all tracks.")
+            return 0
+        except Exception as e:
+            print(f"\n  Error: {e}")
+            return 1
 
     # Extract basename from URL if not provided
     basename = args.output_name
@@ -847,13 +1487,23 @@ def main():
             "verify": True,
         }
 
-    extractor = HotAudioExtractor()
-
     try:
-        result = extractor.extract(args.url, target_path)
-        print("\n  Extraction complete!")
-        print(f"  Audio: {result['audio']['filePath']}")
-        print(f"  Metadata: {result['backupFiles']['metadata']}")
+        if args.all:
+            # Multi-track extraction for CYOA pages
+            result = extractor.extract_all(args.url, target_path)
+            print("\n  Multi-track extraction complete!")
+            print(f"  Total tracks: {result.get('trackCount', 0)}")
+            print(f"  Extracted: {result.get('extractedCount', 0)}")
+            if result.get("tracks"):
+                for t in result["tracks"]:
+                    if "error" not in t:
+                        print(f"    - {t.get('audio', {}).get('filePath', 'unknown')}")
+        else:
+            # Single track extraction
+            result = extractor.extract(args.url, target_path)
+            print("\n  Extraction complete!")
+            print(f"  Audio: {result['audio']['filePath']}")
+            print(f"  Metadata: {result['backupFiles']['metadata']}")
         return 0
     except Exception as e:
         print(f"\n  Error: {e}")

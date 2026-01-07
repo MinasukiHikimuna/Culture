@@ -329,7 +329,7 @@ Return JSON:
   "structure_type": "{{multi_scenario|gender_variants|quality_variants|combined_variants|single_version}}"
 }}"""
 
-    def call_llm(self, prompt: str) -> str:
+    def call_llm(self, prompt: str, max_tokens: int = 2000) -> str:
         """Calls the local LLM API to analyze the post."""
         try:
             with httpx.Client(timeout=300.0) as client:
@@ -345,7 +345,7 @@ Return JSON:
                             },
                         ],
                         "temperature": 0.1,
-                        "max_tokens": 2000,
+                        "max_tokens": max_tokens,
                     },
                 )
 
@@ -364,20 +364,58 @@ Return JSON:
 
     def _repair_json(self, json_str: str) -> str:
         """Attempts to repair common JSON malformations from LLM output."""
-        # Count brackets to detect mismatches
-        open_braces = json_str.count("{")
-        close_braces = json_str.count("}")
-        open_brackets = json_str.count("[")
-        close_brackets = json_str.count("]")
+        import re
 
-        # Add missing closing brackets/braces at the end
+        repaired = json_str
+
+        # Step 1: Fix invalid escape sequences
+        # Common invalid escapes from LLMs: \s, \d, \w, \S, \D, \W, etc.
+        # These are regex patterns that LLMs sometimes include in JSON strings
+        invalid_escapes = [
+            r'\\s', r'\\S', r'\\d', r'\\D', r'\\w', r'\\W',
+            r'\\v', r'\\h', r'\\c', r'\\p', r'\\P', r'\\x',
+            r'\\[0-9]', r'\\e', r'\\a', r'\\z', r'\\Z'
+        ]
+
+        # Replace invalid escapes with their literal character representation
+        # We need to be careful not to break valid JSON escapes like \n, \t, \", \\, etc.
+        for pattern in invalid_escapes:
+            # Only replace if it's not already properly escaped (i.e., not \\\\s)
+            repaired = re.sub(
+                pattern,
+                lambda m: m.group(0).replace('\\', ''),
+                repaired
+            )
+
+        # Step 2: Fix common comma issues in arrays/objects
+        # Missing comma between array elements: "] [" -> "], ["
+        repaired = re.sub(r'\]\s*\[', '], [', repaired)
+
+        # Missing comma between object elements: "} {" -> "}, {"
+        repaired = re.sub(r'\}\s*\{', '}, {', repaired)
+
+        # Missing comma after closing bracket before opening brace: "] {" -> "], {"
+        repaired = re.sub(r'\]\s*\{', '], {', repaired)
+
+        # Missing comma after closing brace before opening bracket: "} [" -> "}, ["
+        repaired = re.sub(r'\}\s*\[', '}, [', repaired)
+
+        # Missing comma between string value and next key: `"value" "key"` -> `"value", "key"`
+        repaired = re.sub(r'"\s+"([a-zA-Z_])', r'", "\1', repaired)
+
+        # Step 3: Handle missing closing brackets/braces
+        open_braces = repaired.count("{")
+        close_braces = repaired.count("}")
+        open_brackets = repaired.count("[")
+        close_brackets = repaired.count("]")
+
         missing_brackets = open_brackets - close_brackets
         missing_braces = open_braces - close_braces
 
         if missing_brackets > 0 or missing_braces > 0:
             # Find the position just before the final closing braces
             # We need to insert missing ] before the final }
-            repaired = json_str.rstrip()
+            repaired = repaired.rstrip()
 
             # Remove trailing braces temporarily
             trailing_braces = ""
@@ -393,9 +431,7 @@ Return JSON:
             if missing_braces > 0:
                 repaired += "}" * missing_braces
 
-            return repaired
-
-        return json_str
+        return repaired
 
     def parse_response(self, response_text: str) -> dict:
         """Parses and validates the LLM response."""
@@ -471,7 +507,9 @@ Return JSON:
         """Generates version naming information using LLM."""
         try:
             prompt = self.create_version_naming_prompt(post_data, audio_versions)
-            llm_response = self.call_llm(prompt)
+            # Use higher token limit for CYOA or releases with many audio files
+            max_tokens = 4000 if len(audio_versions) > 5 else 2000
+            llm_response = self.call_llm(prompt, max_tokens=max_tokens)
             naming_data = self.parse_version_naming_response(llm_response)
             return naming_data
         except Exception as e:

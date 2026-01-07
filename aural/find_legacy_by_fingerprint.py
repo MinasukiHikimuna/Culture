@@ -46,6 +46,7 @@ def main() -> int:
         description="Find legacy audio files in Stashapp by fingerprint"
     )
     parser.add_argument("directory", help="Path to legacy GWA directory")
+    parser.add_argument("--skip", type=int, default=0, help="Skip first N files")
     parser.add_argument("--limit", type=int, help="Max files to check")
     parser.add_argument("--delete", action="store_true", help="Delete matched files")
     parser.add_argument("--verbose", "-v", action="store_true")
@@ -61,6 +62,8 @@ def main() -> int:
     audio_files = find_audio_files(directory)
     print(f"Found {len(audio_files)} M4A audio files")
 
+    if args.skip:
+        audio_files = audio_files[args.skip:]
     if args.limit:
         audio_files = audio_files[: args.limit]
 
@@ -125,6 +128,14 @@ def main() -> int:
                 deleted_count += 1
                 if args.verbose:
                     print(f"  Deleted: {file_path.name}")
+
+                # Also delete JSON sidecar if it exists
+                json_sidecar = file_path.with_suffix(".json")
+                if json_sidecar.exists():
+                    json_sidecar.unlink()
+                    deleted_count += 1
+                    if args.verbose:
+                        print(f"  Deleted: {json_sidecar.name}")
             except Exception as e:
                 print(f"  Error deleting {file_path.name}: {e}")
         print(f"Deleted {deleted_count} files")

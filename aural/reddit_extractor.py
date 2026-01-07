@@ -25,6 +25,8 @@ import os
 import re
 from dotenv import load_dotenv
 
+from config import REDDIT_INDEX_DIR, ensure_directories
+
 
 class RedditExtractor:
     def __init__(self, output_dir: str = "reddit_data"):
@@ -753,6 +755,7 @@ class RedditExtractor:
 
 
 def main():
+    ensure_directories()
     parser = argparse.ArgumentParser(
         description="Extract detailed Reddit data using PRAW"
     )
@@ -762,8 +765,8 @@ def main():
     parser.add_argument(
         "--output",
         "-o",
-        default="extracted_data/reddit",
-        help="Output directory (default: extracted_data/reddit)",
+        default=str(REDDIT_INDEX_DIR),
+        help=f"Output directory (default: {REDDIT_INDEX_DIR})",
     )
     parser.add_argument(
         "--format",
