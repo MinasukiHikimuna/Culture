@@ -23,6 +23,7 @@ from stashapp_importer import (
     STASH_BASE_URL,
     STASH_OUTPUT_DIR,
     StashappClient,
+    StashScanStuckError,
     match_tags_with_stash,
 )
 from ytdlp_extractor import YtDlpExtractor
@@ -212,7 +213,13 @@ class YtDlpImporter:
         print(f"  Scan job started: {job_id}")
 
         print("  Waiting for scan to complete...")
-        self.stash_client.wait_for_scan(60)
+        scan_completed = self.stash_client.wait_for_scan(60)
+
+        if not scan_completed:
+            raise StashScanStuckError(
+                f"Stashapp scan job {job_id} did not complete within 60 seconds. "
+                "The scan may be stuck. Please check Stashapp and restart if needed."
+            )
 
         # Step 4: Find the scene
         print("\nStep 4: Finding scene in Stashapp...")
@@ -232,10 +239,10 @@ class YtDlpImporter:
                 time.sleep(retry_delay)
 
         if not scene:
-            return {
-                "success": False,
-                "error": "Scene not found after scan. May need manual refresh.",
-            }
+            raise StashScanStuckError(
+                f"Scene not found after scan completed. File: {output_filename}. "
+                "Stashapp may not be scanning the expected directory, or the scan is stuck."
+            )
 
         print(f"  Found scene ID: {scene['id']}")
 
@@ -355,6 +362,7 @@ class YtDlpImporter:
         print(f"\nProcessing {len(new_videos)} new videos...")
         imported = 0
         failed = 0
+        aborted = False
 
         for video_url in new_videos:
             try:
@@ -366,15 +374,27 @@ class YtDlpImporter:
                 else:
                     failed += 1
                     print(f"  Failed: {result.get('error')}")
+            except StashScanStuckError as e:
+                # Stash is stuck - abort the entire batch immediately
+                print(f"\n{'!' * 60}")
+                print("  ABORTING BATCH: Stashapp scan is stuck!")
+                print(f"  {e}")
+                print(f"{'!' * 60}")
+                print("\nPlease check Stashapp and restart the scan manually.")
+                print("Then re-run this script to continue processing.\n")
+                failed += 1
+                aborted = True
+                break  # Exit the batch loop immediately
             except Exception as e:
                 failed += 1
                 print(f"  Error: {e}")
 
         return {
-            "success": True,
+            "success": not aborted and failed == 0,
             "imported": imported,
             "skipped": cached_count,
             "failed": failed,
+            "aborted": aborted,
         }
 
 
@@ -410,16 +430,18 @@ Examples:
         result = importer.process_channel(args.url, limit=args.limit, force=args.force)
 
         print(f"\n{'=' * 60}")
-        if result.get("imported", 0) == 1 and result.get("skipped", 0) == 0:
+        if result.get("aborted"):
+            print("Import ABORTED (Stashapp scan stuck)")
+        elif result.get("imported", 0) == 1 and result.get("skipped", 0) == 0:
             print("Import completed successfully!")
         else:
             print("Import completed!")
-            print(f"  Imported: {result.get('imported', 0)}")
-            print(f"  Skipped (cached): {result.get('skipped', 0)}")
+        print(f"  Imported: {result.get('imported', 0)}")
+        print(f"  Skipped (cached): {result.get('skipped', 0)}")
         if result.get("failed"):
             print(f"  Failed: {result.get('failed')}")
         print("=" * 60)
-        return 0
+        return 1 if result.get("aborted") or result.get("failed") else 0
 
     except Exception as e:
         print(f"Error: {e}")
