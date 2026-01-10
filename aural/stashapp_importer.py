@@ -24,6 +24,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import httpx
+import oshash
 from dotenv import load_dotenv
 
 from config import STASH_BASE_URL as CONFIG_STASH_BASE_URL
@@ -366,6 +367,20 @@ class StashappClient:
                 if f.get("basename") == basename:
                     return scene
         return None
+
+    def find_scene_by_oshash(self, file_oshash: str) -> dict | None:
+        """Find a scene by oshash using findSceneByHash query."""
+        query = """
+            query FindSceneByHash($input: SceneHashInput!) {
+                findSceneByHash(input: $input) {
+                    id
+                    title
+                    files { id path basename }
+                }
+            }
+        """
+        result = self.query(query, {"input": {"oshash": file_oshash}})
+        return result.get("findSceneByHash")
 
     def update_scene(self, scene_id: str, updates: dict) -> dict:
         """Update a scene with metadata."""
@@ -993,13 +1008,16 @@ class StashappImporter:
                     "The scan may be stuck. Please check Stashapp and restart if needed."
                 )
 
-            # Find the scene by basename (with retries to allow for database indexing)
+            # Compute oshash for the converted video (used for scene lookup)
+            file_oshash = oshash.oshash(str(output_path))
+
+            # Find the scene by oshash (with retries to allow for database indexing)
             scene = None
             max_retries = 10
             retry_delay = 2  # seconds
 
             for retry in range(max_retries):
-                scene = self.client.find_scene_by_basename(output_filename)
+                scene = self.client.find_scene_by_oshash(file_oshash)
                 if scene:
                     break
                 if retry < max_retries - 1:
@@ -1011,7 +1029,7 @@ class StashappImporter:
 
             if not scene:
                 raise StashScanStuckError(
-                    f"Scene not found after scan completed. File: {output_filename}. "
+                    f"Scene not found after scan completed. oshash: {file_oshash}. "
                     "Stashapp may not be scanning the expected directory, or the scan is stuck."
                 )
 

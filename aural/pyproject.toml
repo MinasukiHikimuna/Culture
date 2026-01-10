@@ -14,6 +14,7 @@ dependencies = [
     "cryptography>=44.0.0",
     "beautifulsoup4>=4.12.0",
     "yt-dlp>=2025.12.8",
+    "oshash>=0.1.1",
 ]
 
 [build-system]
