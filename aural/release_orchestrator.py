@@ -26,6 +26,7 @@ import httpx
 import config as aural_config
 from ao3_extractor import AO3Extractor
 from audiochan_extractor import AudiochanExtractor
+from erocast_extractor import ErocastExtractor
 from hotaudio_extractor import HotAudioExtractor
 from platform_availability import PlatformAvailabilityTracker
 from scriptbin_extractor import ScriptBinExtractor
@@ -203,11 +204,16 @@ class ReleaseOrchestrator:
             "class": AudiochanExtractor
         })
 
+        self.register_extractor("erocast", {
+            "pattern": re.compile(r"erocast\.me", re.IGNORECASE),
+            "class": ErocastExtractor
+        })
+
         # Track active extractor instances for cleanup
         self.active_extractors: dict[str, Any] = {}
 
         # Platform priority for selecting preferred audio source
-        self.platform_priority = ["soundgasm", "whypit", "hotaudio", "audiochan"]
+        self.platform_priority = ["soundgasm", "whypit", "hotaudio", "erocast", "audiochan"]
 
     def register_extractor(self, platform: str, config: dict):
         """Register a platform extractor."""
