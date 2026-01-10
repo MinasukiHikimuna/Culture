@@ -10,7 +10,11 @@ dependencies = [
     "python-dotenv>=1.1.1",
     "scrapy>=2.13.3",
     "sqlalchemy>=2.0.43",
+    "culture-libraries",
 ]
+
+[tool.uv.sources]
+culture-libraries = { workspace = true }
 
 [dependency-groups]
 dev = [

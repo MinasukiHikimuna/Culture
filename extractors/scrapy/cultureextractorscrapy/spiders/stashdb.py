@@ -83,7 +83,7 @@ class StashDBSpider(scrapy.Spider):
         """Query StashDB and process scenes."""
         if self.mode == "performer":
             self.logger.info(f"Querying scenes for performer: {self.performer_id}")
-            scenes = self.stashdb_client.query_scenes(self.performer_id)
+            scenes = self.stashdb_client.query_scenes_by_performer(self.performer_id)
         else:
             self.logger.info(f"Querying scenes for studio: {self.studio_id}")
             scenes = self.stashdb_client.query_scenes_by_studio(self.studio_id)

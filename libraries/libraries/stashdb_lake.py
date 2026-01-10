@@ -58,7 +58,10 @@ class StashDbLake:
             })
 
         df = pl.DataFrame(rows).with_columns([
-            pl.col("release_date").str.to_date("%Y-%m-%d", strict=False),
+            pl.col("release_date").cast(pl.Utf8).str.to_date("%Y-%m-%d", strict=False),
+            pl.col("title").cast(pl.Utf8),
+            pl.col("studio_id").cast(pl.Utf8),
+            pl.col("parent_studio_id").cast(pl.Utf8),
         ])
 
         self._write_or_merge(df, self.scenes_path, "id")
@@ -139,7 +142,12 @@ class StashDbLake:
             })
 
         df = pl.DataFrame(rows).with_columns([
-            pl.col("birth_date").str.to_date("%Y-%m-%d", strict=False),
+            pl.col("birth_date").cast(pl.Utf8).str.to_date("%Y-%m-%d", strict=False),
+            pl.col("name").cast(pl.Utf8),
+            pl.col("disambiguation").cast(pl.Utf8),
+            pl.col("gender").cast(pl.Utf8),
+            pl.col("country").cast(pl.Utf8),
+            pl.col("ethnicity").cast(pl.Utf8),
         ])
 
         self._write_or_merge(df, self.performers_path, "id")
@@ -189,7 +197,10 @@ class StashDbLake:
                 "json_document": json.dumps(studio),
             })
 
-        df = pl.DataFrame(rows)
+        df = pl.DataFrame(rows).with_columns([
+            pl.col("name").cast(pl.Utf8),
+            pl.col("parent_id").cast(pl.Utf8),
+        ])
         self._write_or_merge(df, self.studios_path, "id")
 
     def get_studios(
@@ -238,7 +249,11 @@ class StashDbLake:
                 "json_document": json.dumps(tag),
             })
 
-        df = pl.DataFrame(rows)
+        df = pl.DataFrame(rows).with_columns([
+            pl.col("name").cast(pl.Utf8),
+            pl.col("description").cast(pl.Utf8),
+            pl.col("category").cast(pl.Utf8),
+        ])
         self._write_or_merge(df, self.tags_path, "id")
 
     def get_tags(

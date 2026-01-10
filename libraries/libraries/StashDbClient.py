@@ -119,7 +119,7 @@ class StashDbClient(StashboxClient):
         logger.error(f"Failed to query studio with Stash ID {performer_stash_id}.")
         return None
 
-    def query_scenes(self, performer_stash_id):
+    def query_scenes_by_performer(self, performer_stash_id):
         query = """
             query QueryScenes($stash_ids: [ID!]!, $page: Int!) {
                 queryScenes(
