@@ -40,8 +40,9 @@ class StashScanStuckError(Exception):
     pass
 
 # Stashapp Configuration
-STASH_URL = os.getenv("STASHAPP_URL")
-STASH_API_KEY = os.getenv("STASHAPP_API_KEY")
+_stash_base = os.getenv("AURAL_STASHAPP_URL")
+STASH_URL = f"{_stash_base}/graphql" if _stash_base else None
+STASH_API_KEY = os.getenv("AURAL_STASHAPP_API_KEY")
 STASH_OUTPUT_DIR = CONFIG_STASH_OUTPUT_DIR
 STASH_BASE_URL = CONFIG_STASH_BASE_URL or "https://stash-aural.chiefsclub.com"
 
