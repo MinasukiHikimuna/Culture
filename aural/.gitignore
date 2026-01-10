@@ -1,0 +1,17 @@
+# Environment
+.env
+
+# Data directory (all data consolidated here)
+aural_data/
+
+# Build artifacts
+dist/
+
+# Python
+__pycache__/
+.venv/
+*.pyc
+
+# Temporary
+temp/
+*.tmp

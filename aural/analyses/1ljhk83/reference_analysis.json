@@ -1,0 +1,61 @@
+{
+  "series": {
+    "isPartOfSeries": false,
+    "hasPrequels": false,
+    "hasSequels": false,
+    "seriesName": null,
+    "partNumber": null,
+    "confidence": "high"
+  },
+  "analysis_notes": "Collaboration between three performers filling a private script for Pride Month, with main audio and bloopers version.",
+  "performers": {
+    "count": 3,
+    "primary": "alekirser",
+    "additional": [
+      "RoteDisaster",
+      "beegeewanders"
+    ],
+    "confidence": "high"
+  },
+  "audio_versions": [
+    {
+      "version_name": "Main Audio",
+      "description": "Full scripted performance of the Pride Parade scenario",
+      "urls": [
+        {
+          "platform": "Soundgasm",
+          "url": "https://soundgasm.net/u/alekirser/FFF4F-Prepping-for-the-Pride-Parade-Turns-Into-Your-First-WLW-Experience-Script-Fill"
+        }
+      ]
+    },
+    {
+      "version_name": "Bloopers",
+      "description": "Outtakes and mistakes from the recording session",
+      "urls": [
+        {
+          "platform": "Soundgasm",
+          "url": "https://soundgasm.net/u/alekirser/oh-golly-oh-gee-i-get-to-eat-some-pussy"
+        }
+      ]
+    }
+  ],
+  "script": {
+    "url": null,
+    "author": "inscrutableuser",
+    "fillType": "private"
+  },
+  "metadata": {
+    "post_id": "1ljhk83",
+    "username": "alekirser",
+    "title": "[FFF4F] Prepping for the Pride Parade Turns Into Your First WLW Experience [Script Fill][Pride Month][Coming Out][Friends To Lovers][Foursome][Gentle Fdom][Teasing][Praise][Shy Listener][Kissing][Clit Rubbing][Cunnilingus][Speaker Orgasms][Listener Orgasm] collab w/ u/RoteDisaster & u/beegeewanders",
+    "date": "2025-06-24T20:37:35",
+    "reddit_url": "https://www.reddit.com/r/GWASapphic/comments/1ljhk83/",
+    "analyzed_at": "2025-08-03T10:15:00.000Z"
+  },
+  "reference_metadata": {
+    "post_id": "1ljhk83",
+    "saved_at": "2025-08-03T10:15:00.000Z",
+    "analyzer": "claude-sonnet-4",
+    "type": "gold_standard"
+  }
+}

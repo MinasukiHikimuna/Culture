@@ -1,0 +1,285 @@
+{
+  "url": "https://hotaudio.net/u/SweetnEvil86/Lurky-and-Emma-Airplane-Collab-Blooper",
+  "hax": {
+    "url": "https://cdn.hotaudio.net/a/kntvq9q2y25yqn48dqe1ezd300.hax",
+    "size_bytes": 722660,
+    "sha256": "a2b02d7509e5d397cc9333fdb904e45c6ff579b41ecec01d07ceb5c223249ed9",
+    "header_hex": "48415830e4060b0006020000a2000000"
+  },
+  "metadata": {
+    "base_key_hex": "9d75bba6e2f08bebd4886ddc177da300",
+    "codec": "aac",
+    "duration_ms": 37175,
+    "segment_count": 37,
+    "orig_hash_hex": "0e3e7d6c3117278b2efb5356d35a23e5"
+  },
+  "tree_keys": {
+    "1": "b506d00c5e7fbe600262b656834c12b6a78e0e2a2e7a90ea15b01485234bbc19"
+  },
+  "segments": [
+    {
+      "index": 0,
+      "offset": 680,
+      "size": 17395,
+      "encrypted_sha256": "637ebd6947331c83a9b181929e5ab434f931613dab53d7f812429b220ef26ed2",
+      "decrypted_sha256": "699ac276d305aa784d6dc08fba9654ff25b6f086f5057dd21aafd0daedea1d35"
+    },
+    {
+      "index": 1,
+      "offset": 18075,
+      "size": 23049,
+      "encrypted_sha256": "8abea190e9ce7b65d0f280e89a0f127a7531e959019e1609043ed3b357724882",
+      "decrypted_sha256": "414caf92c53891149ab6a9362544efc06560339a3b7ae4de4a76b49145e4bc38"
+    },
+    {
+      "index": 2,
+      "offset": 41124,
+      "size": 20172,
+      "encrypted_sha256": "d50ae47b6291f1350cc9e167d2ffaa14926c3b706e3fd301c6f79bc447af05c8",
+      "decrypted_sha256": "dc3aeb1643c9e4b463a33496a2c95d9836463af74dd9f9203a525faf77d2886d"
+    },
+    {
+      "index": 3,
+      "offset": 61296,
+      "size": 18348,
+      "encrypted_sha256": "232dfb5bcba2d3f290f9f02f46635449f9faad4fde8a934bd3d787c68dc917df",
+      "decrypted_sha256": "427cb2b26c22d9e8e98499824d54d376409794a9054b4935cafe785ad3fbd8d7"
+    },
+    {
+      "index": 4,
+      "offset": 79644,
+      "size": 21169,
+      "encrypted_sha256": "024f0ab464a81f51bbc8d064bbda791edb04d4772251239e710006c3610314e2",
+      "decrypted_sha256": "ee984e314d79946d87e5563ecad64d0c550a3b110ed79b66fb74e53ae495902b"
+    },
+    {
+      "index": 5,
+      "offset": 100813,
+      "size": 22059,
+      "encrypted_sha256": "b0f77ad072284d14c8e769e8930b478ef781baa19da60fc354fe4c173a54cef7",
+      "decrypted_sha256": "fd44186da7b7469c088c7f09f6ba7377b1cd1c4c197564c581d9b6cd65b1932b"
+    },
+    {
+      "index": 6,
+      "offset": 122872,
+      "size": 20315,
+      "encrypted_sha256": "7496fdb4275856cf52652344972db534012da451a163435fec0fd8637dbcd1be",
+      "decrypted_sha256": "d66e75a9a335ae6056957cbb884fdc58478f730391edb3c2dc2a0dac98ed80eb"
+    },
+    {
+      "index": 7,
+      "offset": 143187,
+      "size": 17825,
+      "encrypted_sha256": "32fb2657eaad7c48064f0675ff86e4f651e0e3ddcf4401af51f310e4a89c1259",
+      "decrypted_sha256": "7b22c0b0d0020e6552c04a16de3ef3ef6eb520361ee73cbc408ecba55df875cf"
+    },
+    {
+      "index": 8,
+      "offset": 161012,
+      "size": 19520,
+      "encrypted_sha256": "7e84e23889fa04ae7423a19cbfbbe57a3394a48a28b25217af76540dc39a7a79",
+      "decrypted_sha256": "e41a05a5665277705a0c3496ac16c38ebd5e1eaf4006a00fe45703cceb7d3a77"
+    },
+    {
+      "index": 9,
+      "offset": 180532,
+      "size": 20865,
+      "encrypted_sha256": "c1d71a72d8ecc7a02df75ff6bafe8f89bafd5c1b6f11ea190218cd9e0b449f3b",
+      "decrypted_sha256": "b4f45474cb9a42e28babc25287dafb318581046839942f99125df8ca92d689ac"
+    },
+    {
+      "index": 10,
+      "offset": 201397,
+      "size": 18014,
+      "encrypted_sha256": "ddd02a1e7e621aeba8f2cca85faca3b0a2d86f80851307c84169fceba4bb5ed8",
+      "decrypted_sha256": "95f71866f27be18172e3b9e812f33704d6c9dd55572d37440262be8993d8d4b7"
+    },
+    {
+      "index": 11,
+      "offset": 219411,
+      "size": 20294,
+      "encrypted_sha256": "95837a86c76a0528f7259c9633c958faa82b6b5c9d8ea194c8269287d2ff9d9f",
+      "decrypted_sha256": "84f89fbf979994552039e9d9b43c7edc96dd0ef5a19936d33f613bb85bc1b05a"
+    },
+    {
+      "index": 12,
+      "offset": 239705,
+      "size": 19719,
+      "encrypted_sha256": "ac9a229f11b9c2696428f2fc1755f6f88a725f79cf2acebad661869d94e22261",
+      "decrypted_sha256": "e5c99422e8a9326aab44b65162a116e49534c72b1883b6a40a532cb046d0eef9"
+    },
+    {
+      "index": 13,
+      "offset": 259424,
+      "size": 26124,
+      "encrypted_sha256": "5a91a79b09129532037fe0e809fa3e517c5a39fb054112e0dd887009f8187450",
+      "decrypted_sha256": "4a7d729b32ccded9d37e0fe5302c13bf035b02e3935cf61c2a2382b907f3bb63"
+    },
+    {
+      "index": 14,
+      "offset": 285548,
+      "size": 24543,
+      "encrypted_sha256": "36d492d1ebf75d15b203eb3dcbbec9b60b1aab3a2c29dcaf1b9dc1ff11716f79",
+      "decrypted_sha256": "8dca1ff726deb5c39576348ddbb670999cfa6b5609fa834622be48f531d9b30c"
+    },
+    {
+      "index": 15,
+      "offset": 310091,
+      "size": 18821,
+      "encrypted_sha256": "7883de4a77aac738645d52d05e2696b8d88a65020dedafe2201cb15838d73bbf",
+      "decrypted_sha256": "3f4cc5b1fb766817a3a5edd81bbfe6a649709e0baf5b285bae82aa32c5ea4dcc"
+    },
+    {
+      "index": 16,
+      "offset": 328912,
+      "size": 21200,
+      "encrypted_sha256": "bd8a3d329f11f6dfff2b59e998da6f0b5f41841b5ad50c02451047221db6ef25",
+      "decrypted_sha256": "fc3660e52f6543c162b83ba433329ae71bedb414855fd2f356e9347b97e48fe1"
+    },
+    {
+      "index": 17,
+      "offset": 350112,
+      "size": 21382,
+      "encrypted_sha256": "e064d5bf3da0326053a05d336c51e41aa4dd1c38fa34d10a997877354a026dc0",
+      "decrypted_sha256": "42e6e362a0f37911c7d5235781827da836d41179eb67660013f7d1ffb019b4cb"
+    },
+    {
+      "index": 18,
+      "offset": 371494,
+      "size": 19227,
+      "encrypted_sha256": "952ca3799df877378a6123166c70c237c6cac0a7ceb43d49c4508d36249ca26a",
+      "decrypted_sha256": "f9b62e958d2406be07f80164166f49155352d09a357cc9e6986037abddb77359"
+    },
+    {
+      "index": 19,
+      "offset": 390721,
+      "size": 17756,
+      "encrypted_sha256": "a96248fea6ec65d86950dcc3c2cef580e8de185c0f4ac39908e865107de361c1",
+      "decrypted_sha256": "d9ad8130e7e826dcc4bf54a0ff711c877caf4ddf2ee3ae672c4a44fa3a051470"
+    },
+    {
+      "index": 20,
+      "offset": 408477,
+      "size": 19081,
+      "encrypted_sha256": "6f72937dd1352047d6b5966059880d3480c28f8cf2469b96e900c534458680c1",
+      "decrypted_sha256": "53014a1f08141e73958a30f30b9e0f64a397b6c6b9100af91928799caa5965e4"
+    },
+    {
+      "index": 21,
+      "offset": 427558,
+      "size": 17957,
+      "encrypted_sha256": "b348b4c01c43ff0f8099e08fc75f773febaa7fcf4b8e82a21b7b504a84872ece",
+      "decrypted_sha256": "3f4a5683613454e363f73ed1a16aa6c988a929c165bb002346c829c33faafa6d"
+    },
+    {
+      "index": 22,
+      "offset": 445515,
+      "size": 17975,
+      "encrypted_sha256": "b7ab7e9f4273760428d6a99b7fce7f673025deeb1bcea017d09c9d4a45c0223e",
+      "decrypted_sha256": "6ab498688d0365d540f14c9b42c6c0900140e5a1651dbdf5f88b96e994080883"
+    },
+    {
+      "index": 23,
+      "offset": 463490,
+      "size": 16102,
+      "encrypted_sha256": "df30fdfb04a6d52d176ab372c776605d0901b898b0bb02c25de12f4167709be0",
+      "decrypted_sha256": "0b9e54e3ad8b42a3923988a326656876080675c0673be993c4d8a63ee07dbf91"
+    },
+    {
+      "index": 24,
+      "offset": 479592,
+      "size": 19727,
+      "encrypted_sha256": "9c33f90b004f5ded23d310461421fc65c0a58299e403acf204a97184eea5fd10",
+      "decrypted_sha256": "e6e364e7c666c325b222d145ff48faaa6495e09d091b26d37855602d8b577333"
+    },
+    {
+      "index": 25,
+      "offset": 499319,
+      "size": 25173,
+      "encrypted_sha256": "59592ba4193491231135646272aa3ebc67b0ffcdbe4f9a7b6ace93403b00728d",
+      "decrypted_sha256": "d9a96d57ea9416e7a677fe7d26aae70e4d7f06da16d9f4433fddc9a0ea28c648"
+    },
+    {
+      "index": 26,
+      "offset": 524492,
+      "size": 17612,
+      "encrypted_sha256": "351538947f0468dfdd3060fa2021007cdb9eb92808021c91f66c23a73f6a3586",
+      "decrypted_sha256": "fe1e6ea0eb76e513973fa1f7e447d003f072f684543ec9a79d42cb391f3a392f"
+    },
+    {
+      "index": 27,
+      "offset": 542104,
+      "size": 17026,
+      "encrypted_sha256": "9b02e77cc2e6dfdd79ce9189ab7851672404ca65bf3b594e0ffaba122017c463",
+      "decrypted_sha256": "e00d91cda407eb7a39221adca49874eed218bb8a45f0fda72bea97a4e4670c7e"
+    },
+    {
+      "index": 28,
+      "offset": 559130,
+      "size": 16699,
+      "encrypted_sha256": "545ce9191b83766d33d93739fef96d3e9c8f71241b60e7fc18e049ad7e9dcd0b",
+      "decrypted_sha256": "9b7f8abad037a3a0b9d11339f8f5d787e0d416071fc64f7708b9993366c4f716"
+    },
+    {
+      "index": 29,
+      "offset": 575829,
+      "size": 18668,
+      "encrypted_sha256": "9b3338c445d56c04a96e7bed484189baa36a6af0af81b1b9798730aae4c649a5",
+      "decrypted_sha256": "a5f5c2d867cdc79055eb5e0142678f7e0ead8e297cc1ac5d52b8a37e8c6a0940"
+    },
+    {
+      "index": 30,
+      "offset": 594497,
+      "size": 20691,
+      "encrypted_sha256": "e2091f91068cbb7b99a6c9173a071174cfd6c9d1b0392e2966b02a5f08b6998d",
+      "decrypted_sha256": "e6d88ac7f3f673c6c45369922ff204284f18bcd2110a722b7e498e901d374031"
+    },
+    {
+      "index": 31,
+      "offset": 615188,
+      "size": 20624,
+      "encrypted_sha256": "c58af6e686d93c8eb6e4b4c2fdba2a62b4e6400da3228ce831ba615012696ce8",
+      "decrypted_sha256": "51a49630bc9400bcff885d78f81cf137be0bbd18e0c5e4b0f556bfb7763b0ca0"
+    },
+    {
+      "index": 32,
+      "offset": 635812,
+      "size": 18583,
+      "encrypted_sha256": "7e701b8229994b911aae60550521da59215edf125b1e4bc99f80598fe4a9a3ad",
+      "decrypted_sha256": "fe19d833849040ed69449ec342a6f7c8fe7e43ff83c5861577a5ce3a6478d578"
+    },
+    {
+      "index": 33,
+      "offset": 654395,
+      "size": 21179,
+      "encrypted_sha256": "fcf0bc3e90ed68b8166f29def2263b6cf438136819d7ad5c883094249d7288bc",
+      "decrypted_sha256": "1b79f2f445b541f3adb134ea907800284ee4202bb249e73335b4ea86c38112be"
+    },
+    {
+      "index": 34,
+      "offset": 675574,
+      "size": 19493,
+      "encrypted_sha256": "168e00501f7e916c0463d864f8857acd0fd6f95fee6fd9cb2ffe3859713bd1f9",
+      "decrypted_sha256": "e6f4bc613cb31adce5c7fbab8450132a16f594188e4d0817e6e673a8ec448181"
+    },
+    {
+      "index": 35,
+      "offset": 695067,
+      "size": 19459,
+      "encrypted_sha256": "a0cc6a7fc7d314c4c2be9c732f6b968335fb1e171d84da2934acb8b27e83e39f",
+      "decrypted_sha256": "5a80e65c71efdaa937f8c423a7ad654adff733abe884e427b0761e3b23ca3c10"
+    },
+    {
+      "index": 36,
+      "offset": 714526,
+      "size": 8134,
+      "encrypted_sha256": "95a84233bff9090988c9683c755a79748de2e81abfc2c5bddb3e29f5b7a35300",
+      "decrypted_sha256": "f1b8b1c4c92c423055dafac016d9165db0bffbddcd3536943fa71ffd62467edc"
+    }
+  ],
+  "output": {
+    "path": "data/hotaudio/Lurky-and-Emma-Airplane-Collab-Blooper.m4a",
+    "size_bytes": 721388,
+    "sha256": "0e3e7d6c3117278b2efb5356d35a23e5c2f6cd0a64b62b53633ca3a5252d94eb"
+  }
+}

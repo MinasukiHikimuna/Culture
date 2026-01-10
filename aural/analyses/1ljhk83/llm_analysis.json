@@ -1,0 +1,66 @@
+{
+  "series": {
+    "isPartOfSeries": false,
+    "hasPrequels": false,
+    "hasSequels": false,
+    "seriesName": null,
+    "partNumber": null,
+    "confidence": "low"
+  },
+  "analysis_notes": "The post does not indicate that it is part of a series or has prequels or sequels. It appears to be a standalone audio script.",
+  "performers": {
+    "count": 3,
+    "primary": "alekirser",
+    "additional": [
+      "RoteDisaster",
+      "beegeewanders"
+    ],
+    "confidence": "high"
+  },
+  "audio_versions": [
+    {
+      "version_name": "Main Audio",
+      "description": "Primary audio version",
+      "urls": [
+        {
+          "platform": "Soundgasm",
+          "url": "https://soundgasm.net/u/alekirser/FFF4F-Prepping-for-the-Pride-Parade-Turns-Into-Your-First-WLW-Experience-Script-Fill"
+        }
+      ]
+    },
+    {
+      "version_name": "Bloopers",
+      "description": "Outtakes and mistakes from recording",
+      "urls": [
+        {
+          "platform": "Soundgasm",
+          "url": "https://soundgasm.net/u/alekirser/oh-golly-oh-gee-i-get-to-eat-some-pussy"
+        }
+      ]
+    }
+  ],
+  "script": {
+    "url": null,
+    "author": "inscrutableuser",
+    "fillType": "private"
+  },
+  "metadata": {
+    "post_id": "1ljhk83",
+    "username": "alekirser",
+    "title": "[FFF4F] Prepping for the Pride Parade Turns Into Your First WLW Experience [Script Fill][Pride Month][Coming Out][Friends To Lovers][Foursome][Gentle Fdom][Teasing][Praise][Shy Listener][Kissing][Clit Rubbing][Cunnilingus][Speaker Orgasms][Listener Orgasm] collab w/ u/RoteDisaster & u/beegeewanders",
+    "date": "2025-06-24T20:37:35",
+    "reddit_url": "https://www.reddit.com/r/GWASapphic/comments/1ljhk83/",
+    "analyzed_at": "2025-08-03T11:04:10.140Z",
+    "preprocessing_used": true
+  },
+  "llm_metadata": {
+    "post_id": "1ljhk83",
+    "saved_at": "2025-08-03T11:04:10.141Z",
+    "analyzer": "llm_analysis_script",
+    "model": "local-model",
+    "type": "automated_analysis",
+    "approved": true,
+    "rejected": false,
+    "experimental": false
+  }
+}
