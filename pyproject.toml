@@ -10,7 +10,7 @@ dependencies = [
 ]
 
 [tool.uv.workspace]
-members = ["api", "cli", "extractors/scrapy", "libraries"]
+members = ["api", "cli", "extractors/scrapy", "libraries", "aural"]
 
 [tool.uv.sources]
 culture-libraries = { workspace = true }

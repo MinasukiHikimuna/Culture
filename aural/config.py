@@ -14,8 +14,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-# Load .env from project root
-load_dotenv(Path(__file__).parent / ".env")
+# Load .env from monorepo root (Culture/)
+load_dotenv(Path(__file__).parent.parent / ".env")
 
 # Base data directory - all data lives under this root
 AURAL_DATA_DIR = Path(os.getenv("AURAL_DATA_DIR", "./aural_data")).resolve()
