@@ -19,6 +19,8 @@ import yt_dlp
 from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
 
+import config as aural_config
+
 
 class ErocastExtractor:
     def __init__(self, config: dict | None = None):
@@ -288,8 +290,8 @@ def main():
     parser.add_argument(
         "--output-dir",
         "-o",
-        default="data/erocast",
-        help="Output directory (default: data/erocast)",
+        default=str(aural_config.EROCAST_DIR),
+        help=f"Output directory (default: {aural_config.EROCAST_DIR})",
     )
     parser.add_argument(
         "--basename",

@@ -33,6 +33,7 @@ REDDIT_SAVED_ARCHIVED_DIR = REDDIT_SAVED_DIR / "archived"
 AO3_DIR = SOURCES_DIR / "ao3"
 SCRIPTBIN_DIR = SOURCES_DIR / "scriptbin"
 HOTAUDIO_DIR = SOURCES_DIR / "hotaudio"
+EROCAST_DIR = SOURCES_DIR / "erocast"
 YTDLP_DIR = SOURCES_DIR / "ytdlp"  # Also includes pornhub (via yt-dlp)
 
 # Releases directory - processed releases organized by performer
@@ -68,6 +69,7 @@ def ensure_directories() -> None:
         AO3_DIR,
         SCRIPTBIN_DIR,
         HOTAUDIO_DIR,
+        EROCAST_DIR,
         YTDLP_DIR,
         RELEASES_DIR,
         CYOA_DIR,
