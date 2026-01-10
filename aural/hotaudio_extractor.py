@@ -515,16 +515,15 @@ class HotAudioExtractor:
 
                 # Wait for all segments to be covered by keys
                 playback_speed = 4.0
-                # Use conservative 3x estimate for timeout (actual ~3-4x varies)
-                # Playback completion is detected by checking progress text
-                max_wait = (track_duration / 3.0) + 120  # Conservative timeout
                 start_time = time.time()
                 last_time_info = None
                 stall_count = 0
+                reload_attempts = 0
+                max_reload_attempts = 3
 
                 print(f"  Collecting keys at {playback_speed}x speed...")
 
-                while time.time() - start_time < max_wait:
+                while True:
                     await page.wait_for_timeout(10000)  # Check every 10 seconds
 
                     # Flush any captured keys
@@ -561,17 +560,53 @@ class HotAudioExtractor:
                         print("  All segments covered!")
                         break
 
-                    # Detect playback stall (same position for 3+ checks)
+                    # Detect playback stall (same position for 3+ checks = 30s)
                     if time_info == last_time_info:
                         stall_count += 1
-                        if stall_count >= 3:
+                        if stall_count == 3:
+                            # Try clicking play first
                             print("  Playback stalled, attempting to resume...")
                             play_button = await page.query_selector("#player-playpause")
                             if play_button:
                                 await play_button.click()
                                 await page.wait_for_timeout(1000)
-                                await play_button.click()  # Click twice to ensure playing
+                                await play_button.click()
+                        elif stall_count >= 6:
+                            # Play click didn't help, reload the page
+                            reload_attempts += 1
+                            if reload_attempts >= max_reload_attempts:
+                                print(f"  Extraction failed after {max_reload_attempts} reload attempts")
+                                break
+                            print(f"  Reloading page (attempt {reload_attempts}/{max_reload_attempts})...")
+                            await page.reload(wait_until="networkidle", timeout=60000)
+                            await page.wait_for_selector("#player-playpause", timeout=10000)
+                            await page.evaluate('document.querySelector("#player-volume").value = 0')
+                            play_button = await page.query_selector("#player-playpause")
+                            if play_button:
+                                await play_button.click()
+                                await page.wait_for_timeout(1000)
+                            # Re-select the track we were working on
+                            track_elements = await page.query_selector_all(".track-item, .playlist-item, [data-track-index]")
+                            if i < len(track_elements):
+                                await track_elements[i].click()
+                                await page.wait_for_timeout(2000)
+                            # Set 4x playback speed
+                            await page.evaluate(
+                                """() => {
+                                const speedOptions = document.querySelectorAll('.speed-option');
+                                speedOptions.forEach(opt => {
+                                    if (opt.textContent.trim() === '2.0x' || opt.textContent.trim() === '4.0x') {
+                                        opt.textContent = '4.0x';
+                                        speedOptions.forEach(o => o.classList.remove('bg-slate-600'));
+                                        opt.classList.add('bg-slate-600');
+                                        opt.click();
+                                    }
+                                });
+                            }"""
+                            )
                             stall_count = 0
+                            last_time_info = None
+                            continue
                     else:
                         stall_count = 0
                     last_time_info = time_info
@@ -1175,13 +1210,12 @@ class HotAudioExtractor:
                         await set_playback_speed(playback_speed)
 
                     start_time = time.time()
-                    # Use conservative 3x estimate for timeout (actual ~3-4x varies)
-                    # Playback completion is detected by checking progress text
-                    max_wait_seconds = (duration / 3.0) + 120
                     last_time_info = None
                     stall_count = 0
+                    reload_attempts = 0
+                    max_reload_attempts = 3
 
-                    while time.time() - start_time < max_wait_seconds:
+                    while True:
                         await page.wait_for_timeout(10000)  # Check every 10 seconds
 
                         # Flush any newly captured keys
@@ -1209,17 +1243,35 @@ class HotAudioExtractor:
                             print("  All segments covered!")
                             break
 
-                        # Detect playback stall (same position for 3+ checks)
+                        # Detect playback stall (same position for 3+ checks = 30s)
                         if time_info == last_time_info:
                             stall_count += 1
-                            if stall_count >= 3:
+                            if stall_count == 3:
+                                # Try clicking play first
                                 print("  Playback stalled, attempting to resume...")
                                 play_button = await page.query_selector("#player-playpause")
                                 if play_button:
                                     await play_button.click()
                                     await page.wait_for_timeout(1000)
-                                    await play_button.click()  # Click twice to ensure playing
+                                    await play_button.click()
+                            elif stall_count >= 6:
+                                # Play click didn't help, reload the page
+                                reload_attempts += 1
+                                if reload_attempts >= max_reload_attempts:
+                                    print(f"  Extraction failed after {max_reload_attempts} reload attempts")
+                                    break
+                                print(f"  Reloading page (attempt {reload_attempts}/{max_reload_attempts})...")
+                                await page.reload(wait_until="networkidle", timeout=60000)
+                                await page.wait_for_selector("#player-playpause", timeout=10000)
+                                await page.evaluate('document.querySelector("#player-volume").value = 0')
+                                play_button = await page.query_selector("#player-playpause")
+                                if play_button:
+                                    await play_button.click()
+                                    await page.wait_for_timeout(1000)
+                                    await set_playback_speed(playback_speed)
                                 stall_count = 0
+                                last_time_info = None
+                                continue
                         else:
                             stall_count = 0
                         last_time_info = time_info
