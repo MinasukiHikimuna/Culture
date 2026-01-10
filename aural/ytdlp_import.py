@@ -17,6 +17,8 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+import oshash
+
 import config as aural_config
 from config import PROCESSED_URLS_FILE
 from stashapp_importer import (
@@ -221,14 +223,15 @@ class YtDlpImporter:
                 "The scan may be stuck. Please check Stashapp and restart if needed."
             )
 
-        # Step 4: Find the scene
+        # Step 4: Find the scene by oshash
         print("\nStep 4: Finding scene in Stashapp...")
+        file_oshash = oshash.oshash(str(output_path))
         scene = None
         max_retries = 10
         retry_delay = 2
 
         for retry in range(max_retries):
-            scene = self.stash_client.find_scene_by_basename(output_filename)
+            scene = self.stash_client.find_scene_by_oshash(file_oshash)
             if scene:
                 break
             if retry < max_retries - 1:
@@ -240,7 +243,7 @@ class YtDlpImporter:
 
         if not scene:
             raise StashScanStuckError(
-                f"Scene not found after scan completed. File: {output_filename}. "
+                f"Scene not found after scan completed. oshash: {file_oshash}. "
                 "Stashapp may not be scanning the expected directory, or the scan is stuck."
             )
 
