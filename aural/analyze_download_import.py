@@ -24,6 +24,7 @@ import httpx
 
 import config as aural_config
 from analyze_reddit_post import EnhancedRedditPostAnalyzer
+from platform_availability import PlatformAvailabilityTracker
 from release_orchestrator import ReleaseOrchestrator
 from stashapp_importer import STASH_BASE_URL, StashappImporter, StashScanStuckError
 
@@ -118,10 +119,23 @@ class AnalyzeDownloadImportPipeline:
         self.skip_analysis = options.get("skip_analysis", False)
         self.skip_import = options.get("skip_import", False)
         self.force = options.get("force", False)
+        self.skip_health_check = options.get("skip_health_check", False)
 
-        # Initialize release orchestrator
+        # Platform availability tracking
+        self.availability_tracker = PlatformAvailabilityTracker()
+
+        # Mark manually skipped platforms from CLI
+        for platform in options.get("skip_platforms", []):
+            self.availability_tracker.mark_manually_skipped(platform.lower())
+
+        # TODO: Temporarily disable hotaudio until extractor handles long files properly
+        # The hotaudio extractor has issues with key collection timing on files > 20min
+        self.availability_tracker.mark_manually_skipped("hotaudio")
+
+        # Initialize release orchestrator with availability tracker
         self.release_orchestrator = ReleaseOrchestrator(
-            {"dataDir": str(self.data_dir), "validateExtractions": True}
+            {"dataDir": str(self.data_dir), "validateExtractions": True},
+            availability_tracker=self.availability_tracker,
         )
 
         # Lazy-loaded components
@@ -222,6 +236,51 @@ class AnalyzeDownloadImportPipeline:
             )
         except (json.JSONDecodeError, FileNotFoundError):
             return post_file_path.stem.split("_")[0]
+
+    def _pre_check_audio_platforms(
+        self, content: str, post_id: str, progress_prefix: str
+    ) -> dict | None:
+        """
+        Pre-analysis check: scan raw post content for audio platform URLs.
+
+        Returns a skip result dict if all found URLs are from unavailable platforms,
+        or None to continue with normal processing.
+        """
+        # Regex to find audio platform URLs in content
+        platform_patterns = {
+            "soundgasm": r"soundgasm\.net",
+            "whypit": r"whyp\.it",
+            "hotaudio": r"hotaudio\.net",
+            "audiochan": r"audiochan\.com",
+        }
+
+        found_platforms: set[str] = set()
+        for platform, pattern in platform_patterns.items():
+            if re.search(pattern, content, re.IGNORECASE):
+                found_platforms.add(platform)
+
+        if not found_platforms:
+            # No audio URLs found - continue with analysis (might be in comments, etc.)
+            return None
+
+        # Check if any found platforms are available
+        available = [p for p in found_platforms if self.availability_tracker.is_available(p)]
+
+        if not available:
+            # All found platforms are unavailable - skip without analysis
+            unavailable_str = ", ".join(sorted(found_platforms))
+            print(f"{progress_prefix}  Skipped (pre-check): only {unavailable_str} URLs found")
+            return {
+                "success": False,
+                "skipped": True,
+                "postId": post_id,
+                "skippedDueToUnavailablePlatforms": True,
+                "unavailablePlatforms": list(found_platforms),
+                "preCheck": True,
+            }
+
+        # Some available platforms found - continue with analysis
+        return None
 
     def has_analyzable_content(self, post_file_path: Path) -> dict:
         """
@@ -617,6 +676,14 @@ class AnalyzeDownloadImportPipeline:
                     "contentDeleted": True,
                     "reason": f"content_{removal_type}",
                 }
+
+            # Pre-analysis platform check: scan raw content for audio URLs
+            # This avoids running expensive LLM analysis for posts with only unavailable platforms
+            if self.availability_tracker.get_unavailable_platforms():
+                pre_check = self._pre_check_audio_platforms(selftext, post_id, progress_prefix)
+                if pre_check:
+                    return pre_check
+
         except (json.JSONDecodeError, FileNotFoundError):
             pass  # Continue with analysis if we can't read the file
 
@@ -762,6 +829,38 @@ class AnalyzeDownloadImportPipeline:
                 "noAudioUrls": True,
             }
 
+        # Check if there are audio URLs from available platforms
+        audio_urls_by_platform: dict[str, list[str]] = {}
+        for v in analysis.get("audio_versions", []):
+            for u in v.get("urls", []):
+                if u.get("url"):
+                    platform = (u.get("platform") or "unknown").lower()
+                    if platform not in audio_urls_by_platform:
+                        audio_urls_by_platform[platform] = []
+                    audio_urls_by_platform[platform].append(u.get("url"))
+
+        # Filter to only available platforms
+        available_platforms = [
+            p
+            for p in audio_urls_by_platform.keys()
+            if self.availability_tracker.is_available(p)
+        ]
+
+        if not available_platforms:
+            unavailable = list(audio_urls_by_platform.keys())
+            print(
+                f"{progress_prefix}  Skipped: All audio URLs from unavailable platforms "
+                f"({', '.join(unavailable)})"
+            )
+            # Don't mark as processed - allow retry when platforms come back
+            return {
+                "success": False,
+                "skipped": True,
+                "postId": post_id,
+                "skippedDueToUnavailablePlatforms": True,
+                "unavailablePlatforms": unavailable,
+            }
+
         # Step 2: Download audio through release orchestrator
         print("\n  Step 2: Downloading audio...")
         process_result = self.process_analysis_with_orchestrator(
@@ -850,6 +949,24 @@ class AnalyzeDownloadImportPipeline:
         print(f"\n  Processing batch of {len(post_files)} Reddit posts")
         print(f"{'=' * 60}\n")
 
+        # Platform health check phase
+        if not self.skip_health_check:
+            print("  Checking audio platform availability...")
+            health_results = self.availability_tracker.run_health_checks()
+            for platform, result in sorted(health_results.items()):
+                if result.get("skipped"):
+                    print(f"    {platform}: SKIPPED (CLI flag)")
+                elif result.get("available"):
+                    print(f"    {platform}: available")
+                else:
+                    print(f"    {platform}: UNAVAILABLE - {result.get('error')}")
+            print()
+
+        # Report manually skipped platforms
+        if self.availability_tracker.manually_skipped:
+            skipped_str = ", ".join(sorted(self.availability_tracker.manually_skipped))
+            print(f"  Skipped platforms (CLI): {skipped_str}\n")
+
         results: dict = {
             "processed": [],
             "skipped": [],
@@ -859,6 +976,7 @@ class AnalyzeDownloadImportPipeline:
             "requestPosts": [],
             "otherPosts": [],
             "noAudioUrls": [],
+            "skippedUnavailablePlatforms": [],  # Releases skipped due to platform issues
         }
 
         for i, post_file in enumerate(post_files):
@@ -872,7 +990,13 @@ class AnalyzeDownloadImportPipeline:
                         {"file": str(post_file), "postId": result.get("postId")}
                     )
                     # Track specific skip reasons
-                    if result.get("scriptOffer"):
+                    if result.get("skippedDueToUnavailablePlatforms"):
+                        results["skippedUnavailablePlatforms"].append({
+                            "file": str(post_file),
+                            "postId": result.get("postId"),
+                            "platforms": result.get("unavailablePlatforms", []),
+                        })
+                    elif result.get("scriptOffer"):
                         results["scriptOffers"].append(
                             {"file": str(post_file), "postId": result.get("postId")}
                         )
@@ -955,9 +1079,14 @@ class AnalyzeDownloadImportPipeline:
                 - len(results["requestPosts"])
                 - len(results["otherPosts"])
                 - len(results["noAudioUrls"])
+                - len(results["skippedUnavailablePlatforms"])
             )
             if already_done > 0:
                 print(f"     Already processed: {already_done}")
+            if results["skippedUnavailablePlatforms"]:
+                print(
+                    f"     Unavailable platforms: {len(results['skippedUnavailablePlatforms'])}"
+                )
             if results["scriptOffers"]:
                 print(f"     Script offers: {len(results['scriptOffers'])}")
             if results["requestPosts"]:
@@ -974,6 +1103,21 @@ class AnalyzeDownloadImportPipeline:
                 print(
                     f"  - {Path(fail['file']).name}: {fail.get('error') or fail.get('stage')}"
                 )
+
+        # Unavailable platforms section
+        if results["skippedUnavailablePlatforms"]:
+            print(f"\n{'-' * 60}")
+            print(
+                f"  Skipped (Unavailable Platforms): "
+                f"{len(results['skippedUnavailablePlatforms'])} posts"
+            )
+            print("  (Re-run when platforms are back online)")
+            for skip in results["skippedUnavailablePlatforms"][:10]:  # Show first 10
+                platforms_str = ", ".join(skip.get("platforms", []))
+                print(f"    - {Path(skip['file']).name} [{platforms_str}]")
+            if len(results["skippedUnavailablePlatforms"]) > 10:
+                remaining = len(results["skippedUnavailablePlatforms"]) - 10
+                print(f"    ... and {remaining} more")
 
         # Script offers section
         if results["scriptOffers"]:
@@ -1004,6 +1148,15 @@ class AnalyzeDownloadImportPipeline:
                 if detection.get("reason"):
                     print(f"     Reason: {detection['reason']}")
                 print()
+
+        # Final platform status summary
+        platform_summary = self.availability_tracker.get_summary()
+        unavailable = [p for p, s in platform_summary.items() if "unavailable" in s or "skipped" in s]
+        if unavailable:
+            print(f"\n{'-' * 60}")
+            print("  Platform Status:")
+            for platform, status in sorted(platform_summary.items()):
+                print(f"    {platform}: {status}")
 
         return results
 
@@ -1142,6 +1295,20 @@ Examples:
         action="store_true",
         help="Re-extract only the script for an existing release (use with release directory path)",
     )
+    parser.add_argument(
+        "--skip-audio-platform",
+        action="append",
+        dest="skip_platforms",
+        default=[],
+        metavar="PLATFORM",
+        help="Skip specified audio platform (can be used multiple times). "
+        "Valid platforms: soundgasm, whypit, hotaudio, audiochan",
+    )
+    parser.add_argument(
+        "--skip-health-check",
+        action="store_true",
+        help="Skip platform health checks at batch start",
+    )
 
     args = parser.parse_args()
 
@@ -1154,6 +1321,8 @@ Examples:
         "skip_import": args.skip_import,
         "force": args.force,
         "script_only": args.script_only,
+        "skip_platforms": args.skip_platforms,
+        "skip_health_check": args.skip_health_check,
     }
 
     try:

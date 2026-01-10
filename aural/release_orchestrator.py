@@ -27,6 +27,7 @@ import config as aural_config
 from ao3_extractor import AO3Extractor
 from audiochan_extractor import AudiochanExtractor
 from hotaudio_extractor import HotAudioExtractor
+from platform_availability import PlatformAvailabilityTracker
 from scriptbin_extractor import ScriptBinExtractor
 from soundgasm_extractor import SoundgasmExtractor
 from whypit_extractor import WhypitExtractor
@@ -163,13 +164,20 @@ class Release:
 class ReleaseOrchestrator:
     """Main orchestrator class for release extraction workflow."""
 
-    def __init__(self, config: dict | None = None):
+    def __init__(
+        self,
+        config: dict | None = None,
+        availability_tracker: PlatformAvailabilityTracker | None = None,
+    ):
         config = config or {}
         self.config = {
             "dataDir": config.get("dataDir", str(aural_config.RELEASES_DIR.parent)),
             "validateExtractions": config.get("validateExtractions", True),
             **config
         }
+
+        # Platform availability tracker for batch processing
+        self.availability_tracker = availability_tracker
 
         # Platform extractors registry
         self.extractors: dict[str, dict] = {}
@@ -284,7 +292,14 @@ class ReleaseOrchestrator:
         return None
 
     def sort_urls_by_priority(self, urls: list[dict]) -> list[dict]:
-        """Sort URLs by platform priority."""
+        """Sort URLs by platform priority, filtering unavailable platforms."""
+        if not urls:
+            return []
+
+        # Filter unavailable platforms first if tracker provided
+        if self.availability_tracker:
+            urls = self.availability_tracker.filter_urls(urls)
+
         if not urls:
             return []
 
@@ -630,6 +645,7 @@ class ReleaseOrchestrator:
 
                 # Try each platform in priority order with retries
                 for url_info in sorted_urls:
+                    platform = url_info.get("platform", "unknown")
                     max_retries = 3
                     retry_count = 0
 
@@ -638,14 +654,24 @@ class ReleaseOrchestrator:
                             version_name = audio_version.get("version_name") or f"Version {i + 1}"
                             print(f"📥 Extracting: {url_info['url']} ({version_name})")
                             audio_source = self.extract_audio(url_info["url"], target_path)
+
+                            # Report success to tracker
+                            if self.availability_tracker:
+                                self.availability_tracker.record_success(platform)
+
                             used_url = url_info
                             break  # Success, exit retry loop
                         except Exception as error:
                             retry_count += 1
+
+                            # Report failure to tracker
+                            if self.availability_tracker:
+                                self.availability_tracker.record_failure(platform, error)
+
                             if retry_count < max_retries:
-                                print(f"⚠️  Retry {retry_count}/{max_retries} for {url_info.get('platform', 'unknown')}: {error}")
+                                print(f"⚠️  Retry {retry_count}/{max_retries} for {platform}: {error}")
                             else:
-                                print(f"❌ Failed {url_info.get('platform', 'unknown')} after {max_retries} retries: {error}")
+                                print(f"❌ Failed {platform} after {max_retries} retries: {error}")
 
                     if audio_source:
                         break  # Success, don't try other platforms
