@@ -15,10 +15,13 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 # Load .env from monorepo root (Culture/)
-load_dotenv(Path(__file__).parent.parent / ".env")
+MONOREPO_ROOT = Path(__file__).parent.parent
+load_dotenv(MONOREPO_ROOT / ".env")
 
 # Base data directory - all data lives under this root
-AURAL_DATA_DIR = Path(os.getenv("AURAL_DATA_DIR", "./aural_data")).resolve()
+# Resolve relative paths from monorepo root, not cwd
+_aural_data_env = os.getenv("AURAL_DATA_DIR", "./aural/aural_data")
+AURAL_DATA_DIR = (MONOREPO_ROOT / _aural_data_env).resolve()
 
 # Index directory - discovery and indexing data
 INDEX_DIR = AURAL_DATA_DIR / "index"
