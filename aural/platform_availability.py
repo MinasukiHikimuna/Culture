@@ -81,6 +81,7 @@ class PlatformAvailabilityTracker:
         File errors (don't count):
         - HTTP 404 Not Found
         - HTTP 403 Forbidden (private/deleted content)
+        - "Could not find audio URL" (page loaded but audio deleted)
         """
         error_str = str(error).lower()
 
@@ -98,9 +99,11 @@ class PlatformAvailabilityTracker:
             return True
         if "500" in error_str or "502" in error_str or "503" in error_str:
             return True
+
+        # "Could not find audio URL" means page loaded but audio element missing
+        # This indicates deleted/removed content, not platform downtime
         if "could not find audio url" in error_str:
-            # Soundgasm-specific: empty page means platform down
-            return True
+            return False
 
         # Default: assume platform error to be safe
         return True
