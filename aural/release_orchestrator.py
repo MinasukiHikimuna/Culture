@@ -587,10 +587,15 @@ class ReleaseOrchestrator:
         print(f"🔗 Found {len(audio_urls)} unique audio URL{'s' if len(audio_urls) != 1 else ''}")
 
         # Check if this is a HotAudio CYOA with multiple tracks
+        # But only if hotaudio platform is available
+        hotaudio_available = (
+            not self.availability_tracker
+            or self.availability_tracker.is_available("hotaudio")
+        )
         hotaudio_urls = [
             u for u in audio_urls
             if "hotaudio.net" in u.lower()
-        ]
+        ] if hotaudio_available else []
 
         # If there's exactly one HotAudio URL, check if it's a multi-track CYOA
         if len(hotaudio_urls) == 1:
