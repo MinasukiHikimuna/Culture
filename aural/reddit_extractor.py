@@ -25,7 +25,13 @@ import os
 import re
 from dotenv import load_dotenv
 
-from config import REDDIT_INDEX_DIR, ensure_directories
+from config import REDDIT_INDEX_DIR, GWASI_INDEX_DIR, ensure_directories
+
+
+def find_latest_gwasi_data() -> Optional[Path]:
+    """Find the most recent gwasi_data_*.json file."""
+    data_files = sorted(GWASI_INDEX_DIR.glob("gwasi_data_*.json"))
+    return data_files[-1] if data_files else None
 
 
 class RedditExtractor:
@@ -760,7 +766,11 @@ def main():
         description="Extract detailed Reddit data using PRAW"
     )
     parser.add_argument(
-        "input", help="Reddit post URL/ID, or path to gwasi_extractor output file (CSV or JSON)"
+        "input",
+        nargs="?",
+        default=None,
+        help="Reddit post URL/ID, or path to gwasi_extractor output file (CSV or JSON). "
+             "If omitted, uses the latest gwasi_data_*.json file.",
     )
     parser.add_argument(
         "--output",
@@ -803,6 +813,16 @@ def main():
     )
 
     args = parser.parse_args()
+
+    # Auto-detect latest gwasi data file if no input provided
+    if args.input is None:
+        latest_file = find_latest_gwasi_data()
+        if latest_file is None:
+            print("❌ No gwasi_data_*.json files found in index directory")
+            print(f"   Expected location: {GWASI_INDEX_DIR}")
+            return 1
+        args.input = str(latest_file)
+        print(f"📂 Using latest gwasi data: {latest_file.name}")
 
     try:
         # Initialize extractor
