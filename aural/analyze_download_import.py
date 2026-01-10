@@ -128,10 +128,6 @@ class AnalyzeDownloadImportPipeline:
         for platform in options.get("skip_platforms", []):
             self.availability_tracker.mark_manually_skipped(platform.lower())
 
-        # TODO: Temporarily disable hotaudio until extractor handles long files properly
-        # The hotaudio extractor has issues with key collection timing on files > 20min
-        self.availability_tracker.mark_manually_skipped("hotaudio")
-
         # Initialize release orchestrator with availability tracker
         self.release_orchestrator = ReleaseOrchestrator(
             {"dataDir": str(self.data_dir), "validateExtractions": True},
