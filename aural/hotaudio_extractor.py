@@ -446,6 +446,9 @@ class HotAudioExtractor:
                         await play_button.click()
                         await page.wait_for_timeout(500)
 
+                # Mute audio before playback
+                await page.evaluate('document.querySelector("#player-volume").value = 0')
+
                 # Click play to trigger key exchange for this track
                 print("  Starting playback to capture keys...")
                 play_button = await page.query_selector("#player-playpause")
@@ -495,34 +498,29 @@ class HotAudioExtractor:
                             uncovered.append(seg)
                     return uncovered
 
-                # Set 4x playback speed to speed up key collection
-                # Find the highest speed option (2.0x or our previously modified 4.0x)
+                # Set 4x playback speed via speed menu UI hack (HotAudio caps at ~4x)
                 await page.evaluate(
                     """() => {
                     const speedOptions = document.querySelectorAll('.speed-option');
-                    let targetOpt = null;
-
-                    // Find 2.0x or 4.0x option
                     speedOptions.forEach(opt => {
-                        const text = opt.textContent.trim();
-                        if (text === '2.0x' || text === '4.0x') {
-                            targetOpt = opt;
+                        if (opt.textContent.trim() === '2.0x' || opt.textContent.trim() === '4.0x') {
+                            opt.textContent = '4.0x';
+                            speedOptions.forEach(o => o.classList.remove('bg-slate-600'));
+                            opt.classList.add('bg-slate-600');
+                            opt.click();
                         }
                     });
-
-                    if (targetOpt) {
-                        targetOpt.textContent = '4.0x';
-                        speedOptions.forEach(o => o.classList.remove('bg-slate-600'));
-                        targetOpt.classList.add('bg-slate-600');
-                        targetOpt.click();
-                    }
                 }"""
                 )
 
                 # Wait for all segments to be covered by keys
                 playback_speed = 4.0
-                max_wait = (track_duration / playback_speed) + 60  # Add 60s buffer
+                # Use conservative 3x estimate for timeout (actual ~3-4x varies)
+                # Playback completion is detected by checking progress text
+                max_wait = (track_duration / 3.0) + 120  # Conservative timeout
                 start_time = time.time()
+                last_time_info = None
+                stall_count = 0
 
                 print(f"  Collecting keys at {playback_speed}x speed...")
 
@@ -562,6 +560,49 @@ class HotAudioExtractor:
                     if not uncovered:
                         print("  All segments covered!")
                         break
+
+                    # Detect playback stall (same position for 3+ checks)
+                    if time_info == last_time_info:
+                        stall_count += 1
+                        if stall_count >= 3:
+                            print("  Playback stalled, attempting to resume...")
+                            play_button = await page.query_selector("#player-playpause")
+                            if play_button:
+                                await play_button.click()
+                                await page.wait_for_timeout(1000)
+                                await play_button.click()  # Click twice to ensure playing
+                            stall_count = 0
+                    else:
+                        stall_count = 0
+                    last_time_info = time_info
+
+                    # Check if playback has reached the end
+                    # Format: "25:56 / 29:10" -> current / total
+                    if " / " in time_info:
+                        try:
+                            current_str, total_str = time_info.split(" / ")
+                            current_parts = current_str.strip().split(":")
+                            total_parts = total_str.strip().split(":")
+                            current_secs = int(current_parts[0]) * 60 + int(current_parts[1])
+                            total_secs = int(total_parts[0]) * 60 + int(total_parts[1])
+                            # If playback reached the end, wait for final keys
+                            if current_secs >= total_secs:
+                                print("  Playback ended, waiting 10s for final keys...")
+                                await page.wait_for_timeout(10000)
+                                # Flush final keys
+                                pending_keys = await page.evaluate(
+                                    """() => {
+                                    const pending = window.__pendingKeyCaptures || [];
+                                    window.__pendingKeyCaptures = [];
+                                    return pending;
+                                }"""
+                                )
+                                for keys in pending_keys:
+                                    self.captured_data["segment_keys"].update(keys)
+                                print("  Playback completed")
+                                break
+                        except (ValueError, IndexError):
+                            pass  # Parsing failed, continue with timeout
 
                 # Final key flush
                 pending_keys = await page.evaluate(
@@ -735,7 +776,24 @@ class HotAudioExtractor:
                 print(f"  Warning: Segment {i} failed: {e}")
                 break
 
-        print(f"  Decrypted {len(decrypted_segments)}/{len(segments)} segments")
+        total_segments = len(segments)
+        print(f"  Decrypted {len(decrypted_segments)}/{total_segments} segments")
+
+        # Require 100% segment decryption - partial extractions are failures
+        if len(decrypted_segments) < total_segments:
+            print(
+                f"  ERROR: Track extraction incomplete "
+                f"({len(decrypted_segments)}/{total_segments} segments). "
+                f"Missing {total_segments - len(decrypted_segments)} segments."
+            )
+            return {
+                "success": False,
+                "error": f"Incomplete extraction: {len(decrypted_segments)}/{total_segments} segments",
+                "platformData": {
+                    "segmentCount": total_segments,
+                    "decryptedSegments": len(decrypted_segments),
+                },
+            }
 
         # Save audio file
         output_path = output_dir / f"{basename}.m4a"
@@ -761,7 +819,7 @@ class HotAudioExtractor:
             },
             "platformData": {
                 "codec": codec,
-                "segmentCount": metadata["segmentCount"],
+                "segmentCount": total_segments,
                 "decryptedSegments": len(decrypted_segments),
                 "tid": track_info.get("tid"),
             },
@@ -963,9 +1021,9 @@ class HotAudioExtractor:
         async def set_playback_speed(speed: float = 4.0) -> bool:
             """Set audio playback speed via HotAudio's speed menu.
 
-            HotAudio uses Web Audio API (not standard <audio> element),
-            so we modify an existing speed option's text to our target speed
-            before clicking it.
+            HotAudio uses Web Audio API which appears to cap at ~4x speed
+            regardless of the UI label. We modify the 2.0x option's text
+            to our target speed before clicking it.
             """
             try:
                 result = await page.evaluate(
@@ -975,7 +1033,7 @@ class HotAudioExtractor:
                     let clicked = false;
 
                     speedOptions.forEach(opt => {{
-                        if (opt.textContent.trim() === '2.0x') {{
+                        if (opt.textContent.trim() === '2.0x' || opt.textContent.trim() === '4.0x') {{
                             // Modify the text to our target speed
                             opt.textContent = '{speed}x';
                             // Remove active state from all options
@@ -1001,10 +1059,11 @@ class HotAudioExtractor:
         async def handle_route(route, request):
             req_url = request.url
 
-            # Capture HAX file URL from CDN
+            # Capture HAX file URL from CDN (only print once per unique URL)
             if ".hax" in req_url or ("/a/" in req_url and "cdn.hotaudio" in req_url):
-                self.captured_data["hax_url"] = req_url
-                print(f"Captured HAX URL from request: {req_url[:60]}...")
+                if self.captured_data["hax_url"] != req_url:
+                    self.captured_data["hax_url"] = req_url
+                    print(f"Captured HAX URL: {req_url[:60]}...")
 
             await route.continue_()
 
@@ -1036,13 +1095,16 @@ class HotAudioExtractor:
             except Exception:
                 print("Player not found, continuing...")
 
+            # Mute audio before playback
+            await page.evaluate('document.querySelector("#player-volume").value = 0')
+
             # Click play to trigger key capture
             print("Clicking play to trigger key exchange...")
             play_button = await page.query_selector("#player-playpause")
             if play_button:
                 await play_button.click()
                 await page.wait_for_timeout(2000)
-                # Set 4x playback speed by modifying the 2.0x option text
+                # Set 4x playback speed via speed menu UI hack
                 await set_playback_speed(4.0)
                 # Flush keys captured after play click
                 await flush_captured_keys()
@@ -1099,7 +1161,7 @@ class HotAudioExtractor:
                                 uncovered.append(seg)
                         return uncovered
 
-                    # Let the audio play at 4x speed to collect all keys faster
+                    # Let the audio play at 4x speed to collect all keys
                     playback_speed = 4.0
                     print(f"  Letting audio play at {playback_speed}x speed to collect all keys...")
                     print(f"  Audio duration: {minutes}:{seconds:02d}")
@@ -1109,12 +1171,15 @@ class HotAudioExtractor:
                     if play_button:
                         await play_button.click()
                         await page.wait_for_timeout(1000)
-                        # Set 4x playback speed by modifying the 2.0x option
+                        # Set 4x playback speed via speed menu UI hack
                         await set_playback_speed(playback_speed)
 
                     start_time = time.time()
-                    # Adjust timeout for 4x playback
-                    max_wait_seconds = (duration / playback_speed) + 60
+                    # Use conservative 3x estimate for timeout (actual ~3-4x varies)
+                    # Playback completion is detected by checking progress text
+                    max_wait_seconds = (duration / 3.0) + 120
+                    last_time_info = None
+                    stall_count = 0
 
                     while time.time() - start_time < max_wait_seconds:
                         await page.wait_for_timeout(10000)  # Check every 10 seconds
@@ -1143,6 +1208,40 @@ class HotAudioExtractor:
                         if not uncovered:
                             print("  All segments covered!")
                             break
+
+                        # Detect playback stall (same position for 3+ checks)
+                        if time_info == last_time_info:
+                            stall_count += 1
+                            if stall_count >= 3:
+                                print("  Playback stalled, attempting to resume...")
+                                play_button = await page.query_selector("#player-playpause")
+                                if play_button:
+                                    await play_button.click()
+                                    await page.wait_for_timeout(1000)
+                                    await play_button.click()  # Click twice to ensure playing
+                                stall_count = 0
+                        else:
+                            stall_count = 0
+                        last_time_info = time_info
+
+                        # Check if playback has reached the end
+                        # Format: "25:56 / 29:10" -> current / total
+                        if " / " in time_info:
+                            try:
+                                current_str, total_str = time_info.split(" / ")
+                                current_parts = current_str.strip().split(":")
+                                total_parts = total_str.strip().split(":")
+                                current_secs = int(current_parts[0]) * 60 + int(current_parts[1])
+                                total_secs = int(total_parts[0]) * 60 + int(total_parts[1])
+                                # If playback reached the end, wait for final keys
+                                if current_secs >= total_secs:
+                                    print("  Playback ended, waiting 10s for final keys...")
+                                    await page.wait_for_timeout(10000)
+                                    await flush_captured_keys()
+                                    print("  Playback completed")
+                                    break
+                            except (ValueError, IndexError):
+                                pass  # Parsing failed, continue with timeout
 
                     final_uncovered = find_uncovered_segments(estimated_segments)
                     print(
@@ -1306,7 +1405,24 @@ class HotAudioExtractor:
                     print(f"  We have: {', '.join(key_sample)}...")
                     break
 
-            print(f"\nDecrypted {len(decrypted_segments)}/{len(segments)} segments")
+            total_segments = len(segments)
+            print(f"\nDecrypted {len(decrypted_segments)}/{total_segments} segments")
+
+            # Require 100% segment decryption - partial extractions are failures
+            if len(decrypted_segments) < total_segments:
+                print(
+                    f"ERROR: Extraction incomplete "
+                    f"({len(decrypted_segments)}/{total_segments} segments). "
+                    f"Missing {total_segments - len(decrypted_segments)} segments."
+                )
+                return {
+                    "success": False,
+                    "error": f"Incomplete extraction: {len(decrypted_segments)}/{total_segments} segments",
+                    "platformData": {
+                        "segmentCount": total_segments,
+                        "decryptedSegments": len(decrypted_segments),
+                    },
+                }
 
             # Concatenate and save
             output_dir.mkdir(parents=True, exist_ok=True)
