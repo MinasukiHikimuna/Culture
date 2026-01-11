@@ -52,12 +52,19 @@ uv run python .claude/skills/stashapp-check/scripts/stashapp_check.py "ghost" --
 - `--verbose` / `-v` - Show verbose output including file paths and details
 - `--limit N` / `-l N` - Limit number of results (default: 10)
 - `--json` - Output results as JSON
+- `--instance {aural,main}` - Select Stashapp instance (default: aural)
+
+## Instance Selection
+
+The script supports multiple Stashapp instances:
+- `--instance aural` (default) - Uses `AURAL_STASHAPP_URL` and `AURAL_STASHAPP_API_KEY`
+- `--instance main` - Uses `STASHAPP_URL` and `STASHAPP_API_KEY`
 
 ## Configuration
 
-The script uses environment variables for configuration:
-- `STASHAPP_URL` - GraphQL endpoint (default: https://stash-aural.chiefsclub.com/graphql)
-- `STASHAPP_API_KEY` - API key for authentication
+Environment variables required (based on instance):
+- For `aural`: `AURAL_STASHAPP_URL` and `AURAL_STASHAPP_API_KEY`
+- For `main`: `STASHAPP_URL` and `STASHAPP_API_KEY`
 
 ## Output Format
 
