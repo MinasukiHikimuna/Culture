@@ -15,6 +15,7 @@ Results are sorted by Unlinked count to prioritize tags that need attention.
 Usage:
     uv run python stashapp_tag_analyzer.py                    # Analyze tags
     uv run python stashapp_tag_analyzer.py --min-count 5      # Filter by count
+    uv run python stashapp_tag_analyzer.py --filter "4M"      # Tags containing "4M"
     uv run python stashapp_tag_analyzer.py --apply --tags "F4M,GFE"  # Create & link
     uv run python stashapp_tag_analyzer.py --apply --tags "F4M" --dry-run  # Preview
 """
@@ -30,13 +31,14 @@ from pathlib import Path
 import requests
 from dotenv import load_dotenv
 
-# Load .env from project root
-project_root = Path(__file__).resolve().parent
-load_dotenv(project_root / ".env")
+# Load .env from monorepo root (parent directory)
+MONOREPO_ROOT = Path(__file__).resolve().parent.parent
+load_dotenv(MONOREPO_ROOT / ".env")
 
 # Stashapp Configuration
-STASH_URL = os.getenv("STASHAPP_URL")
-STASH_API_KEY = os.getenv("STASHAPP_API_KEY")
+_stash_base = os.getenv("AURAL_STASHAPP_URL")
+STASH_URL = f"{_stash_base}/graphql" if _stash_base else None
+STASH_API_KEY = os.getenv("AURAL_STASHAPP_API_KEY")
 
 # Regex for bracketed tags - excludes markdown links [text](url)
 # Uses negative lookahead (?!\() to skip brackets followed by (
@@ -317,16 +319,22 @@ def print_analysis(
     stash_tags: dict[str, dict],
     limit: int | None = None,
     min_count: int = 1,
+    name_filter: str | None = None,
 ):
     """Print formatted terminal summary."""
     # Filter and sort by unlinked count (prioritize tags that need linking)
     filtered = [t for t in tag_data.values() if t.count >= min_count]
+    if name_filter:
+        filter_lower = name_filter.lower()
+        filtered = [t for t in filtered if filter_lower in t.normalized_name]
     sorted_tags = sorted(filtered, key=lambda t: (-t.unlinked_count, -t.count, t.normalized_name))
 
     print("\nStashapp Bracketed Tag Analysis")
     print("=" * 95)
     print(f"Total scenes analyzed: {total_scenes:,}")
     print(f"Unique tags found: {len(tag_data):,}")
+    if name_filter:
+        print(f"Filter: tags containing '{name_filter}'")
     if min_count > 1:
         print(f"Tags with {min_count}+ occurrences: {len(filtered):,}")
     print()
@@ -366,9 +374,13 @@ def print_json(
     total_scenes: int,
     limit: int | None = None,
     min_count: int = 1,
+    name_filter: str | None = None,
 ):
     """Print JSON output."""
     filtered = [t for t in tag_data.values() if t.count >= min_count]
+    if name_filter:
+        filter_lower = name_filter.lower()
+        filtered = [t for t in filtered if filter_lower in t.normalized_name]
     sorted_tags = sorted(filtered, key=lambda t: (-t.unlinked_count, -t.count, t.normalized_name))
     display_tags = sorted_tags[:limit] if limit and limit > 0 else sorted_tags
 
@@ -414,6 +426,12 @@ def main():
         default=1,
         help="Minimum occurrence count to include (default: 1)",
     )
+    parser.add_argument(
+        "--filter",
+        "-f",
+        type=str,
+        help="Filter tags containing this substring (case-insensitive)",
+    )
 
     # Apply mode options
     parser.add_argument(
@@ -448,7 +466,7 @@ def main():
     # Validate environment
     if not STASH_URL or not STASH_API_KEY:
         print("Error: Missing required Stashapp environment variables.")
-        print("Please set STASHAPP_URL and STASHAPP_API_KEY in your .env file.")
+        print("Please set AURAL_STASHAPP_URL and AURAL_STASHAPP_API_KEY in your .env file.")
         sys.exit(1)
 
     try:
@@ -471,9 +489,9 @@ def main():
             # Analysis mode: display results
             stash_tags = analyzer.fetch_all_tags(verbose=args.verbose)
             if args.json:
-                print_json(tag_analysis, len(scenes), args.limit, args.min_count)
+                print_json(tag_analysis, len(scenes), args.limit, args.min_count, args.filter)
             else:
-                print_analysis(tag_analysis, len(scenes), stash_tags, args.limit, args.min_count)
+                print_analysis(tag_analysis, len(scenes), stash_tags, args.limit, args.min_count, args.filter)
 
     except requests.exceptions.RequestException as e:
         print(f"Error connecting to Stashapp: {e}")
