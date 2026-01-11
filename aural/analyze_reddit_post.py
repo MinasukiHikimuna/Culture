@@ -15,6 +15,8 @@ from pathlib import Path
 
 import httpx
 from dotenv import load_dotenv
+from exceptions import LMStudioUnavailableError
+
 
 # Load .env from project root
 load_dotenv(Path(__file__).parent / ".env")
@@ -164,15 +166,19 @@ EXTRACTION RULES:
 
 3. AUDIO VERSIONS (CRITICAL - proper URL grouping):
    - Extract all audio platform URLs: soundgasm.net, whyp.it, hotaudio.net, audiochan.com
-   - IMPORTANT: Group URLs for the SAME AUDIO content together in ONE audio_version:
+   - CRITICAL: Multiple URLs from the SAME platform = DIFFERENT audio files, NOT mirrors
+     * If you see 2 soundgasm.net URLs, those are 2 SEPARATE audio_versions
+     * Mirrors ONLY exist across DIFFERENT platforms (Soundgasm + Whyp.it for same audio)
+   - Group URLs ONLY when they are the SAME AUDIO on DIFFERENT platforms:
      * Look for "alternative link", "backup", "mirror", "if X isn't working"
-     * Same audio on different platforms = ONE audio_version with MULTIPLE urls
      * Example: "AUDIO HERE (soundgasm)" + "alternative link (whyp.it)" = ONE version
-   - Create SEPARATE audio_versions ONLY for genuinely DIFFERENT content:
+   - Create SEPARATE audio_versions for genuinely DIFFERENT content:
      * Gender variants (F4M vs F4F)
-     * Audio quality variants (SFX vs no-SFX)
+     * Audio quality variants (SFX vs no-SFX, with/without specific sections)
+     * "Version WITH X" vs "Version WITHOUT X" = SEPARATE audio_versions
      * Multi-part series (Part 1, Part 2)
      * Bloopers/extras
+     * Different durations = different content
    - version_name rules:
      * NEVER include platform names (NOT "Main Audio (Soundgasm)")
      * Use content descriptors: "F4M", "SFX Version", "Part 1", "Bloopers"
@@ -356,11 +362,8 @@ Return JSON:
 
                 data = response.json()
                 return data["choices"][0]["message"]["content"]
-        except httpx.ConnectError:
-            raise ConnectionError(
-                f"Could not connect to LM Studio. Make sure LM Studio is running "
-                f"and serving on {self.lm_studio_url}"
-            )
+        except httpx.ConnectError as e:
+            raise LMStudioUnavailableError(self.lm_studio_url, e) from e
 
     def _repair_json(self, json_str: str) -> str:
         """Attempts to repair common JSON malformations from LLM output."""
