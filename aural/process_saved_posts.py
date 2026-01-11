@@ -24,6 +24,7 @@ from pathlib import Path
 
 import config as aural_config
 
+
 SAVED_POSTS_DIR = aural_config.REDDIT_SAVED_PENDING_DIR
 SAVED_POSTS_ARCHIVE_DIR = aural_config.REDDIT_SAVED_ARCHIVED_DIR
 EXTRACTED_DATA_DIR = aural_config.INDEX_DIR
@@ -243,6 +244,8 @@ def run_analyze_download_import(
         # Process each post file individually and archive on success
         user_had_success = False
         user_had_failure = False
+        scan_stuck = False
+
         for post_file in post_files:
             # Extract post_id from filename (format: {post_id}_*.json)
             post_id = post_file.stem.split("_")[0]
@@ -257,7 +260,25 @@ def run_analyze_download_import(
             print(f"  Processing: {post_file.name}")
 
             try:
-                result = subprocess.run(cmd, check=False)
+                result = subprocess.run(cmd, check=False, capture_output=True, text=True)
+
+                # Check if the scan got stuck
+                if "ABORTING BATCH: Stashapp scan is stuck" in result.stdout:
+                    print(f"\n{'!' * 60}")
+                    print("  ABORTING: Stashapp scan is stuck!")
+                    print(f"{'!' * 60}")
+                    print("  The Stashapp scan job did not complete within the expected time.")
+                    print("  This usually means the scan is stuck or frozen.")
+                    print("\n  Please:")
+                    print("    1. Check Stashapp UI (Settings > Tasks)")
+                    print("    2. Stop any stuck scan jobs")
+                    print("    3. Restart Stashapp if needed")
+                    print("    4. Re-run this script to continue processing")
+                    print()
+                    scan_stuck = True
+                    user_had_failure = True
+                    break  # Abort processing this user's posts
+
                 if result.returncode == 0:
                     user_had_success = True
                     # Archive this specific saved post on success
@@ -270,10 +291,17 @@ def run_analyze_download_import(
                                 print(f"  Archived: {saved_post_file.name}")
                 else:
                     print(f"    Failed to process {post_file.name}")
+                    if result.stderr:
+                        print(f"    Error output: {result.stderr.strip()[:200]}")
                     user_had_failure = True
             except Exception as e:
                 print(f"    Error: {e}")
                 user_had_failure = True
+
+        # If scan got stuck, abort the entire batch
+        if scan_stuck:
+            results["aborted"] = True
+            break  # Exit the user loop
 
         # Track user-level results (a user can be in both if some posts succeeded and others failed)
         if user_had_success and not user_had_failure:
@@ -403,6 +431,8 @@ Examples:
         print(f"\n{'=' * 60}")
         print("Analysis Summary")
         print(f"{'=' * 60}")
+        if results.get("aborted"):
+            print("  STATUS: ABORTED (Stashapp scan stuck)")
         print(f"Successful: {len(results['success'])}")
         print(f"Failed: {len(results['failed'])}")
         print(f"Skipped: {len(results['skipped'])}")
@@ -413,7 +443,17 @@ Examples:
             for user in results["failed"]:
                 print(f"  - {user}")
 
+        if results.get("aborted"):
+            print("\nBatch was aborted due to Stashapp scan being stuck.")
+            print("Please fix the scan issue and re-run to continue processing.")
+
     print("\nDone!")
+
+    # Return non-zero exit code if there were failures or if batch was aborted
+    if not args.extract_only:
+        if results.get("aborted") or results["failed"]:
+            return 1
+
     return 0
 
 
