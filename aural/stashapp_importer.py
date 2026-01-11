@@ -25,10 +25,12 @@ from pathlib import Path
 
 import httpx
 import oshash
-from dotenv import load_dotenv
-
 from config import STASH_BASE_URL as CONFIG_STASH_BASE_URL
 from config import STASH_OUTPUT_DIR as CONFIG_STASH_OUTPUT_DIR
+from config import local_path_to_windows
+from dotenv import load_dotenv
+from exceptions import StashappUnavailableError
+
 
 # Load .env from project root
 load_dotenv(Path(__file__).parent / ".env")
@@ -72,11 +74,15 @@ class StashappClient:
     def query(self, query: str, variables: dict | None = None) -> dict:
         """Execute a GraphQL query."""
         variables = variables or {}
-        response = self.client.post(
-            self.url,
-            headers={"ApiKey": self.api_key, "Content-Type": "application/json"},
-            json={"query": query, "variables": variables},
-        )
+        try:
+            response = self.client.post(
+                self.url,
+                headers={"ApiKey": self.api_key, "Content-Type": "application/json"},
+                json={"query": query, "variables": variables},
+            )
+        except (httpx.ConnectError, OSError) as e:
+            # Network errors indicate Stashapp is unavailable
+            raise StashappUnavailableError(self.url, e) from e
 
         if response.status_code != 200:
             raise RuntimeError(f"HTTP error: {response.status_code} {response.text}")
@@ -301,14 +307,20 @@ class StashappClient:
                     return tag
         return None
 
-    def trigger_scan(self) -> str:
-        """Trigger a metadata scan."""
+    def trigger_scan(self, paths: list[str] | None = None) -> str:
+        """Trigger a metadata scan.
+
+        Args:
+            paths: Optional list of paths to scan. If empty or None, scans all.
+                   Paths should be in the format expected by Stashapp (Windows paths).
+        """
         query = """
             mutation MetadataScan($input: ScanMetadataInput!) {
                 metadataScan(input: $input)
             }
         """
-        result = self.query(query, {"input": {"paths": []}})
+        scan_paths = paths if paths else []
+        result = self.query(query, {"input": {"paths": scan_paths}})
         return result["metadataScan"]
 
     def wait_for_scan(self, timeout: int = 30) -> bool:
@@ -942,6 +954,14 @@ class StashappImporter:
         stash_tags = self.client.get_all_tags()
         print(f"  Found {len(stash_tags)} tags in Stashapp")
 
+        # Create studio subdirectory (named after primary performer)
+        studio_name = release_data.get("primaryPerformer", "Unknown")
+        # Sanitize for filesystem: remove/replace problematic characters
+        safe_studio_name = re.sub(r'[<>:"/\\|?*]', "_", studio_name).strip()
+        studio_dir = self.output_dir / safe_studio_name
+        studio_dir.mkdir(parents=True, exist_ok=True)
+        print(f"\nStudio directory: {studio_dir}")
+
         last_scene_id: str | None = None
         scene_ids: list[dict] = []  # Track all scene IDs for grouping
 
@@ -980,7 +1000,7 @@ class StashappImporter:
             output_filename = format_output_filename(
                 release_data, source, i, len(audio_sources)
             )
-            output_path = self.output_dir / output_filename
+            output_path = studio_dir / output_filename
 
             print(f"  Output: {output_filename}")
 
@@ -994,9 +1014,15 @@ class StashappImporter:
                     continue
                 print(f"  Conversion successful: {output_path}")
 
-            # Trigger Stashapp scan
+            # Trigger Stashapp scan for the studio directory only
             print("\n  Triggering Stashapp scan...")
-            job_id = self.client.trigger_scan()
+            try:
+                windows_path = local_path_to_windows(studio_dir)
+                print(f"  Scanning: {windows_path}")
+                job_id = self.client.trigger_scan(paths=[windows_path])
+            except ValueError as e:
+                print(f"  Warning: Path mapping failed ({e}), scanning all")
+                job_id = self.client.trigger_scan()
             print(f"  Scan job started: {job_id}")
 
             # Wait for scan to complete

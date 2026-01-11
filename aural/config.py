@@ -57,6 +57,34 @@ STASH_OUTPUT_DIR = (
 )
 STASH_BASE_URL = os.getenv("STASH_BASE_URL", "")
 
+# Windows path mapping for Stashapp scan API
+# Local path: /Volumes/Culture 1/Aural_Stash -> Windows: X:\Culture\Aural_Stash
+STASH_WINDOWS_BASE = os.getenv("STASH_WINDOWS_BASE", "")
+
+
+def local_path_to_windows(local_path: Path | str) -> str:
+    """Convert a local Mac path to a Windows path for Stashapp API."""
+    if not STASH_OUTPUT_DIR or not STASH_WINDOWS_BASE:
+        raise ValueError(
+            "STASH_OUTPUT_DIR and STASH_WINDOWS_BASE must be configured for path mapping"
+        )
+
+    local_path = Path(local_path)
+    # Get the relative path from the local stash directory
+    try:
+        relative = local_path.relative_to(STASH_OUTPUT_DIR)
+    except ValueError as e:
+        raise ValueError(
+            f"Path {local_path} is not under STASH_OUTPUT_DIR {STASH_OUTPUT_DIR}"
+        ) from e
+
+    # Build Windows path with backslashes
+    windows_path = STASH_WINDOWS_BASE.rstrip("\\")
+    if relative.parts:
+        windows_path += "\\" + "\\".join(relative.parts)
+
+    return windows_path
+
 
 def ensure_directories() -> None:
     """Create all required directories if they don't exist."""
