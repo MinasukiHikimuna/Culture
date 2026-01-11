@@ -58,12 +58,19 @@ uv run python .claude/skills/stashapp-schema/scripts/stash_schema.py --type Scen
 - `--search TERM` - Search types and operations by name
 - `--verbose` / `-v` - Show verbose output including descriptions
 - `--json` - Output results as JSON
+- `--instance {aural,main}` - Select Stashapp instance (default: aural)
+
+## Instance Selection
+
+The script supports multiple Stashapp instances:
+- `--instance aural` (default) - Uses `AURAL_STASHAPP_URL` and `AURAL_STASHAPP_API_KEY`
+- `--instance main` - Uses `STASHAPP_URL` and `STASHAPP_API_KEY`
 
 ## Configuration
 
-The script uses environment variables for configuration:
-- `STASHAPP_URL` - GraphQL endpoint (required)
-- `STASHAPP_API_KEY` - API key for authentication (required)
+Environment variables required (based on instance):
+- For `aural`: `AURAL_STASHAPP_URL` and `AURAL_STASHAPP_API_KEY`
+- For `main`: `STASHAPP_URL` and `STASHAPP_API_KEY`
 
 ## Output Format
 

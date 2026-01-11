@@ -21,13 +21,22 @@ from pathlib import Path
 import requests
 from dotenv import load_dotenv
 
-# Load .env from project root
-project_root = Path(__file__).resolve().parents[4]
-load_dotenv(project_root / ".env")
+# Load .env from monorepo root (Culture/)
+monorepo_root = Path(__file__).resolve().parents[4]
+load_dotenv(monorepo_root / ".env")
 
-# Stashapp Configuration
-STASH_URL = os.getenv("STASHAPP_URL")
-STASH_API_KEY = os.getenv("STASHAPP_API_KEY")
+
+def get_stash_config(instance: str) -> tuple[str | None, str | None]:
+    """Get Stashapp URL and API key for the specified instance."""
+    if instance == "aural":
+        base_url = os.getenv("AURAL_STASHAPP_URL")
+        api_key = os.getenv("AURAL_STASHAPP_API_KEY")
+    else:  # main
+        base_url = os.getenv("STASHAPP_URL")
+        api_key = os.getenv("STASHAPP_API_KEY")
+
+    url = f"{base_url}/graphql" if base_url else None
+    return (url, api_key)
 
 
 class StashSchemaIntrospector:
@@ -418,6 +427,14 @@ def main():
     parser.add_argument("--verbose", "-v", action="store_true", help="Show verbose output")
     parser.add_argument("--json", action="store_true", help="Output as JSON")
 
+    # Instance selection
+    parser.add_argument(
+        "--instance",
+        choices=["aural", "main"],
+        default="aural",
+        help="Stashapp instance to query (default: aural)",
+    )
+
     args = parser.parse_args()
 
     # Check that at least one action is specified
@@ -426,14 +443,18 @@ def main():
         parser.print_help()
         sys.exit(1)
 
+    # Get configuration for selected instance
+    stash_url, stash_api_key = get_stash_config(args.instance)
+
     # Validate required environment variables
-    if not STASH_URL or not STASH_API_KEY:
-        print("Error: Missing required Stashapp environment variables.")
-        print("Please set STASHAPP_URL and STASHAPP_API_KEY in your .env file.")
+    if not stash_url or not stash_api_key:
+        prefix = "AURAL_STASHAPP" if args.instance == "aural" else "STASHAPP"
+        print(f"Error: Missing required environment variables for '{args.instance}' instance.")
+        print(f"Please set {prefix}_URL and {prefix}_API_KEY in your .env file.")
         sys.exit(1)
 
     # Initialize client
-    client = StashSchemaIntrospector(STASH_URL, STASH_API_KEY)
+    client = StashSchemaIntrospector(stash_url, stash_api_key)
 
     try:
         if args.types:
