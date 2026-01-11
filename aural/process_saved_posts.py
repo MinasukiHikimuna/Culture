@@ -23,6 +23,8 @@ import sys
 from pathlib import Path
 
 import config as aural_config
+from analyze_download_import import AnalyzeDownloadImportPipeline
+from stashapp_importer import StashScanStuckError
 
 
 SAVED_POSTS_DIR = aural_config.REDDIT_SAVED_PENDING_DIR
@@ -173,15 +175,19 @@ def find_extracted_post_files(post_ids: list[str], username: str) -> list[Path]:
 
 
 def run_analyze_download_import(
-    users: list[str], posts_by_user: dict[str, list[dict]], dry_run: bool = False
+    users: list[str],
+    posts_by_user: dict[str, list[dict]],
+    dry_run: bool = False,
+    verbose: bool = False,
 ) -> dict:
     """
-    Run analyze_download_import.py for each user's saved posts only.
+    Run analyze_download_import for each user's saved posts only.
 
     Args:
         users: List of usernames to process
         posts_by_user: Dict mapping username to list of post info dicts
-        dry_run: If True, only print the commands
+        dry_run: If True, only print what would be done
+        verbose: If True, show detailed output
 
     Returns:
         Dict with results per user
@@ -194,6 +200,12 @@ def run_analyze_download_import(
 
     # Load processed posts once for checking already-processed posts
     processed_data = load_processed_posts()
+
+    # Initialize the pipeline once for all users
+    pipeline = AnalyzeDownloadImportPipeline({
+        "dry_run": dry_run,
+        "verbose": verbose,
+    })
 
     for username in sorted(users):
         user_posts = posts_by_user.get(username, [])
@@ -250,36 +262,12 @@ def run_analyze_download_import(
             # Extract post_id from filename (format: {post_id}_*.json)
             post_id = post_file.stem.split("_")[0]
 
-            cmd = [
-                "uv",
-                "run",
-                "python",
-                "analyze_download_import.py",
-                str(post_file),
-            ]
             print(f"  Processing: {post_file.name}")
 
             try:
-                result = subprocess.run(cmd, check=False, capture_output=True, text=True)
+                result = pipeline.process_post(post_file)
 
-                # Check if the scan got stuck
-                if "ABORTING BATCH: Stashapp scan is stuck" in result.stdout:
-                    print(f"\n{'!' * 60}")
-                    print("  ABORTING: Stashapp scan is stuck!")
-                    print(f"{'!' * 60}")
-                    print("  The Stashapp scan job did not complete within the expected time.")
-                    print("  This usually means the scan is stuck or frozen.")
-                    print("\n  Please:")
-                    print("    1. Check Stashapp UI (Settings > Tasks)")
-                    print("    2. Stop any stuck scan jobs")
-                    print("    3. Restart Stashapp if needed")
-                    print("    4. Re-run this script to continue processing")
-                    print()
-                    scan_stuck = True
-                    user_had_failure = True
-                    break  # Abort processing this user's posts
-
-                if result.returncode == 0:
+                if result.get("success"):
                     user_had_success = True
                     # Archive this specific saved post on success
                     saved_post = post_id_to_saved.get(post_id)
@@ -289,11 +277,39 @@ def run_analyze_download_import(
                             if archive_saved_post(saved_post_file, dry_run):
                                 results["archived"] += 1
                                 print(f"  Archived: {saved_post_file.name}")
+                elif result.get("skipped"):
+                    # Skipped posts (already processed, no content, etc.) are considered successful
+                    user_had_success = True
+                    # Archive if this was a skip due to being already processed
+                    saved_post = post_id_to_saved.get(post_id)
+                    if saved_post:
+                        saved_post_file = saved_post.get("file")
+                        if saved_post_file and saved_post_file.exists():
+                            if archive_saved_post(saved_post_file, dry_run):
+                                results["archived"] += 1
+                                print(f"  Archived: {saved_post_file.name}")
                 else:
                     print(f"    Failed to process {post_file.name}")
-                    if result.stderr:
-                        print(f"    Error output: {result.stderr.strip()[:200]}")
+                    if result.get("error"):
+                        print(f"    Error: {result['error'][:200]}")
                     user_had_failure = True
+
+            except StashScanStuckError:
+                print(f"\n{'!' * 60}")
+                print("  ABORTING: Stashapp scan is stuck!")
+                print(f"{'!' * 60}")
+                print("  The Stashapp scan job did not complete within the expected time.")
+                print("  This usually means the scan is stuck or frozen.")
+                print("\n  Please:")
+                print("    1. Check Stashapp UI (Settings > Tasks)")
+                print("    2. Stop any stuck scan jobs")
+                print("    3. Restart Stashapp if needed")
+                print("    4. Re-run this script to continue processing")
+                print()
+                scan_stuck = True
+                user_had_failure = True
+                break  # Abort processing this user's posts
+
             except Exception as e:
                 print(f"    Error: {e}")
                 user_had_failure = True
@@ -363,6 +379,12 @@ Examples:
         default=0,
         help="Limit number of users to process (0 = no limit)",
     )
+    parser.add_argument(
+        "--verbose",
+        "-v",
+        action="store_true",
+        help="Show detailed output from analyze_download_import.py",
+    )
 
     args = parser.parse_args()
 
@@ -424,7 +446,10 @@ Examples:
     # Stage 3: Analyze, download, import
     if not args.extract_only:
         results = run_analyze_download_import(
-            list(users_to_process.keys()), users_to_process, args.dry_run
+            list(users_to_process.keys()),
+            users_to_process,
+            args.dry_run,
+            args.verbose,
         )
 
         # Summary
