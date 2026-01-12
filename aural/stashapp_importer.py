@@ -308,7 +308,7 @@ class StashappClient:
         return None
 
     def trigger_scan(self, paths: list[str] | None = None) -> str:
-        """Trigger a metadata scan.
+        """Trigger a metadata scan with minimal configuration.
 
         Args:
             paths: Optional list of paths to scan. If empty or None, scans all.
@@ -319,8 +319,17 @@ class StashappClient:
                 metadataScan(input: $input)
             }
         """
-        scan_paths = paths if paths else []
-        result = self.query(query, {"input": {"paths": scan_paths}})
+        scan_input: dict = {
+            "paths": paths if paths else [],
+            "scanGenerateCovers": True,
+            "scanGenerateClipPreviews": False,
+            "scanGenerateImagePreviews": False,
+            "scanGeneratePhashes": False,
+            "scanGeneratePreviews": False,
+            "scanGenerateSprites": False,
+            "scanGenerateThumbnails": False,
+        }
+        result = self.query(query, {"input": scan_input})
         return result["metadataScan"]
 
     def wait_for_scan(self, timeout: int = 30) -> bool:
@@ -1210,12 +1219,6 @@ class StashappImporter:
             print("\n  Updating scene metadata...")
             self.client.update_scene(scene["id"], updates)
             print("  Scene updated successfully!")
-
-            # Generate cover image
-            print("  Generating cover image...")
-            self.client.generate_covers()
-            self.client.wait_for_scan(30)
-            print("  Cover generated!")
 
             # Set audio fingerprint for duplicate detection
             if audio_checksum:
