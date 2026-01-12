@@ -296,8 +296,26 @@ class YtDlpExtractor:
         print("✅ Info extraction completed")
         return result
 
+    def _normalize_pornhub_url(self, url: str) -> str:
+        """Normalize Pornhub URLs to get all uploaded videos.
+
+        Pornhub pornstar/model pages show only featured videos by default.
+        Appending /videos/upload returns all uploaded videos.
+        """
+        # Match pornstar or model pages without /videos/upload suffix
+        pattern = r"^(https?://(?:www\.)?pornhub\.com/(?:pornstar|model)/[^/]+)(?:/videos)?/?$"
+        match = re.match(pattern, url)
+        if match:
+            base_url = match.group(1)
+            normalized = f"{base_url}/videos/upload"
+            print(f"📝 Normalized Pornhub URL: {normalized}")
+            return normalized
+        return url
+
     def index_playlist(self, url: str, max_videos: int | None = None) -> list[dict]:
         """Index all videos in a playlist/channel."""
+        # Normalize Pornhub URLs to get all videos
+        url = self._normalize_pornhub_url(url)
         print(f"📋 Indexing playlist/channel: {url}")
 
         ydl_opts = {
