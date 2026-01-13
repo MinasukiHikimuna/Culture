@@ -485,17 +485,9 @@ class AnalyzeDownloadImportPipeline:
                 post, analysis, gwasi_data=post_data
             )
 
-            # Determine release directory
-            version_naming = analysis.get("version_naming", {})
-            if version_naming.get("release_directory"):
-                release_dir = (
-                    self.data_dir
-                    / "releases"
-                    / post["author"]
-                    / version_naming["release_directory"]
-                )
-            else:
-                release_dir = self.data_dir / "releases" / post["author"] / release.id
+            # Use the actual release directory from the orchestrator
+            # (prevents path mismatch from LLM non-deterministic slug generation)
+            release_dir = release.release_dir
 
             return {
                 "success": True,

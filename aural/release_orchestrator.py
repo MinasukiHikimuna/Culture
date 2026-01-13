@@ -102,6 +102,8 @@ class Release:
     artwork: list = field(default_factory=list)
     aggregated_at: str = ""
     version: str = "1.0"
+    # Runtime field - actual directory path where release is stored (not serialized)
+    release_dir: Path | None = None
 
     def __post_init__(self):
         if not self.id:
@@ -272,6 +274,61 @@ class ReleaseOrchestrator:
                 slug = slug[:last_hyphen]
 
         return slug or "untitled"
+
+    def _find_existing_release_dir(self, performer_dir: Path, post_id: str) -> Path | None:
+        """
+        Find an existing release directory for a post ID.
+
+        Searches for directories matching {post_id}_* pattern to handle
+        LLM non-determinism in slug generation.
+
+        Args:
+            performer_dir: Path to the performer's releases directory
+            post_id: The Reddit post ID
+
+        Returns:
+            Path to existing release directory if found, None otherwise
+        """
+        if not performer_dir.exists():
+            return None
+
+        # Look for directories starting with {post_id}_
+        pattern = f"{post_id}_*"
+        matches = list(performer_dir.glob(pattern))
+
+        if not matches:
+            return None
+
+        if len(matches) == 1:
+            return matches[0]
+
+        # Multiple matches - prefer one with stashapp_scene_id, then oldest
+        best_match = None
+        best_has_stash = False
+        best_mtime = float("inf")
+
+        for match in matches:
+            release_json = match / "release.json"
+            if not release_json.exists():
+                continue
+
+            try:
+                data = json.loads(release_json.read_text(encoding="utf-8"))
+                has_stash = data.get("stashapp_scene_id") is not None
+                mtime = release_json.stat().st_mtime
+
+                # Prefer: has stashapp_scene_id > oldest
+                if has_stash and not best_has_stash:
+                    best_match = match
+                    best_has_stash = True
+                    best_mtime = mtime
+                elif has_stash == best_has_stash and mtime < best_mtime:
+                    best_match = match
+                    best_mtime = mtime
+            except (json.JSONDecodeError, OSError):
+                continue
+
+        return best_match or matches[0]
 
     def load_reddit_data(self, file_path: str | Path) -> tuple[dict, dict]:
         """
@@ -531,18 +588,25 @@ class ReleaseOrchestrator:
 
         # Determine target directory structure first
         data_dir = Path(self.config["dataDir"])
+        post_id = post.get("id") or llm_analysis.get("metadata", {}).get("post_id") or "unknown"
+        performer_dir = data_dir / "releases" / post.get("author", "unknown")
 
-        # Use version naming from LLM analysis for directory structure
-        version_naming = llm_analysis.get("version_naming", {})
-        if version_naming.get("release_directory"):
-            release_dir_name = version_naming["release_directory"]
+        # Check if ANY release directory already exists for this post_id
+        # This prevents LLM non-determinism from creating duplicate directories
+        existing_dir = self._find_existing_release_dir(performer_dir, post_id)
+
+        if existing_dir:
+            release_dir = existing_dir
         else:
-            # Fallback: generate directory name as {post_id}_{slug}
-            post_id = post.get("id") or llm_analysis.get("metadata", {}).get("post_id") or "unknown"
-            title_slug = self._create_slug(post.get("title", ""), max_length=40)
-            release_dir_name = f"{post_id}_{title_slug}" if title_slug else post_id
-
-        release_dir = data_dir / "releases" / post.get("author", "unknown") / release_dir_name
+            # No existing directory - compute new one from LLM analysis
+            version_naming = llm_analysis.get("version_naming", {})
+            if version_naming.get("release_directory"):
+                release_dir_name = version_naming["release_directory"]
+            else:
+                # Fallback: generate directory name as {post_id}_{slug}
+                title_slug = self._create_slug(post.get("title", ""), max_length=40)
+                release_dir_name = f"{post_id}_{title_slug}" if title_slug else post_id
+            release_dir = performer_dir / release_dir_name
 
         # Check if release already exists
         release_path = release_dir / "release.json"
@@ -565,7 +629,8 @@ class ReleaseOrchestrator:
                     script=existing_data.get("script"),
                     artwork=existing_data.get("artwork", []),
                     aggregated_at=existing_data.get("aggregatedAt", ""),
-                    version=existing_data.get("version", "1.0")
+                    version=existing_data.get("version", "1.0"),
+                    release_dir=release_dir,
                 )
                 return release
             except json.JSONDecodeError:
@@ -576,7 +641,7 @@ class ReleaseOrchestrator:
         reddit_data = gwasi_data.get("reddit_data", post) if gwasi_data else post
 
         # Use post ID as release ID
-        release_id = post.get("id") or llm_analysis.get("metadata", {}).get("post_id") or release_dir_name
+        release_id = post_id
 
         release = Release(
             id=release_id,
@@ -588,7 +653,8 @@ class ReleaseOrchestrator:
                 "patreon": None,
                 "llmAnalysis": llm_analysis,
                 "gwasi": gwasi_data  # Full GWASI data with tags, post_type, etc.
-            }
+            },
+            release_dir=release_dir,
         )
 
         release_dir.mkdir(parents=True, exist_ok=True)
