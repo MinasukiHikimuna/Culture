@@ -16,22 +16,27 @@ import argparse
 import hashlib
 import json
 import re
+import sys
+import traceback
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
-
-import httpx
+from typing import TYPE_CHECKING, Any
+from urllib.parse import urlparse
 
 import config as aural_config
+import httpx
 from ao3_extractor import AO3Extractor
 from audiochan_extractor import AudiochanExtractor
 from erocast_extractor import ErocastExtractor
 from hotaudio_extractor import HotAudioExtractor
-from platform_availability import PlatformAvailabilityTracker
 from scriptbin_extractor import ScriptBinExtractor
 from soundgasm_extractor import SoundgasmExtractor
 from whypit_extractor import WhypitExtractor
+
+
+if TYPE_CHECKING:
+    from platform_availability import PlatformAvailabilityTracker
 
 
 @dataclass
@@ -102,11 +107,11 @@ class Release:
         if not self.id:
             self.id = self._generate_id()
         if not self.aggregated_at:
-            self.aggregated_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+            self.aggregated_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
     def _generate_id(self) -> str:
         """Generate a unique ID for the release."""
-        data = f"{self.title}-{self.primary_performer}-{datetime.now().timestamp()}"
+        data = f"{self.title}-{self.primary_performer}-{datetime.now(UTC).timestamp()}"
         return hashlib.sha256(data.encode()).hexdigest()[:16]
 
     def add_audio_source(self, audio_source: AudioSource | dict):
@@ -408,18 +413,17 @@ class ReleaseOrchestrator:
                         audio_source.platform_data["tid"] = track.get("tid")
                         audio_source.platform_data["isCYOATrack"] = True
                         audio_sources.append(audio_source)
+            elif result.get("tracks"):
+                # Single track or fallback with tracks
+                for track in result["tracks"]:
+                    if "error" not in track:
+                        audio_sources.append(
+                            self.normalize_extractor_result(track, platform)
+                        )
             else:
-                # Single track or fallback
-                if result.get("tracks"):
-                    for track in result["tracks"]:
-                        if "error" not in track:
-                            audio_sources.append(
-                                self.normalize_extractor_result(track, platform)
-                            )
-                else:
-                    audio_sources.append(
-                        self.normalize_extractor_result(result, platform)
-                    )
+                audio_sources.append(
+                    self.normalize_extractor_result(result, platform)
+                )
 
             return audio_sources
 
@@ -485,7 +489,7 @@ class ReleaseOrchestrator:
                 "tags": metadata.get("tags") or result.get("tags", []),
                 "duration": metadata.get("duration") or result.get("duration"),
                 "uploadDate": metadata.get("uploadDate") or result.get("uploadDate"),
-                "extractedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+                "extractedAt": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
                 "platform": {
                     "name": platform,
                     "extractorVersion": metadata.get("platform", {}).get("extractorVersion", "1.0")
@@ -706,7 +710,9 @@ class ReleaseOrchestrator:
                     ]
 
                     release.add_audio_source(audio_source)
-                    print(f"✅ Added audio source: {audio_version.get('version_name', 'Version')} from {audio_source.metadata['platform']['name']}")
+                    version_name = audio_version.get("version_name", "Version")
+                    platform_name = audio_source.metadata["platform"]["name"]
+                    print(f"✅ Added audio source: {version_name} from {platform_name}")
                 else:
                     print(f"❌ All platforms failed for {audio_version.get('version_name') or f'Version {i + 1}'}")
 
@@ -808,7 +814,7 @@ class ReleaseOrchestrator:
                 "resolvedUrl": resolved_url,
                 "author": author,
                 "fillType": fill_type,
-                "extractedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+                "extractedAt": datetime.now(UTC).isoformat().replace("+00:00", "Z")
             }
 
             if "scriptbin.works" in resolved_url:
@@ -923,7 +929,7 @@ class ReleaseOrchestrator:
             }
 
         except Exception as error:
-            raise ValueError(f"Scriptbin extraction failed: {error}")
+            raise ValueError(f"Scriptbin extraction failed: {error}") from error
 
     def extract_ao3_script(self, url: str) -> dict:
         """Extract script content from archiveofourown.org using AO3Extractor."""
@@ -983,7 +989,7 @@ class ReleaseOrchestrator:
             }
 
         except Exception as error:
-            raise ValueError(f"AO3 extraction failed: {error}")
+            raise ValueError(f"AO3 extraction failed: {error}") from error
 
     def extract_reddit_script(self, url: str) -> dict:
         """
@@ -992,7 +998,6 @@ class ReleaseOrchestrator:
         """
         try:
             # Clean URL - remove query params and ensure proper format
-            from urllib.parse import urlparse
             parsed = urlparse(url)
             clean_path = parsed.path.rstrip("/")
             json_url = f"https://www.reddit.com{clean_path}.json"
@@ -1031,7 +1036,10 @@ class ReleaseOrchestrator:
                 "postAuthor": post_author,
                 "postId": post.get("id"),
                 "subreddit": post.get("subreddit"),
-                "created": datetime.fromtimestamp(post["created_utc"]).isoformat() if post.get("created_utc") else None,
+                "created": (
+                    datetime.fromtimestamp(post["created_utc"], tz=UTC).isoformat()
+                    if post.get("created_utc") else None
+                ),
                 "redditPostUrl": url
             }
 
@@ -1065,7 +1073,7 @@ class ReleaseOrchestrator:
                     # Don't fall back to Reddit post - propagate the failure
                     raise ValueError(
                         f"Found archiveofourown.org link but extraction failed: {ao3_error}"
-                    )
+                    ) from ao3_error
 
             # Check if this Reddit post links to scriptbin.works
             scriptbin_match = re.search(
@@ -1097,7 +1105,7 @@ class ReleaseOrchestrator:
                     # Don't fall back to Reddit post - propagate the failure
                     raise ValueError(
                         f"Found scriptbin.works link but extraction failed: {scriptbin_error}"
-                    )
+                    ) from scriptbin_error
 
             # No scriptbin link found - return Reddit post content as the script
             return {
@@ -1106,7 +1114,7 @@ class ReleaseOrchestrator:
             }
 
         except Exception as error:
-            raise ValueError(f"Reddit script extraction failed: {error}")
+            raise ValueError(f"Reddit script extraction failed: {error}") from error
 
     def save_release(self, release: Release):
         """Save release to storage using new naming structure."""
@@ -1155,11 +1163,11 @@ class ReleaseOrchestrator:
             "title": release.title,
             "primaryPerformer": release.primary_performer,
             "audioSourceCount": len(release.audio_sources),
-            "platforms": list(set(
+            "platforms": list({
                 s.get("metadata", {}).get("platform", {}).get("name")
                 for s in release.audio_sources
                 if s.get("metadata", {}).get("platform", {}).get("name")
-            )),
+            }),
             "aggregatedAt": release.aggregated_at
         }
 
@@ -1284,10 +1292,9 @@ Examples:
 
     except Exception as e:
         print(f"\n❌ Error: {e}")
-        import traceback
         traceback.print_exc()
         return 1
 
 
 if __name__ == "__main__":
-    exit(main())
+    sys.exit(main())
