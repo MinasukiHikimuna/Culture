@@ -18,6 +18,7 @@ import argparse
 import json
 import os
 import re
+import shutil
 import subprocess
 import time
 from datetime import datetime, timezone
@@ -822,6 +823,26 @@ def get_media_duration(file_path: Path) -> float | None:
         return None
 
 
+def check_disk_space(target_path: Path, min_free_gb: float = 1.0) -> tuple[bool, float]:
+    """
+    Check if there's enough free space on the target drive.
+
+    Args:
+        target_path: Path to check disk space for
+        min_free_gb: Minimum required free space in gigabytes (default: 1GB)
+
+    Returns:
+        tuple: (has_enough_space, available_gb)
+    """
+    try:
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        total, used, free = shutil.disk_usage(target_path.parent)
+        free_gb = free / (1024**3)
+        return free_gb >= min_free_gb, free_gb
+    except OSError:
+        return False, 0.0
+
+
 def convert_audio_to_video(audio_path: Path, output_path: Path) -> bool:
     """Convert audio file to video with static image using ffmpeg."""
     static_image = STATIC_IMAGE
@@ -1058,6 +1079,14 @@ class StashappImporter:
                     output_path.unlink()
 
             if needs_conversion:
+                # Check disk space before attempting conversion
+                has_space, free_gb = check_disk_space(output_path)
+                if not has_space:
+                    raise OSError(
+                        f"Insufficient disk space on {output_path.parent} "
+                        f"({free_gb:.2f} GB free, need at least 1 GB)"
+                    )
+
                 success = convert_audio_to_video(audio_path, output_path)
                 if not success:
                     print("  Error: Failed to convert audio to video")
