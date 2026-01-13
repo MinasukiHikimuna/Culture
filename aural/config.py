@@ -14,6 +14,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+
 # Load .env from monorepo root (Culture/)
 MONOREPO_ROOT = Path(__file__).parent.parent
 load_dotenv(MONOREPO_ROOT / ".env")
@@ -84,6 +85,32 @@ def local_path_to_windows(local_path: Path | str) -> str:
         windows_path += "\\" + "\\".join(relative.parts)
 
     return windows_path
+
+
+def windows_path_to_local(windows_path: str) -> Path:
+    """Convert a Windows path from Stashapp to a local Mac path."""
+    if not STASH_OUTPUT_DIR or not STASH_WINDOWS_BASE:
+        raise ValueError(
+            "STASH_OUTPUT_DIR and STASH_WINDOWS_BASE must be configured for path mapping"
+        )
+
+    # Normalize the Windows base path for comparison
+    windows_base = STASH_WINDOWS_BASE.rstrip("\\")
+
+    # Check if the path starts with the Windows base
+    if not windows_path.startswith(windows_base):
+        raise ValueError(
+            f"Path {windows_path} is not under STASH_WINDOWS_BASE {windows_base}"
+        )
+
+    # Get the relative part after the base
+    relative = windows_path[len(windows_base) :].lstrip("\\")
+
+    # Convert backslashes to forward slashes and build local path
+    if relative:
+        relative_parts = relative.split("\\")
+        return STASH_OUTPUT_DIR / Path(*relative_parts)
+    return STASH_OUTPUT_DIR
 
 
 def ensure_directories() -> None:
