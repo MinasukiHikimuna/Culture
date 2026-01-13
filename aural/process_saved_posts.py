@@ -20,10 +20,12 @@ import json
 import shutil
 import subprocess
 import sys
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import config as aural_config
 from analyze_download_import import AnalyzeDownloadImportPipeline
+from exceptions import LMStudioUnavailableError, StashappUnavailableError
 from stashapp_importer import StashScanStuckError
 
 
@@ -32,6 +34,62 @@ SAVED_POSTS_ARCHIVE_DIR = aural_config.REDDIT_SAVED_ARCHIVED_DIR
 EXTRACTED_DATA_DIR = aural_config.INDEX_DIR
 REDDIT_OUTPUT_DIR = aural_config.REDDIT_INDEX_DIR
 PROCESSED_POSTS_FILE = aural_config.RELEASES_DIR.parent / "processed_posts.json"
+
+
+@dataclass
+class UserStats:
+    """Track per-user processing statistics."""
+    username: str
+    successful: int = 0
+    failed: int = 0
+    skipped: int = 0
+    archived: int = 0
+    failed_posts: list[str] = field(default_factory=list)
+
+    @property
+    def total(self) -> int:
+        return self.successful + self.failed + self.skipped
+
+    @property
+    def has_failures(self) -> bool:
+        return self.failed > 0
+
+
+@dataclass
+class ProcessingResults:
+    """Track overall processing results with per-user breakdown."""
+    user_stats: dict[str, UserStats] = field(default_factory=dict)
+    aborted: bool = False
+    abort_reason: str | None = None
+
+    def get_or_create_user(self, username: str) -> UserStats:
+        if username not in self.user_stats:
+            self.user_stats[username] = UserStats(username=username)
+        return self.user_stats[username]
+
+    @property
+    def total_successful(self) -> int:
+        return sum(u.successful for u in self.user_stats.values())
+
+    @property
+    def total_failed(self) -> int:
+        return sum(u.failed for u in self.user_stats.values())
+
+    @property
+    def total_skipped(self) -> int:
+        return sum(u.skipped for u in self.user_stats.values())
+
+    @property
+    def total_archived(self) -> int:
+        return sum(u.archived for u in self.user_stats.values())
+
+    @property
+    def users_with_failures(self) -> list[UserStats]:
+        return [u for u in self.user_stats.values() if u.has_failures]
+
+    @property
+    def users_all_successful(self) -> list[UserStats]:
+        return [u for u in self.user_stats.values() if not u.has_failures and u.successful > 0]
 
 
 def load_processed_posts() -> dict:
@@ -179,7 +237,7 @@ def run_analyze_download_import(
     posts_by_user: dict[str, list[dict]],
     dry_run: bool = False,
     verbose: bool = False,
-) -> dict:
+) -> ProcessingResults:
     """
     Run analyze_download_import for each user's saved posts only.
 
@@ -190,13 +248,13 @@ def run_analyze_download_import(
         verbose: If True, show detailed output
 
     Returns:
-        Dict with results per user
+        ProcessingResults with per-user per-post breakdown
     """
     print(f"\n{'=' * 60}")
     print("Stage 3: Analyze, Download, and Import")
     print(f"{'=' * 60}")
 
-    results = {"success": [], "failed": [], "skipped": [], "archived": 0}
+    results = ProcessingResults()
 
     # Load processed posts once for checking already-processed posts
     processed_data = load_processed_posts()
@@ -208,10 +266,11 @@ def run_analyze_download_import(
     })
 
     for username in sorted(users):
+        user_stats = results.get_or_create_user(username)
         user_posts = posts_by_user.get(username, [])
+
         if not user_posts:
             print(f"\n[SKIP] {username}: No saved posts")
-            results["skipped"].append(username)
             continue
 
         # Build a mapping from post_id to saved post info
@@ -225,7 +284,7 @@ def run_analyze_download_import(
                 saved_post_file = post.get("file")
                 if saved_post_file and saved_post_file.exists():
                     if archive_saved_post(saved_post_file, dry_run):
-                        results["archived"] += 1
+                        user_stats.archived += 1
                         print(f"  [ALREADY PROCESSED] Archived: {saved_post_file.name}")
             else:
                 posts_to_process.append(post)
@@ -233,7 +292,6 @@ def run_analyze_download_import(
         # Update user_posts to only include unprocessed posts
         if not posts_to_process:
             print(f"\n[SKIP] {username}: All posts already processed and archived")
-            results["success"].append(username)
             continue
 
         # Find the extracted JSON files for the remaining post IDs only
@@ -242,7 +300,6 @@ def run_analyze_download_import(
 
         if not post_files:
             print(f"\n[SKIP] {username}: No extracted data found for saved posts")
-            results["skipped"].append(username)
             continue
 
         print(f"\n[PROCESS] {username} ({len(post_files)} posts)")
@@ -250,14 +307,10 @@ def run_analyze_download_import(
         if dry_run:
             for pf in post_files:
                 print(f"  [DRY RUN] Would process: {pf.name}")
-            results["success"].append(username)
+                user_stats.successful += 1
             continue
 
         # Process each post file individually and archive on success
-        user_had_success = False
-        user_had_failure = False
-        scan_stuck = False
-
         for post_file in post_files:
             # Extract post_id from filename (format: {post_id}_*.json)
             post_id = post_file.stem.split("_")[0]
@@ -268,31 +321,47 @@ def run_analyze_download_import(
                 result = pipeline.process_post(post_file)
 
                 if result.get("success"):
-                    user_had_success = True
+                    user_stats.successful += 1
                     # Archive this specific saved post on success
                     saved_post = post_id_to_saved.get(post_id)
                     if saved_post:
                         saved_post_file = saved_post.get("file")
                         if saved_post_file and saved_post_file.exists():
                             if archive_saved_post(saved_post_file, dry_run):
-                                results["archived"] += 1
+                                user_stats.archived += 1
                                 print(f"  Archived: {saved_post_file.name}")
                 elif result.get("skipped"):
-                    # Skipped posts (already processed, no content, etc.) are considered successful
-                    user_had_success = True
+                    # Skipped posts (already processed, no content, etc.) count as skipped
+                    user_stats.skipped += 1
                     # Archive if this was a skip due to being already processed
                     saved_post = post_id_to_saved.get(post_id)
                     if saved_post:
                         saved_post_file = saved_post.get("file")
                         if saved_post_file and saved_post_file.exists():
                             if archive_saved_post(saved_post_file, dry_run):
-                                results["archived"] += 1
+                                user_stats.archived += 1
                                 print(f"  Archived: {saved_post_file.name}")
                 else:
                     print(f"    Failed to process {post_file.name}")
                     if result.get("error"):
                         print(f"    Error: {result['error'][:200]}")
-                    user_had_failure = True
+                    user_stats.failed += 1
+                    user_stats.failed_posts.append(post_file.name)
+
+            except (LMStudioUnavailableError, StashappUnavailableError) as e:
+                # Mandatory resource unavailable - abort entire batch
+                print(f"\n{'!' * 60}")
+                print(f"  ABORTING: {type(e).__name__}")
+                print(f"{'!' * 60}")
+                print(f"  {e}")
+                print("\n  Processing cannot continue without this resource.")
+                print("  Please ensure the service is running and re-run this script.")
+                print()
+                user_stats.failed += 1
+                user_stats.failed_posts.append(post_file.name)
+                results.aborted = True
+                results.abort_reason = str(e)
+                break  # Exit post loop
 
             except StashScanStuckError:
                 print(f"\n{'!' * 60}")
@@ -306,28 +375,20 @@ def run_analyze_download_import(
                 print("    3. Restart Stashapp if needed")
                 print("    4. Re-run this script to continue processing")
                 print()
-                scan_stuck = True
-                user_had_failure = True
-                break  # Abort processing this user's posts
+                user_stats.failed += 1
+                user_stats.failed_posts.append(post_file.name)
+                results.aborted = True
+                results.abort_reason = "Stashapp scan stuck"
+                break  # Exit post loop
 
             except Exception as e:
                 print(f"    Error: {e}")
-                user_had_failure = True
+                user_stats.failed += 1
+                user_stats.failed_posts.append(post_file.name)
 
-        # If scan got stuck, abort the entire batch
-        if scan_stuck:
-            results["aborted"] = True
-            break  # Exit the user loop
-
-        # Track user-level results (a user can be in both if some posts succeeded and others failed)
-        if user_had_success and not user_had_failure:
-            results["success"].append(username)
-        elif user_had_failure and not user_had_success:
-            results["failed"].append(username)
-        elif user_had_success and user_had_failure:
-            # Partial success - count as success but note in output
-            results["success"].append(username)
-            print(f"  Note: Some posts for {username} failed but others succeeded")
+        # If aborted, exit the user loop
+        if results.aborted:
+            break
 
     return results
 
@@ -444,6 +505,7 @@ Examples:
               f"{extract_totals['skipped']} skipped, {extract_totals['failed']} failed")
 
     # Stage 3: Analyze, download, import
+    results = None
     if not args.extract_only:
         results = run_analyze_download_import(
             list(users_to_process.keys()),
@@ -456,27 +518,52 @@ Examples:
         print(f"\n{'=' * 60}")
         print("Analysis Summary")
         print(f"{'=' * 60}")
-        if results.get("aborted"):
-            print("  STATUS: ABORTED (Stashapp scan stuck)")
-        print(f"Successful: {len(results['success'])}")
-        print(f"Failed: {len(results['failed'])}")
-        print(f"Skipped: {len(results['skipped'])}")
-        print(f"Archived: {results['archived']}")
 
-        if results["failed"]:
-            print("\nFailed users:")
-            for user in results["failed"]:
-                print(f"  - {user}")
+        if results.aborted:
+            print("  STATUS: ABORTED")
+            print(f"  Reason: {results.abort_reason}")
+            print()
 
-        if results.get("aborted"):
-            print("\nBatch was aborted due to Stashapp scan being stuck.")
-            print("Please fix the scan issue and re-run to continue processing.")
+        # Per-user breakdown
+        print("Per-user results:")
+        for username in sorted(results.user_stats.keys()):
+            user = results.user_stats[username]
+            status_parts = []
+            if user.successful > 0:
+                status_parts.append(f"{user.successful} successful")
+            if user.failed > 0:
+                status_parts.append(f"{user.failed} failed")
+            if user.skipped > 0:
+                status_parts.append(f"{user.skipped} skipped")
+            if user.archived > 0:
+                status_parts.append(f"{user.archived} archived")
+
+            status = ", ".join(status_parts) if status_parts else "no posts processed"
+            print(f"  {username}: {status}")
+
+            # Show failed post names if any
+            if user.failed_posts:
+                for post_name in user.failed_posts:
+                    print(f"    - FAILED: {post_name}")
+
+        # Totals
+        print()
+        print("Totals:")
+        print(f"  Posts successful: {results.total_successful}")
+        print(f"  Posts failed: {results.total_failed}")
+        print(f"  Posts skipped: {results.total_skipped}")
+        print(f"  Posts archived: {results.total_archived}")
+
+        if results.aborted:
+            print()
+            print("Batch was aborted due to a mandatory resource being unavailable.")
+            print("Please fix the issue and re-run to continue processing.")
 
     print("\nDone!")
 
     # Return non-zero exit code if there were failures or if batch was aborted
-    if not args.extract_only:
-        if results.get("aborted") or results["failed"]:
+    if results is not None:
+        if results.aborted or results.total_failed > 0:
             return 1
 
     return 0
