@@ -38,15 +38,15 @@ def analyze_video(file_path: Path) -> dict:
     return json.loads(result.stdout)
 
 
-def extract_frame(video_path: Path, output_path: Path, timestamp: float = 10.0) -> bool:
-    """Extract a single frame from video at given timestamp."""
+def extract_frame_png(video_path: Path, output_path: Path, timestamp: float) -> bool:
+    """Extract a single frame from video as lossless PNG."""
     cmd = [
         "ffmpeg",
         "-y",
         "-ss", str(timestamp),
         "-i", str(video_path),
         "-frames:v", "1",
-        "-q:v", "2",
+        "-c:v", "png",
         str(output_path),
     ]
     try:
@@ -74,6 +74,8 @@ def repackage_video(
         "-map", "1:a",
         "-c:v", "libx264",
         "-tune", "stillimage",
+        "-crf", "28",
+        "-preset", "slower",
         "-pix_fmt", "yuv420p",
         "-c:a", "copy",
         "-t", str(duration),
@@ -123,31 +125,32 @@ def format_size(size_bytes: int) -> str:
     """Format bytes as human readable size."""
     if size_bytes >= 1024 * 1024 * 1024:
         return f"{size_bytes / 1024 / 1024 / 1024:.2f} GB"
-    elif size_bytes >= 1024 * 1024:
+    if size_bytes >= 1024 * 1024:
         return f"{size_bytes / 1024 / 1024:.1f} MB"
-    elif size_bytes >= 1024:
+    if size_bytes >= 1024:
         return f"{size_bytes / 1024:.1f} KB"
     return f"{size_bytes} bytes"
 
 
-def main() -> int:
+def parse_frame_rate(frame_rate_str: str) -> float:
+    """Parse ffprobe frame rate string like '30/1' to float."""
+    if "/" in frame_rate_str:
+        num, denom = frame_rate_str.split("/")
+        return float(num) / float(denom) if float(denom) != 0 else 0.0
+    return float(frame_rate_str)
+
+
+def parse_args() -> argparse.Namespace:
+    """Parse command line arguments."""
     parser = argparse.ArgumentParser(
         description="Optimize static image video by repackaging with efficient encoding"
     )
+    parser.add_argument("file", type=Path, help="Video file to optimize")
     parser.add_argument(
-        "file",
-        type=Path,
-        help="Video file to optimize",
+        "--dry-run", action="store_true", help="Preview changes without modifying files"
     )
     parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Preview changes without modifying files",
-    )
-    parser.add_argument(
-        "--backup",
-        action="store_true",
-        help="Keep original file with .original.mp4 suffix",
+        "--backup", action="store_true", help="Keep original file with .original.mp4 suffix"
     )
     parser.add_argument(
         "--frame-at",
@@ -155,91 +158,61 @@ def main() -> int:
         default=None,
         help="Timestamp (seconds) to extract frame from (default: middle of video)",
     )
-    args = parser.parse_args()
+    return parser.parse_args()
 
-    file_path = args.file.resolve()
 
-    if not file_path.exists():
-        print(f"ERROR: File not found: {file_path}")
-        return 1
-
-    print(f"File: {file_path.name}")
-    print(f"Path: {file_path.parent}")
-    print()
-
-    # Analyze video
-    print("Analyzing video...")
-    try:
-        data = analyze_video(file_path)
-    except subprocess.CalledProcessError as e:
-        print(f"ERROR: Failed to analyze video: {e}")
-        return 1
-
-    # Extract info
-    format_info = data.get("format", {})
-    streams = data.get("streams", [])
-
-    duration = float(format_info.get("duration", 0))
-    original_size = int(format_info.get("size", 0))
-
-    video_stream = next((s for s in streams if s.get("codec_type") == "video"), None)
-    audio_stream = next((s for s in streams if s.get("codec_type") == "audio"), None)
-
-    if not video_stream or not audio_stream:
-        print("ERROR: File must have both video and audio streams")
-        return 1
-
+def print_video_info(
+    original_size: int,
+    duration: float,
+    video_stream: dict,
+    audio_stream: dict,
+) -> int:
+    """Print video info and return audio bitrate."""
     video_bitrate = int(video_stream.get("bit_rate", 0))
     audio_bitrate = int(audio_stream.get("bit_rate", 0))
     width = video_stream.get("width", 0)
     height = video_stream.get("height", 0)
-    fps = eval(video_stream.get("r_frame_rate", "0/1"))  # e.g., "30/1"
+    fps = parse_frame_rate(video_stream.get("r_frame_rate", "0/1"))
 
     print(f"  Size: {format_size(original_size)}")
     print(f"  Duration: {duration:.1f}s ({duration/60:.1f} min)")
     print(f"  Video: {width}x{height} @ {fps:.0f}fps, {video_bitrate/1000:.0f} kbps")
     print(f"  Audio: {audio_stream.get('codec_name', 'unknown')} @ {audio_bitrate/1000:.0f} kbps")
     print()
+    return audio_bitrate
 
-    # Estimate savings (assume ~20kbps for static image video)
+
+def print_estimated_savings(original_size: int, audio_bitrate: int, duration: float) -> None:
+    """Print estimated savings."""
     estimated_video_bitrate = 20000  # 20 kbps for stillimage
     estimated_new_size = int((estimated_video_bitrate + audio_bitrate) * duration / 8)
     estimated_savings = original_size - estimated_new_size
     estimated_savings_pct = (estimated_savings / original_size) * 100
-
     print(f"Estimated savings: {format_size(estimated_savings)} ({estimated_savings_pct:.0f}%)")
     print()
 
-    if args.dry_run:
-        print("[DRY-RUN] Would optimize this file")
-        return 0
 
-    # Process
+def process_video(
+    file_path: Path,
+    cover_path: Path,
+    duration: float,
+    original_size: int,
+    backup: bool,
+) -> bool:
+    """Process video: repackage, verify, and replace original."""
     with tempfile.TemporaryDirectory() as temp_dir:
-        temp_path = Path(temp_dir)
-        frame_path = temp_path / "frame.jpg"
-        output_path = temp_path / "optimized.mp4"
+        output_path = Path(temp_dir) / "optimized.mp4"
 
-        # Extract frame (default to middle of video)
-        frame_timestamp = args.frame_at if args.frame_at is not None else duration / 2
-        print(f"Extracting frame at {frame_timestamp:.1f}s...")
-        if not extract_frame(file_path, frame_path, frame_timestamp):
-            print("ERROR: Failed to extract frame")
-            return 1
-        print(f"  Frame size: {format_size(frame_path.stat().st_size)}")
-
-        # Repackage
         print("Repackaging video...")
-        if not repackage_video(file_path, frame_path, output_path, duration):
+        if not repackage_video(file_path, cover_path, output_path, duration):
             print("ERROR: Failed to repackage video")
-            return 1
+            return False
 
-        # Verify
         print("Verifying output...")
         valid, msg = verify_output(output_path)
         if not valid:
             print(f"ERROR: {msg}")
-            return 1
+            return False
 
         new_size = output_path.stat().st_size
         actual_savings = original_size - new_size
@@ -254,8 +227,7 @@ def main() -> int:
         print(f"  Saved:    {format_size(actual_savings)} ({actual_savings_pct:.1f}%)")
         print()
 
-        # Replace original
-        if args.backup:
+        if backup:
             backup_path = file_path.with_suffix(".original.mp4")
             print(f"Backing up to: {backup_path.name}")
             shutil.move(file_path, backup_path)
@@ -268,8 +240,72 @@ def main() -> int:
 
         print()
         print("Done! Run a Stashapp scan to update metadata.")
+    return True
 
-    return 0
+
+def extract_cover_and_process(
+    file_path: Path,
+    duration: float,
+    original_size: int,
+    frame_at: float | None,
+    backup: bool,
+) -> bool:
+    """Extract cover image and process video."""
+    frame_timestamp = frame_at if frame_at is not None else duration / 2
+    cover_path = file_path.with_suffix(".cover.png")
+
+    print(f"Extracting cover image at {frame_timestamp:.1f}s...")
+    if not extract_frame_png(file_path, cover_path, frame_timestamp):
+        print("ERROR: Failed to extract cover image")
+        return False
+    print(f"  Cover saved: {cover_path.name} ({format_size(cover_path.stat().st_size)})")
+
+    return process_video(file_path, cover_path, duration, original_size, backup)
+
+
+def main() -> int:
+    """Main entry point."""
+    args = parse_args()
+    file_path = args.file.resolve()
+
+    if not file_path.exists():
+        print(f"ERROR: File not found: {file_path}")
+        return 1
+
+    print(f"File: {file_path.name}")
+    print(f"Path: {file_path.parent}")
+    print()
+
+    print("Analyzing video...")
+    try:
+        data = analyze_video(file_path)
+    except subprocess.CalledProcessError as e:
+        print(f"ERROR: Failed to analyze video: {e}")
+        return 1
+
+    format_info = data.get("format", {})
+    streams = data.get("streams", [])
+    duration = float(format_info.get("duration", 0))
+    original_size = int(format_info.get("size", 0))
+
+    video_stream = next((s for s in streams if s.get("codec_type") == "video"), None)
+    audio_stream = next((s for s in streams if s.get("codec_type") == "audio"), None)
+
+    if not video_stream or not audio_stream:
+        print("ERROR: File must have both video and audio streams")
+        return 1
+
+    audio_bitrate = print_video_info(original_size, duration, video_stream, audio_stream)
+    print_estimated_savings(original_size, audio_bitrate, duration)
+
+    if args.dry_run:
+        print("[DRY-RUN] Would optimize this file")
+        return 0
+
+    success = extract_cover_and_process(
+        file_path, duration, original_size, args.frame_at, args.backup
+    )
+    return 0 if success else 1
 
 
 if __name__ == "__main__":
