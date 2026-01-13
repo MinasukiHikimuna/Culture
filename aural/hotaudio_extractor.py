@@ -516,10 +516,24 @@ class HotAudioExtractor:
                 # Wait for all segments to be covered by keys
                 playback_speed = 4.0
                 start_time = time.time()
-                last_time_info = None
-                stall_count = 0
+                last_playback_secs = 0
+                slow_progress_count = 0
                 reload_attempts = 0
                 max_reload_attempts = 3
+
+                def parse_time_info(time_str: str) -> tuple[int, int] | None:
+                    """Parse 'MM:SS / MM:SS' format to (current_secs, total_secs)."""
+                    if " / " not in time_str:
+                        return None
+                    try:
+                        current_str, total_str = time_str.split(" / ")
+                        current_parts = current_str.strip().split(":")
+                        total_parts = total_str.strip().split(":")
+                        current_secs = int(current_parts[0]) * 60 + int(current_parts[1])
+                        total_secs = int(total_parts[0]) * 60 + int(total_parts[1])
+                        return current_secs, total_secs
+                    except (ValueError, IndexError):
+                        return None
 
                 print(f"  Collecting keys at {playback_speed}x speed...")
 
@@ -560,84 +574,81 @@ class HotAudioExtractor:
                         print("  All segments covered!")
                         break
 
-                    # Detect playback stall (same position for 3+ checks = 30s)
-                    if time_info == last_time_info:
-                        stall_count += 1
-                        if stall_count == 3:
-                            # Try clicking play first
-                            print("  Playback stalled, attempting to resume...")
-                            play_button = await page.query_selector("#player-playpause")
-                            if play_button:
-                                await play_button.click()
-                                await page.wait_for_timeout(1000)
-                                await play_button.click()
-                        elif stall_count >= 6:
-                            # Play click didn't help, reload the page
-                            reload_attempts += 1
-                            if reload_attempts >= max_reload_attempts:
-                                print(f"  Extraction failed after {max_reload_attempts} reload attempts")
-                                break
-                            print(f"  Reloading page (attempt {reload_attempts}/{max_reload_attempts})...")
-                            await page.reload(wait_until="networkidle", timeout=60000)
-                            await page.wait_for_selector("#player-playpause", timeout=10000)
-                            await page.evaluate('document.querySelector("#player-volume").value = 0')
-                            play_button = await page.query_selector("#player-playpause")
-                            if play_button:
-                                await play_button.click()
-                                await page.wait_for_timeout(1000)
-                            # Re-select the track we were working on
-                            track_elements = await page.query_selector_all(".track-item, .playlist-item, [data-track-index]")
-                            if i < len(track_elements):
-                                await track_elements[i].click()
-                                await page.wait_for_timeout(2000)
-                            # Set 4x playback speed
-                            await page.evaluate(
+                    # Parse current playback position
+                    parsed = parse_time_info(time_info)
+                    if parsed:
+                        current_secs, total_secs = parsed
+
+                        # Check if playback reached the end
+                        if current_secs >= total_secs:
+                            print("  Playback ended, waiting 10s for final keys...")
+                            await page.wait_for_timeout(10000)
+                            # Flush final keys
+                            pending_keys = await page.evaluate(
                                 """() => {
-                                const speedOptions = document.querySelectorAll('.speed-option');
-                                speedOptions.forEach(opt => {
-                                    if (opt.textContent.trim() === '2.0x' || opt.textContent.trim() === '4.0x') {
-                                        opt.textContent = '4.0x';
-                                        speedOptions.forEach(o => o.classList.remove('bg-slate-600'));
-                                        opt.classList.add('bg-slate-600');
-                                        opt.click();
-                                    }
-                                });
+                                const pending = window.__pendingKeyCaptures || [];
+                                window.__pendingKeyCaptures = [];
+                                return pending;
                             }"""
                             )
-                            stall_count = 0
-                            last_time_info = None
-                            continue
-                    else:
-                        stall_count = 0
-                    last_time_info = time_info
+                            for keys in pending_keys:
+                                self.captured_data["segment_keys"].update(keys)
+                            print("  Playback completed")
+                            break
 
-                    # Check if playback has reached the end
-                    # Format: "25:56 / 29:10" -> current / total
-                    if " / " in time_info:
-                        try:
-                            current_str, total_str = time_info.split(" / ")
-                            current_parts = current_str.strip().split(":")
-                            total_parts = total_str.strip().split(":")
-                            current_secs = int(current_parts[0]) * 60 + int(current_parts[1])
-                            total_secs = int(total_parts[0]) * 60 + int(total_parts[1])
-                            # If playback reached the end, wait for final keys
-                            if current_secs >= total_secs:
-                                print("  Playback ended, waiting 10s for final keys...")
-                                await page.wait_for_timeout(10000)
-                                # Flush final keys
-                                pending_keys = await page.evaluate(
+                        # Detect slow progress: at 4x speed, expect ~40s progress per 10s real time
+                        # Be lenient: consider it slow if < 10s progress per 10s check (less than 1x)
+                        progress = current_secs - last_playback_secs
+                        if progress < 10:
+                            slow_progress_count += 1
+                            if slow_progress_count == 2:
+                                # Try clicking play to resume
+                                print("  Slow progress detected, attempting to resume...")
+                                play_button = await page.query_selector("#player-playpause")
+                                if play_button:
+                                    await play_button.click()
+                                    await page.wait_for_timeout(1000)
+                                    await play_button.click()
+                            elif slow_progress_count >= 5:
+                                # Resume clicks aren't helping, reload the page
+                                reload_attempts += 1
+                                if reload_attempts >= max_reload_attempts:
+                                    print(f"  Extraction failed after {max_reload_attempts} reload attempts")
+                                    break
+                                print(f"  Reloading page (attempt {reload_attempts}/{max_reload_attempts})...")
+                                await page.reload(wait_until="networkidle", timeout=60000)
+                                await page.wait_for_selector("#player-playpause", timeout=10000)
+                                await page.evaluate('document.querySelector("#player-volume").value = 0')
+                                play_button = await page.query_selector("#player-playpause")
+                                if play_button:
+                                    await play_button.click()
+                                    await page.wait_for_timeout(1000)
+                                # Re-select the track we were working on
+                                selector = ".track-item, .playlist-item, [data-track-index]"
+                                track_elements = await page.query_selector_all(selector)
+                                if i < len(track_elements):
+                                    await track_elements[i].click()
+                                    await page.wait_for_timeout(2000)
+                                # Set 4x playback speed
+                                await page.evaluate(
                                     """() => {
-                                    const pending = window.__pendingKeyCaptures || [];
-                                    window.__pendingKeyCaptures = [];
-                                    return pending;
+                                    const speedOptions = document.querySelectorAll('.speed-option');
+                                    speedOptions.forEach(opt => {
+                                        if (opt.textContent.trim() === '2.0x' || opt.textContent.trim() === '4.0x') {
+                                            opt.textContent = '4.0x';
+                                            speedOptions.forEach(o => o.classList.remove('bg-slate-600'));
+                                            opt.classList.add('bg-slate-600');
+                                            opt.click();
+                                        }
+                                    });
                                 }"""
                                 )
-                                for keys in pending_keys:
-                                    self.captured_data["segment_keys"].update(keys)
-                                print("  Playback completed")
-                                break
-                        except (ValueError, IndexError):
-                            pass  # Parsing failed, continue with timeout
+                                slow_progress_count = 0
+                                # Don't update last_playback_secs - keep tracking from before reload
+                                continue
+                        else:
+                            slow_progress_count = 0
+                        last_playback_secs = current_secs
 
                 # Final key flush
                 pending_keys = await page.evaluate(
@@ -1210,10 +1221,24 @@ class HotAudioExtractor:
                         await set_playback_speed(playback_speed)
 
                     start_time = time.time()
-                    last_time_info = None
-                    stall_count = 0
+                    last_playback_secs = 0
+                    slow_progress_count = 0
                     reload_attempts = 0
                     max_reload_attempts = 3
+
+                    def parse_time_info(time_str: str) -> tuple[int, int] | None:
+                        """Parse 'MM:SS / MM:SS' format to (current_secs, total_secs)."""
+                        if " / " not in time_str:
+                            return None
+                        try:
+                            current_str, total_str = time_str.split(" / ")
+                            current_parts = current_str.strip().split(":")
+                            total_parts = total_str.strip().split(":")
+                            current_secs = int(current_parts[0]) * 60 + int(current_parts[1])
+                            total_secs = int(total_parts[0]) * 60 + int(total_parts[1])
+                            return current_secs, total_secs
+                        except (ValueError, IndexError):
+                            return None
 
                     while True:
                         await page.wait_for_timeout(10000)  # Check every 10 seconds
@@ -1243,57 +1268,53 @@ class HotAudioExtractor:
                             print("  All segments covered!")
                             break
 
-                        # Detect playback stall (same position for 3+ checks = 30s)
-                        if time_info == last_time_info:
-                            stall_count += 1
-                            if stall_count == 3:
-                                # Try clicking play first
-                                print("  Playback stalled, attempting to resume...")
-                                play_button = await page.query_selector("#player-playpause")
-                                if play_button:
-                                    await play_button.click()
-                                    await page.wait_for_timeout(1000)
-                                    await play_button.click()
-                            elif stall_count >= 6:
-                                # Play click didn't help, reload the page
-                                reload_attempts += 1
-                                if reload_attempts >= max_reload_attempts:
-                                    print(f"  Extraction failed after {max_reload_attempts} reload attempts")
-                                    break
-                                print(f"  Reloading page (attempt {reload_attempts}/{max_reload_attempts})...")
-                                await page.reload(wait_until="networkidle", timeout=60000)
-                                await page.wait_for_selector("#player-playpause", timeout=10000)
-                                await page.evaluate('document.querySelector("#player-volume").value = 0')
-                                play_button = await page.query_selector("#player-playpause")
-                                if play_button:
-                                    await play_button.click()
-                                    await page.wait_for_timeout(1000)
-                                    await set_playback_speed(playback_speed)
-                                stall_count = 0
-                                last_time_info = None
-                                continue
-                        else:
-                            stall_count = 0
-                        last_time_info = time_info
+                        # Parse current playback position
+                        parsed = parse_time_info(time_info)
+                        if parsed:
+                            current_secs, total_secs = parsed
 
-                        # Check if playback has reached the end
-                        # Format: "25:56 / 29:10" -> current / total
-                        if " / " in time_info:
-                            try:
-                                current_str, total_str = time_info.split(" / ")
-                                current_parts = current_str.strip().split(":")
-                                total_parts = total_str.strip().split(":")
-                                current_secs = int(current_parts[0]) * 60 + int(current_parts[1])
-                                total_secs = int(total_parts[0]) * 60 + int(total_parts[1])
-                                # If playback reached the end, wait for final keys
-                                if current_secs >= total_secs:
-                                    print("  Playback ended, waiting 10s for final keys...")
-                                    await page.wait_for_timeout(10000)
-                                    await flush_captured_keys()
-                                    print("  Playback completed")
-                                    break
-                            except (ValueError, IndexError):
-                                pass  # Parsing failed, continue with timeout
+                            # Check if playback reached the end
+                            if current_secs >= total_secs:
+                                print("  Playback ended, waiting 10s for final keys...")
+                                await page.wait_for_timeout(10000)
+                                await flush_captured_keys()
+                                print("  Playback completed")
+                                break
+
+                            # Detect slow progress: at 4x speed, expect ~40s progress per 10s real time
+                            # Be lenient: consider it slow if < 10s progress per 10s check (less than 1x)
+                            progress = current_secs - last_playback_secs
+                            if progress < 10:
+                                slow_progress_count += 1
+                                if slow_progress_count == 2:
+                                    # Try clicking play to resume
+                                    print("  Slow progress detected, attempting to resume...")
+                                    play_button = await page.query_selector("#player-playpause")
+                                    if play_button:
+                                        await play_button.click()
+                                        await page.wait_for_timeout(1000)
+                                        await play_button.click()
+                                elif slow_progress_count >= 5:
+                                    # Resume clicks aren't helping, reload the page
+                                    reload_attempts += 1
+                                    if reload_attempts >= max_reload_attempts:
+                                        print(f"  Extraction failed after {max_reload_attempts} reload attempts")
+                                        break
+                                    print(f"  Reloading page (attempt {reload_attempts}/{max_reload_attempts})...")
+                                    await page.reload(wait_until="networkidle", timeout=60000)
+                                    await page.wait_for_selector("#player-playpause", timeout=10000)
+                                    await page.evaluate('document.querySelector("#player-volume").value = 0')
+                                    play_button = await page.query_selector("#player-playpause")
+                                    if play_button:
+                                        await play_button.click()
+                                        await page.wait_for_timeout(1000)
+                                        await set_playback_speed(playback_speed)
+                                    slow_progress_count = 0
+                                    # Don't update last_playback_secs - keep tracking from before reload
+                                    continue
+                            else:
+                                slow_progress_count = 0
+                            last_playback_secs = current_secs
 
                     final_uncovered = find_uncovered_segments(estimated_segments)
                     print(
