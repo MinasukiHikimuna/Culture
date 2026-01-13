@@ -35,7 +35,8 @@
       "Bash(uv run ruff:*)",
       "Skill(stashapp-check)",
       "Skill(stashapp-schema)",
-      "Bash(tee:*)"
+      "Bash(tee:*)",
+      "WebFetch(domain:github.com)"
     ],
     "deny": []
   }
