@@ -129,6 +129,38 @@ Return this exact JSON structure:
             print(f"Failed to parse CYOA detection response: {response_text}")
             raise ValueError(f"Invalid JSON response from LLM: {e}")
 
+    def _extract_audio_urls_from_text(self, text: str) -> list[dict]:
+        """Pre-extract all audio platform URLs from text to prevent LLM hallucination."""
+        audio_platforms = {
+            "soundgasm.net": "Soundgasm",
+            "whyp.it": "Whypit",
+            "hotaudio.net": "HotAudio",
+            "audiochan.com": "Audiochan",
+        }
+
+        # Match URLs in markdown links [text](url) and bare URLs
+        url_pattern = r"https?://(?:www\.)?(" + "|".join(
+            re.escape(domain) for domain in audio_platforms
+        ) + r')[^\s\)\]"<>]*'
+
+        urls = []
+        seen = set()
+        for match in re.finditer(url_pattern, text, re.IGNORECASE):
+            url = match.group(0)
+            # Clean up trailing punctuation that might have been captured
+            url = url.rstrip(".,;:!?")
+            if url not in seen:
+                seen.add(url)
+                # Determine platform from URL
+                platform = "Unknown"
+                for domain, name in audio_platforms.items():
+                    if domain in url.lower():
+                        platform = name
+                        break
+                urls.append({"url": url, "platform": platform, "index": len(urls)})
+
+        return urls
+
     def create_metadata_extraction_prompt(self, post_data: dict) -> str:
         """Creates a comprehensive metadata extraction prompt."""
         reddit_data = post_data["reddit_data"]
@@ -137,6 +169,25 @@ Return this exact JSON structure:
         author = reddit_data["author"]
         link_flair_text = reddit_data.get("link_flair_text") or "No flair"
 
+        # Pre-extract URLs to prevent LLM hallucination
+        pre_extracted_urls = self._extract_audio_urls_from_text(selftext)
+        self._last_extracted_urls = pre_extracted_urls  # Store for validation
+
+        # Format pre-extracted URLs for the prompt
+        if pre_extracted_urls:
+            urls_list = "\n".join(
+                f"  [{u['index']}] {u['platform']}: {u['url']}"
+                for u in pre_extracted_urls
+            )
+            urls_section = f"""
+PRE-EXTRACTED AUDIO URLs (use these EXACT URLs, do NOT modify them):
+{urls_list}
+
+CRITICAL: When creating audio_versions, you MUST use the EXACT URLs listed above.
+Do NOT retype, modify, truncate, or reconstruct URLs. Copy them exactly as shown."""
+        else:
+            urls_section = "\nNo audio platform URLs detected in post body."
+
         return f"""Extract metadata from this Reddit post from r/gonewildaudio.
 
 CRITICAL: Respond with ONLY valid JSON. No explanations or reasoning.
@@ -144,6 +195,7 @@ CRITICAL: Respond with ONLY valid JSON. No explanations or reasoning.
 POST AUTHOR (the person who posted this): {author}
 TITLE: {title}
 FLAIR: {link_flair_text}
+{urls_section}
 
 POST BODY:
 {selftext}
@@ -375,9 +427,9 @@ Return JSON:
         # Common invalid escapes from LLMs: \s, \d, \w, \S, \D, \W, etc.
         # These are regex patterns that LLMs sometimes include in JSON strings
         invalid_escapes = [
-            r'\\s', r'\\S', r'\\d', r'\\D', r'\\w', r'\\W',
-            r'\\v', r'\\h', r'\\c', r'\\p', r'\\P', r'\\x',
-            r'\\[0-9]', r'\\e', r'\\a', r'\\z', r'\\Z'
+            r"\\s", r"\\S", r"\\d", r"\\D", r"\\w", r"\\W",
+            r"\\v", r"\\h", r"\\c", r"\\p", r"\\P", r"\\x",
+            r"\\[0-9]", r"\\e", r"\\a", r"\\z", r"\\Z"
         ]
 
         # Replace invalid escapes with their literal character representation
@@ -386,22 +438,22 @@ Return JSON:
             # Only replace if it's not already properly escaped (i.e., not \\\\s)
             repaired = re.sub(
                 pattern,
-                lambda m: m.group(0).replace('\\', ''),
+                lambda m: m.group(0).replace("\\", ""),
                 repaired
             )
 
         # Step 2: Fix common comma issues in arrays/objects
         # Missing comma between array elements: "] [" -> "], ["
-        repaired = re.sub(r'\]\s*\[', '], [', repaired)
+        repaired = re.sub(r"\]\s*\[", "], [", repaired)
 
         # Missing comma between object elements: "} {" -> "}, {"
-        repaired = re.sub(r'\}\s*\{', '}, {', repaired)
+        repaired = re.sub(r"\}\s*\{", "}, {", repaired)
 
         # Missing comma after closing bracket before opening brace: "] {" -> "], {"
-        repaired = re.sub(r'\]\s*\{', '], {', repaired)
+        repaired = re.sub(r"\]\s*\{", "], {", repaired)
 
         # Missing comma after closing brace before opening bracket: "} [" -> "}, ["
-        repaired = re.sub(r'\}\s*\[', '}, [', repaired)
+        repaired = re.sub(r"\}\s*\[", "}, [", repaired)
 
         # Missing comma between string value and next key: `"value" "key"` -> `"value", "key"`
         repaired = re.sub(r'"\s+"([a-zA-Z_])', r'", "\1', repaired)
@@ -436,6 +488,69 @@ Return JSON:
 
         return repaired
 
+    def _validate_and_fix_urls(self, parsed: dict) -> dict:
+        """Validate and fix URLs in parsed response against pre-extracted URLs."""
+        if not hasattr(self, "_last_extracted_urls") or not self._last_extracted_urls:
+            return parsed
+
+        valid_urls = {u["url"] for u in self._last_extracted_urls}
+        valid_urls_lower = {u["url"].lower(): u["url"] for u in self._last_extracted_urls}
+
+        def find_best_match(llm_url: str) -> str | None:
+            """Find the best matching pre-extracted URL for an LLM-provided URL."""
+            # Exact match
+            if llm_url in valid_urls:
+                return llm_url
+
+            # Case-insensitive match
+            if llm_url.lower() in valid_urls_lower:
+                return valid_urls_lower[llm_url.lower()]
+
+            # Prefix match (LLM truncated the URL)
+            llm_lower = llm_url.lower().rstrip("/")
+            for original in self._last_extracted_urls:
+                original_lower = original["url"].lower().rstrip("/")
+                if original_lower.startswith(llm_lower) or llm_lower.startswith(original_lower):
+                    return original["url"]
+
+            # Fuzzy match: find URL with longest common prefix
+            best_match = None
+            best_score = 0
+            for original in self._last_extracted_urls:
+                # Calculate common prefix length
+                original_lower = original["url"].lower()
+                common_len = 0
+                for i, (a, b) in enumerate(zip(llm_lower, original_lower, strict=False)):
+                    if a == b:
+                        common_len = i + 1
+                    else:
+                        break
+                # Require at least matching the domain and user path
+                if common_len > best_score and common_len > 40:
+                    best_score = common_len
+                    best_match = original["url"]
+
+            return best_match
+
+        # Fix URLs in audio_versions
+        fixed_count = 0
+        for version in parsed.get("audio_versions", []):
+            for url_entry in version.get("urls", []):
+                llm_url = url_entry.get("url", "")
+                if llm_url and llm_url not in valid_urls:
+                    fixed_url = find_best_match(llm_url)
+                    if fixed_url:
+                        print(f"  URL fix: {llm_url[:60]}... -> {fixed_url[:60]}...")
+                        url_entry["url"] = fixed_url
+                        fixed_count += 1
+                    else:
+                        print(f"  WARNING: Could not match LLM URL to pre-extracted: {llm_url}")
+
+        if fixed_count > 0:
+            print(f"  Fixed {fixed_count} hallucinated URL(s)")
+
+        return parsed
+
     def parse_response(self, response_text: str) -> dict:
         """Parses and validates the LLM response."""
         try:
@@ -466,6 +581,9 @@ Return JSON:
                 raise ValueError("Missing required field: audio_versions")
             if "series" not in parsed:
                 raise ValueError("Missing required field: series")
+
+            # Validate and fix URLs against pre-extracted URLs
+            parsed = self._validate_and_fix_urls(parsed)
 
             return parsed
         except Exception as e:
