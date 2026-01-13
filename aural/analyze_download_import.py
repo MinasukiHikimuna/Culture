@@ -20,10 +20,10 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-import httpx
-
 import config as aural_config
+import httpx
 from analyze_reddit_post import EnhancedRedditPostAnalyzer
+from exceptions import LMStudioUnavailableError, StashappUnavailableError
 from platform_availability import PlatformAvailabilityTracker
 from release_orchestrator import ReleaseOrchestrator
 from stashapp_importer import STASH_BASE_URL, StashappImporter, StashScanStuckError
@@ -376,6 +376,9 @@ class AnalyzeDownloadImportPipeline:
                 "analysisFile": str(analysis_file_path),
             }
 
+        except LMStudioUnavailableError:
+            # Re-raise mandatory resource errors to abort processing
+            raise
         except Exception as e:
             print(f"  Analysis failed for {post_file_path}: {e}")
             return {
@@ -558,8 +561,8 @@ class AnalyzeDownloadImportPipeline:
                 print(f"  Stashapp import failed: {result.get('error')}")
                 return {"success": False, "error": result.get("error")}
 
-        except StashScanStuckError:
-            # Let this propagate up to abort the batch
+        except (StashScanStuckError, StashappUnavailableError):
+            # Let mandatory resource errors propagate up to abort the batch
             raise
 
         except Exception as e:
