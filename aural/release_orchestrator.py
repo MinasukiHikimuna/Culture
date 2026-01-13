@@ -213,7 +213,8 @@ class ReleaseOrchestrator:
         self.active_extractors: dict[str, Any] = {}
 
         # Platform priority for selecting preferred audio source
-        self.platform_priority = ["soundgasm", "whypit", "hotaudio", "erocast", "audiochan"]
+        # HotAudio is last because it requires slow encryption key capture
+        self.platform_priority = ["soundgasm", "whypit", "erocast", "audiochan", "hotaudio"]
 
     def register_extractor(self, platform: str, config: dict):
         """Register a platform extractor."""
