@@ -802,6 +802,26 @@ def match_tags_with_stash(
     return matched_tag_ids
 
 
+def get_media_duration(file_path: Path) -> float | None:
+    """Get duration of audio/video file using ffprobe."""
+    try:
+        result = subprocess.run(
+            [
+                "ffprobe",
+                "-v", "error",
+                "-show_entries", "format=duration",
+                "-of", "default=noprint_wrappers=1:nokey=1",
+                str(file_path),
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return float(result.stdout.strip())
+    except (subprocess.CalledProcessError, ValueError):
+        return None
+
+
 def convert_audio_to_video(audio_path: Path, output_path: Path) -> bool:
     """Convert audio file to video with static image using ffmpeg."""
     static_image = STATIC_IMAGE
@@ -1013,10 +1033,31 @@ class StashappImporter:
 
             print(f"  Output: {output_filename}")
 
-            # Convert audio to video
+            # Convert audio to video (validate existing files for self-healing)
+            needs_conversion = True
+
             if output_path.exists():
-                print("  Video already exists, skipping conversion")
-            else:
+                # Validate video duration matches source audio
+                audio_duration = get_media_duration(audio_path)
+                video_duration = get_media_duration(output_path)
+
+                if audio_duration and video_duration:
+                    # Allow 1 second tolerance for encoding differences
+                    if abs(audio_duration - video_duration) <= 1.0:
+                        print("  Video already exists, skipping conversion")
+                        needs_conversion = False
+                    else:
+                        print(
+                            f"  Video duration mismatch "
+                            f"(audio: {audio_duration:.1f}s, video: {video_duration:.1f}s), "
+                            "re-converting..."
+                        )
+                        output_path.unlink()
+                else:
+                    print("  Video file invalid, re-converting...")
+                    output_path.unlink()
+
+            if needs_conversion:
                 success = convert_audio_to_video(audio_path, output_path)
                 if not success:
                     print("  Error: Failed to convert audio to video")
