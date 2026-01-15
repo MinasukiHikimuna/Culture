@@ -18,9 +18,9 @@ import re
 import sys
 from pathlib import Path
 
+from analyze_download_import import AnalyzeDownloadImportPipeline
 from config import REDDIT_INDEX_DIR
 from reddit_extractor import RedditExtractor
-from analyze_download_import import AnalyzeDownloadImportPipeline
 from stashapp_importer import StashScanStuckError
 
 
@@ -50,7 +50,9 @@ def extract_post_id_from_url(url: str) -> str | None:
     return None
 
 
-def find_legacy_sidecars(directory: Path) -> list[tuple[Path, Path | None]]:
+def find_legacy_sidecars(
+    directory: Path, filter_author: str | None = None
+) -> list[tuple[Path, Path | None]]:
     """
     Find all JSON sidecar files and their corresponding MP4 files.
 
@@ -59,6 +61,16 @@ def find_legacy_sidecars(directory: Path) -> list[tuple[Path, Path | None]]:
     sidecars = []
 
     for json_file in directory.glob("*.json"):
+        # Filter by author if specified
+        if filter_author:
+            try:
+                data = json.loads(json_file.read_text(encoding="utf-8"))
+                author = data.get("author", "")
+                if author.lower() != filter_author.lower():
+                    continue
+            except (json.JSONDecodeError, OSError):
+                continue
+
         # Find corresponding MP4 (same name, different extension)
         mp4_file = json_file.with_suffix(".mp4")
         if mp4_file.exists():
@@ -103,6 +115,7 @@ def process_legacy_sidecars(
     limit: int | None = None,
     skip_import: bool = False,
     verbose: bool = False,
+    filter_author: str | None = None,
 ) -> dict:
     """
     Process all legacy JSON sidecars in a directory.
@@ -126,7 +139,7 @@ def process_legacy_sidecars(
     }
 
     # Find all sidecar files
-    sidecars = find_legacy_sidecars(directory)
+    sidecars = find_legacy_sidecars(directory, filter_author=filter_author)
     total = len(sidecars)
 
     if limit:
@@ -167,7 +180,7 @@ def process_legacy_sidecars(
                     break
 
             if not reddit_url:
-                print(f"  No Reddit URL found in sidecar")
+                print("  No Reddit URL found in sidecar")
                 results["failed"].append({
                     "file": str(json_path),
                     "error": "No Reddit URL in sidecar",
@@ -208,7 +221,7 @@ def process_legacy_sidecars(
                 reddit_data = extractor.get_post_data(post_id)
 
                 if not reddit_data:
-                    print(f"  Failed to fetch Reddit post (may be deleted)")
+                    print("  Failed to fetch Reddit post (may be deleted)")
                     results["failed"].append({
                         "file": str(json_path),
                         "error": "Failed to fetch Reddit post",
@@ -230,7 +243,7 @@ def process_legacy_sidecars(
                 post_json_path = find_extracted_post(actual_author, post_id, REDDIT_INDEX_DIR)
 
                 if not post_json_path:
-                    print(f"  Could not find saved post file")
+                    print("  Could not find saved post file")
                     results["failed"].append({
                         "file": str(json_path),
                         "error": "Could not find saved post file after extraction",
@@ -250,7 +263,7 @@ def process_legacy_sidecars(
 
                 # Cleanup legacy files on success
                 if result.get("stashSceneId") and not result.get("skipped"):
-                    print(f"  Cleaning up legacy files...")
+                    print("  Cleaning up legacy files...")
 
                     # Delete MP4
                     if mp4_path and mp4_path.exists():
@@ -377,6 +390,10 @@ Examples:
         action="store_true",
         help="Show detailed progress",
     )
+    parser.add_argument(
+        "--author",
+        help="Filter to files from specific author",
+    )
 
     args = parser.parse_args()
 
@@ -396,6 +413,7 @@ Examples:
             limit=args.limit,
             skip_import=args.skip_import,
             verbose=args.verbose,
+            filter_author=args.author,
         )
 
         # Return appropriate exit code
