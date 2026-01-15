@@ -103,6 +103,24 @@ def parse_legacy_filename(filename: str) -> tuple[list[str], str]:
     return authors, title_part.strip()
 
 
+def extract_part_number(title: str) -> int | None:
+    """
+    Extract part number from a title if present.
+
+    Matches patterns like:
+    - "Part 1", "Part 2", "part 3"
+    - "Part 1:", "Part 1 -"
+    - "Pt 1", "Pt. 2"
+
+    Returns None if no part number found.
+    """
+    # Match "part N" or "pt N" or "pt. N" patterns
+    match = re.search(r"\b(?:part|pt\.?)\s*(\d+)\b", title, re.IGNORECASE)
+    if match:
+        return int(match.group(1))
+    return None
+
+
 def clean_title_for_matching(title: str) -> str:
     """
     Clean a title for fuzzy matching by removing tags and normalizing.
@@ -226,6 +244,7 @@ def find_best_matches(
     """Find the best Reddit post matches for a legacy file."""
     matches = []
     clean_legacy = clean_title_for_matching(legacy_file.title)
+    legacy_part = extract_part_number(legacy_file.title)
 
     # Collect candidate posts from all authors
     candidate_posts: list[RedditPost] = []
@@ -240,6 +259,25 @@ def find_best_matches(
     # Score each candidate
     for post in candidate_posts:
         clean_reddit = clean_title_for_matching(post.full_title)
+        reddit_part = extract_part_number(post.full_title)
+
+        # Check part number compatibility
+        # If both have part numbers, they must match
+        if (
+            legacy_part is not None
+            and reddit_part is not None
+            and legacy_part != reddit_part
+        ):
+            # Part numbers conflict - skip this candidate entirely
+            continue
+
+        # If legacy has a part number but Reddit doesn't (or vice versa),
+        # this is likely a mismatch (e.g., "Part 1" file vs original post)
+        part_mismatch_penalty = 0.0
+        if legacy_part is not None and reddit_part is None:
+            part_mismatch_penalty = 0.3  # Legacy expects a part, Reddit has none
+        elif legacy_part is None and reddit_part is not None:
+            part_mismatch_penalty = 0.3  # Reddit has a part, legacy doesn't
 
         # Use multiple scoring methods and take the best
         ratio = fuzz.ratio(clean_legacy, clean_reddit)
@@ -249,6 +287,9 @@ def find_best_matches(
 
         # Weight partial_ratio higher for truncated titles
         score = max(ratio, partial * 0.95, token_sort * 0.9, token_set * 0.9)
+
+        # Apply part mismatch penalty
+        score = score * (1.0 - part_mismatch_penalty)
 
         matches.append(
             Match(
