@@ -21,13 +21,14 @@ import hashlib
 import json
 import math
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import httpx
 from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
 from dotenv import load_dotenv
 from playwright.async_api import async_playwright
+
 
 # Make print flush immediately for real-time progress updates
 print = functools.partial(print, flush=True)
@@ -102,7 +103,7 @@ def parse_bencode(buffer: bytes, offset: int = 0) -> tuple:
             result[key] = value
         return result, offset + 1
 
-    elif char == "i":
+    if char == "i":
         offset += 1
         num_str = ""
         while chr(buffer[offset]) != "e":
@@ -110,7 +111,7 @@ def parse_bencode(buffer: bytes, offset: int = 0) -> tuple:
             offset += 1
         return int(num_str), offset + 1
 
-    elif char.isdigit():
+    if char.isdigit():
         len_str = char
         offset += 1
         while chr(buffer[offset]) != ":":
@@ -121,7 +122,7 @@ def parse_bencode(buffer: bytes, offset: int = 0) -> tuple:
         data = buffer[offset : offset + length]
         return data, offset + length
 
-    elif char == "l":
+    if char == "l":
         result = []
         offset += 1
         while chr(buffer[offset]) != "e":
@@ -129,8 +130,7 @@ def parse_bencode(buffer: bytes, offset: int = 0) -> tuple:
             result.append(item)
         return result, offset + 1
 
-    else:
-        raise ValueError(f"Unknown bencode type at offset {offset}: {char}")
+    raise ValueError(f"Unknown bencode type at offset {offset}: {char}")
 
 
 class HotAudioExtractor:
@@ -152,12 +152,10 @@ class HotAudioExtractor:
         This method exists for interface compatibility with ReleaseOrchestrator.
         HotAudio extractor launches browser per extraction due to key capture requirements.
         """
-        pass
 
     def close_browser(self):
         """Close browser if open (sync wrapper for compatibility)."""
         # Async cleanup is handled in extract method
-        pass
 
     def ensure_rate_limit(self):
         """Ensure rate limiting between requests."""
@@ -170,6 +168,61 @@ class HotAudioExtractor:
             time.sleep(delay)
 
         self.last_request_time = time.time()
+
+    def _download_and_parse_hax(self, hax_url: str) -> tuple[bytes, dict, list[dict]]:
+        """
+        Download HAX file and parse its metadata.
+
+        Returns:
+            Tuple of (hax_buffer, metadata_dict, segments_list)
+        """
+        print("Downloading HAX file from CDN...")
+        with httpx.Client() as client:
+            response = client.get(hax_url)
+            response.raise_for_status()
+
+        hax_buffer = response.content
+        print(f"Downloaded {len(hax_buffer) / 1024:.1f} KB")
+
+        # Parse HAX header
+        magic = hax_buffer[:4].decode("utf-8")
+        if magic != "HAX0":
+            raise ValueError(f"Invalid HAX magic: {magic}")
+
+        # Find metadata start (bencode dict starts with 'd')
+        meta_start = 16
+        while meta_start < 64 and hax_buffer[meta_start] != 0x64:
+            meta_start += 1
+
+        metadata, _ = parse_bencode(hax_buffer, meta_start)
+
+        codec = (
+            metadata["codec"].decode("utf-8")
+            if isinstance(metadata["codec"], bytes)
+            else metadata["codec"]
+        )
+        print(f"  Codec: {codec}")
+        print(f"  Duration: {metadata['durationMs'] / 1000:.1f}s")
+        print(f"  Segments: {metadata['segmentCount']}")
+
+        # Parse segment table
+        segment_data = metadata["segments"]
+        segments = []
+        for i in range(metadata["segmentCount"]):
+            offset = int.from_bytes(
+                segment_data[i * 8 : i * 8 + 4], byteorder="little"
+            )
+            pts = int.from_bytes(
+                segment_data[i * 8 + 4 : i * 8 + 8], byteorder="little"
+            )
+            segments.append({"offset": offset, "pts": pts, "index": i})
+
+        # Calculate segment sizes
+        for i in range(len(segments) - 1):
+            segments[i]["size"] = segments[i + 1]["offset"] - segments[i]["offset"]
+        segments[-1]["size"] = len(hax_buffer) - segments[-1]["offset"]
+
+        return hax_buffer, metadata, segments
 
     def discover_tracks(self, url: str) -> list[dict]:
         """
@@ -340,9 +393,11 @@ class HotAudioExtractor:
 
         async def handle_route(route, request):
             req_url = request.url
-            if ".hax" in req_url or ("/a/" in req_url and "cdn.hotaudio" in req_url):
-                if req_url not in captured_hax_urls:
-                    captured_hax_urls.append(req_url)
+            is_hax_url = ".hax" in req_url or (
+                "/a/" in req_url and "cdn.hotaudio" in req_url
+            )
+            if is_hax_url and req_url not in captured_hax_urls:
+                captured_hax_urls.append(req_url)
             await route.continue_()
 
         await page.route("**/*", handle_route)
@@ -457,7 +512,20 @@ class HotAudioExtractor:
                     # Wait for key exchange to complete
                     await page.wait_for_timeout(4000)
 
-                # Get track duration to know how long to wait
+                # Download HAX file early to get actual segment count
+                track_hax_data = None
+                actual_segment_count = None
+                if len(captured_hax_urls) > hax_count_before:
+                    track_hax_url = captured_hax_urls[hax_count_before]
+                    self.captured_data["hax_url"] = track_hax_url
+                    try:
+                        track_hax_data = self._download_and_parse_hax(track_hax_url)
+                        actual_segment_count = track_hax_data[1]["segmentCount"]
+                        print(f"  Actual segment count: {actual_segment_count}")
+                    except Exception as e:
+                        print(f"  Warning: Early HAX download failed: {e}")
+
+                # Get track duration as fallback
                 track_duration = await page.evaluate(
                     """() => {
                     const progressEl = document.querySelector('#player-progress-text');
@@ -473,8 +541,11 @@ class HotAudioExtractor:
                 )
                 print(f"  Track duration: {int(track_duration // 60)}:{int(track_duration % 60):02d}")
 
-                # Estimate segment count from duration (approx 1 segment per second)
-                estimated_segments = math.ceil(track_duration)
+                # Use actual segment count if available, otherwise estimate
+                if actual_segment_count:
+                    target_segments = actual_segment_count
+                else:
+                    target_segments = math.ceil(track_duration)
 
                 # Helper to find uncovered segments using tree key derivation
                 def find_uncovered_segments(segment_count: int) -> list[int]:
@@ -553,7 +624,7 @@ class HotAudioExtractor:
 
                     # Check coverage
                     current_keys = len(self.captured_data["segment_keys"])
-                    uncovered = find_uncovered_segments(estimated_segments)
+                    uncovered = find_uncovered_segments(target_segments)
                     elapsed = int(time.time() - start_time)
 
                     # Get current playback position
@@ -564,10 +635,10 @@ class HotAudioExtractor:
                     }"""
                     )
 
-                    covered_count = estimated_segments - len(uncovered)
+                    covered_count = target_segments - len(uncovered)
                     print(
                         f"  {elapsed}s: {time_info} - {current_keys} keys, "
-                        f"{covered_count}/{estimated_segments} covered"
+                        f"{covered_count}/{target_segments} covered"
                     )
 
                     if not uncovered:
@@ -661,10 +732,10 @@ class HotAudioExtractor:
                 for keys in pending_keys:
                     self.captured_data["segment_keys"].update(keys)
 
-                final_uncovered = find_uncovered_segments(estimated_segments)
-                covered_count = estimated_segments - len(final_uncovered)
+                final_uncovered = find_uncovered_segments(target_segments)
+                covered_count = target_segments - len(final_uncovered)
                 print(f"  Captured {len(self.captured_data['segment_keys'])} keys")
-                print(f"  Coverage: {covered_count}/{estimated_segments} segments")
+                print(f"  Coverage: {covered_count}/{target_segments} segments")
 
                 # Get the current HAX URL - find the one that was loaded for this track
                 # Look for new HAX URLs captured after we switched to this track
@@ -711,7 +782,7 @@ class HotAudioExtractor:
                 # Download and decrypt this track
                 try:
                     track_result = await self._download_and_decrypt_track(
-                        output_dir, track_basename, url, track_info
+                        output_dir, track_basename, url, track_info, track_hax_data
                     )
                     track_result["trackIndex"] = i
                     track_result["trackTitle"] = track_title
@@ -731,7 +802,7 @@ class HotAudioExtractor:
                 "trackCount": len(tracks),
                 "extractedCount": sum(1 for r in results if "error" not in r),
                 "tracks": results,
-                "extractedAt": datetime.now(timezone.utc)
+                "extractedAt": datetime.now(UTC)
                 .isoformat()
                 .replace("+00:00", "Z"),
             }
@@ -755,53 +826,37 @@ class HotAudioExtractor:
             await playwright.stop()
 
     async def _download_and_decrypt_track(
-        self, output_dir: Path, basename: str, source_url: str, track_info: dict
+        self,
+        output_dir: Path,
+        basename: str,
+        source_url: str,
+        track_info: dict,
+        hax_data: tuple[bytes, dict, list[dict]] | None = None,
     ) -> dict:
-        """Download and decrypt a single track using captured data."""
-        hax_url = self.captured_data["hax_url"]
+        """Download and decrypt a single track using captured data.
+
+        Args:
+            output_dir: Directory to save output files
+            basename: Base filename for output
+            source_url: Original source URL
+            track_info: Track metadata
+            hax_data: Optional pre-downloaded (hax_buffer, metadata, segments) tuple
+        """
         segment_keys = self.captured_data["segment_keys"]
 
-        # Download HAX file
-        print("  Downloading HAX file...")
-        with httpx.Client() as client:
-            hax_response = client.get(hax_url)
-            hax_response.raise_for_status()
-
-        hax_buffer = hax_response.content
-        print(f"  Downloaded {len(hax_buffer) / 1024:.1f} KB")
-
-        # Parse HAX file
-        magic = hax_buffer[:4].decode("utf-8")
-        if magic != "HAX0":
-            raise ValueError(f"Invalid HAX magic: {magic}")
-
-        meta_start = 16
-        while meta_start < 64 and hax_buffer[meta_start] != 0x64:
-            meta_start += 1
-
-        metadata, _ = parse_bencode(hax_buffer, meta_start)
+        # Use pre-downloaded data or download now
+        if hax_data:
+            hax_buffer, metadata, segments = hax_data
+        else:
+            hax_buffer, metadata, segments = self._download_and_parse_hax(
+                self.captured_data["hax_url"]
+            )
 
         codec = (
             metadata["codec"].decode("utf-8")
             if isinstance(metadata["codec"], bytes)
             else metadata["codec"]
         )
-
-        # Parse segment table
-        segment_data = metadata["segments"]
-        segments = []
-        for i in range(metadata["segmentCount"]):
-            offset = int.from_bytes(
-                segment_data[i * 8 : i * 8 + 4], byteorder="little"
-            )
-            pts = int.from_bytes(
-                segment_data[i * 8 + 4 : i * 8 + 8], byteorder="little"
-            )
-            segments.append({"offset": offset, "pts": pts, "index": i})
-
-        for i in range(len(segments) - 1):
-            segments[i]["size"] = segments[i + 1]["offset"] - segments[i]["offset"]
-        segments[-1]["size"] = len(hax_buffer) - segments[-1]["offset"]
 
         # Decrypt segments
         print(f"  Decrypting {len(segments)} segments...")
@@ -851,7 +906,7 @@ class HotAudioExtractor:
         track_result = {
             "audio": {
                 "sourceUrl": source_url,
-                "downloadUrl": hax_url,
+                "downloadUrl": self.captured_data["hax_url"],
                 "filePath": str(output_path),
                 "format": "m4a",
                 "fileSize": len(full_audio),
@@ -1106,10 +1161,12 @@ class HotAudioExtractor:
             req_url = request.url
 
             # Capture HAX file URL from CDN (only print once per unique URL)
-            if ".hax" in req_url or ("/a/" in req_url and "cdn.hotaudio" in req_url):
-                if self.captured_data["hax_url"] != req_url:
-                    self.captured_data["hax_url"] = req_url
-                    print(f"Captured HAX URL: {req_url[:60]}...")
+            is_hax_url = ".hax" in req_url or (
+                "/a/" in req_url and "cdn.hotaudio" in req_url
+            )
+            if is_hax_url and self.captured_data["hax_url"] != req_url:
+                self.captured_data["hax_url"] = req_url
+                print(f"Captured HAX URL: {req_url[:60]}...")
 
             await route.continue_()
 
@@ -1156,7 +1213,23 @@ class HotAudioExtractor:
                 await flush_captured_keys()
                 await flush_captured_metadata()
 
-            # Get total duration from player to know how many keys we need
+            # Download HAX file early to get actual segment count
+            hax_buffer = None
+            hax_metadata = None
+            hax_segments = None
+            actual_segment_count = None
+
+            if self.captured_data["hax_url"]:
+                try:
+                    hax_buffer, hax_metadata, hax_segments = self._download_and_parse_hax(
+                        self.captured_data["hax_url"]
+                    )
+                    actual_segment_count = hax_metadata["segmentCount"]
+                except Exception as e:
+                    print(f"  Warning: Early HAX download failed: {e}")
+                    # Will retry later
+
+            # Get total duration from player as fallback
             duration = await page.evaluate(
                 """() => {
                 const progressText = document.querySelector('#player-progress-text');
@@ -1171,158 +1244,171 @@ class HotAudioExtractor:
             }"""
             )
 
+            # Use actual segment count if available, otherwise estimate from duration
+            if actual_segment_count:
+                target_segments = actual_segment_count
+                print(f"Using actual segment count: {target_segments}")
+            elif duration:
+                target_segments = math.ceil(duration)
+                print(f"Using estimated segment count: {target_segments}")
+            else:
+                target_segments = 200  # Fallback
+
             if duration:
                 minutes = int(duration // 60)
                 seconds = int(duration % 60)
                 print(f"Total duration: {minutes}:{seconds:02d}")
 
-                # For long files, let the audio play through to collect all keys
-                estimated_segments = math.ceil(duration)
+            print(f"Collecting keys for {target_segments} segments...")
 
-                if estimated_segments > 200:
-                    print(
-                        f"Long audio detected ({estimated_segments} segments). "
-                        "Collecting all keys..."
-                    )
+            # Helper to find uncovered segments
+            def find_uncovered_segments(segment_count: int) -> list[int]:
+                tree_depth = math.ceil(math.log2(segment_count))
+                segment_key_base = 1 + (1 << (tree_depth + 1))
+                keys = [int(k) for k in self.captured_data["segment_keys"]]
 
-                    # Helper to find uncovered segments
-                    def find_uncovered_segments(segment_count: int) -> list[int]:
-                        tree_depth = math.ceil(math.log2(segment_count))
-                        segment_key_base = 1 + (1 << (tree_depth + 1))
-                        keys = [int(k) for k in self.captured_data["segment_keys"]]
+                uncovered = []
+                for seg in range(segment_count):
+                    node = segment_key_base + seg
+                    n = int(math.log2(node))
+                    covered = False
 
-                        uncovered = []
-                        for seg in range(segment_count):
-                            node = segment_key_base + seg
-                            n = int(math.log2(node))
-                            covered = False
-
-                            for d in range(n + 1):
-                                ancestor = node >> (n - d)
-                                if ancestor in keys:
-                                    covered = True
-                                    break
-
-                            if not covered:
-                                uncovered.append(seg)
-                        return uncovered
-
-                    # Let the audio play at 4x speed to collect all keys
-                    playback_speed = 4.0
-                    print(f"  Letting audio play at {playback_speed}x speed to collect all keys...")
-                    print(f"  Audio duration: {minutes}:{seconds:02d}")
-
-                    # Make sure audio is playing and set 4x speed
-                    play_button = await page.query_selector("#player-playpause")
-                    if play_button:
-                        await play_button.click()
-                        await page.wait_for_timeout(1000)
-                        # Set 4x playback speed via speed menu UI hack
-                        await set_playback_speed(playback_speed)
-
-                    start_time = time.time()
-                    last_playback_secs = 0
-                    slow_progress_count = 0
-                    reload_attempts = 0
-                    max_reload_attempts = 3
-
-                    def parse_time_info(time_str: str) -> tuple[int, int] | None:
-                        """Parse 'MM:SS / MM:SS' format to (current_secs, total_secs)."""
-                        if " / " not in time_str:
-                            return None
-                        try:
-                            current_str, total_str = time_str.split(" / ")
-                            current_parts = current_str.strip().split(":")
-                            total_parts = total_str.strip().split(":")
-                            current_secs = int(current_parts[0]) * 60 + int(current_parts[1])
-                            total_secs = int(total_parts[0]) * 60 + int(total_parts[1])
-                            return current_secs, total_secs
-                        except (ValueError, IndexError):
-                            return None
-
-                    while True:
-                        await page.wait_for_timeout(10000)  # Check every 10 seconds
-
-                        # Flush any newly captured keys
-                        await flush_captured_keys()
-
-                        current_keys = len(self.captured_data["segment_keys"])
-                        uncovered = find_uncovered_segments(estimated_segments)
-                        elapsed = int(time.time() - start_time)
-
-                        # Get current playback position from the player UI
-                        time_info = await page.evaluate(
-                            """() => {
-                            const progressText = document.querySelector('#player-progress-text');
-                            return progressText ? progressText.textContent : 'unknown';
-                        }"""
-                        )
-
-                        covered_count = estimated_segments - len(uncovered)
-                        print(
-                            f"  {elapsed}s: {time_info} - {current_keys} keys, "
-                            f"{covered_count}/{estimated_segments} covered"
-                        )
-
-                        if not uncovered:
-                            print("  All segments covered!")
+                    for d in range(n + 1):
+                        ancestor = node >> (n - d)
+                        if ancestor in keys:
+                            covered = True
                             break
 
-                        # Parse current playback position
-                        parsed = parse_time_info(time_info)
-                        if parsed:
-                            current_secs, total_secs = parsed
+                    if not covered:
+                        uncovered.append(seg)
+                return uncovered
 
-                            # Check if playback reached the end
-                            if current_secs >= total_secs:
-                                print("  Playback ended, waiting 10s for final keys...")
-                                await page.wait_for_timeout(10000)
-                                await flush_captured_keys()
-                                print("  Playback completed")
+            # Let the audio play at 4x speed to collect all keys
+            playback_speed = 4.0
+            print(f"  Letting audio play at {playback_speed}x speed...")
+            if duration:
+                print(f"  Audio duration: {minutes}:{seconds:02d}")
+
+            # Make sure audio is playing and set 4x speed
+            play_button = await page.query_selector("#player-playpause")
+            if play_button:
+                await play_button.click()
+                await page.wait_for_timeout(1000)
+                # Set 4x playback speed via speed menu UI hack
+                await set_playback_speed(playback_speed)
+
+            start_time = time.time()
+            last_playback_secs = 0
+            slow_progress_count = 0
+            reload_attempts = 0
+            max_reload_attempts = 3
+
+            def parse_time_info(time_str: str) -> tuple[int, int] | None:
+                """Parse 'MM:SS / MM:SS' format to (current_secs, total_secs)."""
+                if " / " not in time_str:
+                    return None
+                try:
+                    current_str, total_str = time_str.split(" / ")
+                    current_parts = current_str.strip().split(":")
+                    total_parts = total_str.strip().split(":")
+                    current_secs = int(current_parts[0]) * 60 + int(current_parts[1])
+                    total_secs = int(total_parts[0]) * 60 + int(total_parts[1])
+                    return current_secs, total_secs
+                except (ValueError, IndexError):
+                    return None
+
+            while True:
+                await page.wait_for_timeout(10000)  # Check every 10 seconds
+
+                # Flush any newly captured keys
+                await flush_captured_keys()
+
+                current_keys = len(self.captured_data["segment_keys"])
+                uncovered = find_uncovered_segments(target_segments)
+                elapsed = int(time.time() - start_time)
+
+                # Get current playback position from the player UI
+                time_info = await page.evaluate(
+                    """() => {
+                    const progressText = document.querySelector('#player-progress-text');
+                    return progressText ? progressText.textContent : 'unknown';
+                }"""
+                )
+
+                covered_count = target_segments - len(uncovered)
+                print(
+                    f"  {elapsed}s: {time_info} - {current_keys} keys, "
+                    f"{covered_count}/{target_segments} covered"
+                )
+
+                if not uncovered:
+                    print("  All segments covered!")
+                    break
+
+                # Parse current playback position
+                parsed = parse_time_info(time_info)
+                if parsed:
+                    current_secs, total_secs = parsed
+
+                    # Check if playback reached the end
+                    if current_secs >= total_secs:
+                        print("  Playback ended, waiting 10s for final keys...")
+                        await page.wait_for_timeout(10000)
+                        await flush_captured_keys()
+                        print("  Playback completed")
+                        break
+
+                    # Detect slow progress: at 4x speed, expect ~40s progress per 10s
+                    # Be lenient: consider it slow if < 10s progress per check
+                    progress = current_secs - last_playback_secs
+                    if progress < 10:
+                        slow_progress_count += 1
+                        if slow_progress_count == 2:
+                            # Try clicking play to resume
+                            print("  Slow progress detected, attempting to resume...")
+                            play_button = await page.query_selector("#player-playpause")
+                            if play_button:
+                                await play_button.click()
+                                await page.wait_for_timeout(1000)
+                                await play_button.click()
+                        elif slow_progress_count >= 5:
+                            # Resume clicks aren't helping, reload the page
+                            reload_attempts += 1
+                            if reload_attempts >= max_reload_attempts:
+                                print(
+                                    f"  Extraction failed after "
+                                    f"{max_reload_attempts} reload attempts"
+                                )
                                 break
+                            print(
+                                f"  Reloading page "
+                                f"(attempt {reload_attempts}/{max_reload_attempts})..."
+                            )
+                            await page.reload(wait_until="networkidle", timeout=60000)
+                            await page.wait_for_selector(
+                                "#player-playpause", timeout=10000
+                            )
+                            await page.evaluate(
+                                'document.querySelector("#player-volume").value = 0'
+                            )
+                            play_button = await page.query_selector("#player-playpause")
+                            if play_button:
+                                await play_button.click()
+                                await page.wait_for_timeout(1000)
+                                await set_playback_speed(playback_speed)
+                            slow_progress_count = 0
+                            # Don't update last_playback_secs - keep tracking
+                            continue
+                    else:
+                        slow_progress_count = 0
+                    last_playback_secs = current_secs
 
-                            # Detect slow progress: at 4x speed, expect ~40s progress per 10s real time
-                            # Be lenient: consider it slow if < 10s progress per 10s check (less than 1x)
-                            progress = current_secs - last_playback_secs
-                            if progress < 10:
-                                slow_progress_count += 1
-                                if slow_progress_count == 2:
-                                    # Try clicking play to resume
-                                    print("  Slow progress detected, attempting to resume...")
-                                    play_button = await page.query_selector("#player-playpause")
-                                    if play_button:
-                                        await play_button.click()
-                                        await page.wait_for_timeout(1000)
-                                        await play_button.click()
-                                elif slow_progress_count >= 5:
-                                    # Resume clicks aren't helping, reload the page
-                                    reload_attempts += 1
-                                    if reload_attempts >= max_reload_attempts:
-                                        print(f"  Extraction failed after {max_reload_attempts} reload attempts")
-                                        break
-                                    print(f"  Reloading page (attempt {reload_attempts}/{max_reload_attempts})...")
-                                    await page.reload(wait_until="networkidle", timeout=60000)
-                                    await page.wait_for_selector("#player-playpause", timeout=10000)
-                                    await page.evaluate('document.querySelector("#player-volume").value = 0')
-                                    play_button = await page.query_selector("#player-playpause")
-                                    if play_button:
-                                        await play_button.click()
-                                        await page.wait_for_timeout(1000)
-                                        await set_playback_speed(playback_speed)
-                                    slow_progress_count = 0
-                                    # Don't update last_playback_secs - keep tracking from before reload
-                                    continue
-                            else:
-                                slow_progress_count = 0
-                            last_playback_secs = current_secs
-
-                    final_uncovered = find_uncovered_segments(estimated_segments)
-                    print(
-                        f"Collected {len(self.captured_data['segment_keys'])} "
-                        "tree node keys"
-                    )
-                    covered_count = estimated_segments - len(final_uncovered)
-                    print(f"Coverage: {covered_count}/{estimated_segments} segments")
+            final_uncovered = find_uncovered_segments(target_segments)
+            print(
+                f"Collected {len(self.captured_data['segment_keys'])} tree node keys"
+            )
+            covered_count = target_segments - len(final_uncovered)
+            print(f"Coverage: {covered_count}/{target_segments} segments")
 
             # Final flush before validation
             await flush_captured_keys()
@@ -1353,14 +1439,20 @@ class HotAudioExtractor:
             await browser.close()
             await playwright.stop()
 
-            # Download HAX file directly from CDN
-            print("\nDownloading HAX file from CDN...")
-            with httpx.Client() as client:
-                hax_response = client.get(self.captured_data["hax_url"])
-                hax_response.raise_for_status()
+            # Use already-downloaded HAX data, or download if not available
+            if hax_buffer is None:
+                hax_buffer, hax_metadata, hax_segments = self._download_and_parse_hax(
+                    self.captured_data["hax_url"]
+                )
 
-            hax_buffer = hax_response.content
-            print(f"Downloaded {len(hax_buffer) / 1024:.1f} KB")
+            # Use the pre-parsed data
+            metadata = hax_metadata
+            segments = hax_segments
+            codec = (
+                metadata["codec"].decode("utf-8")
+                if isinstance(metadata["codec"], bytes)
+                else metadata["codec"]
+            )
 
             # Collect HAX verification data
             if verify_data:
@@ -1370,31 +1462,6 @@ class HotAudioExtractor:
                     "sha256": sha256_hex(hax_buffer),
                     "header_hex": hax_buffer[:16].hex(),
                 }
-
-            # Parse HAX file
-            print("\nParsing HAX file...")
-            magic = hax_buffer[:4].decode("utf-8")
-            if magic != "HAX0":
-                raise ValueError(f"Invalid HAX magic: {magic}")
-
-            # Find metadata start
-            meta_start = 16
-            while meta_start < 64 and hax_buffer[meta_start] != 0x64:  # 'd' character
-                meta_start += 1
-
-            metadata, _ = parse_bencode(hax_buffer, meta_start)
-
-            codec = (
-                metadata["codec"].decode("utf-8")
-                if isinstance(metadata["codec"], bytes)
-                else metadata["codec"]
-            )
-            print(f"  Codec: {codec}")
-            print(f"  Duration: {metadata['durationMs'] / 1000:.1f}s")
-            print(f"  Segments: {metadata['segmentCount']}")
-
-            # Collect metadata verification data
-            if verify_data:
                 base_key = metadata.get("baseKey", b"")
                 orig_hash = metadata.get("origHash")
                 verify_data["metadata"] = {
@@ -1405,23 +1472,6 @@ class HotAudioExtractor:
                     "orig_hash_hex": orig_hash.hex() if orig_hash else None,
                 }
                 verify_data["tree_keys"] = dict(self.captured_data["segment_keys"])
-
-            # Parse segment table
-            segment_data = metadata["segments"]
-            segments = []
-            for i in range(metadata["segmentCount"]):
-                offset = int.from_bytes(
-                    segment_data[i * 8 : i * 8 + 4], byteorder="little"
-                )
-                pts = int.from_bytes(
-                    segment_data[i * 8 + 4 : i * 8 + 8], byteorder="little"
-                )
-                segments.append({"offset": offset, "pts": pts, "index": i})
-
-            # Calculate sizes
-            for i in range(len(segments) - 1):
-                segments[i]["size"] = segments[i + 1]["offset"] - segments[i]["offset"]
-            segments[-1]["size"] = len(hax_buffer) - segments[-1]["offset"]
 
             # Build key tree and decrypt
             print("\nDecrypting segments...")
@@ -1541,7 +1591,7 @@ class HotAudioExtractor:
                     "segmentCount": metadata["segmentCount"],
                     "decryptedSegments": len(decrypted_segments),
                     "pid": (self.captured_data.get("metadata") or {}).get("pid"),
-                    "extractedAt": datetime.now(timezone.utc)
+                    "extractedAt": datetime.now(UTC)
                     .isoformat()
                     .replace("+00:00", "Z"),
                 },
@@ -1700,4 +1750,6 @@ def main():
 
 
 if __name__ == "__main__":
-    exit(main())
+    import sys
+
+    sys.exit(main())
