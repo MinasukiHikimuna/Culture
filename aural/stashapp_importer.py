@@ -235,13 +235,20 @@ class StashappClient:
                 }
             }
         """
-        result = self.query(query, {"filter": {"q": name, "per_page": 10}})
-        groups = result.get("findGroups", {}).get("groups", [])
+        try:
+            # Quote the search term to reduce tokenization issues
+            search_term = f'"{name}"'
+            result = self.query(query, {"filter": {"q": search_term, "per_page": 10}})
+            groups = result.get("findGroups", {}).get("groups", [])
 
-        # Exact match (case-insensitive)
-        for g in groups:
-            if g["name"].lower() == name.lower():
-                return g
+            # Exact match (case-insensitive)
+            for g in groups:
+                if g["name"].lower() == name.lower():
+                    return g
+        except Exception as e:
+            # If search fails (e.g., SQL tokenization error), return None
+            # to allow group creation instead
+            print(f"  Warning: Group search failed ({e}), will create new group")
         return None
 
     def create_group(self, input_data: dict) -> dict:
@@ -722,7 +729,16 @@ Return ONLY the group name, nothing else."""
     # Fallback: simple regex-based cleanup
     fallback = re.sub(r"\[[^\]]+\]", "", release_title)  # Remove bracketed tags
     fallback = re.sub(r"[^\w\s\-\'\,\.\!\?]", "", fallback)  # Remove special chars
-    fallback = fallback.strip()
+
+    # Collapse multiple spaces to single space
+    fallback = re.sub(r"\s+", " ", fallback).strip()
+
+    # Remove standalone stop words that can break Stashapp search
+    # (these get interpreted as SQL operators when tokenized)
+    stop_words = {"and", "or", "but", "not", "the", "a", "an", "in", "on", "at", "to", "for"}
+    words = fallback.split()
+    words = [w for w in words if w.lower() not in stop_words]
+    fallback = " ".join(words)
 
     # Truncate if too long
     if len(fallback) > 60:
