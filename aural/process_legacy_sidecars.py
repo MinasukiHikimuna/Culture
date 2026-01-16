@@ -9,6 +9,7 @@ and run through the existing import pipeline.
 Usage:
     uv run python process_legacy_sidecars.py "/Volumes/Culture 1/Aural_Stash_Legacy/GWA/"
     uv run python process_legacy_sidecars.py "/Volumes/Culture 1/Aural_Stash_Legacy/GWA/" --dry-run
+    uv run python process_legacy_sidecars.py "/Volumes/Culture 1/Aural_Stash_Legacy/GWA/" --author WendysLostBoys
     uv run python process_legacy_sidecars.py "/Volumes/Culture 1/Aural_Stash_Legacy/GWA/" --limit 5
 """
 
@@ -52,11 +53,11 @@ def extract_post_id_from_url(url: str) -> str | None:
 
 def find_legacy_sidecars(
     directory: Path, filter_author: str | None = None
-) -> list[tuple[Path, Path | None]]:
+) -> list[tuple[Path, Path | None, Path | None]]:
     """
-    Find all JSON sidecar files and their corresponding MP4 files.
+    Find all JSON sidecar files and their corresponding media files.
 
-    Returns list of tuples: (json_path, mp4_path or None)
+    Returns list of tuples: (json_path, mp4_path or None, m4a_path or None)
     """
     sidecars = []
 
@@ -71,13 +72,15 @@ def find_legacy_sidecars(
             except (json.JSONDecodeError, OSError):
                 continue
 
-        # Find corresponding MP4 (same name, different extension)
+        # Find corresponding media files (same name, different extension)
         mp4_file = json_file.with_suffix(".mp4")
-        if mp4_file.exists():
-            sidecars.append((json_file, mp4_file))
-        else:
-            # MP4 might not exist, still process the JSON
-            sidecars.append((json_file, None))
+        m4a_file = json_file.with_suffix(".m4a")
+
+        sidecars.append((
+            json_file,
+            mp4_file if mp4_file.exists() else None,
+            m4a_file if m4a_file.exists() else None,
+        ))
 
     return sorted(sidecars, key=lambda x: x[0].name)
 
@@ -163,7 +166,7 @@ def process_legacy_sidecars(
         "verbose": verbose,
     })
 
-    for i, (json_path, mp4_path) in enumerate(sidecars):
+    for i, (json_path, mp4_path, m4a_path) in enumerate(sidecars):
         progress = f"[{i + 1}/{len(sidecars)}]"
         print(f"\n{progress} Processing: {json_path.name}")
 
@@ -271,6 +274,12 @@ def process_legacy_sidecars(
                         print(f"  Deleted: {mp4_path.name}")
                         results["deleted"].append(str(mp4_path))
 
+                    # Delete M4A
+                    if m4a_path and m4a_path.exists():
+                        m4a_path.unlink()
+                        print(f"  Deleted: {m4a_path.name}")
+                        results["deleted"].append(str(m4a_path))
+
                     # Delete JSON sidecar
                     if json_path.exists():
                         json_path.unlink()
@@ -283,6 +292,7 @@ def process_legacy_sidecars(
                     results["content_unavailable"].append({
                         "file": str(json_path),
                         "mp4_file": str(mp4_path) if mp4_path else None,
+                        "m4a_file": str(m4a_path) if m4a_path else None,
                         "reason": result.get("reason"),
                     })
                 else:
@@ -357,6 +367,9 @@ Examples:
 
   # Dry run to see what would be processed
   uv run python process_legacy_sidecars.py "/Volumes/Culture 1/Aural_Stash_Legacy/GWA/" --dry-run
+
+  # Process specific author
+  uv run python process_legacy_sidecars.py "/Volumes/Culture 1/Aural_Stash_Legacy/GWA/" --author WendysLostBoys
 
   # Limit to first N files (for testing)
   uv run python process_legacy_sidecars.py "/Volumes/Culture 1/Aural_Stash_Legacy/GWA/" --limit 5
