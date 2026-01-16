@@ -136,6 +136,7 @@ Return this exact JSON structure:
             "whyp.it": "Whypit",
             "hotaudio.net": "HotAudio",
             "audiochan.com": "Audiochan",
+            "erocast.me": "Erocast",
         }
 
         # Match URLs in markdown links [text](url) and bare URLs
@@ -217,7 +218,10 @@ EXTRACTION RULES:
    - If flair is "Script Fill", someone else wrote the script - find who
 
 3. AUDIO VERSIONS (CRITICAL - proper URL grouping):
-   - Extract all audio platform URLs: soundgasm.net, whyp.it, hotaudio.net, audiochan.com
+   - ONLY use URLs from the PRE-EXTRACTED AUDIO URLs section above
+   - Do NOT include URLs from unsupported platforms (chirb.it, clyp.it, vocaroo, etc.)
+   - If no pre-extracted URLs exist, set audio_versions to an empty array
+   - Supported platforms: soundgasm.net, whyp.it, hotaudio.net, audiochan.com, erocast.me
    - CRITICAL: Multiple URLs from the SAME platform = DIFFERENT audio files, NOT mirrors
      * If you see 2 soundgasm.net URLs, those are 2 SEPARATE audio_versions
      * Mirrors ONLY exist across DIFFERENT platforms (Soundgasm + Whyp.it for same audio)
@@ -288,7 +292,9 @@ Return this exact JSON structure:
       "urls": [
         {{"platform": "Soundgasm", "url": "https://soundgasm.net/..."}},
         {{"platform": "Whypit", "url": "https://whyp.it/..."}},
-        {{"platform": "Audiochan", "url": "https://audiochan.com/a/..."}}
+        {{"platform": "HotAudio", "url": "https://hotaudio.net/..."}},
+        {{"platform": "Audiochan", "url": "https://audiochan.com/a/..."}},
+        {{"platform": "Erocast", "url": "https://erocast.me/..."}}
       ],
       "performers": ["username1"],
       "tags": ["tag1", "tag2"]
