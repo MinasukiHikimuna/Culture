@@ -613,26 +613,45 @@ class ReleaseOrchestrator:
         if release_path.exists():
             try:
                 existing_data = json.loads(release_path.read_text(encoding="utf-8"))
-                print(f"⏭️  Release already exists: {release_dir}")
-                print(f"   Audio sources: {len(existing_data.get('audioSources', []))}")
+                audio_sources = existing_data.get("audioSources", [])
 
-                # Return a Release object with the existing data
-                release = Release(
-                    id=existing_data.get("id", ""),
-                    title=existing_data.get("title"),
-                    primary_performer=existing_data.get("primaryPerformer"),
-                    additional_performers=existing_data.get("additionalPerformers", []),
-                    script_author=existing_data.get("scriptAuthor"),
-                    release_date=existing_data.get("releaseDate"),
-                    enrichment_data=existing_data.get("enrichmentData", {}),
-                    audio_sources=existing_data.get("audioSources", []),
-                    script=existing_data.get("script"),
-                    artwork=existing_data.get("artwork", []),
-                    aggregated_at=existing_data.get("aggregatedAt", ""),
-                    version=existing_data.get("version", "1.0"),
-                    release_dir=release_dir,
-                )
-                return release
+                # Verify that all audio files actually exist
+                missing_files = []
+                for source in audio_sources:
+                    file_path = source.get("audio", {}).get("filePath")
+                    if file_path and not Path(file_path).exists():
+                        missing_files.append(file_path)
+
+                if missing_files:
+                    print(f"⚠️  Release metadata exists but {len(missing_files)} audio file(s) missing:")
+                    for f in missing_files:
+                        print(f"     - {Path(f).name}")
+                    print("   Re-extracting audio...")
+                    # Don't return - proceed with extraction below
+                elif not audio_sources:
+                    print("⚠️  Release exists but has no audio sources - re-extracting...")
+                    # Don't return - proceed with extraction below
+                else:
+                    print(f"⏭️  Release already exists: {release_dir}")
+                    print(f"   Audio sources: {len(audio_sources)}")
+
+                    # Return a Release object with the existing data
+                    release = Release(
+                        id=existing_data.get("id", ""),
+                        title=existing_data.get("title"),
+                        primary_performer=existing_data.get("primaryPerformer"),
+                        additional_performers=existing_data.get("additionalPerformers", []),
+                        script_author=existing_data.get("scriptAuthor"),
+                        release_date=existing_data.get("releaseDate"),
+                        enrichment_data=existing_data.get("enrichmentData", {}),
+                        audio_sources=audio_sources,
+                        script=existing_data.get("script"),
+                        artwork=existing_data.get("artwork", []),
+                        aggregated_at=existing_data.get("aggregatedAt", ""),
+                        version=existing_data.get("version", "1.0"),
+                        release_dir=release_dir,
+                    )
+                    return release
             except json.JSONDecodeError:
                 pass  # Proceed with creation
 
