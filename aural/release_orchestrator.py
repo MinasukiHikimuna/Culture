@@ -590,92 +590,123 @@ class ReleaseOrchestrator:
         Raises:
             ValueError: If llm_analysis is not provided or has no audio_versions
         """
+        self._validate_process_inputs(llm_analysis)
+        print(f"🎯 Processing post: {post.get('title', 'Unknown')}")
+
+        post_id = post.get("id") or llm_analysis.get("metadata", {}).get("post_id") or "unknown"
+        release_dir = self._determine_release_directory(post, llm_analysis, post_id)
+
+        existing_release = self._load_existing_release(release_dir)
+        if existing_release:
+            return existing_release
+
+        release = self._create_release_object(post, llm_analysis, gwasi_data, post_id, release_dir)
+        release_dir.mkdir(parents=True, exist_ok=True)
+
+        self._extract_audio_sources(post, llm_analysis, release, release_dir)
+
+        if not release.audio_sources:
+            self.cleanup()
+            raise ValueError("No audio sources could be downloaded - all extractions failed")
+
+        self._extract_script_if_available(llm_analysis, release, release_dir)
+        self._finalize_release(release)
+
+        return release
+
+    def _validate_process_inputs(self, llm_analysis: dict) -> None:
+        """Validate that LLM analysis is provided and has audio versions."""
         if not llm_analysis:
             raise ValueError("LLM analysis is required. Run analyze_reddit_post.py first.")
-
         if not llm_analysis.get("audio_versions"):
             raise ValueError("LLM analysis has no audio_versions. Cannot process post.")
 
-        print(f"🎯 Processing post: {post.get('title', 'Unknown')}")
-
-        # Determine target directory structure first
+    def _determine_release_directory(
+        self, post: dict, llm_analysis: dict, post_id: str
+    ) -> Path:
+        """Determine the release directory, using existing if found."""
         data_dir = Path(self.config["dataDir"])
-        post_id = post.get("id") or llm_analysis.get("metadata", {}).get("post_id") or "unknown"
         performer_dir = data_dir / "releases" / post.get("author", "unknown")
 
-        # Check if ANY release directory already exists for this post_id
-        # This prevents LLM non-determinism from creating duplicate directories
         existing_dir = self._find_existing_release_dir(performer_dir, post_id)
-
         if existing_dir:
-            release_dir = existing_dir
+            return existing_dir
+
+        version_naming = llm_analysis.get("version_naming", {})
+        if version_naming.get("release_directory"):
+            release_dir_name = version_naming["release_directory"]
         else:
-            # No existing directory - compute new one from LLM analysis
-            version_naming = llm_analysis.get("version_naming", {})
-            if version_naming.get("release_directory"):
-                release_dir_name = version_naming["release_directory"]
-            else:
-                # Fallback: generate directory name as {post_id}_{slug}
-                title_slug = self._create_slug(post.get("title", ""), max_length=40)
-                release_dir_name = f"{post_id}_{title_slug}" if title_slug else post_id
-            release_dir = performer_dir / release_dir_name
+            title_slug = self._create_slug(post.get("title", ""), max_length=40)
+            release_dir_name = f"{post_id}_{title_slug}" if title_slug else post_id
 
-        # Check if release already exists
+        return performer_dir / release_dir_name
+
+    def _load_existing_release(self, release_dir: Path) -> Release | None:
+        """Load existing release if valid, or return None to proceed with extraction."""
         release_path = release_dir / "release.json"
-        if release_path.exists():
-            try:
-                existing_data = json.loads(release_path.read_text(encoding="utf-8"))
-                audio_sources = existing_data.get("audioSources", [])
+        if not release_path.exists():
+            return None
 
-                # Verify that all audio files actually exist
-                missing_files = []
-                for source in audio_sources:
-                    file_path = source.get("audio", {}).get("filePath")
-                    if file_path and not Path(file_path).exists():
-                        missing_files.append(file_path)
+        try:
+            existing_data = json.loads(release_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            return None
 
-                if missing_files:
-                    print(f"⚠️  Release metadata exists but {len(missing_files)} audio file(s) missing:")
-                    for f in missing_files:
-                        print(f"     - {Path(f).name}")
-                    print("   Re-extracting audio...")
-                    # Don't return - proceed with extraction below
-                elif not audio_sources:
-                    print("⚠️  Release exists but has no audio sources - re-extracting...")
-                    # Don't return - proceed with extraction below
-                else:
-                    print(f"⏭️  Release already exists: {release_dir}")
-                    print(f"   Audio sources: {len(audio_sources)}")
+        audio_sources = existing_data.get("audioSources", [])
 
-                    # Return a Release object with the existing data
-                    release = Release(
-                        id=existing_data.get("id", ""),
-                        title=existing_data.get("title"),
-                        primary_performer=existing_data.get("primaryPerformer"),
-                        additional_performers=existing_data.get("additionalPerformers", []),
-                        script_author=existing_data.get("scriptAuthor"),
-                        release_date=existing_data.get("releaseDate"),
-                        enrichment_data=existing_data.get("enrichmentData", {}),
-                        audio_sources=audio_sources,
-                        script=existing_data.get("script"),
-                        artwork=existing_data.get("artwork", []),
-                        aggregated_at=existing_data.get("aggregatedAt", ""),
-                        version=existing_data.get("version", "1.0"),
-                        release_dir=release_dir,
-                    )
-                    return release
-            except json.JSONDecodeError:
-                pass  # Proceed with creation
+        if not audio_sources:
+            print("⚠️  Release exists but has no audio sources - re-extracting...")
+            return None
 
-        # Create release object
-        # If gwasi_data provided, use it for enrichment; otherwise use post directly
+        missing_files = self._find_missing_audio_files(audio_sources)
+        if missing_files:
+            print(f"⚠️  Release metadata exists but {len(missing_files)} audio file(s) missing:")
+            for f in missing_files:
+                print(f"     - {Path(f).name}")
+            print("   Re-extracting audio...")
+            return None
+
+        print(f"⏭️  Release already exists: {release_dir}")
+        print(f"   Audio sources: {len(audio_sources)}")
+
+        return Release(
+            id=existing_data.get("id", ""),
+            title=existing_data.get("title"),
+            primary_performer=existing_data.get("primaryPerformer"),
+            additional_performers=existing_data.get("additionalPerformers", []),
+            script_author=existing_data.get("scriptAuthor"),
+            release_date=existing_data.get("releaseDate"),
+            enrichment_data=existing_data.get("enrichmentData", {}),
+            audio_sources=audio_sources,
+            script=existing_data.get("script"),
+            artwork=existing_data.get("artwork", []),
+            aggregated_at=existing_data.get("aggregatedAt", ""),
+            version=existing_data.get("version", "1.0"),
+            release_dir=release_dir,
+        )
+
+    def _find_missing_audio_files(self, audio_sources: list[dict]) -> list[str]:
+        """Check audio sources and return list of missing file paths."""
+        missing = []
+        for source in audio_sources:
+            file_path = source.get("audio", {}).get("filePath")
+            if file_path and not Path(file_path).exists():
+                missing.append(file_path)
+        return missing
+
+    def _create_release_object(
+        self,
+        post: dict,
+        llm_analysis: dict,
+        gwasi_data: dict | None,
+        post_id: str,
+        release_dir: Path,
+    ) -> Release:
+        """Create a new Release object with enrichment data."""
         reddit_data = gwasi_data.get("reddit_data", post) if gwasi_data else post
 
-        # Use post ID as release ID
-        release_id = post_id
-
-        release = Release(
-            id=release_id,
+        return Release(
+            id=post_id,
             title=post.get("title"),
             primary_performer=post.get("author"),
             release_date=post.get("created_utc"),
@@ -683,163 +714,203 @@ class ReleaseOrchestrator:
                 "reddit": reddit_data,
                 "patreon": None,
                 "llmAnalysis": llm_analysis,
-                "gwasi": gwasi_data  # Full GWASI data with tags, post_type, etc.
+                "gwasi": gwasi_data,
             },
             release_dir=release_dir,
         )
 
-        release_dir.mkdir(parents=True, exist_ok=True)
-
-        # Extract audio URLs from post and analysis
+    def _extract_audio_sources(
+        self,
+        post: dict,
+        llm_analysis: dict,
+        release: Release,
+        release_dir: Path,
+    ) -> None:
+        """Extract all audio sources for the release."""
         audio_urls = self.extract_audio_urls(post, llm_analysis)
         print(f"🔗 Found {len(audio_urls)} unique audio URL{'s' if len(audio_urls) != 1 else ''}")
 
-        # Check if this is a HotAudio CYOA with multiple tracks
-        # But only if hotaudio platform is available
+        self._try_extract_hotaudio_cyoa(audio_urls, release, release_dir)
+
+        if not release.audio_sources:
+            self._extract_audio_versions(llm_analysis, release, release_dir)
+
+    def _try_extract_hotaudio_cyoa(
+        self,
+        audio_urls: list[str],
+        release: Release,
+        release_dir: Path,
+    ) -> None:
+        """Try to extract HotAudio CYOA multi-track content if applicable."""
         hotaudio_available = (
             not self.availability_tracker
             or self.availability_tracker.is_available("hotaudio")
         )
-        hotaudio_urls = [
-            u for u in audio_urls
-            if "hotaudio.net" in u.lower()
-        ] if hotaudio_available else []
+        if not hotaudio_available:
+            return
 
-        # If there's exactly one HotAudio URL, check if it's a multi-track CYOA
-        if len(hotaudio_urls) == 1:
-            hotaudio_url = hotaudio_urls[0]
-            tracks = self.discover_hotaudio_tracks(hotaudio_url)
+        hotaudio_urls = [u for u in audio_urls if "hotaudio.net" in u.lower()]
+        if len(hotaudio_urls) != 1:
+            return
 
-            if len(tracks) > 1:
-                print(f"🎭 Detected HotAudio CYOA with {len(tracks)} tracks")
+        hotaudio_url = hotaudio_urls[0]
+        tracks = self.discover_hotaudio_tracks(hotaudio_url)
+        if len(tracks) <= 1:
+            return
 
-                # Use multi-track extraction
-                target_path = {"dir": str(release_dir)}
+        print(f"🎭 Detected HotAudio CYOA with {len(tracks)} tracks")
+        target_path = {"dir": str(release_dir)}
 
-                try:
-                    audio_sources = self.extract_audio_multi_track(hotaudio_url, target_path)
+        try:
+            audio_sources = self.extract_audio_multi_track(hotaudio_url, target_path)
+            for audio_source in audio_sources:
+                track_title = audio_source.platform_data.get("trackTitle", "")
+                audio_source.version_info = {
+                    "version_name": track_title,
+                    "description": f"CYOA Track: {track_title}",
+                    "isCYOATrack": True,
+                }
+                release.add_audio_source(audio_source)
+                print(f"✅ Added CYOA track: {track_title}")
+        except Exception as error:
+            if _is_disk_space_error(error):
+                raise DiskSpaceError(str(error), error) from error
+            print(f"❌ Multi-track extraction failed: {error}")
 
-                    for audio_source in audio_sources:
-                        # Add version info from track metadata
-                        track_title = audio_source.platform_data.get("trackTitle", "")
-                        audio_source.version_info = {
-                            "version_name": track_title,
-                            "description": f"CYOA Track: {track_title}",
-                            "isCYOATrack": True,
-                        }
-                        release.add_audio_source(audio_source)
-                        print(f"✅ Added CYOA track: {track_title}")
+    def _extract_audio_versions(
+        self,
+        llm_analysis: dict,
+        release: Release,
+        release_dir: Path,
+    ) -> None:
+        """Process each audio version from LLM analysis."""
+        for i, audio_version in enumerate(llm_analysis["audio_versions"]):
+            if not audio_version.get("urls"):
+                continue
 
-                except Exception as error:
-                    # Check for disk space error - abort immediately
-                    if _is_disk_space_error(error):
-                        raise DiskSpaceError(str(error), error) from error
-                    print(f"❌ Multi-track extraction failed: {error}")
-                    # Fall through to standard extraction below
+            target_path = self._build_target_path(audio_version, llm_analysis, release, release_dir, i)
+            audio_source, used_url = self._try_extract_from_platforms(audio_version, target_path, i)
 
-        # Process each audio version with proper naming (standard flow)
-        # Skip if we already extracted multi-track CYOA content
-        if not release.audio_sources:
-            for i, audio_version in enumerate(llm_analysis["audio_versions"]):
-                if not audio_version.get("urls"):
-                    continue
+            if audio_source:
+                self._attach_version_metadata(audio_source, audio_version, used_url)
+                release.add_audio_source(audio_source)
+                version_name = audio_version.get("version_name", "Version")
+                platform_name = audio_source.metadata["platform"]["name"]
+                print(f"✅ Added audio source: {version_name} from {platform_name}")
+            else:
+                print(f"❌ All platforms failed for {audio_version.get('version_name') or f'Version {i + 1}'}")
 
-                # Sort URLs by platform priority
-                sorted_urls = self.sort_urls_by_priority(audio_version["urls"])
-                audio_source = None
-                used_url = None
+    def _build_target_path(
+        self,
+        audio_version: dict,
+        llm_analysis: dict,
+        release: Release,
+        release_dir: Path,
+        index: int,
+    ) -> dict:
+        """Build target path configuration for audio extraction."""
+        if audio_version.get("filename"):
+            basename = re.sub(r"\.[^.]+$", "", audio_version["filename"])
+        else:
+            release_slug = llm_analysis.get("version_naming", {}).get("release_slug") or release.id
+            basename = f"{release_slug}_{audio_version.get('slug', index)}"
 
-                # Determine basename for this version
-                if audio_version.get("filename"):
-                    # Remove extension
-                    basename = re.sub(r"\.[^.]+$", "", audio_version["filename"])
-                else:
-                    release_slug = llm_analysis.get("version_naming", {}).get("release_slug") or release.id
-                    basename = f"{release_slug}_{audio_version.get('slug', i)}"
+        return {"dir": str(release_dir), "basename": basename}
 
-                target_path = {"dir": str(release_dir), "basename": basename}
+    def _try_extract_from_platforms(
+        self,
+        audio_version: dict,
+        target_path: dict,
+        version_index: int,
+    ) -> tuple[AudioSource | None, dict | None]:
+        """Try extracting audio from each platform with retries."""
+        sorted_urls = self.sort_urls_by_priority(audio_version["urls"])
 
-                # Try each platform in priority order with retries
-                for url_info in sorted_urls:
-                    platform = url_info.get("platform", "unknown")
-                    max_retries = 3
-                    retry_count = 0
+        for url_info in sorted_urls:
+            audio_source = self._try_extract_single_url(url_info, target_path, audio_version, version_index)
+            if audio_source:
+                return audio_source, url_info
 
-                    while retry_count < max_retries:
-                        try:
-                            version_name = audio_version.get("version_name") or f"Version {i + 1}"
-                            print(f"📥 Extracting: {url_info['url']} ({version_name})")
-                            audio_source = self.extract_audio(url_info["url"], target_path)
+        return None, None
 
-                            # Report success to tracker
-                            if self.availability_tracker:
-                                self.availability_tracker.record_success(platform)
+    def _try_extract_single_url(
+        self,
+        url_info: dict,
+        target_path: dict,
+        audio_version: dict,
+        version_index: int,
+    ) -> AudioSource | None:
+        """Try extracting from a single URL with retry logic."""
+        platform = url_info.get("platform", "unknown")
+        max_retries = 3
 
-                            used_url = url_info
-                            break  # Success, exit retry loop
-                        except Exception as error:
-                            # Check for disk space error - abort immediately, no retries
-                            if _is_disk_space_error(error):
-                                raise DiskSpaceError(str(error), error) from error
-
-                            retry_count += 1
-
-                            # Report failure to tracker
-                            if self.availability_tracker:
-                                self.availability_tracker.record_failure(platform, error)
-
-                            if retry_count < max_retries:
-                                print(f"⚠️  Retry {retry_count}/{max_retries} for {platform}: {error}")
-                            else:
-                                print(f"❌ Failed {platform} after {max_retries} retries: {error}")
-
-                    if audio_source:
-                        break  # Success, don't try other platforms
-
-                if audio_source:
-                    # Add version-specific metadata
-                    audio_source.version_info = {
-                        "slug": audio_version.get("slug"),
-                        "version_name": audio_version.get("version_name"),
-                        "description": audio_version.get("description"),
-                        "performers": audio_version.get("performers", []),
-                        "tags": audio_version.get("tags", [])
-                    }
-
-                    # Store alternate sources
-                    audio_source.alternate_sources = [
-                        {"platform": u.get("platform"), "url": u.get("url")}
-                        for u in sorted_urls
-                        if u.get("url") != used_url.get("url")
-                    ]
-
-                    release.add_audio_source(audio_source)
-                    version_name = audio_version.get("version_name", "Version")
-                    platform_name = audio_source.metadata["platform"]["name"]
-                    print(f"✅ Added audio source: {version_name} from {platform_name}")
-                else:
-                    print(f"❌ All platforms failed for {audio_version.get('version_name') or f'Version {i + 1}'}")
-
-        # Fail early if no audio sources were downloaded
-        if not release.audio_sources:
-            self.cleanup()
-            raise ValueError("No audio sources could be downloaded - all extractions failed")
-
-        # Extract script if available
-        if llm_analysis and llm_analysis.get("script", {}).get("url"):
+        for retry_count in range(max_retries):
             try:
-                release.script = self.extract_script(llm_analysis["script"], release_dir)
+                version_name = audio_version.get("version_name") or f"Version {version_index + 1}"
+                print(f"📥 Extracting: {url_info['url']} ({version_name})")
+                audio_source = self.extract_audio(url_info["url"], target_path)
+
+                if self.availability_tracker:
+                    self.availability_tracker.record_success(platform)
+
+                return audio_source
             except Exception as error:
-                print(f"❌ Failed to extract script: {error}")
+                if _is_disk_space_error(error):
+                    raise DiskSpaceError(str(error), error) from error
 
-        # Save release
+                if self.availability_tracker:
+                    self.availability_tracker.record_failure(platform, error)
+
+                if retry_count < max_retries - 1:
+                    print(f"⚠️  Retry {retry_count + 1}/{max_retries} for {platform}: {error}")
+                else:
+                    print(f"❌ Failed {platform} after {max_retries} retries: {error}")
+
+        return None
+
+    def _attach_version_metadata(
+        self,
+        audio_source: AudioSource,
+        audio_version: dict,
+        used_url: dict,
+    ) -> None:
+        """Attach version-specific metadata to the audio source."""
+        sorted_urls = self.sort_urls_by_priority(audio_version["urls"])
+
+        audio_source.version_info = {
+            "slug": audio_version.get("slug"),
+            "version_name": audio_version.get("version_name"),
+            "description": audio_version.get("description"),
+            "performers": audio_version.get("performers", []),
+            "tags": audio_version.get("tags", []),
+        }
+
+        audio_source.alternate_sources = [
+            {"platform": u.get("platform"), "url": u.get("url")}
+            for u in sorted_urls
+            if u.get("url") != used_url.get("url")
+        ]
+
+    def _extract_script_if_available(
+        self,
+        llm_analysis: dict,
+        release: Release,
+        release_dir: Path,
+    ) -> None:
+        """Extract script if available in LLM analysis."""
+        if not llm_analysis or not llm_analysis.get("script", {}).get("url"):
+            return
+
+        try:
+            release.script = self.extract_script(llm_analysis["script"], release_dir)
+        except Exception as error:
+            print(f"❌ Failed to extract script: {error}")
+
+    def _finalize_release(self, release: Release) -> None:
+        """Save release and cleanup extractors."""
         self.save_release(release)
-
-        # Cleanup extractors
         self.cleanup()
-
         print(f"✅ Release processed: {release.id}")
-        return release
 
     def extract_audio_urls(self, post: dict, llm_analysis: dict | None = None) -> list[str]:
         """Extract audio URLs from post and analysis."""
