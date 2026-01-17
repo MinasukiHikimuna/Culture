@@ -12,7 +12,6 @@ Usage:
 import argparse
 import json
 import sys
-from pathlib import Path
 
 import config as aural_config
 from stashapp_importer import StashappClient

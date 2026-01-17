@@ -17,7 +17,7 @@ import hashlib
 import json
 import re
 import sys
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import config as aural_config
