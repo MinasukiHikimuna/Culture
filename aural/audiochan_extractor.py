@@ -33,11 +33,9 @@ class AudiochanExtractor:
 
     def setup_playwright(self):
         """No-op for interface compatibility - Audiochan doesn't need Playwright."""
-        pass
 
     def close_browser(self):
         """No-op for interface compatibility."""
-        pass
 
     def _get_client(self) -> httpx.Client:
         """Get or create HTTP client."""

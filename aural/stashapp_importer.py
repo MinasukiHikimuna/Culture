@@ -42,7 +42,6 @@ load_dotenv(Path(__file__).parent / ".env")
 class StashScanStuckError(Exception):
     """Raised when Stashapp scan appears to be stuck and not completing."""
 
-    pass
 
 # Stashapp Configuration
 _stash_base = os.getenv("AURAL_STASHAPP_URL")
