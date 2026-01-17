@@ -149,7 +149,7 @@ class GwasiExtractor:
         """
         if self.version_file.exists():
             try:
-                with open(self.version_file, encoding="utf-8") as f:
+                with self.version_file.open(encoding="utf-8") as f:
                     return f.read().strip()
             except OSError:
                 pass
@@ -160,7 +160,7 @@ class GwasiExtractor:
         Save the current base version to file.
         """
         try:
-            with open(self.version_file, "w", encoding="utf-8") as f:
+            with self.version_file.open("w", encoding="utf-8") as f:
                 f.write(version)
             print(f"📝 Saved base version: {version}")
         except OSError as e:
@@ -184,7 +184,7 @@ class GwasiExtractor:
             return None
 
         try:
-            with open(self.consolidated_cache_file, encoding="utf-8") as f:
+            with self.consolidated_cache_file.open(encoding="utf-8") as f:
                 cache_data = json.load(f)
 
             cached_version = cache_data.get("base_version")
@@ -212,7 +212,7 @@ class GwasiExtractor:
         }
 
         try:
-            with open(self.consolidated_cache_file, "w", encoding="utf-8") as f:
+            with self.consolidated_cache_file.open("w", encoding="utf-8") as f:
                 json.dump(cache_data, f, ensure_ascii=False)
             print(f"📦 Saved {len(entries):,} entries to consolidated cache")
         except OSError as e:
@@ -303,7 +303,7 @@ class GwasiExtractor:
         """
         filepath = directory / filename
         try:
-            with open(filepath, "w", encoding="utf-8") as f:
+            with filepath.open("w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
             print(
                 f"💾 Saved intermediate file: {filepath.relative_to(self.output_dir)}"
@@ -318,7 +318,7 @@ class GwasiExtractor:
         filepath = directory / filename
         if filepath.exists():
             try:
-                with open(filepath, encoding="utf-8") as f:
+                with filepath.open(encoding="utf-8") as f:
                     data = json.load(f)
                 if not silent:
                     print(f"📂 Loaded cached file: {filepath.relative_to(self.output_dir)}")
@@ -478,7 +478,7 @@ class GwasiExtractor:
         filepath = self.output_dir / filename
 
         try:
-            with open(filepath, "w", encoding="utf-8") as jsonfile:
+            with filepath.open("w", encoding="utf-8") as jsonfile:
                 json.dump(data, jsonfile, indent=2, ensure_ascii=False)
 
             print(f"💾 Saved {len(data)} entries to {filepath}")
@@ -716,7 +716,7 @@ class GwasiExtractor:
         # Save summary
         summary_path = self.output_dir / f"summary_{timestamp}.json"
         try:
-            with open(summary_path, "w", encoding="utf-8") as f:
+            with summary_path.open("w", encoding="utf-8") as f:
                 json.dump(summary, f, indent=2, ensure_ascii=False)
             print(f"📈 Summary saved to {summary_path}")
         except OSError as e:

@@ -41,7 +41,7 @@ def save_post_data(post):
 
     # Save to JSON file
     filepath = save_dir / filename
-    with open(filepath, "w", encoding="utf-8") as f:
+    with filepath.open("w", encoding="utf-8") as f:
         json.dump(post_data, f, indent=2)
 
     return filepath

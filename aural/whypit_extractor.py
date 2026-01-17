@@ -294,7 +294,7 @@ class WhypitExtractor:
                     timeout=60.0,
                 ) as response:
                     response.raise_for_status()
-                    with open(file_path, "wb") as f:
+                    with file_path.open("wb") as f:
                         for chunk in response.iter_bytes(chunk_size=8192):
                             f.write(chunk)
 

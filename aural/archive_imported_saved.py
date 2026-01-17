@@ -120,7 +120,7 @@ def main():
 
     for i, json_file in enumerate(json_files):
         try:
-            with open(json_file, encoding="utf-8") as f:
+            with json_file.open(encoding="utf-8") as f:
                 post_data = json.load(f)
 
             post_id = post_data.get("id")

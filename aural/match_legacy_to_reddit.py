@@ -133,7 +133,7 @@ def compute_file_sha256(file_path: Path) -> str | None:
     """Compute SHA-256 hash of file."""
     try:
         sha256 = hashlib.sha256()
-        with open(file_path, "rb") as f:
+        with file_path.open("rb") as f:
             for chunk in iter(lambda: f.read(8192), b""):
                 sha256.update(chunk)
         return sha256.hexdigest()

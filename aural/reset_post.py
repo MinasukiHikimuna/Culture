@@ -158,7 +158,7 @@ def find_files_for_post(post_id: str) -> dict:
     processed_path = DATA_DIR / "processed_posts.json"
     if processed_path.exists():
         try:
-            with open(processed_path) as f:
+            with processed_path.open() as f:
                 processed = json.load(f)
             if processed.get("posts", {}).get(post_id):
                 files["processed_entry"] = True
@@ -202,10 +202,10 @@ def delete_files(files: dict, post_id: str, dry_run: bool) -> int:
         print(f"  {action}: processed_posts.json entry for {post_id}")
         if not dry_run:
             processed_path = DATA_DIR / "processed_posts.json"
-            with open(processed_path) as f:
+            with processed_path.open() as f:
                 processed = json.load(f)
             del processed["posts"][post_id]
-            with open(processed_path, "w") as f:
+            with processed_path.open("w") as f:
                 json.dump(processed, f, indent=2)
         count += 1
 

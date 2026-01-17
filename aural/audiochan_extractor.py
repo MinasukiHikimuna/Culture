@@ -241,7 +241,7 @@ class AudiochanExtractor:
                     total = int(response.headers.get("content-length", 0))
                     downloaded = 0
 
-                    with open(file_path, "wb") as f:
+                    with file_path.open("wb") as f:
                         for chunk in response.iter_bytes(chunk_size=65536):
                             f.write(chunk)
                             downloaded += len(chunk)
@@ -265,7 +265,7 @@ class AudiochanExtractor:
     def calculate_checksum(self, file_path: Path) -> str:
         """Calculate SHA256 checksum of file."""
         hash_sum = hashlib.sha256()
-        with open(file_path, "rb") as f:
+        with file_path.open("rb") as f:
             for chunk in iter(lambda: f.read(65536), b""):
                 hash_sum.update(chunk)
         return hash_sum.hexdigest()

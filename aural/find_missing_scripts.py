@@ -43,7 +43,7 @@ def find_missing_scripts(releases_dir: Path) -> None:
         release_dir = release_json.parent
 
         try:
-            with open(release_json) as f:
+            with release_json.open() as f:
                 release = json.load(f)
         except (json.JSONDecodeError, OSError) as e:
             print(f"Warning: Could not read {release_json}: {e}")

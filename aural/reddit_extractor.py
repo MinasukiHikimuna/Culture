@@ -408,7 +408,7 @@ class RedditExtractor:
         """Load gwasi data from CSV file."""
         data = []
         try:
-            with open(csv_path, encoding="utf-8") as f:
+            with csv_path.open(encoding="utf-8") as f:
                 reader = csv.DictReader(f)
                 for row in reader:
                     data.append(row)
@@ -420,7 +420,7 @@ class RedditExtractor:
     def load_gwasi_json(self, json_path: Path) -> list[dict]:
         """Load gwasi data from JSON file."""
         try:
-            with open(json_path, encoding="utf-8") as f:
+            with json_path.open(encoding="utf-8") as f:
                 data = json.load(f)
             print(f"📂 Loaded {len(data)} entries from {json_path}")
             return data
@@ -598,7 +598,7 @@ class RedditExtractor:
 
             columns = sorted(all_columns)
 
-            with open(filepath, "w", newline="", encoding="utf-8") as csvfile:
+            with filepath.open("w", newline="", encoding="utf-8") as csvfile:
                 writer = csv.DictWriter(csvfile, fieldnames=columns)
                 writer.writeheader()
 
@@ -621,7 +621,7 @@ class RedditExtractor:
         filepath = self.output_dir / filename
 
         try:
-            with open(filepath, "w", encoding="utf-8") as jsonfile:
+            with filepath.open("w", encoding="utf-8") as jsonfile:
                 json.dump(data, jsonfile, indent=2, ensure_ascii=False, default=str)
 
             print(f"💾 Saved {len(data)} entries to {filepath}")
@@ -683,7 +683,7 @@ class RedditExtractor:
             old_filepath = user_dir / f"{post_id}.json"
             if old_filepath.exists():
                 try:
-                    with open(old_filepath, encoding="utf-8") as jsonfile:
+                    with old_filepath.open(encoding="utf-8") as jsonfile:
                         return json.load(jsonfile)
                 except Exception as e:
                     print(f"⚠️ Warning: Could not load existing post {old_filepath}: {e}")
@@ -692,7 +692,7 @@ class RedditExtractor:
             if user_dir.exists():
                 for filepath in user_dir.glob(f"{post_id}_*.json"):
                     try:
-                        with open(filepath, encoding="utf-8") as jsonfile:
+                        with filepath.open(encoding="utf-8") as jsonfile:
                             return json.load(jsonfile)
                     except Exception as e:
                         print(f"⚠️ Warning: Could not load existing post {filepath}: {e}")
@@ -704,7 +704,7 @@ class RedditExtractor:
         old_deleted_filepath = deleted_user_dir / f"{post_id}.json"
         if old_deleted_filepath.exists():
             try:
-                with open(old_deleted_filepath, encoding="utf-8") as jsonfile:
+                with old_deleted_filepath.open(encoding="utf-8") as jsonfile:
                     return json.load(jsonfile)
             except Exception as e:
                 print(
@@ -715,7 +715,7 @@ class RedditExtractor:
         if deleted_user_dir.exists():
             for filepath in deleted_user_dir.glob(f"{post_id}_*.json"):
                 try:
-                    with open(filepath, encoding="utf-8") as jsonfile:
+                    with filepath.open(encoding="utf-8") as jsonfile:
                         return json.load(jsonfile)
                 except Exception as e:
                     print(
@@ -747,7 +747,7 @@ class RedditExtractor:
         filepath = user_dir / filename
 
         try:
-            with open(filepath, "w", encoding="utf-8") as jsonfile:
+            with filepath.open("w", encoding="utf-8") as jsonfile:
                 json.dump(
                     enriched_entry, jsonfile, indent=2, ensure_ascii=False, default=str
                 )

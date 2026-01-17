@@ -32,7 +32,7 @@ def find_scriptbin_downloads(releases_dir: Path) -> list[dict]:
         release_dir = release_json.parent
 
         try:
-            with open(release_json) as f:
+            with release_json.open() as f:
                 release = json.load(f)
         except (json.JSONDecodeError, OSError):
             continue

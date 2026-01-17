@@ -546,7 +546,7 @@ class AO3Extractor:
 
             columns = sorted(all_columns)
 
-            with open(filepath, "w", newline="", encoding="utf-8") as csvfile:
+            with filepath.open("w", newline="", encoding="utf-8") as csvfile:
                 writer = csv.DictWriter(csvfile, fieldnames=columns)
                 writer.writeheader()
 

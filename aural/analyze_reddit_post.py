@@ -766,7 +766,7 @@ Return JSON:
         file_path = Path(file_path)
 
         try:
-            with open(file_path, encoding="utf-8") as f:
+            with file_path.open(encoding="utf-8") as f:
                 post_data = json.load(f)
 
             if not post_data.get("reddit_data"):
@@ -929,7 +929,7 @@ Return JSON:
 
         if output_path:
             output_path = Path(output_path)
-            with open(output_path, "w", encoding="utf-8") as f:
+            with output_path.open("w", encoding="utf-8") as f:
                 json.dump(results, f, indent=2, ensure_ascii=False)
             print(f"Results saved to {output_path}")
 
@@ -991,7 +991,7 @@ Examples:
 
             if args.output:
                 output_path = Path(args.output)
-                with open(output_path, "w", encoding="utf-8") as f:
+                with output_path.open("w", encoding="utf-8") as f:
                     json.dump(results, f, indent=2, ensure_ascii=False)
                 print(f"Results saved to {output_path}")
             else:

@@ -125,7 +125,7 @@ def run_single_check() -> bool:
 def log(msg: str):
     """Print and append to log file."""
     print(msg)
-    with open(LOG_FILE, "a") as f:
+    with LOG_FILE.open("a") as f:
         f.write(msg + "\n")
 
 

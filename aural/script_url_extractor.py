@@ -204,7 +204,7 @@ class ScriptUrlExtractor:
         """Update an existing analysis file with script URL information"""
         try:
             # Load existing analysis
-            with open(analysis_file, encoding="utf-8") as f:
+            with analysis_file.open(encoding="utf-8") as f:
                 analysis = json.load(f)
 
             # Update script section
@@ -241,7 +241,7 @@ class ScriptUrlExtractor:
                 analysis["script"]["url"] = primary_url
 
             # Save updated analysis
-            with open(analysis_file, "w", encoding="utf-8") as f:
+            with analysis_file.open("w", encoding="utf-8") as f:
                 json.dump(analysis, f, indent=2, ensure_ascii=False)
 
             print(f"Success: Updated {analysis_file} with script information")
