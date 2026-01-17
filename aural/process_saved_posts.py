@@ -25,7 +25,7 @@ from pathlib import Path
 
 import config as aural_config
 from analyze_download_import import AnalyzeDownloadImportPipeline
-from exceptions import LMStudioUnavailableError, StashappUnavailableError
+from exceptions import DiskSpaceError, LMStudioUnavailableError, StashappUnavailableError
 from stashapp_importer import StashScanStuckError
 
 
@@ -348,7 +348,7 @@ def run_analyze_download_import(
                     user_stats.failed += 1
                     user_stats.failed_posts.append(post_file.name)
 
-            except (LMStudioUnavailableError, StashappUnavailableError) as e:
+            except (LMStudioUnavailableError, StashappUnavailableError, DiskSpaceError) as e:
                 # Mandatory resource unavailable - abort entire batch
                 print(f"\n{'!' * 60}")
                 print(f"  ABORTING: {type(e).__name__}")

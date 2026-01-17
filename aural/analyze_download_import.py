@@ -23,7 +23,7 @@ from pathlib import Path
 import config as aural_config
 import httpx
 from analyze_reddit_post import EnhancedRedditPostAnalyzer
-from exceptions import LMStudioUnavailableError, StashappUnavailableError
+from exceptions import DiskSpaceError, LMStudioUnavailableError, StashappUnavailableError
 from platform_availability import PlatformAvailabilityTracker
 from release_orchestrator import ReleaseOrchestrator
 from stashapp_importer import STASH_BASE_URL, StashappImporter, StashScanStuckError
@@ -1051,6 +1051,20 @@ class AnalyzeDownloadImportPipeline:
                 results["abort_reason"] = str(e)
                 break  # Exit the batch loop immediately
 
+            except DiskSpaceError as e:
+                # Disk full - abort the entire batch immediately
+                print(f"\n{'!' * 60}")
+                print("  ABORTING BATCH: Disk space exhausted!")
+                print(f"  {e}")
+                print(f"{'!' * 60}")
+                print("\nPlease free up disk space and re-run this script.\n")
+                results["failed"].append(
+                    {"file": str(post_file), "error": str(e), "aborted": True}
+                )
+                results["aborted"] = True
+                results["abort_reason"] = str(e)
+                break  # Exit the batch loop immediately
+
             except Exception as e:
                 print(f"  Unexpected error: {e}")
                 results["failed"].append({"file": str(post_file), "error": str(e)})
@@ -1060,7 +1074,7 @@ class AnalyzeDownloadImportPipeline:
         print("  Batch Processing Summary")
         print(f"{'=' * 60}")
         if results.get("aborted"):
-            print("  STATUS: ABORTED (Stashapp scan stuck)")
+            print(f"  STATUS: ABORTED ({results.get('abort_reason', 'Unknown')})")
         print(f"  Processed: {len(results['processed'])}")
         print(f"  Skipped: {len(results['skipped'])}")
         if results["skipped"]:

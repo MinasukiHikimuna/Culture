@@ -13,6 +13,7 @@ All files are stored directly in data/releases/{performer}/{release_dir}/
 """
 
 import argparse
+import errno
 import hashlib
 import json
 import re
@@ -29,6 +30,7 @@ import httpx
 from ao3_extractor import AO3Extractor
 from audiochan_extractor import AudiochanExtractor
 from erocast_extractor import ErocastExtractor
+from exceptions import DiskSpaceError
 from hotaudio_extractor import HotAudioExtractor
 from scriptbin_extractor import ScriptBinExtractor
 from soundgasm_extractor import SoundgasmExtractor
@@ -37,6 +39,16 @@ from whypit_extractor import WhypitExtractor
 
 if TYPE_CHECKING:
     from platform_availability import PlatformAvailabilityTracker
+
+
+def _is_disk_space_error(error: Exception) -> bool:
+    """Check if an exception indicates disk space exhaustion."""
+    if isinstance(error, OSError):
+        if hasattr(error, "errno") and error.errno == errno.ENOSPC:
+            return True
+        if "no space left" in str(error).lower():
+            return True
+    return False
 
 
 @dataclass
@@ -719,6 +731,9 @@ class ReleaseOrchestrator:
                         print(f"✅ Added CYOA track: {track_title}")
 
                 except Exception as error:
+                    # Check for disk space error - abort immediately
+                    if _is_disk_space_error(error):
+                        raise DiskSpaceError(str(error), error) from error
                     print(f"❌ Multi-track extraction failed: {error}")
                     # Fall through to standard extraction below
 
@@ -763,6 +778,10 @@ class ReleaseOrchestrator:
                             used_url = url_info
                             break  # Success, exit retry loop
                         except Exception as error:
+                            # Check for disk space error - abort immediately, no retries
+                            if _is_disk_space_error(error):
+                                raise DiskSpaceError(str(error), error) from error
+
                             retry_count += 1
 
                             # Report failure to tracker

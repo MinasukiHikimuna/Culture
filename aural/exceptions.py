@@ -46,3 +46,15 @@ class StashappUnavailableError(MandatoryResourceError):
             "Make sure Stashapp is running and accessible."
         )
         super().__init__(message)
+
+
+class DiskSpaceError(MandatoryResourceError):
+    """Raised when disk space is insufficient for downloads.
+
+    If the disk is full, there's no point continuing to process additional posts
+    since all downloads will fail. The user needs to free up disk space first.
+    """
+
+    def __init__(self, message: str, original_error: Exception | None = None):
+        self.original_error = original_error
+        super().__init__(f"Disk space exhausted: {message}")
