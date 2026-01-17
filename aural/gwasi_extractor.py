@@ -225,18 +225,18 @@ class GwasiExtractor:
         Prompt user whether to download the new base data when version has changed.
         Returns True if user wants to download, False otherwise.
         """
-        print(f"\n🔄 BASE VERSION CHANGE DETECTED")
+        print("\n🔄 BASE VERSION CHANGE DETECTED")
         print(f"{'='*50}")
         print(f"Previous base version: {old_version}")
         print(f"New base version: {new_version}")
-        print(f"\nThis means the entire base dataset has been updated.")
-        print(f"You can either:")
-        print(f"  1. Download the new base data (recommended for complete dataset)")
-        print(f"  2. Continue with delta-only updates (faster, but may miss some data)")
+        print("\nThis means the entire base dataset has been updated.")
+        print("You can either:")
+        print("  1. Download the new base data (recommended for complete dataset)")
+        print("  2. Continue with delta-only updates (faster, but may miss some data)")
 
         while True:
             try:
-                response = input(f"\nDownload new base data? [y/N]: ").strip().lower()
+                response = input("\nDownload new base data? [y/N]: ").strip().lower()
                 if response in ["", "n", "no"]:
                     return False
                 elif response in ["y", "yes"]:
@@ -258,7 +258,7 @@ class GwasiExtractor:
         cached_version = self.get_current_base_version()
 
         if not cached_version:
-            print(f"📊 No cached base version found, will download all base files")
+            print("📊 No cached base version found, will download all base files")
             return True
 
         if cached_version != current_base_dir:
@@ -267,7 +267,7 @@ class GwasiExtractor:
                 return self.prompt_user_for_base_download(cached_version, current_base_dir)
             else:
                 print(f"🔄 Base version changed: {cached_version} → {current_base_dir}")
-                print(f"📊 Will download all base files for new version")
+                print("📊 Will download all base files for new version")
                 return True
 
         # Check if base files exist for this version
@@ -281,7 +281,7 @@ class GwasiExtractor:
         print(
             f"✅ Base version unchanged ({current_base_dir}), found {len(existing_files)} cached files"
         )
-        print(f"📊 Will only update with delta.json")
+        print("📊 Will only update with delta.json")
         return False
 
     def get_local_filename(self, url: str) -> tuple[Path, str]:
@@ -603,14 +603,14 @@ class GwasiExtractor:
 
         # Check if we should skip base files entirely (delta-only mode)
         if delta_only:
-            print(f"📊 Delta-only mode: skipping base files")
+            print("📊 Delta-only mode: skipping base files")
             needs_full_download = False
         else:
             needs_full_download = self.needs_full_base_download(base_dir_name, interactive)
 
         # Step 3: Handle base files
         if needs_full_download or max_files or force_full_download:
-            print(f"\n📊 Fetching base data...")
+            print("\n📊 Fetching base data...")
             print(
                 f"🔧 Debug: needs_full_download={needs_full_download}, max_files={max_files}, force_full_download={force_full_download}"
             )
@@ -633,7 +633,7 @@ class GwasiExtractor:
                 all_entries.extend(cached_entries)
             else:
                 # Fall back to loading individual files (slow path)
-                print(f"\n📂 Loading base data from individual cached files...")
+                print("\n📂 Loading base data from individual cached files...")
                 base_files = list(self.current_base_dir.glob("*.json"))
                 print(f"🔧 Found {len(base_files)} cached files to process...")
                 base_files.sort(key=lambda x: int(x.stem) if x.stem.isdigit() else 0)
@@ -728,18 +728,18 @@ class GwasiExtractor:
             print(f"❌ Error saving summary: {e}")
 
         # Print summary to console
-        print(f"\n📈 EXTRACTION SUMMARY")
+        print("\n📈 EXTRACTION SUMMARY")
         print(f"{'='*50}")
         print(f"Total entries: {summary['total_entries']:,}")
         print(
             f"Date range: {summary['date_range']['earliest']} to {summary['date_range']['latest']}"
         )
-        print(f"\nTop subreddits:")
+        print("\nTop subreddits:")
         for sub, count in sorted(
             summary["subreddits"].items(), key=lambda x: x[1], reverse=True
         )[:10]:
             print(f"  {sub}: {count:,}")
-        print(f"\nContent types:")
+        print("\nContent types:")
         for ctype, count in sorted(
             summary["content_types"].items(), key=lambda x: x[1], reverse=True
         ):

@@ -95,7 +95,7 @@ def mark_post_skipped(
             return False
         if current.get("stashSceneId"):
             print(f"  ⚠️  Post has Stashapp scene ID: {current['stashSceneId']}")
-            print(f"      Use reset_post.py first if you want to skip this post")
+            print("      Use reset_post.py first if you want to skip this post")
             return False
 
     print(f"  {action} as skipped (reason: {reason})")

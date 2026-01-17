@@ -101,7 +101,7 @@ def download_scripts(to_download: list[dict], dry_run: bool = False) -> None:
                 script_data = extractor.get_script_data(url)
 
                 if not script_data or not script_data.get("script_content"):
-                    print(f"  ❌ No content extracted")
+                    print("  ❌ No content extracted")
                     failed += 1
                     continue
 

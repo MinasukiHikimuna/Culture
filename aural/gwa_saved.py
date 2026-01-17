@@ -109,7 +109,7 @@ def main():
         # Get remaining saved count
         remaining_saved = sum(1 for _ in me.saved(limit=None))
 
-        print(f"\n--- Summary ---")
+        print("\n--- Summary ---")
         print(f"Saved: {saved_count}")
         print(f"Failed: {failed_count}")
         print(f"Skipped (non-submissions): {skipped_count}")

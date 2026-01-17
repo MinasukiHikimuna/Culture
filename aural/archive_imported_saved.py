@@ -146,7 +146,7 @@ def main():
             print(f"[{i + 1}/{len(json_files)}] {json_file.name} - ERROR: {e}")
             error_count += 1
 
-    print(f"\n--- Summary ---")
+    print("\n--- Summary ---")
     print(f"{'Would archive' if args.dry_run else 'Archived'}: {archived_count}")
     print(f"Not in Stashapp: {not_found_count}")
     print(f"Errors: {error_count}")
