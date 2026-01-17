@@ -562,9 +562,8 @@ Examples:
     print("\nDone!")
 
     # Return non-zero exit code if there were failures or if batch was aborted
-    if results is not None:
-        if results.aborted or results.total_failed > 0:
-            return 1
+    if results is not None and (results.aborted or results.total_failed > 0):
+        return 1
 
     return 0
 
