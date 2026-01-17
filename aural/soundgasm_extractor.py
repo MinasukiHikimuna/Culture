@@ -21,7 +21,7 @@ from playwright.sync_api import sync_playwright
 
 
 class SoundgasmExtractor:
-    def __init__(self, config: dict = None):
+    def __init__(self, config: dict | None = None):
         config = config or {}
         self.platform = "soundgasm"
         self.request_delay = config.get("request_delay", 2.0)

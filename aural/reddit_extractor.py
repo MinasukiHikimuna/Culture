@@ -47,7 +47,7 @@ class RedditExtractor:
         self.last_request_time = 0
 
     def setup_reddit(
-        self, client_id: str = None, client_secret: str = None, user_agent: str = None
+        self, client_id: str | None = None, client_secret: str | None = None, user_agent: str | None = None
     ):
         """
         Setup Reddit API connection using PRAW.
