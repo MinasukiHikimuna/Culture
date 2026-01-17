@@ -97,7 +97,7 @@ class RedditExtractor:
             print(f"🔧 User agent: {user_agent}")
 
         except Exception as e:
-            raise Exception(f"Failed to connect to Reddit API: {e}")
+            raise Exception(f"Failed to connect to Reddit API: {e}") from e
 
     def rate_limit(self):
         """Simple rate limiting to be respectful to Reddit API."""
@@ -415,7 +415,7 @@ class RedditExtractor:
             print(f"📂 Loaded {len(data)} entries from {csv_path}")
             return data
         except Exception as e:
-            raise Exception(f"Error loading CSV file {csv_path}: {e}")
+            raise Exception(f"Error loading CSV file {csv_path}: {e}") from e
 
     def load_gwasi_json(self, json_path: Path) -> list[dict]:
         """Load gwasi data from JSON file."""
@@ -425,7 +425,7 @@ class RedditExtractor:
             print(f"📂 Loaded {len(data)} entries from {json_path}")
             return data
         except Exception as e:
-            raise Exception(f"Error loading JSON file {json_path}: {e}")
+            raise Exception(f"Error loading JSON file {json_path}: {e}") from e
 
     def extract_reddit_data(
         self,

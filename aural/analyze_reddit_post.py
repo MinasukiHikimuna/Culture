@@ -128,7 +128,7 @@ Return this exact JSON structure:
             return parsed
         except Exception as e:
             print(f"Failed to parse CYOA detection response: {response_text}")
-            raise ValueError(f"Invalid JSON response from LLM: {e}")
+            raise ValueError(f"Invalid JSON response from LLM: {e}") from e
 
     def _extract_audio_urls_from_text(self, text: str) -> list[dict]:
         """Pre-extract all audio platform URLs from text to prevent LLM hallucination."""
@@ -595,7 +595,7 @@ Return JSON:
             return parsed
         except Exception as e:
             print(f"Failed to parse LLM response: {response_text}")
-            raise ValueError(f"Invalid JSON response from LLM: {e}")
+            raise ValueError(f"Invalid JSON response from LLM: {e}") from e
 
     def parse_version_naming_response(self, response_text: str) -> dict:
         """Parses and validates the version naming LLM response."""
@@ -629,7 +629,7 @@ Return JSON:
             return parsed
         except Exception as e:
             print(f"Failed to parse version naming LLM response: {response_text}")
-            raise ValueError(f"Invalid JSON response from LLM: {e}")
+            raise ValueError(f"Invalid JSON response from LLM: {e}") from e
 
     def generate_version_naming(self, post_data: dict, audio_versions: list) -> dict:
         """Generates version naming information using LLM."""
@@ -896,7 +896,7 @@ Return JSON:
 
             return analysis
         except Exception as e:
-            raise RuntimeError(f"Failed to analyze {file_path}: {e}")
+            raise RuntimeError(f"Failed to analyze {file_path}: {e}") from e
 
     def analyze_directory(
         self, dir_path: str | Path, output_path: str | Path | None = None
