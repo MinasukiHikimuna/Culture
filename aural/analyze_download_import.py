@@ -939,7 +939,23 @@ class AnalyzeDownloadImportPipeline:
         print(f"\n  Processing batch of {len(post_files)} Reddit posts")
         print(f"{'=' * 60}\n")
 
-        # Platform health check phase
+        self._run_health_checks()
+
+        results = self._create_empty_results()
+
+        for i, post_file in enumerate(post_files):
+            progress_prefix = f"[{i + 1}/{len(post_files)}]"
+            should_abort = self._process_single_post(
+                post_file, progress_prefix, results, i, len(post_files)
+            )
+            if should_abort:
+                break
+
+        self._print_batch_summary(results)
+        return results
+
+    def _run_health_checks(self) -> None:
+        """Run platform health checks and report results."""
         if not self.skip_health_check:
             print("  Checking audio platform availability...")
             health_results = self.availability_tracker.run_health_checks()
@@ -952,12 +968,13 @@ class AnalyzeDownloadImportPipeline:
                     print(f"    {platform}: UNAVAILABLE - {result.get('error')}")
             print()
 
-        # Report manually skipped platforms
         if self.availability_tracker.manually_skipped:
             skipped_str = ", ".join(sorted(self.availability_tracker.manually_skipped))
             print(f"  Skipped platforms (CLI): {skipped_str}\n")
 
-        results: dict = {
+    def _create_empty_results(self) -> dict:
+        """Create an empty results dictionary."""
+        return {
             "processed": [],
             "skipped": [],
             "failed": [],
@@ -966,116 +983,150 @@ class AnalyzeDownloadImportPipeline:
             "requestPosts": [],
             "otherPosts": [],
             "noAudioUrls": [],
-            "skippedUnavailablePlatforms": [],  # Releases skipped due to platform issues
+            "skippedUnavailablePlatforms": [],
         }
 
-        for i, post_file in enumerate(post_files):
-            progress_prefix = f"[{i + 1}/{len(post_files)}]"
+    def _process_single_post(
+        self,
+        post_file: Path,
+        progress_prefix: str,
+        results: dict,
+        index: int,
+        total: int,
+    ) -> bool:
+        """Process a single post and update results. Returns True if batch should abort."""
+        try:
+            result = self.process_post(post_file, progress_prefix)
+            self._categorize_result(post_file, result, results)
+            self._maybe_delay_between_posts(result, index, total)
+            return False
+        except (StashScanStuckError, DiskSpaceError) as e:
+            self._handle_critical_error(e, post_file, results)
+            return True
+        except Exception as e:
+            print(f"  Unexpected error: {e}")
+            results["failed"].append({"file": str(post_file), "error": str(e)})
+            return False
 
-            try:
-                result = self.process_post(post_file, progress_prefix)
+    def _categorize_result(self, post_file: Path, result: dict, results: dict) -> None:
+        """Categorize a post result into the appropriate results bucket."""
+        if result.get("skipped"):
+            self._categorize_skipped_result(post_file, result, results)
+        elif result.get("success"):
+            self._categorize_success_result(post_file, result, results)
+        else:
+            results["failed"].append({
+                "file": str(post_file),
+                "stage": result.get("stage"),
+                "error": result.get("error"),
+            })
 
-                if result.get("skipped"):
-                    results["skipped"].append(
-                        {"file": str(post_file), "postId": result.get("postId")}
-                    )
-                    # Track specific skip reasons
-                    if result.get("skippedDueToUnavailablePlatforms"):
-                        results["skippedUnavailablePlatforms"].append({
-                            "file": str(post_file),
-                            "postId": result.get("postId"),
-                            "platforms": result.get("unavailablePlatforms", []),
-                        })
-                    elif result.get("scriptOffer"):
-                        results["scriptOffers"].append(
-                            {"file": str(post_file), "postId": result.get("postId")}
-                        )
-                    elif result.get("requestPost"):
-                        results["requestPosts"].append(
-                            {"file": str(post_file), "postId": result.get("postId")}
-                        )
-                    elif result.get("otherPost"):
-                        results["otherPosts"].append(
-                            {"file": str(post_file), "postId": result.get("postId")}
-                        )
-                    elif result.get("noAudioUrls"):
-                        results["noAudioUrls"].append(
-                            {"file": str(post_file), "postId": result.get("postId")}
-                        )
-                elif result.get("success"):
-                    results["processed"].append(
-                        {"file": str(post_file), "result": result}
-                    )
+    def _categorize_skipped_result(
+        self, post_file: Path, result: dict, results: dict
+    ) -> None:
+        """Categorize a skipped post result."""
+        results["skipped"].append({
+            "file": str(post_file),
+            "postId": result.get("postId"),
+        })
 
-                    # Track CYOA releases separately
-                    if result.get("isCYOA"):
-                        results["cyoa"].append(
-                            {
-                                "file": str(post_file),
-                                "releaseDir": result.get("releaseDir"),
-                                "redditUrl": result.get("redditUrl"),
-                                "cyoaDetection": result.get("cyoaDetection"),
-                            }
-                        )
-                else:
-                    results["failed"].append(
-                        {
-                            "file": str(post_file),
-                            "stage": result.get("stage"),
-                            "error": result.get("error"),
-                        }
-                    )
+        skip_reason_map = [
+            ("skippedDueToUnavailablePlatforms", "skippedUnavailablePlatforms", {
+                "file": str(post_file),
+                "postId": result.get("postId"),
+                "platforms": result.get("unavailablePlatforms", []),
+            }),
+            ("scriptOffer", "scriptOffers", {
+                "file": str(post_file),
+                "postId": result.get("postId"),
+            }),
+            ("requestPost", "requestPosts", {
+                "file": str(post_file),
+                "postId": result.get("postId"),
+            }),
+            ("otherPost", "otherPosts", {
+                "file": str(post_file),
+                "postId": result.get("postId"),
+            }),
+            ("noAudioUrls", "noAudioUrls", {
+                "file": str(post_file),
+                "postId": result.get("postId"),
+            }),
+        ]
 
-                # Brief delay between posts
-                if (
-                    i < len(post_files) - 1
-                    and not result.get("skipped")
-                    and not self.dry_run
-                ):
-                    print("\n  Waiting 3 seconds before next post...")
-                    time.sleep(3)
+        for result_key, results_key, entry in skip_reason_map:
+            if result.get(result_key):
+                results[results_key].append(entry)
+                break
 
-            except StashScanStuckError as e:
-                # Stash is stuck - abort the entire batch immediately
-                print(f"\n{'!' * 60}")
-                print("  ABORTING BATCH: Stashapp scan is stuck!")
-                print(f"  {e}")
-                print(f"{'!' * 60}")
-                print("\nPlease check Stashapp and restart the scan manually.")
-                print("Then re-run this script to continue processing.\n")
-                results["failed"].append(
-                    {"file": str(post_file), "error": str(e), "aborted": True}
-                )
-                results["aborted"] = True
-                results["abort_reason"] = str(e)
-                break  # Exit the batch loop immediately
+    def _categorize_success_result(
+        self, post_file: Path, result: dict, results: dict
+    ) -> None:
+        """Categorize a successful post result."""
+        results["processed"].append({"file": str(post_file), "result": result})
 
-            except DiskSpaceError as e:
-                # Disk full - abort the entire batch immediately
-                print(f"\n{'!' * 60}")
-                print("  ABORTING BATCH: Disk space exhausted!")
-                print(f"  {e}")
-                print(f"{'!' * 60}")
-                print("\nPlease free up disk space and re-run this script.\n")
-                results["failed"].append(
-                    {"file": str(post_file), "error": str(e), "aborted": True}
-                )
-                results["aborted"] = True
-                results["abort_reason"] = str(e)
-                break  # Exit the batch loop immediately
+        if result.get("isCYOA"):
+            results["cyoa"].append({
+                "file": str(post_file),
+                "releaseDir": result.get("releaseDir"),
+                "redditUrl": result.get("redditUrl"),
+                "cyoaDetection": result.get("cyoaDetection"),
+            })
 
-            except Exception as e:
-                print(f"  Unexpected error: {e}")
-                results["failed"].append({"file": str(post_file), "error": str(e)})
+    def _maybe_delay_between_posts(
+        self, result: dict, index: int, total: int
+    ) -> None:
+        """Add delay between posts if needed."""
+        if index < total - 1 and not result.get("skipped") and not self.dry_run:
+            print("\n  Waiting 3 seconds before next post...")
+            time.sleep(3)
 
-        # Batch summary
+    def _handle_critical_error(
+        self, error: Exception, post_file: Path, results: dict
+    ) -> None:
+        """Handle critical errors that should abort the batch."""
+        if isinstance(error, StashScanStuckError):
+            error_type = "Stashapp scan is stuck"
+            recovery_msg = "Please check Stashapp and restart the scan manually."
+        else:
+            error_type = "Disk space exhausted"
+            recovery_msg = "Please free up disk space and re-run this script."
+
+        print(f"\n{'!' * 60}")
+        print(f"  ABORTING BATCH: {error_type}!")
+        print(f"  {error}")
+        print(f"{'!' * 60}")
+        print(f"\n{recovery_msg}")
+        print("Then re-run this script to continue processing.\n")
+
+        results["failed"].append({
+            "file": str(post_file),
+            "error": str(error),
+            "aborted": True,
+        })
+        results["aborted"] = True
+        results["abort_reason"] = str(error)
+
+    def _print_batch_summary(self, results: dict) -> None:
+        """Print the batch processing summary."""
         print(f"\n{'=' * 60}")
         print("  Batch Processing Summary")
         print(f"{'=' * 60}")
+
+        self._print_summary_stats(results)
+        self._print_failed_posts(results)
+        self._print_unavailable_platforms(results)
+        self._print_script_offers(results)
+        self._print_cyoa_warnings(results)
+        self._print_platform_status()
+
+    def _print_summary_stats(self, results: dict) -> None:
+        """Print summary statistics."""
         if results.get("aborted"):
             print(f"  STATUS: ABORTED ({results.get('abort_reason', 'Unknown')})")
         print(f"  Processed: {len(results['processed'])}")
         print(f"  Skipped: {len(results['skipped'])}")
+
         if results["skipped"]:
             already_done = (
                 len(results["skipped"])
@@ -1088,9 +1139,7 @@ class AnalyzeDownloadImportPipeline:
             if already_done > 0:
                 print(f"     Already processed: {already_done}")
             if results["skippedUnavailablePlatforms"]:
-                print(
-                    f"     Unavailable platforms: {len(results['skippedUnavailablePlatforms'])}"
-                )
+                print(f"     Unavailable platforms: {len(results['skippedUnavailablePlatforms'])}")
             if results["scriptOffers"]:
                 print(f"     Script offers: {len(results['scriptOffers'])}")
             if results["requestPosts"]:
@@ -1099,70 +1148,79 @@ class AnalyzeDownloadImportPipeline:
                 print(f"     Other posts: {len(results['otherPosts'])}")
             if results["noAudioUrls"]:
                 print(f"     No audio URLs: {len(results['noAudioUrls'])}")
+
         print(f"  Failed: {len(results['failed'])}")
 
+    def _print_failed_posts(self, results: dict) -> None:
+        """Print failed posts section."""
         if results["failed"]:
             print("\nFailed posts:")
             for fail in results["failed"]:
-                print(
-                    f"  - {Path(fail['file']).name}: {fail.get('error') or fail.get('stage')}"
-                )
+                print(f"  - {Path(fail['file']).name}: {fail.get('error') or fail.get('stage')}")
 
-        # Unavailable platforms section
-        if results["skippedUnavailablePlatforms"]:
-            print(f"\n{'-' * 60}")
-            print(
-                f"  Skipped (Unavailable Platforms): "
-                f"{len(results['skippedUnavailablePlatforms'])} posts"
-            )
-            print("  (Re-run when platforms are back online)")
-            for skip in results["skippedUnavailablePlatforms"][:10]:  # Show first 10
-                platforms_str = ", ".join(skip.get("platforms", []))
-                print(f"    - {Path(skip['file']).name} [{platforms_str}]")
-            if len(results["skippedUnavailablePlatforms"]) > 10:
-                remaining = len(results["skippedUnavailablePlatforms"]) - 10
-                print(f"    ... and {remaining} more")
+    def _print_unavailable_platforms(self, results: dict) -> None:
+        """Print unavailable platforms section."""
+        if not results["skippedUnavailablePlatforms"]:
+            return
 
-        # Script offers section
+        print(f"\n{'-' * 60}")
+        print(f"  Skipped (Unavailable Platforms): {len(results['skippedUnavailablePlatforms'])} posts")
+        print("  (Re-run when platforms are back online)")
+
+        for skip in results["skippedUnavailablePlatforms"][:10]:
+            platforms_str = ", ".join(skip.get("platforms", []))
+            print(f"    - {Path(skip['file']).name} [{platforms_str}]")
+
+        if len(results["skippedUnavailablePlatforms"]) > 10:
+            remaining = len(results["skippedUnavailablePlatforms"]) - 10
+            print(f"    ... and {remaining} more")
+
+    def _print_script_offers(self, results: dict) -> None:
+        """Print script offers section."""
         if results["scriptOffers"]:
             print(f"\n{'-' * 60}")
             print(f"  Script Offers ({len(results['scriptOffers'])} posts):")
             for so in results["scriptOffers"]:
                 print(f"  - {Path(so['file']).name}")
 
-        # CYOA warnings section
-        if results["cyoa"]:
-            print(f"\n{'=' * 60}")
-            print(f"  CYOA Releases Requiring Manual Handling: {len(results['cyoa'])}")
-            print(f"{'=' * 60}")
-            print("These releases have decision tree structures that require manual")
-            print("mapping in Stashapp release descriptions as links.\n")
+    def _print_cyoa_warnings(self, results: dict) -> None:
+        """Print CYOA warnings section."""
+        if not results["cyoa"]:
+            return
 
-            for cyoa in results["cyoa"]:
-                detection = cyoa.get("cyoaDetection") or {}
-                print(f"    {Path(cyoa['file']).name}")
-                if cyoa.get("redditUrl"):
-                    print(f"     Reddit: {cyoa['redditUrl']}")
-                if detection.get("audio_count"):
-                    endings = detection.get("endings_count")
-                    endings_str = f", Endings: {endings}" if endings else ""
-                    print(f"     Audios: {detection['audio_count']}{endings_str}")
-                if detection.get("decision_tree_url"):
-                    print(f"     Flowchart: {detection['decision_tree_url']}")
-                if detection.get("reason"):
-                    print(f"     Reason: {detection['reason']}")
-                print()
+        print(f"\n{'=' * 60}")
+        print(f"  CYOA Releases Requiring Manual Handling: {len(results['cyoa'])}")
+        print(f"{'=' * 60}")
+        print("These releases have decision tree structures that require manual")
+        print("mapping in Stashapp release descriptions as links.\n")
 
-        # Final platform status summary
+        for cyoa in results["cyoa"]:
+            detection = cyoa.get("cyoaDetection") or {}
+            print(f"    {Path(cyoa['file']).name}")
+            if cyoa.get("redditUrl"):
+                print(f"     Reddit: {cyoa['redditUrl']}")
+            if detection.get("audio_count"):
+                endings = detection.get("endings_count")
+                endings_str = f", Endings: {endings}" if endings else ""
+                print(f"     Audios: {detection['audio_count']}{endings_str}")
+            if detection.get("decision_tree_url"):
+                print(f"     Flowchart: {detection['decision_tree_url']}")
+            if detection.get("reason"):
+                print(f"     Reason: {detection['reason']}")
+            print()
+
+    def _print_platform_status(self) -> None:
+        """Print final platform status summary."""
         platform_summary = self.availability_tracker.get_summary()
-        unavailable = [p for p, s in platform_summary.items() if "unavailable" in s or "skipped" in s]
+        unavailable = [
+            p for p, s in platform_summary.items()
+            if "unavailable" in s or "skipped" in s
+        ]
         if unavailable:
             print(f"\n{'-' * 60}")
             print("  Platform Status:")
             for platform, status in sorted(platform_summary.items()):
                 print(f"    {platform}: {status}")
-
-        return results
 
     def find_reddit_posts(self, directory: Path) -> list[Path]:
         """Find all JSON files in a directory (Reddit posts)."""
