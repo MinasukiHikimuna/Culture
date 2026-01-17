@@ -54,7 +54,7 @@ def main():
     try:
         dotenv.load_dotenv()
     except Exception as e:
-        print(f"Error loading .env file: {str(e)}", file=sys.stderr)
+        print(f"Error loading .env file: {e!s}", file=sys.stderr)
         sys.exit(1)
 
     env_client_id = os.getenv("REDDIT_CLIENT_ID")
@@ -116,7 +116,7 @@ def main():
         print(f"Remaining saved on Reddit: {remaining_saved}")
 
     except Exception as e:
-        print(f"Authentication error: {str(e)}", file=sys.stderr)
+        print(f"Authentication error: {e!s}", file=sys.stderr)
         print(f"Error type: {type(e)}", file=sys.stderr)
         sys.exit(1)
 
