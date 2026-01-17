@@ -10,7 +10,7 @@ import argparse
 import json
 import re
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from pathlib import Path
 
 import config as aural_config
@@ -136,7 +136,7 @@ class HotAudioIndexer:
 
         return {
             "platform": "hotaudio",
-            "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "timestamp": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
             "user": self.extract_user_from_url(user_url),
             "totalReleases": len(releases),
             "storyMap": story_map,
@@ -174,7 +174,7 @@ class HotAudioIndexer:
                 if link_id not in releases:
                     releases[link_id] = {
                         **link,
-                        "discoveredAt": datetime.now(timezone.utc)
+                        "discoveredAt": datetime.now(UTC)
                         .isoformat()
                         .replace("+00:00", "Z"),
                         "discoveredFrom": url,

@@ -17,7 +17,7 @@ To undo a skip, use reset_post.py.
 
 import argparse
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from pathlib import Path
 
 import config as aural_config
@@ -39,7 +39,7 @@ def load_processed_posts() -> dict:
 def save_processed_posts(data: dict) -> None:
     """Save the processed posts tracking file."""
     tracking_path = DATA_DIR / "processed_posts.json"
-    data["lastUpdated"] = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    data["lastUpdated"] = datetime.now(UTC).isoformat().replace("+00:00", "Z")
     tracking_path.parent.mkdir(parents=True, exist_ok=True)
     tracking_path.write_text(
         json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8"
@@ -73,7 +73,7 @@ def get_post_title(post_file: Path | None) -> str | None:
     try:
         data = json.loads(post_file.read_text(encoding="utf-8"))
         return data.get("reddit_data", {}).get("title")
-    except (json.JSONDecodeError, IOError):
+    except (OSError, json.JSONDecodeError):
         return None
 
 
@@ -102,7 +102,7 @@ def mark_post_skipped(
 
     if not dry_run:
         processed["posts"][post_id] = {
-            "processedAt": datetime.now(timezone.utc)
+            "processedAt": datetime.now(UTC)
             .isoformat()
             .replace("+00:00", "Z"),
             "releaseId": None,

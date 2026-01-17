@@ -17,7 +17,7 @@ import hashlib
 import json
 import re
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from pathlib import Path
 
 import config as aural_config
@@ -215,7 +215,7 @@ class YtDlpExtractor:
             "backupFiles": {
                 "metadata": None,  # Set by caller
             },
-            "extractedAt": datetime.now(timezone.utc)
+            "extractedAt": datetime.now(UTC)
             .isoformat()
             .replace("+00:00", "Z"),
         }
@@ -397,7 +397,7 @@ class YtDlpExtractor:
 
         summary = {
             "total_videos": len(data),
-            "extraction_date": datetime.now(timezone.utc)
+            "extraction_date": datetime.now(UTC)
             .isoformat()
             .replace("+00:00", "Z"),
             "uploaders": {},

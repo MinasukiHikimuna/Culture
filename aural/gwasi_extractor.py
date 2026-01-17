@@ -17,7 +17,6 @@ import re
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 from urllib.parse import parse_qs, urlparse
 
 import config as aural_config
@@ -54,7 +53,7 @@ class GwasiExtractor:
             }
         )
 
-    def get_base_version_from_delta(self, delta_data: Dict) -> Optional[str]:
+    def get_base_version_from_delta(self, delta_data: dict) -> str | None:
         """
         Extract base version from delta.json data.
         Returns: base version string (e.g., "37997ef38e")
@@ -71,8 +70,8 @@ class GwasiExtractor:
             return None
 
     def download_and_process_base_files(
-        self, base_dir_url: str, use_cache: bool = True, max_files: Optional[int] = None
-    ) -> List[Dict]:
+        self, base_dir_url: str, use_cache: bool = True, max_files: int | None = None
+    ) -> list[dict]:
         """
         Download and process base files sequentially until consecutive 404 limit is reached.
         Returns all entries from successfully downloaded files.
@@ -146,15 +145,15 @@ class GwasiExtractor:
         print(f"📊 Stopped after {consecutive_404s} consecutive 404s")
         return all_entries
 
-    def get_current_base_version(self) -> Optional[str]:
+    def get_current_base_version(self) -> str | None:
         """
         Get the currently cached base version.
         """
         if self.version_file.exists():
             try:
-                with open(self.version_file, "r", encoding="utf-8") as f:
+                with open(self.version_file, encoding="utf-8") as f:
                     return f.read().strip()
-            except IOError:
+            except OSError:
                 pass
         return None
 
@@ -166,7 +165,7 @@ class GwasiExtractor:
             with open(self.version_file, "w", encoding="utf-8") as f:
                 f.write(version)
             print(f"📝 Saved base version: {version}")
-        except IOError as e:
+        except OSError as e:
             print(f"⚠️  Warning: Could not save base version: {e}")
 
     def setup_base_directory(self, base_dir_name: str):
@@ -178,7 +177,7 @@ class GwasiExtractor:
         self.current_base_dir.mkdir(exist_ok=True)
         print(f"📁 Using base directory: {self.current_base_dir}")
 
-    def load_consolidated_cache(self, base_version: str) -> Optional[List[Dict]]:
+    def load_consolidated_cache(self, base_version: str) -> list[dict] | None:
         """
         Load parsed base entries from consolidated cache if version matches.
         Returns None if cache doesn't exist or version mismatch.
@@ -187,7 +186,7 @@ class GwasiExtractor:
             return None
 
         try:
-            with open(self.consolidated_cache_file, "r", encoding="utf-8") as f:
+            with open(self.consolidated_cache_file, encoding="utf-8") as f:
                 cache_data = json.load(f)
 
             cached_version = cache_data.get("base_version")
@@ -199,11 +198,11 @@ class GwasiExtractor:
             print(f"📦 Loaded {len(entries):,} entries from consolidated cache")
             return entries
 
-        except (IOError, json.JSONDecodeError) as e:
+        except (OSError, json.JSONDecodeError) as e:
             print(f"⚠️  Warning: Could not load consolidated cache: {e}")
             return None
 
-    def save_consolidated_cache(self, base_version: str, entries: List[Dict]):
+    def save_consolidated_cache(self, base_version: str, entries: list[dict]):
         """
         Save parsed base entries to consolidated cache.
         """
@@ -218,7 +217,7 @@ class GwasiExtractor:
             with open(self.consolidated_cache_file, "w", encoding="utf-8") as f:
                 json.dump(cache_data, f, ensure_ascii=False)
             print(f"📦 Saved {len(entries):,} entries to consolidated cache")
-        except IOError as e:
+        except OSError as e:
             print(f"⚠️  Warning: Could not save consolidated cache: {e}")
 
     def prompt_user_for_base_download(self, old_version: str, new_version: str) -> bool:
@@ -285,7 +284,7 @@ class GwasiExtractor:
         print(f"📊 Will only update with delta.json")
         return False
 
-    def get_local_filename(self, url: str) -> Tuple[Path, str]:
+    def get_local_filename(self, url: str) -> tuple[Path, str]:
         """
         Generate a local directory and filename for a URL.
         Returns: (directory_path, filename)
@@ -302,7 +301,7 @@ class GwasiExtractor:
         filename = url.split("/")[-1]
         return self.raw_data_dir, filename
 
-    def save_intermediate_file(self, data: Dict, directory: Path, filename: str):
+    def save_intermediate_file(self, data: dict, directory: Path, filename: str):
         """
         Save JSON data to intermediate file.
         """
@@ -313,26 +312,26 @@ class GwasiExtractor:
             print(
                 f"💾 Saved intermediate file: {filepath.relative_to(self.output_dir)}"
             )
-        except IOError as e:
+        except OSError as e:
             print(f"⚠️  Warning: Could not save intermediate file {filename}: {e}")
 
-    def load_intermediate_file(self, directory: Path, filename: str, silent: bool = False) -> Optional[Dict]:
+    def load_intermediate_file(self, directory: Path, filename: str, silent: bool = False) -> dict | None:
         """
         Load JSON data from intermediate file if it exists.
         """
         filepath = directory / filename
         if filepath.exists():
             try:
-                with open(filepath, "r", encoding="utf-8") as f:
+                with open(filepath, encoding="utf-8") as f:
                     data = json.load(f)
                 if not silent:
                     print(f"📂 Loaded cached file: {filepath.relative_to(self.output_dir)}")
                 return data
-            except (IOError, json.JSONDecodeError) as e:
+            except (OSError, json.JSONDecodeError) as e:
                 print(f"⚠️  Warning: Could not load cached file {filename}: {e}")
         return None
 
-    def fetch_json_data(self, url: str, use_cache: bool = True) -> Optional[Dict]:
+    def fetch_json_data(self, url: str, use_cache: bool = True) -> dict | None:
         """
         Fetch JSON data from URL with error handling and caching.
         """
@@ -365,7 +364,7 @@ class GwasiExtractor:
             print(f"❌ JSON decode error for {url}: {e}")
             return None
 
-    def parse_entry(self, entry: List) -> Dict:
+    def parse_entry(self, entry: list) -> dict:
         """
         Parse a single entry from the JSON data.
 
@@ -435,7 +434,7 @@ class GwasiExtractor:
             print(f"⚠️  Warning: Error parsing entry {entry}: {e}")
             return {}
 
-    def determine_content_type(self, post_type: str, tags: List[str]) -> str:
+    def determine_content_type(self, post_type: str, tags: list[str]) -> str:
         """Determine if content is audio, script, or other."""
         if not post_type:
             return "unknown"
@@ -454,7 +453,7 @@ class GwasiExtractor:
         else:
             return "other"
 
-    def extract_duration(self, title: str) -> Optional[str]:
+    def extract_duration(self, title: str) -> str | None:
         """Extract duration from title (e.g., '15m', '1h23m')."""
         if not title:
             return None
@@ -475,7 +474,7 @@ class GwasiExtractor:
         return None
 
 
-    def save_to_json(self, data: List[Dict], filename: str):
+    def save_to_json(self, data: list[dict], filename: str):
         """Save extracted data to JSON file."""
         if not data:
             print("⚠️  No data to save")
@@ -489,10 +488,10 @@ class GwasiExtractor:
 
             print(f"💾 Saved {len(data)} entries to {filepath}")
 
-        except IOError as e:
+        except OSError as e:
             print(f"❌ Error saving to JSON: {e}")
 
-    def load_from_cache_only(self) -> List[Dict]:
+    def load_from_cache_only(self) -> list[dict]:
         """
         Load and process data from cached intermediate files only.
         """
@@ -554,12 +553,12 @@ class GwasiExtractor:
 
     def extract_all_data(
         self,
-        max_files: Optional[int] = None,
+        max_files: int | None = None,
         use_cache: bool = True,
         force_full_download: bool = False,
         delta_only: bool = False,
         interactive: bool = True,
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """
         Main extraction method. Fetches and processes all available data.
 
@@ -681,7 +680,7 @@ class GwasiExtractor:
 
         return unique_entries
 
-    def generate_summary(self, data: List[Dict], timestamp: str):
+    def generate_summary(self, data: list[dict], timestamp: str):
         """Generate a summary report of the extracted data."""
         if not data:
             return
@@ -725,7 +724,7 @@ class GwasiExtractor:
             with open(summary_path, "w", encoding="utf-8") as f:
                 json.dump(summary, f, indent=2, ensure_ascii=False)
             print(f"📈 Summary saved to {summary_path}")
-        except IOError as e:
+        except OSError as e:
             print(f"❌ Error saving summary: {e}")
 
         # Print summary to console

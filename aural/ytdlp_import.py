@@ -14,7 +14,7 @@ import json
 import re
 import shutil
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from pathlib import Path
 
 import config as aural_config
@@ -97,7 +97,7 @@ class YtDlpImporter:
             return
 
         self._processed_urls["lastUpdated"] = (
-            datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+            datetime.now(UTC).isoformat().replace("+00:00", "Z")
         )
         PROCESSED_URLS_FILE.parent.mkdir(parents=True, exist_ok=True)
         PROCESSED_URLS_FILE.write_text(
@@ -117,7 +117,7 @@ class YtDlpImporter:
         """Mark a URL as successfully processed."""
         processed = self.load_processed_urls()
         processed["urls"][url] = {
-            "processedAt": datetime.now(timezone.utc)
+            "processedAt": datetime.now(UTC)
             .isoformat()
             .replace("+00:00", "Z"),
             "sceneId": result.get("sceneId"),
@@ -144,7 +144,7 @@ class YtDlpImporter:
         if upload_date and len(upload_date) == 8:
             date_str = f"{upload_date[:4]}-{upload_date[4:6]}-{upload_date[6:8]}"
         else:
-            date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            date_str = datetime.now(UTC).strftime("%Y-%m-%d")
 
         # Get video ID
         video_id = platform_data.get("id", "unknown")

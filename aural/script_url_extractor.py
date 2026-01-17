@@ -10,8 +10,6 @@ import json
 import os
 import re
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
-
 import praw
 from dotenv import load_dotenv
 
@@ -66,7 +64,7 @@ class ScriptUrlExtractor:
         except Exception as e:
             print(f"Error: Failed to connect to Reddit API: {e}")
 
-    def extract_reddit_post_id(self, url: str) -> Optional[str]:
+    def extract_reddit_post_id(self, url: str) -> str | None:
         """Extract post ID from various Reddit URL formats"""
         # Handle reddit.com/r/.../comments/ID/...
         match = re.search(r"/comments/([a-z0-9]+)/", url)
@@ -86,7 +84,7 @@ class ScriptUrlExtractor:
 
         return None
 
-    def resolve_reddit_shortlink(self, shortlink: str) -> Optional[str]:
+    def resolve_reddit_shortlink(self, shortlink: str) -> str | None:
         """Resolve Reddit shortlink to get actual post ID"""
         if not self.reddit:
             print("Error: Cannot resolve shortlink without Reddit API connection")
@@ -100,7 +98,7 @@ class ScriptUrlExtractor:
             print(f"Error: Failed to resolve shortlink {shortlink}: {e}")
             return None
 
-    def extract_script_urls_from_text(self, text: str) -> List[Tuple[str, str]]:
+    def extract_script_urls_from_text(self, text: str) -> list[tuple[str, str]]:
         """Extract script URLs from text content
 
         Returns list of tuples: (url, context)
@@ -130,7 +128,7 @@ class ScriptUrlExtractor:
 
         return script_urls
 
-    def extract_script_info_from_reddit_post(self, post_id: str) -> Optional[Dict]:
+    def extract_script_info_from_reddit_post(self, post_id: str) -> dict | None:
         """Extract script information from a Reddit post"""
         if not self.reddit:
             print("Error: Cannot fetch Reddit post without API connection")
@@ -201,11 +199,11 @@ class ScriptUrlExtractor:
             print(f"Error: Failed to extract script info from post {post_id}: {e}")
             return None
 
-    def update_analysis_with_script_url(self, analysis_file: Path, script_info: Dict):
+    def update_analysis_with_script_url(self, analysis_file: Path, script_info: dict):
         """Update an existing analysis file with script URL information"""
         try:
             # Load existing analysis
-            with open(analysis_file, "r", encoding="utf-8") as f:
+            with open(analysis_file, encoding="utf-8") as f:
                 analysis = json.load(f)
 
             # Update script section

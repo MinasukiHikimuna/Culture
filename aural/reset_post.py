@@ -162,7 +162,7 @@ def find_files_for_post(post_id: str) -> dict:
                 processed = json.load(f)
             if processed.get("posts", {}).get(post_id):
                 files["processed_entry"] = True
-        except (json.JSONDecodeError, IOError):
+        except (OSError, json.JSONDecodeError):
             pass
 
     # 5. Find Stashapp scenes with URLs containing the post ID

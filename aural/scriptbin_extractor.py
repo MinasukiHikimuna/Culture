@@ -14,7 +14,7 @@ import argparse
 import json
 import re
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from pathlib import Path
 
 import config as aural_config
@@ -142,7 +142,7 @@ class ScriptBinExtractor:
         """Extract metadata from script page."""
         metadata = {
             "url": url,
-            "extracted_at": datetime.now(timezone.utc)
+            "extracted_at": datetime.now(UTC)
             .isoformat()
             .replace("+00:00", "Z"),
         }

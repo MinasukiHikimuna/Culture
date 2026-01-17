@@ -11,7 +11,7 @@ import hashlib
 import json
 import re
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from pathlib import Path
 
 import httpx
@@ -156,7 +156,7 @@ class WhypitExtractor:
                 "platformData": {
                     "trackId": track_id,
                     "titleSlug": title_slug,
-                    "extractedAt": datetime.now(timezone.utc)
+                    "extractedAt": datetime.now(UTC)
                     .isoformat()
                     .replace("+00:00", "Z"),
                 },

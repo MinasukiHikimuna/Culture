@@ -12,7 +12,7 @@ import hashlib
 import json
 import re
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from pathlib import Path
 
 import config as aural_config
@@ -167,7 +167,7 @@ class ErocastExtractor:
                     "releasedAt": song_data.get("released_at"),
                     "plays": song_data.get("plays"),
                     "loves": song_data.get("loves"),
-                    "extractedAt": datetime.now(timezone.utc)
+                    "extractedAt": datetime.now(UTC)
                     .isoformat()
                     .replace("+00:00", "Z"),
                 },

@@ -17,7 +17,7 @@ import argparse
 import json
 import re
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from pathlib import Path
 
 import config as aural_config
@@ -179,7 +179,7 @@ class AnalyzeDownloadImportPipeline:
 
         tracking_path = self.data_dir / "processed_posts.json"
         self._processed_posts["lastUpdated"] = (
-            datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+            datetime.now(UTC).isoformat().replace("+00:00", "Z")
         )
         tracking_path.parent.mkdir(parents=True, exist_ok=True)
         tracking_path.write_text(
@@ -206,7 +206,7 @@ class AnalyzeDownloadImportPipeline:
         """Mark a post as processed."""
         processed = self.load_processed_posts()
         processed["posts"][post_id] = {
-            "processedAt": datetime.now(timezone.utc)
+            "processedAt": datetime.now(UTC)
             .isoformat()
             .replace("+00:00", "Z"),
             "releaseId": result.get("release", {}).get("id")

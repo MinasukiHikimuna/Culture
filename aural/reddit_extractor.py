@@ -21,15 +21,13 @@ import re
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
-
 import praw
 from config import GWASI_INDEX_DIR, REDDIT_INDEX_DIR, ensure_directories
 from dotenv import load_dotenv
 import sys
 
 
-def find_latest_gwasi_data() -> Optional[Path]:
+def find_latest_gwasi_data() -> Path | None:
     """Find the most recent gwasi_data_*.json file."""
     data_files = sorted(GWASI_INDEX_DIR.glob("gwasi_data_*.json"))
     return data_files[-1] if data_files else None
@@ -109,7 +107,7 @@ class RedditExtractor:
             time.sleep(sleep_time)
         self.last_request_time = time.time()
 
-    def extract_post_id_from_url(self, reddit_url: str) -> Optional[str]:
+    def extract_post_id_from_url(self, reddit_url: str) -> str | None:
         """Extract post ID from Reddit URL."""
         if not reddit_url:
             return None
@@ -187,7 +185,7 @@ class RedditExtractor:
 
         return False
 
-    def resolve_crosspost(self, submission) -> Optional[Dict]:
+    def resolve_crosspost(self, submission) -> dict | None:
         """
         Resolve a crosspost to get the original post content.
 
@@ -245,7 +243,7 @@ class RedditExtractor:
 
         return None
 
-    def get_post_data(self, post_id: str, resolve_crossposts: bool = True) -> Optional[Dict]:
+    def get_post_data(self, post_id: str, resolve_crossposts: bool = True) -> dict | None:
         """
         Fetch detailed data for a single Reddit post.
 
@@ -395,7 +393,7 @@ class RedditExtractor:
 
         return slug or "untitled"
 
-    def load_gwasi_data(self, gwasi_file: str) -> List[Dict]:
+    def load_gwasi_data(self, gwasi_file: str) -> list[dict]:
         """Load gwasi extractor output data."""
         gwasi_path = Path(gwasi_file)
 
@@ -409,11 +407,11 @@ class RedditExtractor:
         else:
             raise ValueError(f"Unsupported file format: {gwasi_path.suffix}")
 
-    def load_gwasi_csv(self, csv_path: Path) -> List[Dict]:
+    def load_gwasi_csv(self, csv_path: Path) -> list[dict]:
         """Load gwasi data from CSV file."""
         data = []
         try:
-            with open(csv_path, "r", encoding="utf-8") as f:
+            with open(csv_path, encoding="utf-8") as f:
                 reader = csv.DictReader(f)
                 for row in reader:
                     data.append(row)
@@ -422,10 +420,10 @@ class RedditExtractor:
         except Exception as e:
             raise Exception(f"Error loading CSV file {csv_path}: {e}")
 
-    def load_gwasi_json(self, json_path: Path) -> List[Dict]:
+    def load_gwasi_json(self, json_path: Path) -> list[dict]:
         """Load gwasi data from JSON file."""
         try:
-            with open(json_path, "r", encoding="utf-8") as f:
+            with open(json_path, encoding="utf-8") as f:
                 data = json.load(f)
             print(f"📂 Loaded {len(data)} entries from {json_path}")
             return data
@@ -434,11 +432,11 @@ class RedditExtractor:
 
     def extract_reddit_data(
         self,
-        gwasi_data: List[Dict],
-        max_posts: Optional[int] = None,
+        gwasi_data: list[dict],
+        max_posts: int | None = None,
         save_format: str = "both",
-        filter_usernames: Optional[List[str]] = None,
-    ) -> List[Dict]:
+        filter_usernames: list[str] | None = None,
+    ) -> list[dict]:
         """
         Extract detailed Reddit data for posts from gwasi data.
 
@@ -566,7 +564,7 @@ class RedditExtractor:
 
         return enriched_data
 
-    def save_to_csv(self, data: List[Dict], filename: str):
+    def save_to_csv(self, data: list[dict], filename: str):
         """Save enriched data to CSV file."""
         if not data:
             print("⚠️  No data to save")
@@ -617,7 +615,7 @@ class RedditExtractor:
         except Exception as e:
             print(f"❌ Error saving to CSV: {e}")
 
-    def save_to_json(self, data: List[Dict], filename: str):
+    def save_to_json(self, data: list[dict], filename: str):
         """Save data to JSON file."""
         if not data:
             print("⚠️  No data to save")
@@ -634,7 +632,7 @@ class RedditExtractor:
         except Exception as e:
             print(f"❌ Error saving to JSON: {e}")
 
-    def post_exists(self, gwasi_entry: Dict) -> bool:
+    def post_exists(self, gwasi_entry: dict) -> bool:
         """Check if individual post file already exists (checks both old and new filename formats)"""
         # Try to determine the expected author/username from the gwasi data
         username = gwasi_entry.get("username", "unknown")
@@ -672,7 +670,7 @@ class RedditExtractor:
 
         return False
 
-    def load_existing_post(self, gwasi_entry: Dict) -> Optional[Dict]:
+    def load_existing_post(self, gwasi_entry: dict) -> dict | None:
         """Load existing individual post file if it exists (checks both old and new filename formats)"""
         username = gwasi_entry.get("username", "unknown")
         post_id = gwasi_entry.get("post_id")
@@ -688,7 +686,7 @@ class RedditExtractor:
             old_filepath = user_dir / f"{post_id}.json"
             if old_filepath.exists():
                 try:
-                    with open(old_filepath, "r", encoding="utf-8") as jsonfile:
+                    with open(old_filepath, encoding="utf-8") as jsonfile:
                         return json.load(jsonfile)
                 except Exception as e:
                     print(f"⚠️ Warning: Could not load existing post {old_filepath}: {e}")
@@ -697,7 +695,7 @@ class RedditExtractor:
             if user_dir.exists():
                 for filepath in user_dir.glob(f"{post_id}_*.json"):
                     try:
-                        with open(filepath, "r", encoding="utf-8") as jsonfile:
+                        with open(filepath, encoding="utf-8") as jsonfile:
                             return json.load(jsonfile)
                     except Exception as e:
                         print(f"⚠️ Warning: Could not load existing post {filepath}: {e}")
@@ -709,7 +707,7 @@ class RedditExtractor:
         old_deleted_filepath = deleted_user_dir / f"{post_id}.json"
         if old_deleted_filepath.exists():
             try:
-                with open(old_deleted_filepath, "r", encoding="utf-8") as jsonfile:
+                with open(old_deleted_filepath, encoding="utf-8") as jsonfile:
                     return json.load(jsonfile)
             except Exception as e:
                 print(
@@ -720,7 +718,7 @@ class RedditExtractor:
         if deleted_user_dir.exists():
             for filepath in deleted_user_dir.glob(f"{post_id}_*.json"):
                 try:
-                    with open(filepath, "r", encoding="utf-8") as jsonfile:
+                    with open(filepath, encoding="utf-8") as jsonfile:
                         return json.load(jsonfile)
                 except Exception as e:
                     print(
@@ -729,7 +727,7 @@ class RedditExtractor:
 
         return None
 
-    def save_individual_post(self, enriched_entry: Dict):
+    def save_individual_post(self, enriched_entry: dict):
         """Save individual post as <username>/<post_id>_<slug>.json"""
         reddit_data = enriched_entry.get("reddit_data", {})
         author = reddit_data.get("author", "unknown")

@@ -19,7 +19,7 @@ import json
 import re
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from pathlib import Path
 
 import httpx
@@ -215,7 +215,7 @@ class CYOAImporter:
         post_id = cyoa_data["reddit_post_id"]
 
         # Get date from Reddit post (assume current date if not available)
-        date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        date = datetime.now(UTC).strftime("%Y-%m-%d")
 
         results: dict[str, dict] = {}
         audio_keys = list(cyoa_data["audios"].keys())

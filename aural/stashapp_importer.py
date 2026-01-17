@@ -22,7 +22,7 @@ import re
 import shutil
 import subprocess
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from pathlib import Path
 
 import httpx
@@ -968,7 +968,7 @@ def format_output_filename(
     date_str = "Unknown"
     release_date = release.get("releaseDate")
     if release_date:
-        date = datetime.fromtimestamp(release_date, tz=timezone.utc)
+        date = datetime.fromtimestamp(release_date, tz=UTC)
         date_str = date.strftime("%Y-%m-%d")
 
     # Get Reddit post ID (try both 'id' and 'post_id' keys)
@@ -1045,7 +1045,7 @@ class StashappImporter:
         # Date
         release_date = release_data.get("releaseDate")
         if release_date:
-            date = datetime.fromtimestamp(release_date, tz=timezone.utc)
+            date = datetime.fromtimestamp(release_date, tz=UTC)
             updates["date"] = date.strftime("%Y-%m-%d")
 
         # URLs
@@ -1416,7 +1416,7 @@ class StashappImporter:
             group_options: dict = {}
             release_date = release_data.get("releaseDate")
             if release_date:
-                date = datetime.fromtimestamp(release_date, tz=timezone.utc)
+                date = datetime.fromtimestamp(release_date, tz=UTC)
                 group_options["date"] = date.strftime("%Y-%m-%d")
             reddit_data = release_data.get("enrichmentData", {}).get("reddit", {})
             if reddit_data.get("url"):

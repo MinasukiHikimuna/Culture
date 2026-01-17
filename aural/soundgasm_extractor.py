@@ -11,7 +11,7 @@ import hashlib
 import json
 import re
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from pathlib import Path
 
 import httpx
@@ -132,7 +132,7 @@ class SoundgasmExtractor:
                 "platformData": {
                     "titleFromUrl": metadata["titleFromUrl"],
                     "pageTitle": metadata["pageTitle"],
-                    "extractedAt": datetime.now(timezone.utc)
+                    "extractedAt": datetime.now(UTC)
                     .isoformat()
                     .replace("+00:00", "Z"),
                 },

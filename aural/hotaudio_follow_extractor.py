@@ -13,7 +13,7 @@ import argparse
 import hashlib
 import json
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from pathlib import Path
 
 from playwright.sync_api import sync_playwright
@@ -312,7 +312,7 @@ class HotAudioFollowExtractor:
         node: dict = {
             "url": url,
             "depth": depth,
-            "processedAt": datetime.now(timezone.utc)
+            "processedAt": datetime.now(UTC)
             .isoformat()
             .replace("+00:00", "Z"),
         }

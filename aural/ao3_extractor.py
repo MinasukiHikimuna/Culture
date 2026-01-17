@@ -15,7 +15,7 @@ import argparse
 import json
 import re
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from pathlib import Path
 
 import config as aural_config
@@ -153,7 +153,7 @@ class AO3Extractor:
         """Extract metadata from AO3 work page."""
         metadata = {
             "url": url,
-            "extracted_at": datetime.now(timezone.utc)
+            "extracted_at": datetime.now(UTC)
             .isoformat()
             .replace("+00:00", "Z"),
         }
