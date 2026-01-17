@@ -140,7 +140,7 @@ def get_network_diagnostics() -> str:
         # Check default route
         result = subprocess.run(
             ["netstat", "-rn"],
-            capture_output=True,
+            check=False, capture_output=True,
             text=True,
             timeout=5,
         )
@@ -152,7 +152,7 @@ def get_network_diagnostics() -> str:
         # Quick ping to gateway
         result = subprocess.run(
             ["ping", "-c", "1", "-t", "2", "10.0.0.1"],
-            capture_output=True,
+            check=False, capture_output=True,
             text=True,
             timeout=5,
         )
@@ -164,7 +164,7 @@ def get_network_diagnostics() -> str:
         # Quick ping to LM Studio host
         result = subprocess.run(
             ["ping", "-c", "1", "-t", "2", "10.0.1.1"],
-            capture_output=True,
+            check=False, capture_output=True,
             text=True,
             timeout=5,
         )
@@ -206,7 +206,7 @@ def get_network_diagnostics() -> str:
             pid = os.getpid()
             result = subprocess.run(
                 ["lsof", "-p", str(pid)],
-                capture_output=True,
+                check=False, capture_output=True,
                 text=True,
                 timeout=5,
             )
@@ -219,7 +219,7 @@ def get_network_diagnostics() -> str:
         try:
             result = subprocess.run(
                 ["netstat", "-an"],
-                capture_output=True,
+                check=False, capture_output=True,
                 text=True,
                 timeout=5,
             )
@@ -242,7 +242,7 @@ def get_network_diagnostics() -> str:
             result = subprocess.run(
                 ["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}",
                  "--connect-timeout", "2", "http://10.0.1.1:1234/v1/models"],
-                capture_output=True,
+                check=False, capture_output=True,
                 text=True,
                 timeout=5,
             )
@@ -255,7 +255,7 @@ def get_network_diagnostics() -> str:
             result = subprocess.run(
                 ["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}",
                  "--connect-timeout", "2", "https://www.google.com"],
-                capture_output=True,
+                check=False, capture_output=True,
                 text=True,
                 timeout=5,
             )
@@ -277,7 +277,7 @@ def get_network_diagnostics() -> str:
         try:
             result = subprocess.run(
                 ["ipconfig", "getifaddr", "en0"],
-                capture_output=True,
+                check=False, capture_output=True,
                 text=True,
                 timeout=5,
             )
@@ -290,7 +290,7 @@ def get_network_diagnostics() -> str:
         try:
             result = subprocess.run(
                 ["arp", "-n", "10.0.1.1"],
-                capture_output=True,
+                check=False, capture_output=True,
                 text=True,
                 timeout=5,
             )
@@ -302,7 +302,7 @@ def get_network_diagnostics() -> str:
         try:
             result = subprocess.run(
                 ["netstat", "-an"],
-                capture_output=True,
+                check=False, capture_output=True,
                 text=True,
                 timeout=5,
             )
@@ -315,7 +315,7 @@ def get_network_diagnostics() -> str:
         try:
             result = subprocess.run(
                 ["traceroute", "-n", "-m", "2", "-w", "1", "10.0.1.1"],
-                capture_output=True,
+                check=False, capture_output=True,
                 text=True,
                 timeout=10,
             )
@@ -328,7 +328,7 @@ def get_network_diagnostics() -> str:
         try:
             result = subprocess.run(
                 ["netstat", "-an"],
-                capture_output=True,
+                check=False, capture_output=True,
                 text=True,
                 timeout=5,
             )
@@ -366,7 +366,7 @@ def get_network_diagnostics() -> str:
         try:
             result = subprocess.run(
                 ["zellij", "list-sessions"],
-                capture_output=True,
+                check=False, capture_output=True,
                 text=True,
                 timeout=5,
             )
@@ -400,7 +400,7 @@ def get_network_diagnostics() -> str:
             ppid = os.getppid()
             result = subprocess.run(
                 ["ps", "-p", str(ppid), "-o", "comm="],
-                capture_output=True,
+                check=False, capture_output=True,
                 text=True,
                 timeout=5,
             )
@@ -412,7 +412,7 @@ def get_network_diagnostics() -> str:
         try:
             result = subprocess.run(
                 ["ps", "-p", str(os.getpid()), "-o", "ppid=,comm="],
-                capture_output=True,
+                check=False, capture_output=True,
                 text=True,
                 timeout=5,
             )
