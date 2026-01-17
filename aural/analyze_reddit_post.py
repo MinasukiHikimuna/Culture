@@ -16,6 +16,7 @@ from pathlib import Path
 import httpx
 from dotenv import load_dotenv
 from exceptions import LMStudioUnavailableError
+import sys
 
 
 # Load .env from project root
@@ -1004,4 +1005,4 @@ Examples:
 
 
 if __name__ == "__main__":
-    exit(main())
+    sys.exit(main())

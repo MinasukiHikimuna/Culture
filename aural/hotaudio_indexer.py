@@ -15,6 +15,7 @@ from pathlib import Path
 
 import config as aural_config
 from playwright.sync_api import sync_playwright
+import sys
 
 
 class HotAudioIndexer:
@@ -292,4 +293,4 @@ def main():
 
 
 if __name__ == "__main__":
-    exit(main())
+    sys.exit(main())

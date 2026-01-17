@@ -28,6 +28,7 @@ from stashapp_importer import (
     match_tags_with_stash,
 )
 from ytdlp_extractor import YtDlpExtractor
+import sys
 
 
 class YtDlpImporter:
@@ -454,4 +455,4 @@ Examples:
 
 
 if __name__ == "__main__":
-    exit(main())
+    sys.exit(main())

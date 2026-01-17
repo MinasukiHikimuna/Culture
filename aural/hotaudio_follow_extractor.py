@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from playwright.sync_api import sync_playwright
+import sys
 
 
 class HotAudioFollowExtractor:
@@ -656,4 +657,4 @@ def main():
 
 
 if __name__ == "__main__":
-    exit(main())
+    sys.exit(main())

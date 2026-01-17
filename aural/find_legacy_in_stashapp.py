@@ -18,6 +18,7 @@ import unicodedata
 from pathlib import Path
 
 from stashapp_importer import StashappClient
+import sys
 
 
 def normalize_text(text: str) -> str:
@@ -264,4 +265,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    exit(main())
+    sys.exit(main())

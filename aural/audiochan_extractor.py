@@ -19,6 +19,7 @@ from pathlib import Path
 
 import httpx
 from dotenv import load_dotenv
+import sys
 
 
 class AudiochanExtractor:
@@ -334,4 +335,4 @@ def main():
 
 
 if __name__ == "__main__":
-    exit(main())
+    sys.exit(main())

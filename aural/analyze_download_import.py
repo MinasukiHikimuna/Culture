@@ -27,6 +27,7 @@ from exceptions import DiskSpaceError, LMStudioUnavailableError, StashappUnavail
 from platform_availability import PlatformAvailabilityTracker
 from release_orchestrator import ReleaseOrchestrator
 from stashapp_importer import STASH_BASE_URL, StashappImporter, StashScanStuckError
+import sys
 
 
 class RedditResolver:
@@ -1387,4 +1388,4 @@ Examples:
 
 
 if __name__ == "__main__":
-    exit(main())
+    sys.exit(main())

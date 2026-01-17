@@ -19,6 +19,7 @@ import config as aural_config
 import yt_dlp
 from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
+import sys
 
 
 class ErocastExtractor:
@@ -333,4 +334,4 @@ def main():
 
 
 if __name__ == "__main__":
-    exit(main())
+    sys.exit(main())

@@ -21,6 +21,7 @@ from pathlib import Path
 import config as aural_config
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
+import sys
 
 
 class AO3Extractor:
@@ -691,4 +692,4 @@ def main():
 
 
 if __name__ == "__main__":
-    exit(main())
+    sys.exit(main())

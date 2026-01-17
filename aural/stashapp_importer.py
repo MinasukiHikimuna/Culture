@@ -32,6 +32,7 @@ from config import STASH_OUTPUT_DIR as CONFIG_STASH_OUTPUT_DIR
 from config import local_path_to_windows
 from dotenv import load_dotenv
 from exceptions import StashappUnavailableError
+import sys
 
 
 # Load .env from project root
@@ -1512,4 +1513,4 @@ with full metadata including performers, studios, and tags.
 
 
 if __name__ == "__main__":
-    exit(main())
+    sys.exit(main())

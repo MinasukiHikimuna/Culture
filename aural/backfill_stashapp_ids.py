@@ -15,6 +15,7 @@ from pathlib import Path
 
 import config as aural_config
 from stashapp_importer import StashappClient
+import sys
 
 
 def backfill_stashapp_ids(dry_run: bool = False) -> dict:
@@ -147,4 +148,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    exit(main())
+    sys.exit(main())

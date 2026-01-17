@@ -26,6 +26,7 @@ from typing import Dict, List, Optional
 import praw
 from config import GWASI_INDEX_DIR, REDDIT_INDEX_DIR, ensure_directories
 from dotenv import load_dotenv
+import sys
 
 
 def find_latest_gwasi_data() -> Optional[Path]:
@@ -916,4 +917,4 @@ def main():
 
 
 if __name__ == "__main__":
-    exit(main())
+    sys.exit(main())

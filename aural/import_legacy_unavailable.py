@@ -25,6 +25,7 @@ from pathlib import Path
 
 from config import REDDIT_INDEX_DIR
 from stashapp_importer import StashappClient, match_tags_with_stash
+import sys
 
 
 STASH_LIBRARY_PATH = Path("/Volumes/Culture 1/Aural_Stash")
@@ -288,4 +289,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    exit(main())
+    sys.exit(main())

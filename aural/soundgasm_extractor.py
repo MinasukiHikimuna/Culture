@@ -17,6 +17,7 @@ from pathlib import Path
 import httpx
 from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
+import sys
 
 
 class SoundgasmExtractor:
@@ -369,4 +370,4 @@ def main():
 
 
 if __name__ == "__main__":
-    exit(main())
+    sys.exit(main())
