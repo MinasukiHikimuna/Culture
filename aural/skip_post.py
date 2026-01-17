@@ -22,6 +22,7 @@ from pathlib import Path
 
 import config as aural_config
 
+
 # Use same data_dir as analyze_download_import.py
 DATA_DIR = aural_config.RELEASES_DIR.parent
 EXTRACTED_DATA_DIR = aural_config.REDDIT_INDEX_DIR

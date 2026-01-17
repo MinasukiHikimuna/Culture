@@ -26,6 +26,7 @@ from pathlib import Path
 from config import REDDIT_INDEX_DIR
 from stashapp_importer import StashappClient, match_tags_with_stash
 
+
 STASH_LIBRARY_PATH = Path("/Volumes/Culture 1/Aural_Stash")
 
 

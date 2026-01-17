@@ -13,9 +13,8 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from playwright.sync_api import sync_playwright
-
 import config as aural_config
+from playwright.sync_api import sync_playwright
 
 
 class HotAudioIndexer:

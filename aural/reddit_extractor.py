@@ -13,19 +13,19 @@ Requirements:
 3. Have gwasi_extractor output files available
 """
 
-import praw
-import json
+import argparse
 import csv
+import json
+import os
+import re
 import time
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
-import argparse
-import os
-import re
-from dotenv import load_dotenv
 
-from config import REDDIT_INDEX_DIR, GWASI_INDEX_DIR, ensure_directories
+import praw
+from config import GWASI_INDEX_DIR, REDDIT_INDEX_DIR, ensure_directories
+from dotenv import load_dotenv
 
 
 def find_latest_gwasi_data() -> Optional[Path]:
@@ -281,7 +281,7 @@ class RedditExtractor:
             try:
                 submission.comments.replace_more(limit=None)  # Load all comments
                 for comment in submission.comments.list():
-                    if hasattr(comment, 'body'):  # Skip deleted comments
+                    if hasattr(comment, "body"):  # Skip deleted comments
                         comment_data = {
                             "comment_id": comment.id,
                             "author": str(comment.author) if comment.author else "[deleted]",
@@ -365,33 +365,33 @@ class RedditExtractor:
     def create_slug(self, title: str, max_length: int = 50) -> str:
         """
         Create a URL-friendly slug from a title.
-        
+
         Args:
             title: The title to convert
             max_length: Maximum length of the slug
-            
+
         Returns:
             A URL-friendly slug
         """
         if not title:
             return "untitled"
-            
+
         # Convert to lowercase and replace spaces with hyphens
         slug = title.lower()
-        
+
         # Remove special characters except hyphens and alphanumeric
-        slug = re.sub(r'[^a-z0-9\s-]', '', slug)
-        
+        slug = re.sub(r"[^a-z0-9\s-]", "", slug)
+
         # Replace multiple spaces/hyphens with single hyphen
-        slug = re.sub(r'[\s-]+', '-', slug)
-        
+        slug = re.sub(r"[\s-]+", "-", slug)
+
         # Remove leading/trailing hyphens
-        slug = slug.strip('-')
-        
+        slug = slug.strip("-")
+
         # Truncate to max length
         if len(slug) > max_length:
-            slug = slug[:max_length].rstrip('-')
-            
+            slug = slug[:max_length].rstrip("-")
+
         return slug or "untitled"
 
     def load_gwasi_data(self, gwasi_file: str) -> List[Dict]:
@@ -645,12 +645,12 @@ class RedditExtractor:
         # Check in the original username directory
         if username and username not in ["[deleted]", "[suspended]", None]:
             user_dir = self.output_dir / username
-            
+
             # Check for old format first
             old_filepath = user_dir / f"{post_id}.json"
             if old_filepath.exists():
                 return True
-                
+
             # Check for new format (any file starting with post_id_)
             if user_dir.exists():
                 for file in user_dir.glob(f"{post_id}_*.json"):
@@ -658,12 +658,12 @@ class RedditExtractor:
 
         # Also check in deleted_users directory
         deleted_user_dir = self.output_dir / "deleted_users"
-        
+
         # Check old format
         old_deleted_filepath = deleted_user_dir / f"{post_id}.json"
         if old_deleted_filepath.exists():
             return True
-            
+
         # Check new format
         if deleted_user_dir.exists():
             for file in deleted_user_dir.glob(f"{post_id}_*.json"):
@@ -682,7 +682,7 @@ class RedditExtractor:
         # Try original username directory first
         if username and username not in ["[deleted]", "[suspended]", None]:
             user_dir = self.output_dir / username
-            
+
             # Try old format first
             old_filepath = user_dir / f"{post_id}.json"
             if old_filepath.exists():
@@ -691,7 +691,7 @@ class RedditExtractor:
                         return json.load(jsonfile)
                 except Exception as e:
                     print(f"⚠️ Warning: Could not load existing post {old_filepath}: {e}")
-            
+
             # Try new format (find any file starting with post_id_)
             if user_dir.exists():
                 for filepath in user_dir.glob(f"{post_id}_*.json"):
@@ -703,7 +703,7 @@ class RedditExtractor:
 
         # Try deleted_users directory
         deleted_user_dir = self.output_dir / "deleted_users"
-        
+
         # Try old format
         old_deleted_filepath = deleted_user_dir / f"{post_id}.json"
         if old_deleted_filepath.exists():
@@ -714,7 +714,7 @@ class RedditExtractor:
                 print(
                     f"⚠️ Warning: Could not load existing post {old_deleted_filepath}: {e}"
                 )
-        
+
         # Try new format in deleted_users
         if deleted_user_dir.exists():
             for filepath in deleted_user_dir.glob(f"{post_id}_*.json"):
@@ -745,7 +745,7 @@ class RedditExtractor:
 
         # Create slug from title
         slug = self.create_slug(title)
-        
+
         # Save post as JSON with new filename format
         filename = f"{post_id}_{slug}.json"
         filepath = user_dir / filename
@@ -843,7 +843,7 @@ def main():
 
         # Also check if it looks like a Reddit URL or post ID
         is_reddit_url = "reddit.com" in args.input or args.input.startswith("/r/")
-        is_post_id = not is_file and not is_reddit_url and re.match(r'^[a-z0-9]+$', args.input, re.IGNORECASE)
+        is_post_id = not is_file and not is_reddit_url and re.match(r"^[a-z0-9]+$", args.input, re.IGNORECASE)
 
         if is_reddit_url or is_post_id:
             # Single post mode

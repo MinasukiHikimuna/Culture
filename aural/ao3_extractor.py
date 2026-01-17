@@ -18,10 +18,9 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+import config as aural_config
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
-
-import config as aural_config
 
 
 class AO3Extractor:

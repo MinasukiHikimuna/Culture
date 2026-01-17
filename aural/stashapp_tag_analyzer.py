@@ -31,6 +31,7 @@ from pathlib import Path
 import requests
 from dotenv import load_dotenv
 
+
 # Load .env from monorepo root (parent directory)
 MONOREPO_ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(MONOREPO_ROOT / ".env")

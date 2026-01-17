@@ -11,17 +11,17 @@ Data sources:
 - https://gwasi.com/base_*.json (main dataset)
 """
 
-import requests
+import argparse
 import json
 import re
 import time
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
-import argparse
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import parse_qs, urlparse
 
 import config as aural_config
+import requests
 
 
 class GwasiExtractor:
@@ -234,13 +234,13 @@ class GwasiExtractor:
         print(f"You can either:")
         print(f"  1. Download the new base data (recommended for complete dataset)")
         print(f"  2. Continue with delta-only updates (faster, but may miss some data)")
-        
+
         while True:
             try:
                 response = input(f"\nDownload new base data? [y/N]: ").strip().lower()
-                if response in ['', 'n', 'no']:
+                if response in ["", "n", "no"]:
                     return False
-                elif response in ['y', 'yes']:
+                elif response in ["y", "yes"]:
                     return True
                 else:
                     print("Please enter 'y' for yes or 'n' for no.")
@@ -809,8 +809,8 @@ def main():
         else:
             # Normal extraction with optional caching
             use_cache = not args.no_cache
-            delta_only = getattr(args, 'delta_only', False)
-            interactive = not getattr(args, 'non_interactive', False)
+            delta_only = getattr(args, "delta_only", False)
+            interactive = not getattr(args, "non_interactive", False)
             data = extractor.extract_all_data(
                 args.max_files, use_cache, args.force_full, delta_only, interactive
             )

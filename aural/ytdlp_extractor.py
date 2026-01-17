@@ -20,9 +20,8 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-import yt_dlp
-
 import config as aural_config
+import yt_dlp
 
 
 class YtDlpLogger:

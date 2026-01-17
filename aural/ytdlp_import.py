@@ -17,9 +17,8 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-import oshash
-
 import config as aural_config
+import oshash
 from config import PROCESSED_URLS_FILE
 from stashapp_importer import (
     STASH_BASE_URL,

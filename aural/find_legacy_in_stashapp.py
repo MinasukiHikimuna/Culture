@@ -235,7 +235,7 @@ def main() -> int:
         print("\nMatched files (can be deleted):")
         for m in results["matched"]:
             print(f"  - {Path(m['file']).name}")
-            performers_str = f" [{', '.join(m['performers'])}]" if m.get('performers') else ""
+            performers_str = f" [{', '.join(m['performers'])}]" if m.get("performers") else ""
             print(f"    → Scene {m['scene_id']}: {m['title'][:50]}{performers_str} (score: {m['score']:.2f})")
 
     if results["not_found"]:

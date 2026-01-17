@@ -18,10 +18,10 @@ import os
 import shutil
 from pathlib import Path
 
+import config as aural_config
 import httpx
 from dotenv import load_dotenv
 
-import config as aural_config
 
 load_dotenv()
 

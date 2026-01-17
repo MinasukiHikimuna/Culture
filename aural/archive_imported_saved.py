@@ -15,10 +15,10 @@ import json
 import shutil
 from pathlib import Path
 
-from dotenv import load_dotenv
-
 import config as aural_config
+from dotenv import load_dotenv
 from stashapp_importer import StashappClient
+
 
 load_dotenv(Path(__file__).parent / ".env")
 

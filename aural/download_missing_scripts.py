@@ -17,7 +17,7 @@ def script_is_incomplete(script_file: Path) -> str | None:
 
     content = script_file.read_text(encoding="utf-8")
     if len(content) < 2000:
-        match = re.search(r'https://scriptbin\.works/[^\s\)\]]+', content)
+        match = re.search(r"https://scriptbin\.works/[^\s\)\]]+", content)
         if match:
             return match.group(0)
 

@@ -23,7 +23,7 @@ def script_is_incomplete(script_file: Path) -> str | None:
     # Real scripts are typically much longer than Reddit post summaries
     if len(content) < 2000:
         # Look for scriptbin.works links in the content
-        match = re.search(r'https://scriptbin\.works/[^\s\)\]]+', content)
+        match = re.search(r"https://scriptbin\.works/[^\s\)\]]+", content)
         if match:
             return match.group(0)
 

@@ -15,11 +15,10 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+import config as aural_config
 import yt_dlp
 from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
-
-import config as aural_config
 
 
 class ErocastExtractor:

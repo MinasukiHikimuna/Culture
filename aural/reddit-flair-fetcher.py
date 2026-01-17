@@ -184,11 +184,11 @@ def parse_gender_from_flair(flair_text: str, flair_css_class: str) -> str | None
             return "non_binary"
 
         # Bracketed gender markers [F], [M], [NB]
-        if re.search(r'\[f\]', flair_lower):
+        if re.search(r"\[f\]", flair_lower):
             return "female"
-        if re.search(r'\[m\]', flair_lower) and not re.search(r'\[fm\]|\[mf\]', flair_lower):
+        if re.search(r"\[m\]", flair_lower) and not re.search(r"\[fm\]|\[mf\]", flair_lower):
             return "male"
-        if re.search(r'\[nb\]', flair_lower):
+        if re.search(r"\[nb\]", flair_lower):
             return "non_binary"
 
         # Text patterns (be careful with "male" matching "female")

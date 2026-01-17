@@ -14,9 +14,9 @@ import time
 from pathlib import Path
 
 import httpx
-
 from exceptions import StashappUnavailableError
 from stashapp_importer import LM_STUDIO_URL, StashappClient
+
 
 LOG_FILE = Path(__file__).parent / "connectivity_test.log"
 
@@ -349,7 +349,7 @@ def get_network_diagnostics() -> str:
                 sock.close()
                 lines.append(f"  Socket 10.0.1.1:{port} ({name}): connectable")
             except Exception as e:
-                err = str(e).split(']')[-1].strip() if ']' in str(e) else str(e)
+                err = str(e).split("]")[-1].strip() if "]" in str(e) else str(e)
                 lines.append(f"  Socket 10.0.1.1:{port} ({name}): FAILED ({err})")
 
         # Try a different local IP on same subnet
