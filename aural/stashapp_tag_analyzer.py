@@ -231,7 +231,7 @@ class StashappTagAnalyzer:
         if tag_id in existing_tag_ids:
             return False  # Already has this tag
 
-        new_tag_ids = existing_tag_ids + [tag_id]
+        new_tag_ids = [*existing_tag_ids, tag_id]
 
         if dry_run:
             return True
@@ -304,7 +304,7 @@ class StashappTagAnalyzer:
                         ):
                             linked_count += 1
                             # Update cache
-                            scene_existing_tags[scene_id] = existing_tags + [tag_id]
+                            scene_existing_tags[scene_id] = [*existing_tags, tag_id]
                         else:
                             skipped_count += 1
 
