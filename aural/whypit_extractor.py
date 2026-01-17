@@ -237,7 +237,7 @@ class WhypitExtractor:
             if "cdn.whyp.it" not in r.url:
                 return False
             url_path = r.url.split("?")[0]
-            return url_path.endswith(".mp3") or url_path.endswith(".flac")
+            return url_path.endswith((".mp3", ".flac"))
 
         # Use expect_response to wait for audio URL (mp3 or flac) while clicking play
         with self.page.expect_response(is_audio_response, timeout=30000) as response_info:

@@ -201,9 +201,9 @@ def parse_gender_from_flair(flair_text: str, flair_css_class: str) -> str | None
             return "transgender"
 
         # Check for F/M at start of flair (common pattern)
-        if flair_lower.startswith("f ") or flair_lower.startswith("f/"):
+        if flair_lower.startswith(("f ", "f/")):
             return "female"
-        if flair_lower.startswith("m ") or flair_lower.startswith("m/"):
+        if flair_lower.startswith(("m ", "m/")):
             return "male"
 
     return None

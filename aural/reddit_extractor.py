@@ -135,7 +135,7 @@ class RedditExtractor:
         normalized = url.split("?")[0].split("#")[0]
 
         # Ensure https://www.reddit.com prefix
-        if normalized.startswith("/r/") or normalized.startswith("/u/"):
+        if normalized.startswith(("/r/", "/u/")):
             normalized = f"https://www.reddit.com{normalized}"
         elif normalized.startswith("reddit.com"):
             normalized = f"https://www.{normalized}"

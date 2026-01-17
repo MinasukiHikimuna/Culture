@@ -285,7 +285,7 @@ class ScriptBinExtractor:
                     for p in paragraphs:
                         text = p.get_text(strip=True)
                         # Skip metadata paragraphs
-                        if text.startswith("Performers:") or text.startswith("Listeners:"):
+                        if text.startswith(("Performers:", "Listeners:")):
                             continue
                         if text.startswith("Short link:") or "scriptbin.works" in text:
                             continue
