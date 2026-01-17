@@ -961,19 +961,103 @@ class HotAudioExtractor:
         """
         self.ensure_rate_limit()
 
-        # Support both old options format and new target_path format
-        if "dir" in target_path:
-            # New format: { dir, basename }
-            output_dir = Path(target_path["dir"])
-            output_name = target_path.get("basename")
-            verify = False
-        else:
-            # Old format: { outputDir, outputName, verify }
-            output_dir = Path(target_path.get("outputDir", "./data/hotaudio"))
-            output_name = target_path.get("outputName")
-            verify = target_path.get("verify", False)
+        output_dir, output_name, verify = self._parse_target_path(target_path)
+        final_output_name = output_name or self._extract_slug_from_url(url)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        json_path = output_dir / f"{final_output_name}.json"
 
-        # Reset captured data for this extraction
+        cached = self._check_cache(json_path, url)
+        if cached:
+            return cached
+
+        self._reset_captured_data()
+        verify_data = self._init_verify_data(url, verify)
+
+        print("HotAudio Extractor")
+        print("==================\n")
+        print(f"URL: {url}\n")
+
+        playwright, browser, _context, page = await self._setup_browser()
+
+        try:
+            await self._navigate_and_start_playback(page, url)
+            target_segments, duration = await self._determine_segment_count(page)
+            await self._collect_keys_during_playback(page, target_segments, duration)
+            await self._validate_captured_data(page)
+            await self._close_browser(browser, playwright)
+
+            hax_buffer, metadata, segments = self._download_and_parse_hax(
+                self.captured_data["hax_url"]
+            )
+            codec = self._decode_codec(metadata)
+
+            if verify_data:
+                self._collect_hax_verification(verify_data, hax_buffer, metadata, codec)
+
+            decrypted_segments = self._decrypt_segments(
+                hax_buffer, metadata, segments, verify_data
+            )
+
+            if len(decrypted_segments) < len(segments):
+                return self._build_failure_result(decrypted_segments, segments)
+
+            full_audio = b"".join(decrypted_segments)
+            output_path = output_dir / f"{final_output_name}.m4a"
+            output_path.write_bytes(full_audio)
+
+            if verify_data:
+                self._collect_output_verification(verify_data, output_path, full_audio)
+
+            result = self._build_success_result(
+                url, output_path, json_path, full_audio, metadata, codec,
+                decrypted_segments, verify_data
+            )
+            json_path.write_text(
+                json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8"
+            )
+
+            self._print_summary(output_path, full_audio, metadata, verify_data)
+            return result
+
+        except Exception as error:
+            print(f"\nError: {error}")
+            raise
+
+        finally:
+            await self._cleanup_browser(browser, playwright)
+
+    def _parse_target_path(self, target_path: dict) -> tuple[Path, str | None, bool]:
+        """Parse target path options into output directory, name, and verify flag."""
+        if "dir" in target_path:
+            return (
+                Path(target_path["dir"]),
+                target_path.get("basename"),
+                False,
+            )
+        return (
+            Path(target_path.get("outputDir", "./data/hotaudio")),
+            target_path.get("outputName"),
+            target_path.get("verify", False),
+        )
+
+    def _extract_slug_from_url(self, url: str) -> str:
+        """Extract audio slug from URL for output filename."""
+        url_parts = url.rstrip("/").split("/")
+        return url_parts[-1] or "audio"
+
+    def _check_cache(self, json_path: Path, url: str) -> dict | None:
+        """Check if extraction is already cached."""
+        if json_path.exists():
+            try:
+                cached = json.loads(json_path.read_text(encoding="utf-8"))
+                print(f"  Using cached extraction for: {url}")
+                return cached
+            except json.JSONDecodeError:
+                pass
+        return None
+
+    def _reset_captured_data(self) -> None:
+        """Reset captured data for a new extraction."""
         self.captured_data = {
             "hax_url": None,
             "segment_keys": {},
@@ -981,77 +1065,53 @@ class HotAudioExtractor:
             "segment_count": None,
         }
 
-        # Extract audio slug from URL for output filename (early, for cache check)
-        url_parts = url.rstrip("/").split("/")
-        slug = url_parts[-1] or "audio"
-        final_output_name = output_name or slug
+    def _init_verify_data(self, url: str, verify: bool) -> dict | None:
+        """Initialize verification data collector if verify mode is enabled."""
+        if not verify:
+            return None
+        return {
+            "url": url,
+            "hax": {},
+            "metadata": {},
+            "tree_keys": {},
+            "segments": [],
+            "output": {},
+        }
 
-        # Check if already extracted (JSON exists)
-        output_dir.mkdir(parents=True, exist_ok=True)
-        json_path = output_dir / f"{final_output_name}.json"
-
-        if json_path.exists():
-            try:
-                cached = json.loads(json_path.read_text(encoding="utf-8"))
-                print(f"  Using cached extraction for: {url}")
-                return cached
-            except json.JSONDecodeError:
-                pass  # Not cached or invalid, continue with extraction
-
-        # Verification data collector
-        verify_data = (
-            {
-                "url": url,
-                "hax": {},
-                "metadata": {},
-                "tree_keys": {},
-                "segments": [],
-                "output": {},
-            }
-            if verify
-            else None
-        )
-
-        print("HotAudio Extractor")
-        print("==================\n")
-        print(f"URL: {url}\n")
-
-        # Launch browser with async API
+    async def _setup_browser(self):
+        """Launch browser with key capture hooks installed."""
         playwright = await async_playwright().start()
         browser = await playwright.chromium.launch(
             headless=False,
             channel="chrome",
             args=["--disable-blink-features=AutomationControlled"],
         )
-
         context = await browser.new_context(
             viewport={"width": 1920, "height": 1080},
             user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
         )
+        await context.add_init_script(script=self._get_key_capture_script())
+        page = await context.new_page()
+        await page.route("**/*", self._create_route_handler())
+        return playwright, browser, context, page
 
-        # Add init script to CONTEXT (not page) - must be done before page creation
-        # This ensures the script runs before any page JavaScript
-        await context.add_init_script(
-            script="""
-            // Buffer for captured data - will be polled by Python
+    def _get_key_capture_script(self) -> str:
+        """Return JavaScript to hook JSON.parse for key capture."""
+        return """
             window.__pendingKeyCaptures = window.__pendingKeyCaptures || [];
             window.__pendingMetadataCaptures = window.__pendingMetadataCaptures || [];
             window.__hookInstalled = true;
             window.__jsonParseCallCount = 0;
 
-            // Hook JSON.parse to capture segment keys from /api/v1/audio/listen response
             const originalJSONParse = JSON.parse.bind(JSON);
             JSON.parse = function(text) {
                 window.__jsonParseCallCount = (window.__jsonParseCallCount || 0) + 1;
                 const result = originalJSONParse(text);
 
                 if (result && typeof result === 'object') {
-                    // Capture segment keys from listen response
                     if (result.keys && typeof result.keys === 'object' && !result.tracks) {
                         window.__pendingKeyCaptures.push(result.keys);
                     }
-
-                    // Capture track metadata from decrypted state
                     if (result.tracks && Array.isArray(result.tracks)) {
                         const track = result.tracks[0];
                         window.__pendingMetadataCaptures.push({
@@ -1062,578 +1122,519 @@ class HotAudioExtractor:
                         });
                     }
                 }
-
                 return result;
             };
-            """
-        )
+        """
 
-        page = await context.new_page()
-
-        # Helper to flush captured keys from window storage
-        # (CDP console capture doesn't work reliably in Python Playwright for init scripts)
-        async def flush_captured_keys():
-            """Flush any keys stored in window.__pendingKeyCaptures."""
-            try:
-                pending = await page.evaluate(
-                    """() => {
-                    const pending = window.__pendingKeyCaptures || [];
-                    window.__pendingKeyCaptures = [];
-                    return pending;
-                }"""
-                )
-                for keys in pending:
-                    new_keys = [
-                        k
-                        for k in keys
-                        if k not in self.captured_data["segment_keys"]
-                    ]
-                    self.captured_data["segment_keys"].update(keys)
-                    if new_keys:
-                        key_nums = sorted([int(k) for k in new_keys])
-                        key_preview = ",".join(str(k) for k in key_nums[:5])
-                        if len(key_nums) > 5:
-                            key_preview += "..."
-                        total = len(self.captured_data["segment_keys"])
-                        print(
-                            f"Captured {len(new_keys)} new tree node keys: "
-                            f"{key_preview} (total: {total})"
-                        )
-            except Exception:
-                pass  # Page might not be ready yet
-
-        async def flush_captured_metadata():
-            """Flush any metadata stored in window.__pendingMetadataCaptures."""
-            try:
-                pending = await page.evaluate(
-                    """() => {
-                    const pending = window.__pendingMetadataCaptures || [];
-                    window.__pendingMetadataCaptures = [];
-                    return pending;
-                }"""
-                )
-                for metadata in pending:
-                    if metadata:
-                        self.captured_data["metadata"] = metadata
-                        print(f"Captured metadata: {metadata.get('title', 'untitled')}")
-            except Exception:
-                pass  # Page might not be ready yet
-
-        async def set_playback_speed(speed: float = 4.0) -> bool:
-            """Set audio playback speed via HotAudio's speed menu.
-
-            HotAudio uses Web Audio API which appears to cap at ~4x speed
-            regardless of the UI label. We modify the 2.0x option's text
-            to our target speed before clicking it.
-            """
-            try:
-                result = await page.evaluate(
-                    f"""() => {{
-                    // Find the 2.0x option and change its text to our target speed
-                    const speedOptions = document.querySelectorAll('.speed-option');
-                    let clicked = false;
-
-                    speedOptions.forEach(opt => {{
-                        if (opt.textContent.trim() === '2.0x' || opt.textContent.trim() === '4.0x') {{
-                            // Modify the text to our target speed
-                            opt.textContent = '{speed}x';
-                            // Remove active state from all options
-                            speedOptions.forEach(o => o.classList.remove('bg-slate-600'));
-                            // Set active state and click
-                            opt.classList.add('bg-slate-600');
-                            opt.click();
-                            clicked = true;
-                        }}
-                    }});
-
-                    return clicked ? {speed} : null;
-                }}"""
-                )
-                if result:
-                    print(f"  Set playback speed to {result}x")
-                    return True
-                return False
-            except Exception:
-                return False
-
-        # Intercept network to capture HAX URL
+    def _create_route_handler(self):
+        """Create route handler to capture HAX URL from network requests."""
         async def handle_route(route, request):
             req_url = request.url
-
-            # Capture HAX file URL from CDN (only print once per unique URL)
             is_hax_url = ".hax" in req_url or (
                 "/a/" in req_url and "cdn.hotaudio" in req_url
             )
             if is_hax_url and self.captured_data["hax_url"] != req_url:
                 self.captured_data["hax_url"] = req_url
                 print(f"Captured HAX URL: {req_url[:60]}...")
-
             await route.continue_()
+        return handle_route
 
-        await page.route("**/*", handle_route)
+    async def _navigate_and_start_playback(self, page, url: str) -> None:
+        """Navigate to page and start audio playback."""
+        print("Navigating to page...")
+        await page.goto(url, wait_until="networkidle", timeout=60000)
+
+        hook_status = await page.evaluate(
+            """() => ({
+                hookInstalled: window.__hookInstalled,
+                jsonParseCallCount: window.__jsonParseCallCount,
+                pendingKeys: (window.__pendingKeyCaptures || []).length
+            })"""
+        )
+        print(f"Hook status: {hook_status}")
+
+        await self._flush_captured_keys(page)
+        await self._flush_captured_metadata(page)
 
         try:
-            # Navigate to page
-            print("Navigating to page...")
-            await page.goto(url, wait_until="networkidle", timeout=60000)
+            await page.wait_for_selector("#player-playpause", timeout=10000)
+            print("Player found")
+        except Exception:
+            print("Player not found, continuing...")
 
-            # Check if hook is installed
-            hook_status = await page.evaluate(
-                """() => ({
-                    hookInstalled: window.__hookInstalled,
-                    jsonParseCallCount: window.__jsonParseCallCount,
-                    pendingKeys: (window.__pendingKeyCaptures || []).length
-                })"""
-            )
-            print(f"Hook status: {hook_status}")
+        await page.evaluate('document.querySelector("#player-volume").value = 0')
 
-            # Flush any captured data from init script
-            await flush_captured_keys()
-            await flush_captured_metadata()
+        print("Clicking play to trigger key exchange...")
+        play_button = await page.query_selector("#player-playpause")
+        if play_button:
+            await play_button.click()
+            await page.wait_for_timeout(2000)
+            await self._set_playback_speed(page, 4.0)
+            await self._flush_captured_keys(page)
+            await self._flush_captured_metadata(page)
 
-            # Wait for player
+    async def _determine_segment_count(self, page) -> tuple[int, int | None]:
+        """Determine target segment count from HAX file or duration estimate."""
+        actual_segment_count = None
+        if self.captured_data["hax_url"]:
             try:
-                await page.wait_for_selector("#player-playpause", timeout=10000)
-                print("Player found")
-            except Exception:
-                print("Player not found, continuing...")
+                _, hax_metadata, _ = self._download_and_parse_hax(
+                    self.captured_data["hax_url"]
+                )
+                actual_segment_count = hax_metadata["segmentCount"]
+            except Exception as e:
+                print(f"  Warning: Early HAX download failed: {e}")
 
-            # Mute audio before playback
-            await page.evaluate('document.querySelector("#player-volume").value = 0')
+        duration = await page.evaluate(
+            """() => {
+            const progressText = document.querySelector('#player-progress-text');
+            if (progressText) {
+                const parts = progressText.textContent.split('/');
+                if (parts.length === 2) {
+                    const [min, sec] = parts[1].trim().split(':').map(Number);
+                    return min * 60 + sec;
+                }
+            }
+            return null;
+        }"""
+        )
 
-            # Click play to trigger key capture
-            print("Clicking play to trigger key exchange...")
-            play_button = await page.query_selector("#player-playpause")
-            if play_button:
-                await play_button.click()
-                await page.wait_for_timeout(2000)
-                # Set 4x playback speed via speed menu UI hack
-                await set_playback_speed(4.0)
-                # Flush keys captured after play click
-                await flush_captured_keys()
-                await flush_captured_metadata()
+        if actual_segment_count:
+            target_segments = actual_segment_count
+            print(f"Using actual segment count: {target_segments}")
+        elif duration:
+            target_segments = math.ceil(duration)
+            print(f"Using estimated segment count: {target_segments}")
+        else:
+            target_segments = 200
 
-            # Download HAX file early to get actual segment count
-            hax_buffer = None
-            hax_metadata = None
-            hax_segments = None
-            actual_segment_count = None
+        if duration:
+            minutes = int(duration // 60)
+            seconds = int(duration % 60)
+            print(f"Total duration: {minutes}:{seconds:02d}")
 
-            if self.captured_data["hax_url"]:
-                try:
-                    hax_buffer, hax_metadata, hax_segments = self._download_and_parse_hax(
-                        self.captured_data["hax_url"]
-                    )
-                    actual_segment_count = hax_metadata["segmentCount"]
-                except Exception as e:
-                    print(f"  Warning: Early HAX download failed: {e}")
-                    # Will retry later
+        print(f"Collecting keys for {target_segments} segments...")
+        return target_segments, duration
 
-            # Get total duration from player as fallback
-            duration = await page.evaluate(
+    async def _collect_keys_during_playback(
+        self, page, target_segments: int, duration: int | None
+    ) -> None:
+        """Play audio at 4x speed and collect encryption keys."""
+        playback_speed = 4.0
+        print(f"  Letting audio play at {playback_speed}x speed...")
+        if duration:
+            minutes = int(duration // 60)
+            seconds = int(duration % 60)
+            print(f"  Audio duration: {minutes}:{seconds:02d}")
+
+        play_button = await page.query_selector("#player-playpause")
+        if play_button:
+            await play_button.click()
+            await page.wait_for_timeout(1000)
+            await self._set_playback_speed(page, playback_speed)
+
+        start_time = time.time()
+        last_playback_secs = 0
+        slow_progress_count = 0
+        reload_attempts = 0
+        max_reload_attempts = 3
+
+        while True:
+            await page.wait_for_timeout(10000)
+            await self._flush_captured_keys(page)
+
+            current_keys = len(self.captured_data["segment_keys"])
+            uncovered = self._find_uncovered_segments(target_segments)
+            elapsed = int(time.time() - start_time)
+
+            time_info = await page.evaluate(
                 """() => {
                 const progressText = document.querySelector('#player-progress-text');
-                if (progressText) {
-                    const parts = progressText.textContent.split('/');
-                    if (parts.length === 2) {
-                        const [min, sec] = parts[1].trim().split(':').map(Number);
-                        return min * 60 + sec;
-                    }
-                }
-                return null;
+                return progressText ? progressText.textContent : 'unknown';
             }"""
             )
 
-            # Use actual segment count if available, otherwise estimate from duration
-            if actual_segment_count:
-                target_segments = actual_segment_count
-                print(f"Using actual segment count: {target_segments}")
-            elif duration:
-                target_segments = math.ceil(duration)
-                print(f"Using estimated segment count: {target_segments}")
-            else:
-                target_segments = 200  # Fallback
+            covered_count = target_segments - len(uncovered)
+            print(
+                f"  {elapsed}s: {time_info} - {current_keys} keys, "
+                f"{covered_count}/{target_segments} covered"
+            )
 
-            if duration:
-                minutes = int(duration // 60)
-                seconds = int(duration % 60)
-                print(f"Total duration: {minutes}:{seconds:02d}")
+            if not uncovered:
+                print("  All segments covered!")
+                break
 
-            print(f"Collecting keys for {target_segments} segments...")
+            parsed = self._parse_time_info(time_info)
+            if parsed:
+                current_secs, total_secs = parsed
 
-            # Helper to find uncovered segments
-            def find_uncovered_segments(segment_count: int) -> list[int]:
-                tree_depth = math.ceil(math.log2(segment_count))
-                segment_key_base = 1 + (1 << (tree_depth + 1))
-                keys = [int(k) for k in self.captured_data["segment_keys"]]
+                if current_secs >= total_secs:
+                    print("  Playback ended, waiting 10s for final keys...")
+                    await page.wait_for_timeout(10000)
+                    await self._flush_captured_keys(page)
+                    print("  Playback completed")
+                    break
 
-                uncovered = []
-                for seg in range(segment_count):
-                    node = segment_key_base + seg
-                    n = int(math.log2(node))
-                    covered = False
+                progress = current_secs - last_playback_secs
+                if progress < 10:
+                    slow_progress_count += 1
+                    should_break = await self._handle_slow_progress(
+                        page, slow_progress_count, reload_attempts,
+                        max_reload_attempts, playback_speed
+                    )
+                    if should_break is True:
+                        break
+                    if should_break == "reloaded":
+                        reload_attempts += 1
+                        slow_progress_count = 0
+                        continue
+                else:
+                    slow_progress_count = 0
+                last_playback_secs = current_secs
 
-                    for d in range(n + 1):
-                        ancestor = node >> (n - d)
-                        if ancestor in keys:
-                            covered = True
-                            break
+        final_uncovered = self._find_uncovered_segments(target_segments)
+        print(f"Collected {len(self.captured_data['segment_keys'])} tree node keys")
+        covered_count = target_segments - len(final_uncovered)
+        print(f"Coverage: {covered_count}/{target_segments} segments")
 
-                    if not covered:
-                        uncovered.append(seg)
-                return uncovered
+        await self._flush_captured_keys(page)
+        await self._flush_captured_metadata(page)
 
-            # Let the audio play at 4x speed to collect all keys
-            playback_speed = 4.0
-            print(f"  Letting audio play at {playback_speed}x speed...")
-            if duration:
-                print(f"  Audio duration: {minutes}:{seconds:02d}")
-
-            # Make sure audio is playing and set 4x speed
+    async def _handle_slow_progress(
+        self, page, slow_progress_count: int, reload_attempts: int,
+        max_reload_attempts: int, playback_speed: float
+    ) -> bool | str | None:
+        """Handle slow playback progress with resume attempts and page reloads."""
+        if slow_progress_count == 2:
+            print("  Slow progress detected, attempting to resume...")
             play_button = await page.query_selector("#player-playpause")
             if play_button:
                 await play_button.click()
                 await page.wait_for_timeout(1000)
-                # Set 4x playback speed via speed menu UI hack
-                await set_playback_speed(playback_speed)
+                await play_button.click()
+        elif slow_progress_count >= 5:
+            if reload_attempts >= max_reload_attempts:
+                print(f"  Extraction failed after {max_reload_attempts} reload attempts")
+                return True
+            print(f"  Reloading page (attempt {reload_attempts + 1}/{max_reload_attempts})...")
+            await page.reload(wait_until="networkidle", timeout=60000)
+            await page.wait_for_selector("#player-playpause", timeout=10000)
+            await page.evaluate('document.querySelector("#player-volume").value = 0')
+            play_button = await page.query_selector("#player-playpause")
+            if play_button:
+                await play_button.click()
+                await page.wait_for_timeout(1000)
+                await self._set_playback_speed(page, playback_speed)
+            return "reloaded"
+        return None
 
-            start_time = time.time()
-            last_playback_secs = 0
-            slow_progress_count = 0
-            reload_attempts = 0
-            max_reload_attempts = 3
+    def _find_uncovered_segments(self, segment_count: int) -> list[int]:
+        """Find segments not covered by captured keys."""
+        tree_depth = math.ceil(math.log2(segment_count))
+        segment_key_base = 1 + (1 << (tree_depth + 1))
+        keys = [int(k) for k in self.captured_data["segment_keys"]]
 
-            def parse_time_info(time_str: str) -> tuple[int, int] | None:
-                """Parse 'MM:SS / MM:SS' format to (current_secs, total_secs)."""
-                if " / " not in time_str:
-                    return None
-                try:
-                    current_str, total_str = time_str.split(" / ")
-                    current_parts = current_str.strip().split(":")
-                    total_parts = total_str.strip().split(":")
-                    current_secs = int(current_parts[0]) * 60 + int(current_parts[1])
-                    total_secs = int(total_parts[0]) * 60 + int(total_parts[1])
-                    return current_secs, total_secs
-                except (ValueError, IndexError):
-                    return None
-
-            while True:
-                await page.wait_for_timeout(10000)  # Check every 10 seconds
-
-                # Flush any newly captured keys
-                await flush_captured_keys()
-
-                current_keys = len(self.captured_data["segment_keys"])
-                uncovered = find_uncovered_segments(target_segments)
-                elapsed = int(time.time() - start_time)
-
-                # Get current playback position from the player UI
-                time_info = await page.evaluate(
-                    """() => {
-                    const progressText = document.querySelector('#player-progress-text');
-                    return progressText ? progressText.textContent : 'unknown';
-                }"""
-                )
-
-                covered_count = target_segments - len(uncovered)
-                print(
-                    f"  {elapsed}s: {time_info} - {current_keys} keys, "
-                    f"{covered_count}/{target_segments} covered"
-                )
-
-                if not uncovered:
-                    print("  All segments covered!")
+        uncovered = []
+        for seg in range(segment_count):
+            node = segment_key_base + seg
+            n = int(math.log2(node))
+            covered = False
+            for d in range(n + 1):
+                ancestor = node >> (n - d)
+                if ancestor in keys:
+                    covered = True
                     break
+            if not covered:
+                uncovered.append(seg)
+        return uncovered
 
-                # Parse current playback position
-                parsed = parse_time_info(time_info)
-                if parsed:
-                    current_secs, total_secs = parsed
+    def _parse_time_info(self, time_str: str) -> tuple[int, int] | None:
+        """Parse 'MM:SS / MM:SS' format to (current_secs, total_secs)."""
+        if " / " not in time_str:
+            return None
+        try:
+            current_str, total_str = time_str.split(" / ")
+            current_parts = current_str.strip().split(":")
+            total_parts = total_str.strip().split(":")
+            current_secs = int(current_parts[0]) * 60 + int(current_parts[1])
+            total_secs = int(total_parts[0]) * 60 + int(total_parts[1])
+            return current_secs, total_secs
+        except (ValueError, IndexError):
+            return None
 
-                    # Check if playback reached the end
-                    if current_secs >= total_secs:
-                        print("  Playback ended, waiting 10s for final keys...")
-                        await page.wait_for_timeout(10000)
-                        await flush_captured_keys()
-                        print("  Playback completed")
-                        break
-
-                    # Detect slow progress: at 4x speed, expect ~40s progress per 10s
-                    # Be lenient: consider it slow if < 10s progress per check
-                    progress = current_secs - last_playback_secs
-                    if progress < 10:
-                        slow_progress_count += 1
-                        if slow_progress_count == 2:
-                            # Try clicking play to resume
-                            print("  Slow progress detected, attempting to resume...")
-                            play_button = await page.query_selector("#player-playpause")
-                            if play_button:
-                                await play_button.click()
-                                await page.wait_for_timeout(1000)
-                                await play_button.click()
-                        elif slow_progress_count >= 5:
-                            # Resume clicks aren't helping, reload the page
-                            reload_attempts += 1
-                            if reload_attempts >= max_reload_attempts:
-                                print(
-                                    f"  Extraction failed after "
-                                    f"{max_reload_attempts} reload attempts"
-                                )
-                                break
-                            print(
-                                f"  Reloading page "
-                                f"(attempt {reload_attempts}/{max_reload_attempts})..."
-                            )
-                            await page.reload(wait_until="networkidle", timeout=60000)
-                            await page.wait_for_selector(
-                                "#player-playpause", timeout=10000
-                            )
-                            await page.evaluate(
-                                'document.querySelector("#player-volume").value = 0'
-                            )
-                            play_button = await page.query_selector("#player-playpause")
-                            if play_button:
-                                await play_button.click()
-                                await page.wait_for_timeout(1000)
-                                await set_playback_speed(playback_speed)
-                            slow_progress_count = 0
-                            # Don't update last_playback_secs - keep tracking
-                            continue
-                    else:
-                        slow_progress_count = 0
-                    last_playback_secs = current_secs
-
-            final_uncovered = find_uncovered_segments(target_segments)
-            print(
-                f"Collected {len(self.captured_data['segment_keys'])} tree node keys"
+    async def _flush_captured_keys(self, page) -> None:
+        """Flush any keys stored in window.__pendingKeyCaptures."""
+        try:
+            pending = await page.evaluate(
+                """() => {
+                const pending = window.__pendingKeyCaptures || [];
+                window.__pendingKeyCaptures = [];
+                return pending;
+            }"""
             )
-            covered_count = target_segments - len(final_uncovered)
-            print(f"Coverage: {covered_count}/{target_segments} segments")
-
-            # Final flush before validation
-            await flush_captured_keys()
-            await flush_captured_metadata()
-
-            # Check if we have all required data
-            if not self.captured_data["segment_keys"]:
-                raise ValueError("Failed to capture segment keys")
-
-            if not self.captured_data["hax_url"]:
-                # Try to extract from page config
-                hax_url = await page.evaluate(
-                    """() => {
-                    if (window.__ha_state?.tracks?.[0]?.src) {
-                        return window.__ha_state.tracks[0].src;
-                    }
-                    return null;
-                }"""
-                )
-
-                if hax_url:
-                    self.captured_data["hax_url"] = hax_url
-                    print(f"Extracted HAX URL from page: {hax_url[:60]}...")
-                else:
-                    raise ValueError("Failed to capture HAX URL")
-
-            # Close browser - we have what we need
-            await browser.close()
-            await playwright.stop()
-
-            # Use already-downloaded HAX data, or download if not available
-            if hax_buffer is None:
-                hax_buffer, hax_metadata, hax_segments = self._download_and_parse_hax(
-                    self.captured_data["hax_url"]
-                )
-
-            # Use the pre-parsed data
-            metadata = hax_metadata
-            segments = hax_segments
-            codec = (
-                metadata["codec"].decode("utf-8")
-                if isinstance(metadata["codec"], bytes)
-                else metadata["codec"]
-            )
-
-            # Collect HAX verification data
-            if verify_data:
-                verify_data["hax"] = {
-                    "url": self.captured_data["hax_url"],
-                    "size_bytes": len(hax_buffer),
-                    "sha256": sha256_hex(hax_buffer),
-                    "header_hex": hax_buffer[:16].hex(),
-                }
-                base_key = metadata.get("baseKey", b"")
-                orig_hash = metadata.get("origHash")
-                verify_data["metadata"] = {
-                    "base_key_hex": base_key.hex() if base_key else None,
-                    "codec": codec,
-                    "duration_ms": metadata["durationMs"],
-                    "segment_count": metadata["segmentCount"],
-                    "orig_hash_hex": orig_hash.hex() if orig_hash else None,
-                }
-                verify_data["tree_keys"] = dict(self.captured_data["segment_keys"])
-
-            # Build key tree and decrypt
-            print("\nDecrypting segments...")
-            key_preview = sorted([int(k) for k in self.captured_data["segment_keys"]])[
-                :20
-            ]
-            print(f"Key nodes available: {', '.join(str(k) for k in key_preview)}...")
-
-            key_tree = KeyTree(self.captured_data["segment_keys"])
-            decrypted_segments = []
-
-            for i, seg in enumerate(segments):
-                if seg["size"] == 0:
-                    continue
-
-                try:
-                    seg_key = key_tree.get_segment_key(i, metadata["segmentCount"])
-                    ciphertext = hax_buffer[seg["offset"] : seg["offset"] + seg["size"]]
-
-                    # ChaCha20-Poly1305 decryption with zero nonce
-                    nonce = bytes(12)
-                    cipher = ChaCha20Poly1305(seg_key)
-                    decrypted = cipher.decrypt(nonce, ciphertext, None)
-
-                    decrypted_segments.append(decrypted)
-
-                    # Collect segment verification data
-                    if verify_data:
-                        verify_data["segments"].append(
-                            {
-                                "index": i,
-                                "offset": seg["offset"],
-                                "size": seg["size"],
-                                "encrypted_sha256": sha256_hex(ciphertext),
-                                "decrypted_sha256": sha256_hex(decrypted),
-                            }
-                        )
-
-                    if i == 0 or i == len(segments) - 1:
-                        print(f"  Segment {i}: {len(decrypted)} bytes")
-                    elif i == 1:
-                        print(f"  ... decrypting {len(segments) - 2} more segments ...")
-
-                except Exception as e:
-                    failed_node = 4097 + i  # Approximate - assuming base
-                    print(f"  Segment {i} failed (node {failed_node}): {e}")
-                    ancestors = [
-                        n for n in [1, 2, 4, 8, 16, 32, 64, 128] if n < failed_node
-                    ]
+            for keys in pending:
+                new_keys = [
+                    k for k in keys if k not in self.captured_data["segment_keys"]
+                ]
+                self.captured_data["segment_keys"].update(keys)
+                if new_keys:
+                    key_nums = sorted([int(k) for k in new_keys])
+                    key_preview = ",".join(str(k) for k in key_nums[:5])
+                    if len(key_nums) > 5:
+                        key_preview += "..."
+                    total = len(self.captured_data["segment_keys"])
                     print(
-                        f"  Looking for ancestors: {', '.join(str(a) for a in ancestors)}"
+                        f"Captured {len(new_keys)} new tree node keys: "
+                        f"{key_preview} (total: {total})"
                     )
-                    key_sample = list(self.captured_data["segment_keys"].keys())[:20]
-                    print(f"  We have: {', '.join(key_sample)}...")
-                    break
+        except Exception:
+            pass
 
-            total_segments = len(segments)
-            print(f"\nDecrypted {len(decrypted_segments)}/{total_segments} segments")
-
-            # Require 100% segment decryption - partial extractions are failures
-            if len(decrypted_segments) < total_segments:
-                print(
-                    f"ERROR: Extraction incomplete "
-                    f"({len(decrypted_segments)}/{total_segments} segments). "
-                    f"Missing {total_segments - len(decrypted_segments)} segments."
-                )
-                return {
-                    "success": False,
-                    "error": f"Incomplete extraction: {len(decrypted_segments)}/{total_segments} segments",
-                    "platformData": {
-                        "segmentCount": total_segments,
-                        "decryptedSegments": len(decrypted_segments),
-                    },
-                }
-
-            # Concatenate and save
-            output_dir.mkdir(parents=True, exist_ok=True)
-            output_path = output_dir / f"{final_output_name}.m4a"
-
-            full_audio = b"".join(decrypted_segments)
-            output_path.write_bytes(full_audio)
-
-            # Collect output verification data
-            if verify_data:
-                verify_data["output"] = {
-                    "path": str(output_path),
-                    "size_bytes": len(full_audio),
-                    "sha256": sha256_hex(full_audio),
-                }
-
-            # Calculate checksum
-            audio_checksum = sha256_hex(full_audio)
-
-            # Build result in platform-agnostic schema (matching soundgasm/whypit format)
-            result = {
-                "audio": {
-                    "sourceUrl": url,
-                    "downloadUrl": self.captured_data["hax_url"],
-                    "filePath": str(output_path),
-                    "format": "m4a",
-                    "fileSize": len(full_audio),
-                    "checksum": {"sha256": audio_checksum},
-                },
-                "metadata": {
-                    "title": (
-                        (self.captured_data.get("metadata") or {}).get("title")
-                        or final_output_name
-                    ),
-                    "author": (self.captured_data.get("metadata") or {}).get("artist"),
-                    "description": "",
-                    "tags": [],
-                    "duration": metadata["durationMs"] / 1000,
-                    "platform": {"name": "hotaudio", "url": "https://hotaudio.net"},
-                },
-                "platformData": {
-                    "codec": codec,
-                    "segmentCount": metadata["segmentCount"],
-                    "decryptedSegments": len(decrypted_segments),
-                    "pid": (self.captured_data.get("metadata") or {}).get("pid"),
-                    "extractedAt": datetime.now(UTC)
-                    .isoformat()
-                    .replace("+00:00", "Z"),
-                },
-                "backupFiles": {"metadata": str(json_path)},
-                # Keep legacy fields for CLI compatibility
-                "success": True,
-                "outputPath": str(output_path),
-                "duration": metadata["durationMs"] / 1000,
-                "size": len(full_audio),
-                "segments": len(decrypted_segments),
-                "verifyData": verify_data,
-            }
-
-            # Save metadata JSON (serves as completion marker)
-            json_path.write_text(
-                json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8"
+    async def _flush_captured_metadata(self, page) -> None:
+        """Flush any metadata stored in window.__pendingMetadataCaptures."""
+        try:
+            pending = await page.evaluate(
+                """() => {
+                const pending = window.__pendingMetadataCaptures || [];
+                window.__pendingMetadataCaptures = [];
+                return pending;
+            }"""
             )
+            for metadata in pending:
+                if metadata:
+                    self.captured_data["metadata"] = metadata
+                    print(f"Captured metadata: {metadata.get('title', 'untitled')}")
+        except Exception:
+            pass
 
-            print(f"\nSaved: {output_path}")
-            print(f"Size: {len(full_audio) / 1024:.1f} KB")
-            print(f"Duration: {metadata['durationMs'] / 1000:.1f}s")
+    async def _set_playback_speed(self, page, speed: float = 4.0) -> bool:
+        """Set audio playback speed via HotAudio's speed menu."""
+        try:
+            result = await page.evaluate(
+                f"""() => {{
+                const speedOptions = document.querySelectorAll('.speed-option');
+                let clicked = false;
+                speedOptions.forEach(opt => {{
+                    if (opt.textContent.trim() === '2.0x' || opt.textContent.trim() === '4.0x') {{
+                        opt.textContent = '{speed}x';
+                        speedOptions.forEach(o => o.classList.remove('bg-slate-600'));
+                        opt.classList.add('bg-slate-600');
+                        opt.click();
+                        clicked = true;
+                    }}
+                }});
+                return clicked ? {speed} : null;
+            }}"""
+            )
+            if result:
+                print(f"  Set playback speed to {result}x")
+                return True
+            return False
+        except Exception:
+            return False
 
-            # Output verification JSON if requested
-            if verify_data:
-                print("\n--- VERIFICATION DATA ---")
-                print(json.dumps(verify_data, indent=2))
+    async def _validate_captured_data(self, page) -> None:
+        """Validate that all required data was captured."""
+        if not self.captured_data["segment_keys"]:
+            raise ValueError("Failed to capture segment keys")
 
-            return result
+        if not self.captured_data["hax_url"]:
+            hax_url = await page.evaluate(
+                """() => {
+                if (window.__ha_state?.tracks?.[0]?.src) {
+                    return window.__ha_state.tracks[0].src;
+                }
+                return null;
+            }"""
+            )
+            if hax_url:
+                self.captured_data["hax_url"] = hax_url
+                print(f"Extracted HAX URL from page: {hax_url[:60]}...")
+            else:
+                raise ValueError("Failed to capture HAX URL")
 
-        except Exception as error:
-            print(f"\nError: {error}")
-            raise
+    async def _close_browser(self, browser, playwright) -> None:
+        """Close browser after successful data capture."""
+        await browser.close()
+        await playwright.stop()
 
-        finally:
+    async def _cleanup_browser(self, browser, playwright) -> None:
+        """Cleanup browser resources in finally block."""
+        try:
+            await browser.close()
+        except Exception:
+            pass
+        try:
+            await playwright.stop()
+        except Exception:
+            pass
+
+    def _decode_codec(self, metadata: dict) -> str:
+        """Decode codec from metadata."""
+        codec = metadata["codec"]
+        if isinstance(codec, bytes):
+            return codec.decode("utf-8")
+        return codec
+
+    def _collect_hax_verification(
+        self, verify_data: dict, hax_buffer: bytes, metadata: dict, codec: str
+    ) -> None:
+        """Collect HAX file verification data."""
+        verify_data["hax"] = {
+            "url": self.captured_data["hax_url"],
+            "size_bytes": len(hax_buffer),
+            "sha256": sha256_hex(hax_buffer),
+            "header_hex": hax_buffer[:16].hex(),
+        }
+        base_key = metadata.get("baseKey", b"")
+        orig_hash = metadata.get("origHash")
+        verify_data["metadata"] = {
+            "base_key_hex": base_key.hex() if base_key else None,
+            "codec": codec,
+            "duration_ms": metadata["durationMs"],
+            "segment_count": metadata["segmentCount"],
+            "orig_hash_hex": orig_hash.hex() if orig_hash else None,
+        }
+        verify_data["tree_keys"] = dict(self.captured_data["segment_keys"])
+
+    def _decrypt_segments(
+        self, hax_buffer: bytes, metadata: dict, segments: list[dict],
+        verify_data: dict | None
+    ) -> list[bytes]:
+        """Decrypt all segments using captured keys."""
+        print("\nDecrypting segments...")
+        key_preview = sorted([int(k) for k in self.captured_data["segment_keys"]])[:20]
+        print(f"Key nodes available: {', '.join(str(k) for k in key_preview)}...")
+
+        key_tree = KeyTree(self.captured_data["segment_keys"])
+        decrypted_segments = []
+
+        for i, seg in enumerate(segments):
+            if seg["size"] == 0:
+                continue
+
             try:
-                await browser.close()
-            except Exception:
-                pass
-            try:
-                await playwright.stop()
-            except Exception:
-                pass
+                seg_key = key_tree.get_segment_key(i, metadata["segmentCount"])
+                ciphertext = hax_buffer[seg["offset"] : seg["offset"] + seg["size"]]
+
+                nonce = bytes(12)
+                cipher = ChaCha20Poly1305(seg_key)
+                decrypted = cipher.decrypt(nonce, ciphertext, None)
+                decrypted_segments.append(decrypted)
+
+                if verify_data:
+                    verify_data["segments"].append({
+                        "index": i,
+                        "offset": seg["offset"],
+                        "size": seg["size"],
+                        "encrypted_sha256": sha256_hex(ciphertext),
+                        "decrypted_sha256": sha256_hex(decrypted),
+                    })
+
+                if i == 0 or i == len(segments) - 1:
+                    print(f"  Segment {i}: {len(decrypted)} bytes")
+                elif i == 1:
+                    print(f"  ... decrypting {len(segments) - 2} more segments ...")
+
+            except Exception as e:
+                failed_node = 4097 + i
+                print(f"  Segment {i} failed (node {failed_node}): {e}")
+                ancestors = [n for n in [1, 2, 4, 8, 16, 32, 64, 128] if n < failed_node]
+                print(f"  Looking for ancestors: {', '.join(str(a) for a in ancestors)}")
+                key_sample = list(self.captured_data["segment_keys"].keys())[:20]
+                print(f"  We have: {', '.join(key_sample)}...")
+                break
+
+        total_segments = len(segments)
+        print(f"\nDecrypted {len(decrypted_segments)}/{total_segments} segments")
+        return decrypted_segments
+
+    def _build_failure_result(
+        self, decrypted_segments: list[bytes], segments: list[dict]
+    ) -> dict:
+        """Build result dict for incomplete extraction."""
+        total_segments = len(segments)
+        print(
+            f"ERROR: Extraction incomplete "
+            f"({len(decrypted_segments)}/{total_segments} segments). "
+            f"Missing {total_segments - len(decrypted_segments)} segments."
+        )
+        return {
+            "success": False,
+            "error": f"Incomplete extraction: {len(decrypted_segments)}/{total_segments} segments",
+            "platformData": {
+                "segmentCount": total_segments,
+                "decryptedSegments": len(decrypted_segments),
+            },
+        }
+
+    def _collect_output_verification(
+        self, verify_data: dict, output_path: Path, full_audio: bytes
+    ) -> None:
+        """Collect output file verification data."""
+        verify_data["output"] = {
+            "path": str(output_path),
+            "size_bytes": len(full_audio),
+            "sha256": sha256_hex(full_audio),
+        }
+
+    def _build_success_result(
+        self, url: str, output_path: Path, json_path: Path, full_audio: bytes,
+        metadata: dict, codec: str, decrypted_segments: list[bytes],
+        verify_data: dict | None
+    ) -> dict:
+        """Build result dict for successful extraction."""
+        audio_checksum = sha256_hex(full_audio)
+        final_output_name = output_path.stem
+
+        return {
+            "audio": {
+                "sourceUrl": url,
+                "downloadUrl": self.captured_data["hax_url"],
+                "filePath": str(output_path),
+                "format": "m4a",
+                "fileSize": len(full_audio),
+                "checksum": {"sha256": audio_checksum},
+            },
+            "metadata": {
+                "title": (
+                    (self.captured_data.get("metadata") or {}).get("title")
+                    or final_output_name
+                ),
+                "author": (self.captured_data.get("metadata") or {}).get("artist"),
+                "description": "",
+                "tags": [],
+                "duration": metadata["durationMs"] / 1000,
+                "platform": {"name": "hotaudio", "url": "https://hotaudio.net"},
+            },
+            "platformData": {
+                "codec": codec,
+                "segmentCount": metadata["segmentCount"],
+                "decryptedSegments": len(decrypted_segments),
+                "pid": (self.captured_data.get("metadata") or {}).get("pid"),
+                "extractedAt": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+            },
+            "backupFiles": {"metadata": str(json_path)},
+            "success": True,
+            "outputPath": str(output_path),
+            "duration": metadata["durationMs"] / 1000,
+            "size": len(full_audio),
+            "segments": len(decrypted_segments),
+            "verifyData": verify_data,
+        }
+
+    def _print_summary(
+        self, output_path: Path, full_audio: bytes, metadata: dict,
+        verify_data: dict | None
+    ) -> None:
+        """Print extraction summary."""
+        print(f"\nSaved: {output_path}")
+        print(f"Size: {len(full_audio) / 1024:.1f} KB")
+        print(f"Duration: {metadata['durationMs'] / 1000:.1f}s")
+
+        if verify_data:
+            print("\n--- VERIFICATION DATA ---")
+            print(json.dumps(verify_data, indent=2))
 
 
 def main():
