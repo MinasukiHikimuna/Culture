@@ -211,10 +211,7 @@ class RedditProcessor:
 
         # Check crosspost_parent_list
         crosspost_parent_list = getattr(submission, "crosspost_parent_list", None)
-        if crosspost_parent_list and len(crosspost_parent_list) > 0:
-            return True
-
-        return False
+        return crosspost_parent_list and len(crosspost_parent_list) > 0
 
     def resolve_crosspost(self, submission) -> dict | None:
         """Resolve a crosspost to get the original post content."""

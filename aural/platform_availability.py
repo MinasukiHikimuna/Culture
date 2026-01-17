@@ -38,9 +38,7 @@ class PlatformAvailabilityTracker:
         platform = platform.lower()
         if platform in self.manually_skipped:
             return False
-        if platform in self.detected_unavailable:
-            return False
-        return True
+        return platform not in self.detected_unavailable
 
     def record_failure(self, platform: str, error: Exception) -> None:
         """
