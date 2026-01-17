@@ -550,9 +550,8 @@ class AnalyzeDownloadImportPipeline:
             if result.get("success"):
                 print("  Stashapp import completed")
                 return {"success": True, "stashSceneId": result.get("sceneId")}
-            else:
-                print(f"  Stashapp import failed: {result.get('error')}")
-                return {"success": False, "error": result.get("error")}
+            print(f"  Stashapp import failed: {result.get('error')}")
+            return {"success": False, "error": result.get("error")}
 
         except (StashScanStuckError, StashappUnavailableError):
             # Let mandatory resource errors propagate up to abort the batch
@@ -616,9 +615,8 @@ class AnalyzeDownloadImportPipeline:
                     print("  Updated release.json")
 
                     return {"success": True, "script": script_result}
-                else:
-                    print(f"  Script extraction failed: {script_result.get('error')}")
-                    return {"success": False, "error": script_result.get("error")}
+                print(f"  Script extraction failed: {script_result.get('error')}")
+                return {"success": False, "error": script_result.get("error")}
 
             finally:
                 orchestrator.cleanup()
@@ -1362,7 +1360,7 @@ Examples:
             result = pipeline.process_post(input_path)
             return 0 if result.get("success") else 1
 
-        elif input_path.is_dir():
+        if input_path.is_dir():
             print(f"  Searching for Reddit posts in: {input_path}")
             post_files = pipeline.find_reddit_posts(input_path)
 
@@ -1374,9 +1372,8 @@ Examples:
             results = pipeline.process_batch(post_files)
             return 0 if len(results["failed"]) == 0 else 1
 
-        else:
-            print("  Input path must be a file or directory")
-            return 1
+        print("  Input path must be a file or directory")
+        return 1
 
     except Exception as e:
         print(f"  Pipeline error: {e}")

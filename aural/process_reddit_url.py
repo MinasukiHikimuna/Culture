@@ -495,9 +495,8 @@ Output Structure:
         if result["success"]:
             print("\nProcessing completed successfully!")
             return 0
-        else:
-            print("\nProcessing failed")
-            return 1
+        print("\nProcessing failed")
+        return 1
 
     except Exception as error:
         print(f"\nFatal error: {error}")

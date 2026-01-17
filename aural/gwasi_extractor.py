@@ -64,9 +64,8 @@ class GwasiExtractor:
         if base_version:
             print(f"📁 Found base version in delta.json: {base_version}")
             return base_version
-        else:
-            print("⚠️  No 'base' field found in delta.json")
-            return None
+        print("⚠️  No 'base' field found in delta.json")
+        return None
 
     def download_and_process_base_files(
         self, base_dir_url: str, use_cache: bool = True, max_files: int | None = None
@@ -238,10 +237,9 @@ class GwasiExtractor:
                 response = input("\nDownload new base data? [y/N]: ").strip().lower()
                 if response in ["", "n", "no"]:
                     return False
-                elif response in ["y", "yes"]:
+                if response in ["y", "yes"]:
                     return True
-                else:
-                    print("Please enter 'y' for yes or 'n' for no.")
+                print("Please enter 'y' for yes or 'n' for no.")
             except (KeyboardInterrupt, EOFError):
                 print("\n⏹️  Interrupted by user, defaulting to no base download")
                 return False
@@ -264,10 +262,9 @@ class GwasiExtractor:
             if interactive:
                 # Prompt user for decision
                 return self.prompt_user_for_base_download(cached_version, current_base_dir)
-            else:
-                print(f"🔄 Base version changed: {cached_version} → {current_base_dir}")
-                print("📊 Will download all base files for new version")
-                return True
+            print(f"🔄 Base version changed: {cached_version} → {current_base_dir}")
+            print("📊 Will download all base files for new version")
+            return True
 
         # Check if base files exist for this version
         existing_files = list(self.current_base_dir.glob("*.json"))
@@ -291,7 +288,7 @@ class GwasiExtractor:
         # Extract filename from URL
         if url.endswith("/delta.json"):
             return self.raw_data_dir, "delta.json"
-        elif "/base_" in url:
+        if "/base_" in url:
             # Extract file number from URL (e.g., "1.json", "2.json")
             filename = url.split("/")[-1]  # Get the last part (e.g., "1.json")
             return self.current_base_dir, filename
@@ -443,14 +440,13 @@ class GwasiExtractor:
 
         if "script" in post_type_lower or any("script" in tag for tag in tags_lower):
             return "script"
-        elif any(
+        if any(
             keyword in post_type_lower for keyword in ["audio", "ramblefap", "fill"]
         ):
             return "audio"
-        elif "verification" in post_type_lower:
+        if "verification" in post_type_lower:
             return "verification"
-        else:
-            return "other"
+        return "other"
 
     def extract_duration(self, title: str) -> str | None:
         """Extract duration from title (e.g., '15m', '1h23m')."""

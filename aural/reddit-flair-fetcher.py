@@ -90,16 +90,15 @@ def get_user_flair(reddit, username: str, subreddit_name: str = "gonewildaudio")
                 "gender": gender,
                 "stashapp_gender": map_to_stashapp_gender(gender)
             }
-        else:
-            return {
-                "username": username,
-                "subreddit": subreddit_name,
-                "flair_text": None,
-                "flair_css_class": None,
-                "gender": None,
-                "stashapp_gender": None,
-                "note": "No flair found in recent posts/comments"
-            }
+        return {
+            "username": username,
+            "subreddit": subreddit_name,
+            "flair_text": None,
+            "flair_css_class": None,
+            "gender": None,
+            "stashapp_gender": None,
+            "note": "No flair found in recent posts/comments"
+        }
 
     except Exception as e:
         return {

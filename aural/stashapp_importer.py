@@ -1503,9 +1503,8 @@ with full metadata including performers, studios, and tags.
                 print(f"Group URL: {result['groupUrl']}")
             print("=" * 60)
             return 0
-        else:
-            print(f"\nImport failed: {result.get('error')}")
-            return 1
+        print(f"\nImport failed: {result.get('error')}")
+        return 1
 
     except Exception as e:
         print(f"Error: {e}")

@@ -403,10 +403,9 @@ class RedditExtractor:
 
         if gwasi_path.suffix.lower() == ".csv":
             return self.load_gwasi_csv(gwasi_path)
-        elif gwasi_path.suffix.lower() == ".json":
+        if gwasi_path.suffix.lower() == ".json":
             return self.load_gwasi_json(gwasi_path)
-        else:
-            raise ValueError(f"Unsupported file format: {gwasi_path.suffix}")
+        raise ValueError(f"Unsupported file format: {gwasi_path.suffix}")
 
     def load_gwasi_csv(self, csv_path: Path) -> list[dict]:
         """Load gwasi data from CSV file."""
