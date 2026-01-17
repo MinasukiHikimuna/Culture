@@ -18,13 +18,14 @@ import csv
 import json
 import os
 import re
+import sys
 import time
 from datetime import datetime
 from pathlib import Path
+
 import praw
 from config import GWASI_INDEX_DIR, REDDIT_INDEX_DIR, ensure_directories
 from dotenv import load_dotenv
-import sys
 
 
 def find_latest_gwasi_data() -> Path | None:

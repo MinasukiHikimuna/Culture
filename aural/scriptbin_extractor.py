@@ -13,14 +13,14 @@ Requirements:
 import argparse
 import json
 import re
+import sys
 import time
-from datetime import datetime, timezone, UTC
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 
 import config as aural_config
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
-import sys
 
 
 class ScriptBinExtractor:

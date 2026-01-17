@@ -10,13 +10,13 @@ import argparse
 import json
 import os
 import re
+import sys
 from datetime import datetime
 from pathlib import Path
 
 import httpx
 from dotenv import load_dotenv
 from exceptions import LMStudioUnavailableError
-import sys
 
 
 # Load .env from project root

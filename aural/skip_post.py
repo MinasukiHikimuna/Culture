@@ -17,7 +17,7 @@ To undo a skip, use reset_post.py.
 
 import argparse
 import json
-from datetime import datetime, timezone, UTC
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 
 import config as aural_config

@@ -13,11 +13,11 @@ import argparse
 import hashlib
 import json
 import re
-from datetime import datetime, timezone, UTC
+import sys
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 
 from playwright.sync_api import sync_playwright
-import sys
 
 
 class HotAudioFollowExtractor:

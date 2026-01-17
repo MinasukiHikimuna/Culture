@@ -16,13 +16,13 @@ import argparse
 import json
 import re
 import shutil
+import sys
 from pathlib import Path
 
 import praw
 from analyze_reddit_post import EnhancedRedditPostAnalyzer
 from dotenv import load_dotenv
 from release_orchestrator import ReleaseOrchestrator
-import sys
 
 
 # Load environment variables

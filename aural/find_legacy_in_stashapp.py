@@ -14,11 +14,11 @@ Usage:
 
 import argparse
 import re
+import sys
 import unicodedata
 from pathlib import Path
 
 from stashapp_importer import StashappClient
-import sys
 
 
 def normalize_text(text: str) -> str:

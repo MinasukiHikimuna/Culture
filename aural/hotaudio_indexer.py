@@ -9,13 +9,13 @@ It crawls user profiles and creates JSON lists of releases for extraction.
 import argparse
 import json
 import re
+import sys
 import time
-from datetime import datetime, timezone, UTC
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 
 import config as aural_config
 from playwright.sync_api import sync_playwright
-import sys
 
 
 class HotAudioIndexer:

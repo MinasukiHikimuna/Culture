@@ -16,8 +16,9 @@ Usage:
 import argparse
 import json
 import re
+import sys
 import time
-from datetime import datetime, timezone, UTC
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 
 import config as aural_config
@@ -27,7 +28,6 @@ from exceptions import DiskSpaceError, LMStudioUnavailableError, StashappUnavail
 from platform_availability import PlatformAvailabilityTracker
 from release_orchestrator import ReleaseOrchestrator
 from stashapp_importer import STASH_BASE_URL, StashappImporter, StashScanStuckError
-import sys
 
 
 class RedditResolver:

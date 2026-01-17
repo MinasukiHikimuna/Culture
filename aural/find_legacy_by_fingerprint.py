@@ -13,10 +13,10 @@ Usage:
 
 import argparse
 import hashlib
+import sys
 from pathlib import Path
 
 from stashapp_importer import StashappClient
-import sys
 
 
 def compute_file_sha256(file_path: Path) -> str | None:

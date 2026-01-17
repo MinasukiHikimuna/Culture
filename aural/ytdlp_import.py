@@ -13,8 +13,9 @@ import argparse
 import json
 import re
 import shutil
+import sys
 import time
-from datetime import datetime, timezone, UTC
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 
 import config as aural_config
@@ -28,7 +29,6 @@ from stashapp_importer import (
     match_tags_with_stash,
 )
 from ytdlp_extractor import YtDlpExtractor
-import sys
 
 
 class YtDlpImporter:

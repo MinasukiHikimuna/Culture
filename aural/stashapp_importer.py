@@ -21,8 +21,9 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import time
-from datetime import datetime, timezone, UTC
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 
 import httpx
@@ -32,7 +33,6 @@ from config import STASH_OUTPUT_DIR as CONFIG_STASH_OUTPUT_DIR
 from config import local_path_to_windows
 from dotenv import load_dotenv
 from exceptions import StashappUnavailableError
-import sys
 
 
 # Load .env from project root

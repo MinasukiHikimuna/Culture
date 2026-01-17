@@ -10,14 +10,14 @@ import argparse
 import hashlib
 import json
 import re
+import sys
 import time
-from datetime import datetime, timezone, UTC
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 
 import httpx
 from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
-import sys
 
 
 class WhypitExtractor:
