@@ -254,68 +254,105 @@ class StashappTagAnalyzer:
     ):
         """Create tags and link them to matching scenes."""
         stash_tags = self.fetch_all_tags(verbose)
-
-        # Build scene lookup for existing tags
-        scene_existing_tags: dict[str, list[str]] = {}
-        for scene in scenes:
-            scene_id = scene.get("id", "")
-            existing = [t["id"] for t in scene.get("tags") or []]
-            scene_existing_tags[scene_id] = existing
+        scene_existing_tags = _build_scene_tag_lookup(scenes)
 
         for tag_name in tag_names:
             normalized = tag_name.lower().strip()
             print(f"\nProcessing: {tag_name}")
 
-            # Check if tag exists or needs creation
-            if normalized in stash_tags:
-                tag_id = stash_tags[normalized]["id"]
-                primary_name = stash_tags[normalized]["name"]
-                if primary_name.lower() == normalized:
-                    print(f"  Tag exists: {primary_name} (id: {tag_id})")
-                else:
-                    print(f"  Tag exists: {primary_name} (id: {tag_id}) [alias: {tag_name}]")
-            else:
-                tag_id = self.create_tag(tag_name, dry_run)
-                if tag_id:
-                    # Update cache
-                    stash_tags[normalized] = {"id": tag_id, "name": tag_name}
+            tag_id = self._resolve_or_create_tag(
+                tag_name, normalized, stash_tags, dry_run
+            )
 
-            # Find scenes with this bracketed tag
             tag_occurrence = tag_analysis.get(normalized)
             if not tag_occurrence:
                 print(f"  No scenes found with [{tag_name}] in title/details")
                 continue
 
-            # Link to scenes
-            linked_count = 0
-            skipped_count = 0
-
-            for scene_id in tag_occurrence.scene_ids:
-                existing_tags = scene_existing_tags.get(scene_id, [])
-
-                if dry_run:
-                    if tag_id and tag_id not in existing_tags:
-                        linked_count += 1
-                    elif not tag_id:
-                        # Dry run - assume we'd link
-                        linked_count += 1
-                    else:
-                        skipped_count += 1
-                else:
-                    if tag_id:
-                        if self.link_tag_to_scene(
-                            scene_id, tag_id, existing_tags, dry_run
-                        ):
-                            linked_count += 1
-                            # Update cache
-                            scene_existing_tags[scene_id] = [*existing_tags, tag_id]
-                        else:
-                            skipped_count += 1
+            linked_count, skipped_count = self._link_tag_to_scenes(
+                tag_id, tag_occurrence.scene_ids, scene_existing_tags, dry_run
+            )
 
             action = "Would link" if dry_run else "Linked"
             print(f"  {action} to {linked_count} scenes")
             if skipped_count > 0:
                 print(f"  Skipped {skipped_count} scenes (already tagged)")
+
+    def _resolve_or_create_tag(
+        self,
+        tag_name: str,
+        normalized: str,
+        stash_tags: dict[str, dict],
+        dry_run: bool,
+    ) -> str | None:
+        """Look up existing tag or create new one. Returns tag ID."""
+        if normalized in stash_tags:
+            tag_id = stash_tags[normalized]["id"]
+            primary_name = stash_tags[normalized]["name"]
+            if primary_name.lower() == normalized:
+                print(f"  Tag exists: {primary_name} (id: {tag_id})")
+            else:
+                print(f"  Tag exists: {primary_name} (id: {tag_id}) [alias: {tag_name}]")
+            return tag_id
+
+        tag_id = self.create_tag(tag_name, dry_run)
+        if tag_id:
+            stash_tags[normalized] = {"id": tag_id, "name": tag_name}
+        return tag_id
+
+    def _link_tag_to_scenes(
+        self,
+        tag_id: str | None,
+        scene_ids: list[str],
+        scene_existing_tags: dict[str, list[str]],
+        dry_run: bool,
+    ) -> tuple[int, int]:
+        """Link tag to scenes, return (linked_count, skipped_count)."""
+        linked_count = 0
+        skipped_count = 0
+
+        for scene_id in scene_ids:
+            existing_tags = scene_existing_tags.get(scene_id, [])
+            was_linked = self._process_scene_link(
+                scene_id, tag_id, existing_tags, scene_existing_tags, dry_run
+            )
+            if was_linked:
+                linked_count += 1
+            elif tag_id:  # Only count as skipped if tag exists
+                skipped_count += 1
+
+        return linked_count, skipped_count
+
+    def _process_scene_link(
+        self,
+        scene_id: str,
+        tag_id: str | None,
+        existing_tags: list[str],
+        scene_existing_tags: dict[str, list[str]],
+        dry_run: bool,
+    ) -> bool:
+        """Process a single scene link. Returns True if linked."""
+        if not tag_id:
+            return dry_run  # Dry run assumes we'd link
+
+        if tag_id in existing_tags:
+            return False
+
+        if dry_run:
+            return True
+
+        if self.link_tag_to_scene(scene_id, tag_id, existing_tags, dry_run=False):
+            scene_existing_tags[scene_id] = [*existing_tags, tag_id]
+            return True
+        return False
+
+
+def _build_scene_tag_lookup(scenes: list[dict]) -> dict[str, list[str]]:
+    """Build lookup of scene_id -> existing tag IDs."""
+    return {
+        scene.get("id", ""): [t["id"] for t in scene.get("tags") or []]
+        for scene in scenes
+    }
 
 
 def print_analysis(
