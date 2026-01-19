@@ -269,7 +269,11 @@ class StashappTagAnalyzer:
             # Check if tag exists or needs creation
             if normalized in stash_tags:
                 tag_id = stash_tags[normalized]["id"]
-                print(f"  Tag exists (id: {tag_id})")
+                primary_name = stash_tags[normalized]["name"]
+                if primary_name.lower() == normalized:
+                    print(f"  Tag exists: {primary_name} (id: {tag_id})")
+                else:
+                    print(f"  Tag exists: {primary_name} (id: {tag_id}) [alias: {tag_name}]")
             else:
                 tag_id = self.create_tag(tag_name, dry_run)
                 if tag_id:
