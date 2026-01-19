@@ -11,6 +11,7 @@ import json
 import os
 import re
 import sys
+import urllib.parse
 from datetime import datetime
 from pathlib import Path
 
@@ -558,6 +559,88 @@ Return JSON:
 
         return parsed
 
+    def _add_missing_urls_as_versions(self, parsed: dict) -> dict:
+        """
+        Add missing pre-extracted URLs as separate audio_versions.
+
+        When the LLM fails to include all URLs (common with large collab posts),
+        this method creates audio_versions for each missing URL.
+        """
+        if not hasattr(self, "_last_extracted_urls") or not self._last_extracted_urls:
+            return parsed
+
+        # Collect all URLs already in audio_versions
+        included_urls = set()
+        for version in parsed.get("audio_versions", []):
+            for url_entry in version.get("urls", []):
+                url = url_entry.get("url", "")
+                if url:
+                    included_urls.add(url.lower().rstrip("/"))
+
+        # Find missing URLs
+        missing_urls = []
+        for pre_extracted in self._last_extracted_urls:
+            url = pre_extracted.get("url", "")
+            url_normalized = url.lower().rstrip("/")
+            if url and url_normalized not in included_urls:
+                missing_urls.append(pre_extracted)
+
+        if not missing_urls:
+            return parsed
+
+        # Only add missing URLs if a significant number were missed
+        # (to avoid duplicating due to minor URL normalization differences)
+        total_pre_extracted = len(self._last_extracted_urls)
+        missing_count = len(missing_urls)
+
+        # If more than 50% of URLs are missing, likely LLM truncation issue
+        if missing_count < 3 or (missing_count / total_pre_extracted) < 0.5:
+            return parsed
+
+        print(f"  WARNING: LLM missed {missing_count}/{total_pre_extracted} URLs, adding as separate audio_versions")
+
+        # Create audio_versions for missing URLs
+        for url_info in missing_urls:
+            url = url_info.get("url", "")
+            platform = url_info.get("platform", "Unknown")
+
+            # Extract version name from URL path
+            version_name = self._extract_version_name_from_url(url)
+
+            new_version = {
+                "version_name": version_name,
+                "description": f"Audio from {platform}",
+                "urls": [{"platform": platform, "url": url}],
+                "performers": [],  # Unknown without context
+                "tags": [],
+                "auto_added": True,  # Mark as automatically added
+            }
+            parsed["audio_versions"].append(new_version)
+
+        return parsed
+
+    def _extract_version_name_from_url(self, url: str) -> str:
+        """Extract a human-readable version name from a URL."""
+        parsed_url = urllib.parse.urlparse(url)
+        path_parts = parsed_url.path.strip("/").split("/")
+
+        if len(path_parts) >= 2:
+            # For soundgasm: /u/username/audio-title
+            # For whyp.it: /tracks/id/audio-title
+            audio_slug = path_parts[-1]
+            # Convert slug to readable name
+            audio_slug = audio_slug.replace("-", " ").replace("_", " ")
+            # Clean up common prefixes
+            for prefix in ["f4m ", "f4f ", "m4f ", "m4m ", "a4a "]:
+                if audio_slug.lower().startswith(prefix):
+                    audio_slug = audio_slug[len(prefix):]
+            # Capitalize words
+            words = audio_slug.split()
+            if words:
+                return " ".join(word.capitalize() for word in words[:6])  # Limit length
+
+        return "Audio"
+
     def parse_response(self, response_text: str) -> dict:
         """Parses and validates the LLM response."""
         try:
@@ -591,6 +674,9 @@ Return JSON:
 
             # Validate and fix URLs against pre-extracted URLs
             parsed = self._validate_and_fix_urls(parsed)
+
+            # Check for missing URLs and add them as separate audio_versions
+            parsed = self._add_missing_urls_as_versions(parsed)
 
             return parsed
         except Exception as e:
@@ -788,7 +874,18 @@ Return JSON:
 
             # Use LLM for comprehensive metadata extraction
             prompt = self.create_metadata_extraction_prompt(post_data)
-            llm_response = self.call_llm(prompt)
+
+            # Adaptive token limit based on number of pre-extracted URLs
+            # Each audio_version needs ~200-300 tokens in the response
+            url_count = len(getattr(self, "_last_extracted_urls", []))
+            if url_count > 20:
+                max_tokens = 8000
+            elif url_count > 10:
+                max_tokens = 4000
+            else:
+                max_tokens = 2000
+
+            llm_response = self.call_llm(prompt, max_tokens=max_tokens)
             analysis = self.parse_response(llm_response)
 
             # Ensure performers has count field for compatibility
