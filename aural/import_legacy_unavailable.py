@@ -22,13 +22,17 @@ Usage:
 
 import argparse
 import json
+import os
 import re
 import shutil
 import sys
 import time
+from datetime import UTC, datetime
 from pathlib import Path
 
+import praw
 from config import REDDIT_INDEX_DIR
+from dotenv import load_dotenv
 from stashapp_importer import (
     StashappClient,
     convert_audio_to_video,
@@ -36,7 +40,54 @@ from stashapp_importer import (
 )
 
 
+load_dotenv(Path(__file__).parent / ".env")
+
 AUDIO_EXTENSIONS = {".m4a", ".mp3", ".wav", ".ogg", ".flac"}
+
+
+class RedditClient:
+    """Lazy-loaded Reddit API client singleton."""
+
+    _instance: praw.Reddit | None = None
+
+    @classmethod
+    def get(cls) -> praw.Reddit | None:
+        """Get or create Reddit API client. Returns None if credentials missing."""
+        if cls._instance is not None:
+            return cls._instance
+
+        client_id = os.getenv("REDDIT_CLIENT_ID")
+        client_secret = os.getenv("REDDIT_CLIENT_SECRET")
+        user_agent = os.getenv("REDDIT_USER_AGENT", "Aural/1.0")
+
+        if not client_id or not client_secret:
+            return None
+
+        cls._instance = praw.Reddit(
+            client_id=client_id,
+            client_secret=client_secret,
+            user_agent=user_agent,
+        )
+        return cls._instance
+
+
+def fetch_reddit_post_date(post_id: str) -> str | None:
+    """Fetch post date from Reddit. Returns ISO date string or None."""
+    reddit = RedditClient.get()
+    if not reddit:
+        return None
+
+    try:
+        submission = reddit.submission(id=post_id)
+        # Trigger lazy loading
+        _ = submission.title
+        # Check if post is deleted
+        if submission.selftext in ("[deleted]", "[removed]"):
+            return None
+        date = datetime.fromtimestamp(submission.created_utc, tz=UTC)
+        return date.strftime("%Y-%m-%d")
+    except Exception:
+        return None
 
 
 STASH_LIBRARY_PATH = Path("/Volumes/Culture 1/Aural_Stash")
@@ -191,12 +242,22 @@ def import_legacy_file(
     tags = sidecar.get("tags", [])
     reddit_url = get_reddit_url_from_sidecar(sidecar)
 
+    # Try to get post date from Reddit
+    post_date = None
+    if reddit_url:
+        post_id = extract_post_id_from_url(reddit_url)
+        if post_id:
+            print("  Checking Reddit for post date...")
+            post_date = fetch_reddit_post_date(post_id)
+            if post_date:
+                print(f"  Found post date: {post_date}")
+
     is_audio = media_path.suffix.lower() in AUDIO_EXTENSIONS
     output_filename = media_path.with_suffix(".mp4").name if is_audio else media_path.name
     dest_path = STASH_LIBRARY_PATH / output_filename
 
     if dry_run:
-        return print_dry_run(media_path, output_filename, is_audio, title, author, reddit_url, tags)
+        return print_dry_run(media_path, output_filename, is_audio, title, author, reddit_url, tags, post_date)
 
     # Check for existing scene
     if dest_path.exists():
@@ -227,6 +288,8 @@ def import_legacy_file(
     updates = {"title": title, "performer_ids": performer_ids, "tag_ids": tag_ids}
     if reddit_url:
         updates["urls"] = [reddit_url]
+    if post_date:
+        updates["date"] = post_date
 
     client.update_scene(scene_id, updates)
     print(f"  Updated scene: {scene_id}")
@@ -247,6 +310,7 @@ def print_dry_run(
     author: str,
     reddit_url: str | None,
     tags: list,
+    post_date: str | None = None,
 ) -> dict:
     """Print dry run info and return result."""
     print(f"  [DRY RUN] Would import: {media_path.name}")
@@ -255,6 +319,7 @@ def print_dry_run(
     print(f"    Title: {title}")
     print(f"    Performer: {author}")
     print(f"    URL: {reddit_url}")
+    print(f"    Date: {post_date or 'Unknown'}")
     print(f"    Tags: {len(tags)}")
     return {"success": True, "dryRun": True}
 
