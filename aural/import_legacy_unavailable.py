@@ -79,11 +79,8 @@ def fetch_reddit_post_date(post_id: str) -> str | None:
 
     try:
         submission = reddit.submission(id=post_id)
-        # Trigger lazy loading
-        _ = submission.title
-        # Check if post is deleted
-        if submission.selftext in ("[deleted]", "[removed]"):
-            return None
+        # Trigger lazy loading - created_utc is available even for removed posts
+        _ = submission.created_utc
         date = datetime.fromtimestamp(submission.created_utc, tz=UTC)
         return date.strftime("%Y-%m-%d")
     except Exception:
