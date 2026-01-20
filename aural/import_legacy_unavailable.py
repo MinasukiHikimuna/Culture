@@ -11,6 +11,10 @@ Reddit content has been deleted/removed. Uses sidecar metadata for:
 - "Missing or Removed" tag added to all imports
 
 Usage:
+    # Single file
+    uv run python import_legacy_unavailable.py --file "/path/to/file.json"
+
+    # Directory
     uv run python import_legacy_unavailable.py "/Volumes/Culture 1/Aural_Stash_Legacy/GWA/"
     uv run python import_legacy_unavailable.py "/Volumes/Culture 1/Aural_Stash_Legacy/GWA/" --dry-run
     uv run python import_legacy_unavailable.py "/Volumes/Culture 1/Aural_Stash_Legacy/GWA/" --limit 5
@@ -25,7 +29,14 @@ import time
 from pathlib import Path
 
 from config import REDDIT_INDEX_DIR
-from stashapp_importer import StashappClient, match_tags_with_stash
+from stashapp_importer import (
+    StashappClient,
+    convert_audio_to_video,
+    match_tags_with_stash,
+)
+
+
+AUDIO_EXTENSIONS = {".m4a", ".mp3", ".wav", ".ogg", ".flac"}
 
 
 STASH_LIBRARY_PATH = Path("/Volumes/Culture 1/Aural_Stash")
@@ -130,102 +141,161 @@ def find_legacy_sidecars(directory: Path, reddit_dir: Path) -> list[tuple[Path, 
     return results
 
 
+def get_reddit_url_from_sidecar(sidecar: dict) -> str | None:
+    """Extract and normalize Reddit URL from sidecar."""
+    for url in sidecar.get("urls", []):
+        if "reddit.com" in url:
+            return normalize_reddit_url(url)
+    return None
+
+
+def copy_or_convert_media(media_path: Path, dest_path: Path) -> bool:
+    """Copy or convert media file to destination. Returns success."""
+    is_audio = media_path.suffix.lower() in AUDIO_EXTENSIONS
+    if is_audio:
+        print(f"  Converting audio to video: {media_path.name} -> {dest_path.name}")
+        if not convert_audio_to_video(media_path, dest_path):
+            return False
+        print(f"  Converted to library: {dest_path.name}")
+    else:
+        shutil.copy2(media_path, dest_path)
+        print(f"  Copied to library: {dest_path.name}")
+    return True
+
+
+def wait_for_scene(client: StashappClient, filename: str) -> dict | None:
+    """Trigger scan and wait for scene to appear."""
+    client.trigger_scan()
+    if not client.wait_for_scan(timeout=60):
+        print("  Warning: Scan timeout, continuing anyway...")
+
+    for _ in range(10):
+        scene = find_scene_by_filename(client, filename)
+        if scene:
+            return scene
+        time.sleep(1)
+    return None
+
+
 def import_legacy_file(
     json_path: Path,
-    mp4_path: Path,
+    media_path: Path,
     client: StashappClient,
     missing_tag_id: str,
     dry_run: bool = False,
 ) -> dict:
     """Import a single legacy file to Stashapp."""
     sidecar = json.loads(json_path.read_text(encoding="utf-8"))
-
-    # Extract metadata
-    title = sidecar.get("title", mp4_path.stem)
+    title = sidecar.get("title", media_path.stem)
     author = sidecar.get("author", "Unknown")
     tags = sidecar.get("tags", [])
+    reddit_url = get_reddit_url_from_sidecar(sidecar)
 
-    # Get Reddit URL
-    reddit_url = None
-    for url in sidecar.get("urls", []):
-        if "reddit.com" in url:
-            reddit_url = normalize_reddit_url(url)
-            break
+    is_audio = media_path.suffix.lower() in AUDIO_EXTENSIONS
+    output_filename = media_path.with_suffix(".mp4").name if is_audio else media_path.name
+    dest_path = STASH_LIBRARY_PATH / output_filename
 
     if dry_run:
-        print(f"  [DRY RUN] Would import: {mp4_path.name}")
-        print(f"    Title: {title}")
-        print(f"    Performer: {author}")
-        print(f"    URL: {reddit_url}")
-        print(f"    Tags: {len(tags)}")
-        return {"success": True, "dryRun": True}
+        return print_dry_run(media_path, output_filename, is_audio, title, author, reddit_url, tags)
 
-    # 1. Copy MP4 to Stashapp library
-    dest_path = STASH_LIBRARY_PATH / mp4_path.name
+    # Check for existing scene
     if dest_path.exists():
         print(f"  File already exists in library: {dest_path.name}")
-        # Try to find existing scene
         scene = find_scene_by_filename(client, dest_path.name)
         if scene:
             print(f"  Scene already exists: {scene['id']}")
             return {"success": True, "sceneId": scene["id"], "alreadyExists": True}
-    else:
-        shutil.copy2(mp4_path, dest_path)
-        print(f"  Copied to library: {dest_path.name}")
 
-    # 2. Trigger scan and wait
-    client.trigger_scan()
-    if not client.wait_for_scan(timeout=60):
-        print("  Warning: Scan timeout, continuing anyway...")
+    # Copy or convert media
+    if not copy_or_convert_media(media_path, dest_path):
+        return {"success": False, "error": "Audio to video conversion failed"}
 
-    # 3. Find scene by filename (with retry)
-    scene = None
-    for attempt in range(10):
-        scene = find_scene_by_filename(client, dest_path.name)
-        if scene:
-            break
-        time.sleep(1)
-
+    # Wait for scene to appear in Stashapp
+    scene = wait_for_scene(client, dest_path.name)
     if not scene:
         return {"success": False, "error": "Scene not found after scan"}
 
+    # Update scene metadata
     scene_id = scene["id"]
-
-    # 4. Find or create performer
     performer = client.find_or_create_performer(author, gender="FEMALE")
     performer_ids = [performer["id"]] if performer else []
 
-    # 5. Match tags (only existing tags in Stashapp, no creation)
-    tag_ids = [missing_tag_id]  # Always include "Missing or Removed"
     all_stash_tags = client.get_all_tags()
     matched_tag_ids = match_tags_with_stash(tags, all_stash_tags)
-    tag_ids.extend(matched_tag_ids)
+    tag_ids = list({missing_tag_id, *matched_tag_ids})
 
-    # 6. Update scene
-    updates = {
-        "title": title,
-        "performer_ids": performer_ids,
-        "tag_ids": list(set(tag_ids)),  # Dedupe
-    }
+    updates = {"title": title, "performer_ids": performer_ids, "tag_ids": tag_ids}
     if reddit_url:
         updates["urls"] = [reddit_url]
 
     client.update_scene(scene_id, updates)
     print(f"  Updated scene: {scene_id}")
 
-    # 7. Delete legacy files
+    # Clean up legacy files
     json_path.unlink()
-    mp4_path.unlink()
+    media_path.unlink()
     print("  Deleted legacy files")
 
     return {"success": True, "sceneId": scene_id}
+
+
+def print_dry_run(
+    media_path: Path,
+    output_filename: str,
+    is_audio: bool,
+    title: str,
+    author: str,
+    reddit_url: str | None,
+    tags: list,
+) -> dict:
+    """Print dry run info and return result."""
+    print(f"  [DRY RUN] Would import: {media_path.name}")
+    if is_audio:
+        print(f"    Convert to: {output_filename}")
+    print(f"    Title: {title}")
+    print(f"    Performer: {author}")
+    print(f"    URL: {reddit_url}")
+    print(f"    Tags: {len(tags)}")
+    return {"success": True, "dryRun": True}
+
+
+def find_media_file(json_path: Path) -> Path | None:
+    """Find media file corresponding to JSON sidecar (.mp4, .m4a, .mp3, etc.)."""
+    for ext in (".mp4", ".m4a", ".mp3", ".wav", ".ogg", ".flac"):
+        media_path = json_path.with_suffix(ext)
+        if media_path.exists():
+            return media_path
+    return None
+
+
+def get_sidecars_to_process(
+    args: argparse.Namespace,
+) -> tuple[list[tuple[Path, Path]], str | None]:
+    """Get list of sidecars to process based on args. Returns (sidecars, error)."""
+    if args.file:
+        json_path = Path(args.file)
+        if not json_path.exists():
+            return [], f"File not found: {json_path}"
+        media_path = find_media_file(json_path)
+        if not media_path:
+            return [], f"No media file (.mp4/.m4a) found for: {json_path}"
+        print(f"Processing single file: {json_path.name}")
+        return [(json_path, media_path)], None
+
+    directory = Path(args.directory)
+    if not directory.exists():
+        return [], f"Directory not found: {directory}"
+    sidecars = find_legacy_sidecars(directory, REDDIT_INDEX_DIR)
+    print(f"Found {len(sidecars)} legacy files with unavailable Reddit content")
+    return sidecars, None
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Import legacy unavailable audio files to Stashapp"
     )
-    parser.add_argument("directory", help="Path to legacy GWA directory")
+    parser.add_argument("directory", nargs="?", help="Path to legacy GWA directory")
+    parser.add_argument("--file", help="Path to single JSON sidecar file")
     parser.add_argument(
         "--dry-run", action="store_true", help="Show what would be done"
     )
@@ -234,16 +304,15 @@ def main() -> int:
 
     args = parser.parse_args()
 
-    directory = Path(args.directory)
-    reddit_dir = REDDIT_INDEX_DIR
+    if not args.directory and not args.file:
+        parser.error("Either directory or --file is required")
+    if args.directory and args.file:
+        parser.error("Cannot use both directory and --file")
 
-    if not directory.exists():
-        print(f"Error: Directory not found: {directory}")
+    sidecars, error = get_sidecars_to_process(args)
+    if error:
+        print(f"Error: {error}")
         return 1
-
-    # Find files to import
-    sidecars = find_legacy_sidecars(directory, reddit_dir)
-    print(f"Found {len(sidecars)} legacy files with unavailable Reddit content")
 
     if args.limit:
         sidecars = sidecars[: args.limit]
