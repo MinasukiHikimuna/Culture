@@ -450,7 +450,12 @@ Return JSON:
                 repaired
             )
 
-        # Step 2: Fix common comma issues in arrays/objects
+        # Step 2: Fix duplicate opening braces: {"{ -> {
+        # LLMs sometimes stutter and insert extra { characters
+        # Pattern: {"{  should become just {
+        repaired = re.sub(r'\{"\{', '{', repaired)
+
+        # Step 3: Fix common comma issues in arrays/objects
         # Missing comma between array elements: "] [" -> "], ["
         repaired = re.sub(r"\]\s*\[", "], [", repaired)
 
@@ -466,7 +471,7 @@ Return JSON:
         # Missing comma between string value and next key: `"value" "key"` -> `"value", "key"`
         repaired = re.sub(r'"\s+"([a-zA-Z_])', r'", "\1', repaired)
 
-        # Step 3: Handle missing closing brackets/braces
+        # Step 4: Handle missing closing brackets/braces
         open_braces = repaired.count("{")
         close_braces = repaired.count("}")
         open_brackets = repaired.count("[")
