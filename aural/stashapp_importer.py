@@ -1148,16 +1148,23 @@ class StashappImporter:
             )
             updates["studio_id"] = studio["id"]
 
-        # Tags - use per-audio tags if available, fallback to release-level
+        # Tags - for multi-audio posts use per-audio tags, for single audio extract all from title
         print("    Processing tags...")
+        audio_sources = release_data.get("audioSources", [])
+        is_single_audio = len(audio_sources) == 1
         per_audio_tags = source.get("versionInfo", {}).get("tags", [])
 
-        if per_audio_tags:
-            print(f"      Using per-audio tags: {len(per_audio_tags)} tags")
+        if is_single_audio:
+            # Single audio: extract ALL bracketed tags from title
+            extracted_tags = extract_all_tags(release_data)
+            print(f"      Single audio - extracted {len(extracted_tags)} tags from title/body")
+        elif per_audio_tags:
+            # Multi-audio: use version-specific tags from LLM
+            print(f"      Multi-audio - using per-audio tags: {len(per_audio_tags)} tags")
             extracted_tags = per_audio_tags
         else:
             extracted_tags = extract_all_tags(release_data)
-            print(f"      Extracted {len(extracted_tags)} tags from title and post body")
+            print(f"      Fallback - extracted {len(extracted_tags)} tags from title/body")
 
         if stash_tags and extracted_tags:
             matched_tag_ids = match_tags_with_stash(extracted_tags, stash_tags)
