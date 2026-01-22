@@ -889,9 +889,23 @@ def check_disk_space(target_path: Path, min_free_gb: float = 1.0) -> tuple[bool,
         return False, 0.0
 
 
-def convert_audio_to_video(audio_path: Path, output_path: Path) -> bool:
-    """Convert audio file to video with static image using ffmpeg."""
-    static_image = STATIC_IMAGE
+def convert_audio_to_video(
+    audio_path: Path,
+    output_path: Path,
+    static_image: Path | None = None,
+    preserve_audio: bool = True,
+) -> bool:
+    """Convert audio file to video with static image using ffmpeg.
+
+    Args:
+        audio_path: Path to the audio file
+        output_path: Path for the output video file
+        static_image: Path to static image (defaults to STATIC_IMAGE/gwa.png)
+        preserve_audio: If True (default), copy audio without re-encoding (-c:a copy).
+                       If False, re-encode to AAC 192k for compatibility.
+    """
+    if static_image is None:
+        static_image = STATIC_IMAGE
 
     # Check if static image exists
     if not static_image.exists():
@@ -925,15 +939,16 @@ def convert_audio_to_video(audio_path: Path, output_path: Path) -> bool:
         "libx264",
         "-tune",
         "stillimage",
-        "-c:a",
-        "aac",
-        "-b:a",
-        "192k",
         "-pix_fmt",
         "yuv420p",
-        "-shortest",
-        str(output_path),
     ]
+
+    if preserve_audio:
+        cmd.extend(["-c:a", "copy"])
+    else:
+        cmd.extend(["-c:a", "aac", "-b:a", "192k"])
+
+    cmd.extend(["-shortest", str(output_path)])
 
     print("  Running ffmpeg conversion...")
 
