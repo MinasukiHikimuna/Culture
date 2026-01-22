@@ -18,6 +18,7 @@ Usage:
     uv run python stashapp_tag_analyzer.py --filter "4M"      # Tags containing "4M"
     uv run python stashapp_tag_analyzer.py --apply --tags "F4M,GFE"  # Create & link
     uv run python stashapp_tag_analyzer.py --apply --tags "F4M" --dry-run  # Preview
+    uv run python stashapp_tag_analyzer.py --alias "Anal Pie" --target "Anal Creampie"
 """
 
 import argparse
@@ -203,6 +204,48 @@ class StashappTagAnalyzer:
 
         return tag_data
 
+    def fetch_tag_by_name(self, name: str) -> dict | None:
+        """Fetch a tag by exact name, returning id, name, and aliases."""
+        query = """
+            query FindTags($filter: FindFilterType!, $tag_filter: TagFilterType!) {
+                findTags(filter: $filter, tag_filter: $tag_filter) {
+                    tags { id name aliases }
+                }
+            }
+        """
+        result = self.query(
+            query,
+            {
+                "filter": {"per_page": 1},
+                "tag_filter": {"name": {"value": name, "modifier": "EQUALS"}},
+            },
+        )
+        tags = result.get("findTags", {}).get("tags", [])
+        return tags[0] if tags else None
+
+    def add_alias_to_tag(
+        self, tag_id: str, tag_name: str, existing_aliases: list[str], new_alias: str, dry_run: bool = False
+    ) -> bool:
+        """Add an alias to an existing tag."""
+        if new_alias.lower() in [a.lower() for a in existing_aliases]:
+            print(f"  Alias '{new_alias}' already exists on tag '{tag_name}'")
+            return False
+
+        updated_aliases = [*existing_aliases, new_alias]
+
+        if dry_run:
+            print(f"  Would add alias '{new_alias}' to tag '{tag_name}'")
+            return True
+
+        mutation = """
+            mutation TagUpdate($input: TagUpdateInput!) {
+                tagUpdate(input: $input) { id name aliases }
+            }
+        """
+        self.query(mutation, {"input": {"id": tag_id, "aliases": updated_aliases}})
+        print(f"  Added alias '{new_alias}' to tag '{tag_name}'")
+        return True
+
     def create_tag(self, name: str, dry_run: bool = False) -> str | None:
         """Create a new tag in Stashapp. Returns tag ID."""
         if dry_run:
@@ -345,6 +388,50 @@ class StashappTagAnalyzer:
             scene_existing_tags[scene_id] = [*existing_tags, tag_id]
             return True
         return False
+
+    def apply_alias(
+        self,
+        alias_name: str,
+        target_tag_name: str,
+        scenes: list[dict],
+        tag_analysis: dict[str, TagOccurrence],
+        dry_run: bool = False,
+    ):
+        """Add alias to target tag and link scenes with [alias] to that tag."""
+        print(f"\nAdding alias '{alias_name}' to tag '{target_tag_name}'")
+
+        # Fetch the target tag
+        target_tag = self.fetch_tag_by_name(target_tag_name)
+        if not target_tag:
+            print(f"  Error: Target tag '{target_tag_name}' not found in Stashapp")
+            return
+
+        tag_id = target_tag["id"]
+        existing_aliases = target_tag.get("aliases") or []
+
+        # Add the alias
+        self.add_alias_to_tag(tag_id, target_tag_name, existing_aliases, alias_name, dry_run)
+
+        # Update the internal cache so scene linking works
+        if not dry_run:
+            self._stash_tags = None  # Clear cache to pick up new alias
+
+        # Link scenes with [alias] to the target tag
+        normalized_alias = alias_name.lower().strip()
+        tag_occurrence = tag_analysis.get(normalized_alias)
+        if not tag_occurrence:
+            print(f"  No scenes found with [{alias_name}] in title/details")
+            return
+
+        scene_existing_tags = _build_scene_tag_lookup(scenes)
+        linked_count, skipped_count = self._link_tag_to_scenes(
+            tag_id, tag_occurrence.scene_ids, scene_existing_tags, dry_run
+        )
+
+        action = "Would link" if dry_run else "Linked"
+        print(f"  {action} to {linked_count} scenes")
+        if skipped_count > 0:
+            print(f"  Skipped {skipped_count} scenes (already tagged)")
 
 
 def _build_scene_tag_lookup(scenes: list[dict]) -> dict[str, list[str]]:
@@ -492,6 +579,18 @@ def main():
         help="Preview changes without applying",
     )
 
+    # Alias mode options
+    parser.add_argument(
+        "--alias",
+        type=str,
+        help="Tag name to add as alias (use with --target)",
+    )
+    parser.add_argument(
+        "--target",
+        type=str,
+        help="Existing tag to add the alias to",
+    )
+
     # Output options
     parser.add_argument("--json", action="store_true", help="Output as JSON")
     parser.add_argument(
@@ -503,6 +602,10 @@ def main():
     # Validate arguments
     if args.apply and not args.tags:
         print("Error: --apply requires --tags")
+        sys.exit(1)
+
+    if (args.alias and not args.target) or (args.target and not args.alias):
+        print("Error: --alias and --target must be used together")
         sys.exit(1)
 
     # Validate environment
@@ -519,7 +622,14 @@ def main():
         scenes = analyzer.fetch_all_scenes(verbose=args.verbose)
         tag_analysis = analyzer.analyze_tags(scenes, verbose=args.verbose)
 
-        if args.apply:
+        if args.alias:
+            # Alias mode: add alias to existing tag and link scenes
+            if args.dry_run:
+                print("\n=== DRY RUN - No changes will be made ===")
+            analyzer.apply_alias(
+                args.alias, args.target, scenes, tag_analysis, dry_run=args.dry_run
+            )
+        elif args.apply:
             # Apply mode: create and link tags
             tag_names = [t.strip() for t in args.tags.split(",") if t.strip()]
             if args.dry_run:
