@@ -644,7 +644,16 @@ class AnalyzeDownloadImportPipeline:
             print(
                 f"{progress_prefix}  Already processed: {post_id} ({post_file_path.name})"
             )
-            return {"success": True, "skipped": True, "postId": post_id}
+            # Include stashSceneId so callers can clean up legacy files
+            processed = self.load_processed_posts()
+            record = processed.get("posts", {}).get(post_id, {})
+            return {
+                "success": True,
+                "skipped": True,
+                "postId": post_id,
+                "stashSceneId": record.get("stashSceneId"),
+                "alreadyProcessed": True,
+            }
 
         # Early detection for deleted/removed content
         try:

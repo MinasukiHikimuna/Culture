@@ -264,8 +264,12 @@ def process_legacy_sidecars(
                     "stash_scene_id": result.get("stashSceneId"),
                 })
 
-                # Cleanup legacy files on success
-                if result.get("stashSceneId") and not result.get("skipped"):
+                # Cleanup legacy files on success (including already-processed posts)
+                # Clean up when: newly imported OR already processed in Stashapp
+                should_cleanup = result.get("stashSceneId") and (
+                    not result.get("skipped") or result.get("alreadyProcessed")
+                )
+                if should_cleanup:
                     print("  Cleaning up legacy files...")
 
                     # Delete MP4
