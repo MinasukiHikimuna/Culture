@@ -150,15 +150,20 @@ def clean_title_for_matching(title: str) -> str:
     return cleaned.lower()
 
 
+AUDIO_EXTENSIONS = (".m4a", ".mp4")
+
+
 def find_orphan_files(directory: Path, include_collabs: bool = False) -> list[LegacyFile]:
-    """Find all M4A files without JSON sidecars."""
+    """Find all audio files (M4A, MP4) without JSON sidecars."""
     orphans = []
 
-    for m4a_file in directory.glob("*.m4a"):
-        json_file = m4a_file.with_suffix(".json")
+    for audio_file in directory.iterdir():
+        if not audio_file.is_file() or audio_file.suffix.lower() not in AUDIO_EXTENSIONS:
+            continue
+        json_file = audio_file.with_suffix(".json")
         has_sidecar = json_file.exists()
 
-        authors, title = parse_legacy_filename(m4a_file.name)
+        authors, title = parse_legacy_filename(audio_file.name)
 
         # Skip collab files by default (files with multiple authors)
         if not include_collabs and len(authors) > 1:
@@ -166,7 +171,7 @@ def find_orphan_files(directory: Path, include_collabs: bool = False) -> list[Le
 
         orphans.append(
             LegacyFile(
-                path=m4a_file,
+                path=audio_file,
                 authors=authors,
                 title=title,
                 has_sidecar=has_sidecar,
@@ -493,7 +498,7 @@ def print_scan_results(stats: dict) -> None:
     print("\n" + "=" * 60)
     print("Scan Results")
     print("=" * 60)
-    print(f"Total M4A files: {stats['total_files']}")
+    print(f"Total audio files: {stats['total_files']}")
     print(f"  With sidecar: {stats['with_sidecar']}")
     print(f"  Without sidecar (orphans): {stats['without_sidecar']}")
     print()
