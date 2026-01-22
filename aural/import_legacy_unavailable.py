@@ -152,13 +152,25 @@ def is_content_unavailable(post_id: str, reddit_dir: Path) -> bool:
     return True  # If not found, assume unavailable
 
 
-def find_legacy_sidecars(directory: Path, reddit_dir: Path) -> list[tuple[Path, Path]]:
-    """Find JSON sidecars with MP4s where Reddit content is unavailable."""
+def find_media_file(json_path: Path) -> Path | None:
+    """Find media file corresponding to JSON sidecar (.mp4, .m4a, .mp3, etc.)."""
+    for ext in (".mp4", ".m4a", ".mp3", ".wav", ".ogg", ".flac"):
+        media_path = json_path.with_suffix(ext)
+        if media_path.exists():
+            return media_path
+    return None
+
+
+def find_legacy_sidecars(
+    directory: Path, reddit_dir: Path, pattern: str | None = None
+) -> list[tuple[Path, Path]]:
+    """Find JSON sidecars with media files where Reddit content is unavailable."""
     results = []
 
-    for json_file in sorted(directory.glob("*.json")):
-        mp4_file = json_file.with_suffix(".mp4")
-        if not mp4_file.exists():
+    glob_pattern = f"{pattern}.json" if pattern else "*.json"
+    for json_file in sorted(directory.glob(glob_pattern)):
+        media_file = find_media_file(json_file)
+        if not media_file:
             continue
 
         try:
@@ -181,7 +193,7 @@ def find_legacy_sidecars(directory: Path, reddit_dir: Path) -> list[tuple[Path, 
 
             # Check if content is unavailable
             if is_content_unavailable(post_id, reddit_dir):
-                results.append((json_file, mp4_file))
+                results.append((json_file, media_file))
 
         except (json.JSONDecodeError, FileNotFoundError):
             continue
@@ -321,15 +333,6 @@ def print_dry_run(
     return {"success": True, "dryRun": True}
 
 
-def find_media_file(json_path: Path) -> Path | None:
-    """Find media file corresponding to JSON sidecar (.mp4, .m4a, .mp3, etc.)."""
-    for ext in (".mp4", ".m4a", ".mp3", ".wav", ".ogg", ".flac"):
-        media_path = json_path.with_suffix(ext)
-        if media_path.exists():
-            return media_path
-    return None
-
-
 def get_sidecars_to_process(
     args: argparse.Namespace,
 ) -> tuple[list[tuple[Path, Path]], str | None]:
@@ -347,8 +350,9 @@ def get_sidecars_to_process(
     directory = Path(args.directory)
     if not directory.exists():
         return [], f"Directory not found: {directory}"
-    sidecars = find_legacy_sidecars(directory, REDDIT_INDEX_DIR)
-    print(f"Found {len(sidecars)} legacy files with unavailable Reddit content")
+    sidecars = find_legacy_sidecars(directory, REDDIT_INDEX_DIR, args.filter)
+    filter_desc = f" matching '{args.filter}'" if args.filter else ""
+    print(f"Found {len(sidecars)} legacy files{filter_desc} with unavailable Reddit content")
     return sidecars, None
 
 
@@ -362,6 +366,9 @@ def main() -> int:
         "--dry-run", action="store_true", help="Show what would be done"
     )
     parser.add_argument("--limit", type=int, help="Max files to process")
+    parser.add_argument(
+        "--filter", help="Filter files by pattern (e.g., 'sloth215*')"
+    )
     parser.add_argument("--verbose", "-v", action="store_true")
 
     args = parser.parse_args()
