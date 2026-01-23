@@ -101,6 +101,33 @@ def extract_viewkey(url: str) -> str | None:
     return match.group(1) if match else None
 
 
+def normalize_url(url: str) -> str:
+    """Normalize URL for comparison (http->https, remove www)."""
+    url = url.replace("http://", "https://")
+    url = url.replace("://www.", "://")
+    return url
+
+
+def add_url_if_new(url: str, url_list: list[str]) -> bool:
+    """Add URL to list if not already present. Prefers https over http.
+
+    Returns True if URL was added or upgraded, False if already present.
+    """
+    normalized = normalize_url(url)
+
+    for i, existing in enumerate(url_list):
+        if normalize_url(existing) == normalized:
+            # URL exists - upgrade http to https if needed
+            if existing.startswith("http://") and url.startswith("https://"):
+                url_list[i] = url
+                return True
+            return False
+
+    # URL doesn't exist, add it
+    url_list.append(url)
+    return True
+
+
 def format_details(post: dict) -> str:
     """Format SnakeySmut post data as scene details."""
     lines = []
@@ -155,15 +182,20 @@ def enrich_scene(scene_id: int) -> dict | None:
 
     print(f"Found SnakeySmut post: {post['slug']}")
 
-    # Build updated URLs (append snakeysmut URL if not already present)
-    snakeysmut_url = post["url"]
+    # Build updated URLs (append snakeysmut URL and platform URLs)
     existing_urls = scene.get("urls", [])
-    if snakeysmut_url not in existing_urls:
-        updated_urls = [*existing_urls, snakeysmut_url]
+    updated_urls = list(existing_urls)
+
+    # Add snakeysmut.com URL
+    snakeysmut_url = post["url"]
+    if add_url_if_new(snakeysmut_url, updated_urls):
         print(f"Adding URL: {snakeysmut_url}")
-    else:
-        updated_urls = existing_urls
-        print("SnakeySmut URL already present")
+
+    # Add platform URLs (Newgrounds, Reddit, etc.)
+    for platform in post.get("platforms", []):
+        platform_url = platform.get("url", "")
+        if platform_url and add_url_if_new(platform_url, updated_urls):
+            print(f"Adding URL: {platform_url}")
 
     # Set details if empty
     details = None
