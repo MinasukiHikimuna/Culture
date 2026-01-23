@@ -199,14 +199,23 @@ def update_stashapp_scene(
     updates: dict = {
         "title": post_meta["title"],
         "date": post_meta["date"],
+        "code": post_meta["post_id"],
         "performer_ids": [performer["id"]],
         "studio_id": studio["id"],
         "urls": [post_meta["url"]] if post_meta["url"] else [],
     }
     if matched_tag_ids:
         updates["tag_ids"] = matched_tag_ids
+
+    # Build details with teaser and all tags in brackets (like Reddit posts)
+    details_parts = []
     if post_meta["teaser"]:
-        updates["details"] = post_meta["teaser"]
+        details_parts.append(post_meta["teaser"])
+    if all_tags:
+        tags_line = " ".join(f"[{tag}]" for tag in all_tags)
+        details_parts.append(tags_line)
+    if details_parts:
+        updates["details"] = "\n\n".join(details_parts)
 
     client.update_scene(scene_id, updates)
     print("  Updated scene metadata")
