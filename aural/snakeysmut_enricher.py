@@ -288,6 +288,9 @@ def enrich_scene(scene_id: int, post: dict | None = None) -> dict | None:
     if script_credit and not scene.get("director"):
         author = script_credit.get("author", "")
         if author:
+            # Normalize: remove "u/" prefix from Reddit usernames
+            if author.startswith("u/"):
+                author = author[2:]
             director = author
             print(f"  Setting director: {author}")
 
