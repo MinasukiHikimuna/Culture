@@ -16,6 +16,7 @@ Uses async Playwright API for reliable CDP console message capture.
 
 import argparse
 import asyncio
+import concurrent.futures
 import contextlib
 import functools
 import hashlib
@@ -29,6 +30,25 @@ import httpx
 from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
 from dotenv import load_dotenv
 from playwright.async_api import async_playwright
+
+
+def run_async(coro):
+    """
+    Run an async coroutine, handling both sync and async contexts.
+
+    When called from a sync context, uses asyncio.run().
+    When called from within an existing event loop (e.g., from another async context),
+    runs the coroutine in a separate thread to avoid the nested event loop error.
+    """
+    try:
+        asyncio.get_running_loop()
+        # Already in an event loop - run in a new thread with its own loop
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(asyncio.run, coro)
+            return future.result()
+    except RuntimeError:
+        # No running event loop - safe to use asyncio.run()
+        return asyncio.run(coro)
 
 
 # Make print flush immediately for real-time progress updates
@@ -238,7 +258,7 @@ class HotAudioExtractor:
         Returns:
             List of track dicts with keys: tid, title, tag (h1/h2), index
         """
-        return asyncio.run(self._discover_tracks_async(url))
+        return run_async(self._discover_tracks_async(url))
 
     async def _discover_tracks_async(self, url: str) -> list[dict]:
         """Async implementation of track discovery."""
@@ -318,7 +338,7 @@ class HotAudioExtractor:
         Returns:
             Dict with 'tracks' list containing results for each extracted track
         """
-        return asyncio.run(self._extract_all_async(url, target_path))
+        return run_async(self._extract_all_async(url, target_path))
 
     async def _extract_all_async(self, url: str, target_path: dict) -> dict:
         """Async implementation of extract_all."""
@@ -973,7 +993,7 @@ class HotAudioExtractor:
         Returns:
             Platform-agnostic metadata dict
         """
-        return asyncio.run(self._extract_async(url, target_path))
+        return run_async(self._extract_async(url, target_path))
 
     async def _extract_async(self, url: str, target_path: dict) -> dict:
         """
