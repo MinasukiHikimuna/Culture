@@ -39,6 +39,7 @@ SCRIPTBIN_DIR = SOURCES_DIR / "scriptbin"
 HOTAUDIO_DIR = SOURCES_DIR / "hotaudio"
 EROCAST_DIR = SOURCES_DIR / "erocast"
 YTDLP_DIR = SOURCES_DIR / "ytdlp"  # Also includes pornhub (via yt-dlp)
+SNAKEYSMUT_DIR = SOURCES_DIR / "snakeysmut"
 
 # Releases directory - processed releases organized by performer
 RELEASES_DIR = AURAL_DATA_DIR / "releases"
@@ -129,6 +130,7 @@ def ensure_directories() -> None:
         HOTAUDIO_DIR,
         EROCAST_DIR,
         YTDLP_DIR,
+        SNAKEYSMUT_DIR,
         RELEASES_DIR,
         CYOA_DIR,
         ANALYSIS_DIR,

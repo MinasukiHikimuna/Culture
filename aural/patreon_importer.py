@@ -355,8 +355,8 @@ def main():
     parser.add_argument(
         "--performer",
         type=str,
-        default="Pippits",
-        help="Performer name (default: Pippits)",
+        required=True,
+        help="Performer name (must match Stashapp)",
     )
     parser.add_argument(
         "--studio",
