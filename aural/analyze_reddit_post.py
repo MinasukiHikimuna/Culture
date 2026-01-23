@@ -18,6 +18,7 @@ from pathlib import Path
 import httpx
 from dotenv import load_dotenv
 from exceptions import LMStudioUnavailableError
+from url_utils import is_audio_content_url
 
 
 # Load .env from project root
@@ -154,6 +155,9 @@ Return this exact JSON structure:
             url = url.rstrip(".,;:!?")
             if url not in seen:
                 seen.add(url)
+                # Filter out profile URLs (not actual audio content)
+                if not is_audio_content_url(url):
+                    continue
                 # Determine platform from URL
                 platform = "Unknown"
                 for domain, name in audio_platforms.items():
@@ -453,7 +457,7 @@ Return JSON:
         # Step 2: Fix duplicate opening braces: {"{ -> {
         # LLMs sometimes stutter and insert extra { characters
         # Pattern: {"{  should become just {
-        repaired = re.sub(r'\{"\{', '{', repaired)
+        repaired = re.sub(r'\{"\{', "{", repaired)
 
         # Step 3: Fix common comma issues in arrays/objects
         # Missing comma between array elements: "] [" -> "], ["

@@ -34,6 +34,7 @@ from exceptions import DiskSpaceError
 from hotaudio_extractor import HotAudioExtractor
 from scriptbin_extractor import ScriptBinExtractor
 from soundgasm_extractor import SoundgasmExtractor
+from url_utils import is_audio_content_url
 from whypit_extractor import WhypitExtractor
 
 
@@ -841,14 +842,21 @@ class ReleaseOrchestrator:
         version_index: int,
     ) -> AudioSource | None:
         """Try extracting from a single URL with retry logic."""
+        url = url_info.get("url", "")
+
+        # Filter out profile URLs (not actual audio content)
+        if not is_audio_content_url(url):
+            print(f"⏭️  Skipping profile URL: {url}")
+            return None
+
         platform = url_info.get("platform", "unknown")
         max_retries = 3
 
         for retry_count in range(max_retries):
             try:
                 version_name = audio_version.get("version_name") or f"Version {version_index + 1}"
-                print(f"📥 Extracting: {url_info['url']} ({version_name})")
-                audio_source = self.extract_audio(url_info["url"], target_path)
+                print(f"📥 Extracting: {url} ({version_name})")
+                audio_source = self.extract_audio(url, target_path)
 
                 if self.availability_tracker:
                     self.availability_tracker.record_success(platform)
