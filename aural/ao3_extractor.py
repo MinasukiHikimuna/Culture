@@ -18,6 +18,7 @@ import sys
 import time
 from datetime import UTC, datetime
 from pathlib import Path
+from urllib.parse import urljoin
 
 import config as aural_config
 from bs4 import BeautifulSoup
@@ -151,189 +152,185 @@ class AO3Extractor:
 
     def extract_work_metadata(self, soup: BeautifulSoup, url: str) -> dict:
         """Extract metadata from AO3 work page."""
-        metadata = {
+        return {
             "url": url,
-            "extracted_at": datetime.now(UTC)
-            .isoformat()
-            .replace("+00:00", "Z"),
+            "extracted_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+            **self._extract_work_id(url),
+            **self._extract_title(soup),
+            **self._extract_authors(soup, url),
+            **self._extract_tags(soup),
+            **self._extract_language(soup),
+            **self._extract_stats(soup),
+            **self._extract_content_sections(soup),
+            **self._extract_series(soup),
         }
 
-        # Extract work ID from URL
-        work_id_match = re.search(r"/works/(\d+)", url)
-        if work_id_match:
-            metadata["work_id"] = work_id_match.group(1)
+    def _extract_work_id(self, url: str) -> dict:
+        """Extract work ID from URL."""
+        match = re.search(r"/works/(\d+)", url)
+        return {"work_id": match.group(1)} if match else {}
 
-        # Extract title
-        title_elem = soup.select_one(".preface h2.title")
-        if title_elem:
-            metadata["title"] = title_elem.get_text(strip=True)
+    def _extract_title(self, soup: BeautifulSoup) -> dict:
+        """Extract title from page."""
+        elem = soup.select_one(".preface h2.title")
+        return {"title": elem.get_text(strip=True)} if elem else {}
 
-        # Extract author(s)
+    def _extract_authors(self, soup: BeautifulSoup, url: str) -> dict:
+        """Extract author(s) with URLs and usernames."""
         author_links = soup.select(".preface h3.byline a[rel='author']")
-        if author_links:
-            authors = [a.get_text(strip=True) for a in author_links]
-            metadata["authors"] = authors
-            metadata["author"] = authors[0] if len(authors) == 1 else authors
-            # Build author URLs and extract usernames
-            author_urls = []
-            usernames = []
-            for a in author_links:
-                href = a.get("href", "")
-                if href:
-                    from urllib.parse import urljoin
+        if not author_links:
+            return {}
 
-                    author_urls.append(urljoin(url, href))
-                    # Extract username from URL pattern /users/{username}
-                    username_match = re.search(r"/users/([^/]+)", href)
-                    if username_match:
-                        usernames.append(username_match.group(1))
-            metadata["author_urls"] = author_urls
-            if usernames:
-                metadata["usernames"] = usernames
-                metadata["username"] = usernames[0]  # Primary username for compatibility
+        authors = [a.get_text(strip=True) for a in author_links]
+        result = {
+            "authors": authors,
+            "author": authors[0] if len(authors) == 1 else authors,
+            "author_urls": [],
+        }
 
-        # Extract rating
-        rating_elem = soup.select_one("dd.rating a.tag")
-        if rating_elem:
-            metadata["rating"] = rating_elem.get_text(strip=True)
+        usernames = []
+        for a in author_links:
+            href = a.get("href", "")
+            if not href:
+                continue
+            result["author_urls"].append(urljoin(url, href))
+            username_match = re.search(r"/users/([^/]+)", href)
+            if username_match:
+                usernames.append(username_match.group(1))
 
-        # Extract archive warnings
-        warning_elems = soup.select("dd.warning a.tag")
-        if warning_elems:
-            metadata["archive_warnings"] = [
-                w.get_text(strip=True) for w in warning_elems
-            ]
+        if usernames:
+            result["usernames"] = usernames
+            result["username"] = usernames[0]
 
-        # Extract categories
-        category_elems = soup.select("dd.category a.tag")
-        if category_elems:
-            metadata["categories"] = [c.get_text(strip=True) for c in category_elems]
+        return result
 
-        # Extract fandoms
-        fandom_elems = soup.select("dd.fandom a.tag")
-        if fandom_elems:
-            metadata["fandoms"] = [f.get_text(strip=True) for f in fandom_elems]
+    def _extract_tags(self, soup: BeautifulSoup) -> dict:
+        """Extract all tag types: rating, warnings, categories, fandoms, etc."""
+        tag_mappings = [
+            ("dd.rating a.tag", "rating", False),
+            ("dd.warning a.tag", "archive_warnings", True),
+            ("dd.category a.tag", "categories", True),
+            ("dd.fandom a.tag", "fandoms", True),
+            ("dd.relationship a.tag", "relationships", True),
+            ("dd.character a.tag", "characters", True),
+            ("dd.freeform a.tag", "additional_tags", True),
+        ]
 
-        # Extract relationships
-        relationship_elems = soup.select("dd.relationship a.tag")
-        if relationship_elems:
-            metadata["relationships"] = [
-                r.get_text(strip=True) for r in relationship_elems
-            ]
+        result = {}
+        for selector, key, is_list in tag_mappings:
+            elems = soup.select(selector)
+            if not elems:
+                continue
+            if is_list:
+                result[key] = [e.get_text(strip=True) for e in elems]
+            else:
+                result[key] = elems[0].get_text(strip=True)
+        return result
 
-        # Extract characters
-        character_elems = soup.select("dd.character a.tag")
-        if character_elems:
-            metadata["characters"] = [c.get_text(strip=True) for c in character_elems]
+    def _extract_language(self, soup: BeautifulSoup) -> dict:
+        """Extract language from page."""
+        elem = soup.select_one("dd.language")
+        return {"language": elem.get_text(strip=True)} if elem else {}
 
-        # Extract additional/freeform tags
-        freeform_elems = soup.select("dd.freeform a.tag")
-        if freeform_elems:
-            metadata["additional_tags"] = [
-                t.get_text(strip=True) for t in freeform_elems
-            ]
-
-        # Extract language
-        language_elem = soup.select_one("dd.language")
-        if language_elem:
-            metadata["language"] = language_elem.get_text(strip=True)
-
-        # Extract stats
+    def _extract_stats(self, soup: BeautifulSoup) -> dict:
+        """Extract stats: published, updated, word_count, chapters, kudos, etc."""
         stats_dl = soup.select_one("dl.stats")
-        if stats_dl:
-            # Published date
-            published_elem = stats_dl.select_one("dd.published")
-            if published_elem:
-                metadata["published"] = published_elem.get_text(strip=True)
+        if not stats_dl:
+            return {}
 
-            # Updated date (for multi-chapter works)
-            updated_elem = stats_dl.select_one("dd.status")
-            if updated_elem:
-                metadata["updated"] = updated_elem.get_text(strip=True)
+        return {
+            **self._extract_dates(stats_dl),
+            **self._extract_word_count(stats_dl),
+            **self._extract_chapters(stats_dl),
+            **self._extract_numeric_stats(stats_dl),
+        }
 
-            # Word count
-            words_elem = stats_dl.select_one("dd.words")
-            if words_elem:
-                word_text = words_elem.get_text(strip=True).replace(",", "")
-                try:
-                    metadata["word_count"] = int(word_text)
-                except ValueError:
-                    metadata["word_count_text"] = words_elem.get_text(strip=True)
+    def _extract_dates(self, stats_dl: BeautifulSoup) -> dict:
+        """Extract published and updated dates."""
+        result = {}
+        published_elem = stats_dl.select_one("dd.published")
+        if published_elem:
+            result["published"] = published_elem.get_text(strip=True)
 
-            # Chapter count
-            chapters_elem = stats_dl.select_one("dd.chapters")
-            if chapters_elem:
-                chapters_text = chapters_elem.get_text(strip=True)
-                metadata["chapters"] = chapters_text
-                # Parse current/total chapters
-                chapter_match = re.match(r"(\d+)/(\d+|\?)", chapters_text)
-                if chapter_match:
-                    metadata["chapters_current"] = int(chapter_match.group(1))
-                    total = chapter_match.group(2)
-                    metadata["chapters_total"] = None if total == "?" else int(total)
+        updated_elem = stats_dl.select_one("dd.status")
+        if updated_elem:
+            result["updated"] = updated_elem.get_text(strip=True)
+        return result
 
-            # Kudos
-            kudos_elem = stats_dl.select_one("dd.kudos")
-            if kudos_elem:
-                kudos_text = kudos_elem.get_text(strip=True).replace(",", "")
-                try:
-                    metadata["kudos"] = int(kudos_text)
-                except ValueError:
-                    pass
+    def _extract_word_count(self, stats_dl: BeautifulSoup) -> dict:
+        """Extract word count."""
+        elem = stats_dl.select_one("dd.words")
+        if not elem:
+            return {}
+        word_text = elem.get_text(strip=True).replace(",", "")
+        try:
+            return {"word_count": int(word_text)}
+        except ValueError:
+            return {"word_count_text": elem.get_text(strip=True)}
 
-            # Bookmarks
-            bookmarks_elem = stats_dl.select_one("dd.bookmarks a")
-            if bookmarks_elem:
-                bookmarks_text = bookmarks_elem.get_text(strip=True).replace(",", "")
-                try:
-                    metadata["bookmarks"] = int(bookmarks_text)
-                except ValueError:
-                    pass
+    def _extract_chapters(self, stats_dl: BeautifulSoup) -> dict:
+        """Extract chapter count and parse current/total."""
+        elem = stats_dl.select_one("dd.chapters")
+        if not elem:
+            return {}
 
-            # Hits
-            hits_elem = stats_dl.select_one("dd.hits")
-            if hits_elem:
-                hits_text = hits_elem.get_text(strip=True).replace(",", "")
-                try:
-                    metadata["hits"] = int(hits_text)
-                except ValueError:
-                    pass
+        chapters_text = elem.get_text(strip=True)
+        result = {"chapters": chapters_text}
 
-            # Comments
-            comments_elem = stats_dl.select_one("dd.comments")
-            if comments_elem:
-                comments_text = comments_elem.get_text(strip=True).replace(",", "")
-                try:
-                    metadata["comments"] = int(comments_text)
-                except ValueError:
-                    pass
+        match = re.match(r"(\d+)/(\d+|\?)", chapters_text)
+        if match:
+            result["chapters_current"] = int(match.group(1))
+            total = match.group(2)
+            result["chapters_total"] = None if total == "?" else int(total)
+        return result
 
-        # Extract summary
-        summary_elem = soup.select_one(".summary .userstuff")
-        if summary_elem:
-            metadata["summary"] = summary_elem.get_text(strip=True)
+    def _extract_numeric_stats(self, stats_dl: BeautifulSoup) -> dict:
+        """Extract numeric stats: kudos, bookmarks, hits, comments."""
+        stat_mappings = [
+            ("dd.kudos", "kudos"),
+            ("dd.bookmarks a", "bookmarks"),
+            ("dd.hits", "hits"),
+            ("dd.comments", "comments"),
+        ]
 
-        # Extract notes (beginning notes)
-        notes_elem = soup.select_one(".preface .notes .userstuff")
-        if notes_elem:
-            metadata["notes"] = notes_elem.get_text(strip=True)
+        result = {}
+        for selector, key in stat_mappings:
+            elem = stats_dl.select_one(selector)
+            if not elem:
+                continue
+            text = elem.get_text(strip=True).replace(",", "")
+            try:
+                result[key] = int(text)
+            except ValueError:
+                pass
+        return result
 
-        # Extract end notes
-        end_notes_elem = soup.select_one("#work_endnotes .userstuff")
-        if end_notes_elem:
-            metadata["end_notes"] = end_notes_elem.get_text(strip=True)
+    def _extract_content_sections(self, soup: BeautifulSoup) -> dict:
+        """Extract summary, notes, and end notes."""
+        content_mappings = [
+            (".summary .userstuff", "summary"),
+            (".preface .notes .userstuff", "notes"),
+            ("#work_endnotes .userstuff", "end_notes"),
+        ]
 
-        # Check if work is part of a series
-        series_elems = soup.select(".series span.position a")
-        if series_elems:
-            series_info = []
-            for s in series_elems:
-                series_info.append(
-                    {"name": s.get_text(strip=True), "url": s.get("href", "")}
-                )
-            metadata["series"] = series_info
+        result = {}
+        for selector, key in content_mappings:
+            elem = soup.select_one(selector)
+            if elem:
+                result[key] = elem.get_text(strip=True)
+        return result
 
-        return metadata
+    def _extract_series(self, soup: BeautifulSoup) -> dict:
+        """Extract series information."""
+        elems = soup.select(".series span.position a")
+        if not elems:
+            return {}
+        return {
+            "series": [
+                {"name": s.get_text(strip=True), "url": s.get("href", "")}
+                for s in elems
+            ]
+        }
 
     def extract_work_content(self, soup: BeautifulSoup) -> list[str]:
         """Extract work content from page."""
