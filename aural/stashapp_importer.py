@@ -1348,10 +1348,10 @@ class StashappImporter:
                     continue
                 print(f"  Conversion successful: {output_path}")
 
-            # Trigger Stashapp scan for the studio directory only
+            # Trigger Stashapp scan for the specific file only
             print("\n  Triggering Stashapp scan...")
             try:
-                windows_path = local_path_to_windows(studio_dir)
+                windows_path = local_path_to_windows(output_path)
                 print(f"  Scanning: {windows_path}")
                 job_id = self.client.trigger_scan(paths=[windows_path])
             except ValueError as e:
