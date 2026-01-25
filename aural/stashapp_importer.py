@@ -666,50 +666,70 @@ def parse_gender_from_flair(flair_text: str | None) -> str | None:
 
     flair = flair_text.lower()
 
-    # Check for Reddit emoji placeholders (most common in GWA)
+    return (
+        _check_emoji_placeholders(flair)
+        or _check_unicode_symbols(flair_text)
+        or _check_pronoun_patterns(flair)
+        or _check_bracketed_markers(flair)
+        or _check_text_patterns(flair)
+    )
+
+
+def _check_emoji_placeholders(flair: str) -> str | None:
+    """Check for Reddit emoji placeholders like :female:, :male:, etc."""
     if ":female:" in flair:
         return "FEMALE"
     if ":male:" in flair:
         return "MALE"
-    if ":nonbinary:" in flair or ":non-binary:" in flair or ":nb:" in flair:
+    if any(x in flair for x in [":nonbinary:", ":non-binary:", ":nb:"]):
         return "NON_BINARY"
     if ":trans:" in flair:
         if ":transm:" in flair or ":ftm:" in flair:
             return "TRANSGENDER_MALE"
         if ":transf:" in flair or ":mtf:" in flair:
             return "TRANSGENDER_FEMALE"
-        return None  # Can't determine specific type
+    return None
 
-    # Check for Unicode symbols
+
+def _check_unicode_symbols(flair_text: str) -> str | None:
+    """Check for Unicode gender symbols (needs original case)."""
     if "\u2640" in flair_text:  # Female sign
         return "FEMALE"
     if "\u2642" in flair_text:  # Male sign
         return "MALE"
+    return None
 
-    # Check for pronoun indicators
+
+def _check_pronoun_patterns(flair: str) -> str | None:
+    """Check for pronoun indicators like she/her, he/him, etc."""
     if "she/her" in flair or "(she)" in flair:
         return "FEMALE"
     if "he/him" in flair or "(he)" in flair:
         return "MALE"
     if "they/them" in flair:
         return "NON_BINARY"
+    return None
 
-    # Check for bracketed gender markers [F], [M], [NB]
+
+def _check_bracketed_markers(flair: str) -> str | None:
+    """Check for bracketed gender markers like [F], [M], [NB]."""
     if re.search(r"\[f\]", flair):
         return "FEMALE"
     if re.search(r"\[m\]", flair) and not re.search(r"\[fm\]|\[mf\]", flair):
         return "MALE"
     if re.search(r"\[nb\]", flair):
         return "NON_BINARY"
+    return None
 
-    # Text patterns
+
+def _check_text_patterns(flair: str) -> str | None:
+    """Check for text gender indicators like 'female', 'male', etc."""
     if "female" in flair:
         return "FEMALE"
     if "male" in flair and "female" not in flair:
         return "MALE"
     if "non-binary" in flair or "nonbinary" in flair:
         return "NON_BINARY"
-
     return None
 
 
