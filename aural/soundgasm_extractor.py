@@ -31,8 +31,15 @@ class SoundgasmExtractor:
         self.playwright = None
         self.context = None
 
-    def setup_playwright(self):
-        """Initialize Playwright browser."""
+    def setup_playwright(self, page=None, context=None):
+        """Initialize Playwright browser or use provided page/context."""
+        if page is not None:
+            self.page = page
+            self.context = context
+            self._owns_browser = False
+            print("🔗 Using shared Playwright browser")
+            return
+
         try:
             print("🚀 Starting Playwright browser...")
             self.playwright = sync_playwright().start()
@@ -41,13 +48,19 @@ class SoundgasmExtractor:
                 user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/76.0.3809.100 Safari/537.36"
             )
             self.page = self.context.new_page()
+            self._owns_browser = True
             print("✅ Playwright browser initialized successfully")
         except Exception as error:
             print(f"❌ Failed to initialize Playwright: {error}")
             raise
 
     def close_browser(self):
-        """Close Playwright browser."""
+        """Close Playwright browser if we own it."""
+        if not getattr(self, "_owns_browser", True):
+            self.page = None
+            self.context = None
+            return
+
         if self.page:
             self.page.close()
             self.page = None

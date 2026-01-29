@@ -421,7 +421,8 @@ class ReleaseOrchestrator:
                 extractor = extractor_class({"request_delay": 2.0})
 
                 if hasattr(extractor, "setup_playwright"):
-                    extractor.setup_playwright()
+                    page, context = self._get_shared_playwright()
+                    extractor.setup_playwright(page=page, context=context)
 
                 self.active_extractors[platform] = extractor
 
