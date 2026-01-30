@@ -116,6 +116,29 @@ def write_tag_metadata(
     console.print(f"[blue]Metadata saved to {metadata_path}[/blue]")
 
 
+def create_720p_version(source_path: Path, tag_name: str) -> Path:
+    """Create a 720p version of the WebM for uploading to Stashapp."""
+    temp_path = Path("/tmp") / f"{tag_name}_720p.webm"
+
+    cmd = [
+        "ffmpeg",
+        "-i",
+        str(source_path),
+        "-vf",
+        "scale=720:720",
+        "-c:v",
+        "libvpx-vp9",
+        "-b:v",
+        "1070k",  # Half of default 2140k
+        "-an",
+        "-y",
+        str(temp_path),
+    ]
+    console.print(f"[blue]Creating 720p version for upload: {' '.join(cmd)}[/blue]")
+    subprocess.run(cmd, check=True, capture_output=True)
+    return temp_path
+
+
 def upload_tag_image(client: StashAppClient, tag_name: str, webm_path: Path) -> None:
     """Upload a WebM file as a tag image in Stashapp."""
     tags = client.stash.find_tags(f={"name": {"value": tag_name, "modifier": "EQUALS"}})
@@ -124,7 +147,38 @@ def upload_tag_image(client: StashAppClient, tag_name: str, webm_path: Path) -> 
         sys.exit(1)
 
     tag_id = tags[0]["id"]
-    data = webm_path.read_bytes()
+
+    # Probe the resolution of the source WebM
+    result = subprocess.run(
+        [
+            "ffprobe",
+            "-v",
+            "error",
+            "-select_streams",
+            "v:0",
+            "-show_entries",
+            "stream=width",
+            "-of",
+            "json",
+            str(webm_path),
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    width = int(json.loads(result.stdout)["streams"][0]["width"])
+
+    # Create 720p version if source is larger
+    upload_path = webm_path
+    cleanup_temp = False
+    if width > 720:
+        console.print(f"[yellow]Source is {width}x{width}, creating 720p version for upload[/yellow]")
+        upload_path = create_720p_version(webm_path, tag_name)
+        cleanup_temp = True
+    else:
+        console.print(f"[blue]Source is {width}x{width}, uploading as-is[/blue]")
+
+    data = upload_path.read_bytes()
     b64 = base64.b64encode(data).decode()
     data_url = f"data:video/webm;base64,{b64}"
 
@@ -134,7 +188,12 @@ def upload_tag_image(client: StashAppClient, tag_name: str, webm_path: Path) -> 
         }""",
         {"input": {"id": tag_id, "image": data_url}},
     )
-    console.print(f"[green]Updated tag '{tag_name}' (id={tag_id}) with image from {webm_path}[/green]")
+    console.print(f"[green]Updated tag '{tag_name}' (id={tag_id}) with image from {upload_path}[/green]")
+
+    # Clean up temp file if created
+    if cleanup_temp:
+        upload_path.unlink()
+        console.print("[blue]Cleaned up temporary 720p file[/blue]")
 
 
 def set_image(
