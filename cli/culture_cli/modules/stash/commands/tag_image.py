@@ -55,9 +55,10 @@ def encode_square_webm(
     # For landscape: crop height-sized square, anchor controls X position
     # For portrait: crop width-sized square, anchor controls Y position
     vf = (
-        f"if(gte(iw,ih)"
-        f",crop=ih:ih:(iw-ih)*{anchor}:0"
-        f",crop=iw:iw:0:(ih-iw)*{anchor})"
+        f"crop="
+        f"'min(iw,ih):min(iw,ih)"
+        f":(iw-min(iw,ih))*{anchor}"
+        f":(ih-min(iw,ih))*{anchor}'"
     )
     if resolution:
         vf += f",scale={resolution}:{resolution}"
