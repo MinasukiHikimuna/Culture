@@ -4,6 +4,7 @@ import base64
 import json
 import subprocess
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated
 
@@ -15,7 +16,7 @@ from libraries.client_stashapp import StashAppClient
 
 console = Console()
 
-TAG_IMAGE_DIR = Path("/tmp/culture/tag-images")
+TAG_DIR = Path("/Volumes/Culture 1/Tags")
 
 
 def probe_video_height(input_path: Path) -> int:
@@ -77,6 +78,44 @@ def encode_square_webm(
     subprocess.run(cmd, check=True)
 
 
+def write_tag_metadata(
+    tag_name: str,
+    input_path: Path,
+    start: str,
+    duration: float,
+    bitrate: str,
+    resolution: int | None,
+    anchor: float,
+) -> None:
+    """Write metadata JSON for a tag image with version history."""
+    new_version = {
+        "tag_name": tag_name,
+        "source_video": str(input_path.absolute()),
+        "start": start,
+        "duration": duration,
+        "bitrate": bitrate,
+        "resolution": resolution,
+        "anchor": anchor,
+        "created_at": datetime.now(UTC).isoformat(),
+    }
+
+    metadata_path = TAG_DIR / f"{tag_name}.json"
+
+    # Read existing metadata if it exists
+    if metadata_path.exists():
+        existing_data = json.loads(metadata_path.read_text())
+        versions = existing_data.get("versions", [])
+    else:
+        versions = []
+
+    # Prepend new version to history
+    versions.insert(0, new_version)
+
+    metadata = {"versions": versions}
+    metadata_path.write_text(json.dumps(metadata, indent=2))
+    console.print(f"[blue]Metadata saved to {metadata_path}[/blue]")
+
+
 def upload_tag_image(client: StashAppClient, tag_name: str, webm_path: Path) -> None:
     """Upload a WebM file as a tag image in Stashapp."""
     tags = client.stash.find_tags(f={"name": {"value": tag_name, "modifier": "EQUALS"}})
@@ -120,8 +159,8 @@ def set_image(
         console.print(f"[red]Input file not found: {input_path}[/red]")
         sys.exit(1)
 
-    TAG_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
-    output_path = TAG_IMAGE_DIR / f"{tag}.webm"
+    TAG_DIR.mkdir(parents=True, exist_ok=True)
+    output_path = TAG_DIR / f"{tag}.webm"
 
     if resolution:
         source_height = probe_video_height(input_path)
@@ -133,6 +172,8 @@ def set_image(
 
     encode_square_webm(input_path, output_path, start, duration, bitrate, resolution, anchor)
     console.print(f"[green]WebM saved to {output_path}[/green]")
+
+    write_tag_metadata(tag, input_path, start, duration, bitrate, resolution, anchor)
 
     client = StashAppClient(prefix=prefix)
     upload_tag_image(client, tag, output_path)
