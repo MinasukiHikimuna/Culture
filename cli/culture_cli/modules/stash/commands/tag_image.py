@@ -52,7 +52,13 @@ def encode_square_webm(
     anchor: float,
 ) -> None:
     """Encode a square cropped VP9 WebM clip."""
-    vf = f"crop=ih:ih:(iw-ih)*{anchor}:0"
+    # For landscape: crop height-sized square, anchor controls X position
+    # For portrait: crop width-sized square, anchor controls Y position
+    vf = (
+        f"if(gte(iw,ih)"
+        f",crop=ih:ih:(iw-ih)*{anchor}:0"
+        f",crop=iw:iw:0:(ih-iw)*{anchor})"
+    )
     if resolution:
         vf += f",scale={resolution}:{resolution}"
 
@@ -204,7 +210,7 @@ def set_image(
     bitrate: str = typer.Option("2140k", "--bitrate", "-b", help="Target bitrate"),
     resolution: int | None = typer.Option(None, "--resolution", "-r", help="Target square size (e.g. 1080)"),
     anchor: float = typer.Option(
-        0.5, "--anchor", "-a", help="Horizontal crop anchor (0.0=left, 0.5=center, 1.0=right)"
+        0.5, "--anchor", "-a", help="Crop anchor (landscape: 0.0=left, 1.0=right; portrait: 0.0=top, 1.0=bottom)"
     ),
     prefix: str = typer.Option("", "--prefix", "-p", help="Env var prefix for Stashapp connection"),
 ) -> None:
