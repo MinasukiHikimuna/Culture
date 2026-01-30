@@ -7,10 +7,12 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from culture_cli.modules.stash.commands.tag_image import set_image
 from libraries.client_stashapp import StashAppClient
 
 
 app = typer.Typer()
+app.command("set-image")(set_image)
 console = Console()
 
 
