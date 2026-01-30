@@ -146,14 +146,8 @@ def create_720p_version(source_path: Path, tag_name: str) -> Path:
     return temp_path
 
 
-def upload_tag_image(client: StashAppClient, tag_name: str, webm_path: Path) -> None:
+def upload_tag_image(client: StashAppClient, tag_name: str, tag_id: str, webm_path: Path) -> None:
     """Upload a WebM file as a tag image in Stashapp."""
-    tags = client.stash.find_tags(f={"name": {"value": tag_name, "modifier": "EQUALS"}})
-    if not tags:
-        console.print(f"[red]Tag '{tag_name}' not found in Stashapp.[/red]")
-        sys.exit(1)
-
-    tag_id = tags[0]["id"]
 
     # Probe the resolution of the source WebM
     result = subprocess.run(
@@ -225,6 +219,12 @@ def set_image(
         console.print(f"[red]Input file not found: {input_path}[/red]")
         sys.exit(1)
 
+    client = StashAppClient(prefix=prefix)
+    tags = client.stash.find_tags(f={"name": {"value": tag, "modifier": "EQUALS"}})
+    if not tags:
+        console.print(f"[red]Tag '{tag}' not found in Stashapp.[/red]")
+        sys.exit(1)
+
     TAG_DIR.mkdir(parents=True, exist_ok=True)
     output_path = TAG_DIR / f"{tag}.webm"
 
@@ -241,5 +241,4 @@ def set_image(
 
     write_tag_metadata(tag, input_path, start, duration, bitrate, resolution, anchor)
 
-    client = StashAppClient(prefix=prefix)
-    upload_tag_image(client, tag, output_path)
+    upload_tag_image(client, tag, tags[0]["id"], output_path)
