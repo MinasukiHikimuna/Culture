@@ -14,6 +14,17 @@ from rich.console import Console
 from libraries.client_stashapp import StashAppClient
 
 
+# Windows share path to local volume mapping for all Culture shares
+# e.g. "W:\Culture\Videos\..." -> "/Volumes/Culture 4/Videos/..."
+WINDOWS_SHARE_MAP: dict[str, Path] = {
+    "X:\\Culture": Path("/Volumes/Culture 1"),
+    "Y:\\Culture": Path("/Volumes/Culture 2"),
+    "Z:\\Culture": Path("/Volumes/Culture 3"),
+    "W:\\Culture": Path("/Volumes/Culture 4"),
+    "F:\\Culture": Path("/Volumes/Culture 5"),
+}
+
+
 console = Console()
 
 TAG_DIR = Path("/Volumes/Culture 1/Tags")
@@ -197,10 +208,43 @@ def upload_tag_image(client: StashAppClient, tag_name: str, tag_id: str, webm_pa
         console.print("[blue]Cleaned up temporary 720p file[/blue]")
 
 
+def windows_path_to_local(windows_path: str) -> Path:
+    """Convert a Windows path from Stashapp to a local Mac path."""
+    for share_prefix, local_base in WINDOWS_SHARE_MAP.items():
+        if windows_path.startswith(share_prefix):
+            relative = windows_path[len(share_prefix):].lstrip("\\")
+            if relative:
+                return local_base / Path(*relative.split("\\"))
+            return local_base
+    console.print(f"[red]Unknown share prefix in path: {windows_path}[/red]")
+    sys.exit(1)
+
+
+def resolve_scene_path(client: StashAppClient, scene_id: int) -> Path:
+    """Look up a scene by ID in Stashapp and return its local file path."""
+    scene = client.stash.find_scene(scene_id, fragment="id files { path }")
+    if not scene:
+        console.print(f"[red]Scene {scene_id} not found in Stashapp.[/red]")
+        sys.exit(1)
+
+    files = scene.get("files", [])
+    if not files:
+        console.print(f"[red]Scene {scene_id} has no files.[/red]")
+        sys.exit(1)
+
+    stashapp_path = files[0]["path"]
+    local_path = windows_path_to_local(stashapp_path)
+    console.print(f"[blue]Resolved scene {scene_id} to {local_path}[/blue]")
+    return local_path
+
+
 def set_image(
-    input_path: Annotated[Path, typer.Option("--input", "-i", help="Source video path")],
     start: Annotated[str, typer.Option("--start", "-ss", help="Start time (HH:MM:SS or seconds)")],
     tag: Annotated[str, typer.Option(help="Stashapp tag name")],
+    input_path: Annotated[Path | None, typer.Option("--input", "-i", help="Source video path")] = None,
+    scene_id: Annotated[
+        int | None, typer.Option("--scene-id", help="Stashapp scene ID (resolves path automatically)")
+    ] = None,
     duration: float = typer.Option(5.4, "--duration", "-t", help="Clip duration in seconds"),
     bitrate: str = typer.Option("2140k", "--bitrate", "-b", help="Target bitrate"),
     resolution: int | None = typer.Option(None, "--resolution", "-r", help="Target square size (e.g. 1080)"),
@@ -213,17 +257,25 @@ def set_image(
 
     Examples:
         culture stash tags set-image -i video.mp4 -ss 00:01:30 --tag "POV"
-        culture stash tags set-image -i video.mp4 -ss 30 --tag "POV" -r 1080 -b 8560k
+        culture stash tags set-image --scene-id 123 -ss 00:01:30 --tag "POV"
     """
-    if not input_path.exists():
-        console.print(f"[red]Input file not found: {input_path}[/red]")
+    if not input_path and not scene_id:
+        console.print("[red]Either --input/-i or --scene-id must be provided.[/red]")
         sys.exit(1)
 
     client = StashAppClient(prefix=prefix)
+
+    if scene_id:
+        input_path = resolve_scene_path(client, scene_id)
+
+    if not input_path.exists():
+        console.print(f"[red]Input file not found: {input_path}[/red]")
+        sys.exit(1)
     tags = client.stash.find_tags(f={"name": {"value": tag, "modifier": "EQUALS"}})
     if not tags:
         console.print(f"[red]Tag '{tag}' not found in Stashapp.[/red]")
         sys.exit(1)
+    tag = tags[0]["name"]
 
     TAG_DIR.mkdir(parents=True, exist_ok=True)
     output_path = TAG_DIR / f"{tag}.webm"
