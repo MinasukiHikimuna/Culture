@@ -61,15 +61,17 @@ def encode_square_webm(
     bitrate: str,
     resolution: int | None,
     anchor: float,
+    zoom: float = 1.0,
 ) -> None:
     """Encode a square cropped VP9 WebM clip."""
     # For landscape: crop height-sized square, anchor controls X position
     # For portrait: crop width-sized square, anchor controls Y position
+    # Zoom shrinks the crop area (zoom>1 crops tighter), anchored around the same midpoint
     vf = (
         f"crop="
-        f"'min(iw,ih):min(iw,ih)"
-        f":(iw-min(iw,ih))*{anchor}"
-        f":(ih-min(iw,ih))*{anchor}'"
+        f"'min(iw,ih)/{zoom}:min(iw,ih)/{zoom}"
+        f":(iw-min(iw,ih)/{zoom})*{anchor}"
+        f":(ih-min(iw,ih)/{zoom})*{anchor}'"
     )
     if resolution:
         vf += f",scale={resolution}:{resolution}"
@@ -104,6 +106,7 @@ def write_tag_metadata(
     bitrate: str,
     resolution: int | None,
     anchor: float,
+    zoom: float = 1.0,
 ) -> None:
     """Write metadata JSON for a tag image with version history."""
     new_version = {
@@ -114,6 +117,7 @@ def write_tag_metadata(
         "bitrate": bitrate,
         "resolution": resolution,
         "anchor": anchor,
+        "zoom": zoom,
         "created_at": datetime.now(UTC).isoformat(),
     }
 
@@ -251,6 +255,9 @@ def set_image(
     anchor: float = typer.Option(
         0.5, "--anchor", "-a", help="Crop anchor (landscape: 0.0=left, 1.0=right; portrait: 0.0=top, 1.0=bottom)"
     ),
+    zoom: float = typer.Option(
+        1.0, "--zoom", "-z", help="Zoom factor to crop past black bars (1.0=none, 1.1=10% crop)"
+    ),
     prefix: str = typer.Option("", "--prefix", "-p", help="Env var prefix for Stashapp connection"),
 ) -> None:
     """Extract a square clip from a video and set it as a tag image in Stashapp.
@@ -288,9 +295,9 @@ def set_image(
             bitrate = f"{int(bitrate_value)}k"
             console.print(f"[yellow]Scaled bitrate to {bitrate} for {resolution}x{resolution}[/yellow]")
 
-    encode_square_webm(input_path, output_path, start, duration, bitrate, resolution, anchor)
+    encode_square_webm(input_path, output_path, start, duration, bitrate, resolution, anchor, zoom)
     console.print(f"[green]WebM saved to {output_path}[/green]")
 
-    write_tag_metadata(tag, input_path, start, duration, bitrate, resolution, anchor)
+    write_tag_metadata(tag, input_path, start, duration, bitrate, resolution, anchor, zoom)
 
     upload_tag_image(client, tag, tags[0]["id"], output_path)
