@@ -1294,263 +1294,25 @@ class StashappImporter:
         print(f"Processing: {title}...")
         print("=" * 60)
 
-        # Find audio files
         audio_sources = release_data.get("audioSources", [])
         if len(audio_sources) == 0:
             print("Error: No audio sources found in release")
             return {"success": False, "error": "No audio sources"}
 
-        # Get all Stashapp tags for matching
         print("\nFetching Stashapp tags...")
         stash_tags = self.client.get_all_tags()
         print(f"  Found {len(stash_tags)} tags in Stashapp")
 
-        # Create studio subdirectory (named after primary performer)
-        studio_name = release_data.get("primaryPerformer", "Unknown")
-        # Sanitize for filesystem: remove/replace problematic characters
-        safe_studio_name = re.sub(r'[<>:"/\\|?*]', "_", studio_name).strip()
-        studio_dir = self.output_dir / safe_studio_name
-        studio_dir.mkdir(parents=True, exist_ok=True)
-        print(f"\nStudio directory: {studio_dir}")
+        studio_dir = self._create_studio_dir(release_data)
+        scene_ids = self._process_audio_sources(
+            audio_sources, release_data, release_json_path, studio_dir, stash_tags
+        )
 
-        last_scene_id: str | None = None
-        scene_ids: list[dict] = []  # Track all scene IDs for grouping
-
-        # Process each audio source
-        for i, source in enumerate(audio_sources):
-            audio_info = source.get("audio", {})
-            audio_path_str = audio_info.get("filePath", "")
-            audio_checksum = source.get("audio", {}).get("checksum", {}).get("sha256")
-
-            print(f"\n[Audio {i + 1}/{len(audio_sources)}]")
-
-            # STEP 1: Check Stashapp for existing scene by fingerprint FIRST
-            # This handles cases where the audio is already imported but not marked processed
-            if audio_checksum:
-                existing_scene = self.client.find_scene_by_fingerprint(
-                    "audio_sha256", audio_checksum
-                )
-                if existing_scene:
-                    print(
-                        f"  Found existing scene by fingerprint: {existing_scene['id']}"
-                    )
-                    print("  Updating metadata on existing scene...")
-
-                    # Update metadata on the existing scene (self-healing)
-                    self._update_scene_metadata(
-                        scene_id=existing_scene["id"],
-                        release_data=release_data,
-                        source=source,
-                        audio_info=audio_info,
-                        audio_sources=audio_sources,
-                        stash_tags=stash_tags,
-                    )
-
-                    scene_ids.append({"id": existing_scene["id"], "index": i})
-                    last_scene_id = existing_scene["id"]
-                    continue
-
-            # STEP 2: Check if local audio file exists
-            audio_path = Path(audio_path_str) if audio_path_str else None
-            if audio_path and not audio_path.is_absolute():
-                audio_path = Path(__file__).parent / audio_path_str
-
-            # STEP 3: If file not found, try to recover by checksum
-            if not audio_path or not audio_path.exists():
-                if audio_checksum:
-                    # Try to find the file by checksum (handles renamed files)
-                    release_dir = release_json_path.parent
-                    recovered_path = find_audio_by_checksum(release_dir, audio_checksum)
-                    if recovered_path:
-                        print(
-                            f"  Recovered audio file by checksum: {recovered_path.name}"
-                        )
-                        # Update the path in release_data for this source
-                        audio_info["filePath"] = str(recovered_path)
-                        audio_path = recovered_path
-                        # Mark that we need to save the updated release.json
-                        release_data["_needs_save"] = True
-                    else:
-                        print(
-                            f"  Warning: Audio file not found and could not recover: "
-                            f"{audio_path_str}"
-                        )
-                        continue
-                else:
-                    print(f"  Warning: Audio file not found: {audio_path_str}")
-                    continue
-
-            print(f"  Source: {audio_path.name}")
-
-            # Generate output filename (with version slug for multi-version releases)
-            output_filename = format_output_filename(
-                release_data, source, i, len(audio_sources)
-            )
-            output_path = studio_dir / output_filename
-
-            print(f"  Output: {output_filename}")
-
-            # Convert audio to video (validate existing files for self-healing)
-            needs_conversion = True
-
-            if output_path.exists():
-                # Validate video duration matches source audio
-                audio_duration = get_media_duration(audio_path)
-                video_duration = get_media_duration(output_path)
-
-                if audio_duration and video_duration:
-                    # Allow 1 second tolerance for encoding differences
-                    if abs(audio_duration - video_duration) <= 1.0:
-                        print("  Video already exists, skipping conversion")
-                        needs_conversion = False
-                    else:
-                        print(
-                            f"  Video duration mismatch "
-                            f"(audio: {audio_duration:.1f}s, video: {video_duration:.1f}s), "
-                            "re-converting..."
-                        )
-                        output_path.unlink()
-                else:
-                    print("  Video file invalid, re-converting...")
-                    output_path.unlink()
-
-            if needs_conversion:
-                # Check disk space before attempting conversion
-                has_space, free_gb = check_disk_space(output_path)
-                if not has_space:
-                    raise OSError(
-                        f"Insufficient disk space on {output_path.parent} "
-                        f"({free_gb:.2f} GB free, need at least 1 GB)"
-                    )
-
-                success = convert_audio_to_video(audio_path, output_path)
-                if not success:
-                    print("  Error: Failed to convert audio to video")
-                    continue
-                print(f"  Conversion successful: {output_path}")
-
-            # Trigger Stashapp scan for the studio directory (not the specific file,
-            # because Stashapp can't process a file whose parent folder is new)
-            print("\n  Triggering Stashapp scan...")
-            try:
-                windows_path = local_path_to_windows(output_path.parent)
-                print(f"  Scanning: {windows_path}")
-                job_id = self.client.trigger_scan(paths=[windows_path])
-            except ValueError as e:
-                print(f"  Warning: Path mapping failed ({e}), scanning all")
-                job_id = self.client.trigger_scan()
-            print(f"  Scan job started: {job_id}")
-
-            # Wait for scan to complete
-            print("  Waiting for scan to complete...")
-            scan_completed = self.client.wait_for_scan(60)
-
-            if not scan_completed:
-                raise StashScanStuckError(
-                    f"Stashapp scan job {job_id} did not complete within 60 seconds. "
-                    "The scan may be stuck. Please check Stashapp and restart if needed."
-                )
-
-            # Compute oshash for the converted video (used for scene lookup)
-            file_oshash = oshash.oshash(str(output_path))
-
-            # Find the scene by oshash (with retries to allow for database indexing)
-            scene = None
-            max_retries = 10
-            retry_delay = 2  # seconds
-
-            for retry in range(max_retries):
-                scene = self.client.find_scene_by_oshash(file_oshash)
-                if scene:
-                    break
-                if retry < max_retries - 1:
-                    print(
-                        f"  Scene not found yet, retrying in {retry_delay}s... "
-                        f"({retry + 1}/{max_retries})"
-                    )
-                    time.sleep(retry_delay)
-
-            if not scene:
-                raise StashScanStuckError(
-                    f"Scene not found after scan completed. oshash: {file_oshash}. "
-                    "Stashapp may not be scanning the expected directory, or the scan is stuck."
-                )
-
-            print(f"  Found scene ID: {scene['id']}")
-            last_scene_id = scene["id"]
-            scene_ids.append({"id": scene["id"], "index": i})
-
-            # Update scene metadata
-            self._update_scene_metadata(
-                scene_id=scene["id"],
-                release_data=release_data,
-                source=source,
-                audio_info=audio_info,
-                audio_sources=audio_sources,
-                stash_tags=stash_tags,
-            )
-
-            # Set audio fingerprint for duplicate detection
-            if audio_checksum:
-                scene_with_files = self.client.get_scene_with_files(scene["id"])
-                files = scene_with_files.get("files", []) if scene_with_files else []
-                file_id = files[0]["id"] if files else None
-                if file_id:
-                    self.client.set_file_fingerprint(
-                        file_id, "audio_sha256", audio_checksum
-                    )
-                    print(f"  Set audio fingerprint: {audio_checksum[:16]}...")
-
-            # Clean up source audio file after successful import
-            if audio_path.exists():
-                audio_path.unlink()
-                print(f"  Cleaned up source audio: {audio_path.name}")
-
-        # Create group if multiple scenes were processed
-        group_id: str | None = None
-        if len(scene_ids) > 1:
-            print("\n  Creating group for multi-audio release...")
-            group_name = generate_group_name(
-                release_data.get("title", ""),
-                release_data.get("primaryPerformer", ""),
-            )
-            print(f'  Group name: "{group_name}"')
-
-            group_options: dict = {}
-            release_date = release_data.get("releaseDate")
-            if release_date:
-                date = datetime.fromtimestamp(release_date, tz=UTC)
-                group_options["date"] = date.strftime("%Y-%m-%d")
-            reddit_data = release_data.get("enrichmentData", {}).get("reddit", {})
-            if reddit_data.get("url"):
-                group_options["urls"] = [reddit_data["url"]]
-
-            group = self.client.find_or_create_group(group_name, group_options)
-            group_id = group["id"]
-
-            # Associate scenes with group
-            for scene_info in scene_ids:
-                self.client.add_scene_to_group(
-                    scene_info["id"], group["id"], scene_info["index"] + 1
-                )
-                print(
-                    f"    Added scene {scene_info['id']} to group at index "
-                    f"{scene_info['index'] + 1}"
-                )
-            print(f"  Group created/updated: {STASH_BASE_URL}/groups/{group['id']}")
-
-        # Save Stashapp scene IDs to release.json for idempotency
-        # Also save if file paths were recovered during processing
-        needs_save = scene_ids or release_data.pop("_needs_save", False)
-        if needs_save:
-            if scene_ids:
-                release_data["stashapp_scene_ids"] = [s["id"] for s in scene_ids]
-                release_data["stashapp_scene_id"] = last_scene_id
-                if group_id:
-                    release_data["stashapp_group_id"] = group_id
-            release_json_path.write_text(
-                json.dumps(release_data, indent=2, ensure_ascii=False), encoding="utf-8"
-            )
+        group_id = self._create_release_group(release_data, scene_ids)
+        last_scene_id = scene_ids[-1]["id"] if scene_ids else None
+        self._save_release_metadata(
+            release_json_path, release_data, scene_ids, last_scene_id, group_id
+        )
 
         return {
             "success": True,
@@ -1561,6 +1323,280 @@ class StashappImporter:
             "groupId": group_id,
             "groupUrl": f"{STASH_BASE_URL}/groups/{group_id}" if group_id else None,
         }
+
+    def _create_studio_dir(self, release_data: dict) -> Path:
+        """Create studio subdirectory named after the primary performer."""
+        studio_name = release_data.get("primaryPerformer", "Unknown")
+        safe_studio_name = re.sub(r'[<>:"/\\|?*]', "_", studio_name).strip()
+        studio_dir = self.output_dir / safe_studio_name
+        studio_dir.mkdir(parents=True, exist_ok=True)
+        print(f"\nStudio directory: {studio_dir}")
+        return studio_dir
+
+    def _process_audio_sources(
+        self,
+        audio_sources: list,
+        release_data: dict,
+        release_json_path: Path,
+        studio_dir: Path,
+        stash_tags: list,
+    ) -> list[dict]:
+        """Process each audio source: import or update existing scenes."""
+        scene_ids: list[dict] = []
+
+        for i, source in enumerate(audio_sources):
+            audio_info = source.get("audio", {})
+            audio_checksum = audio_info.get("checksum", {}).get("sha256")
+
+            print(f"\n[Audio {i + 1}/{len(audio_sources)}]")
+
+            existing = self._find_existing_scene(audio_checksum)
+            if existing:
+                self._update_scene_metadata(
+                    scene_id=existing["id"],
+                    release_data=release_data,
+                    source=source,
+                    audio_info=audio_info,
+                    audio_sources=audio_sources,
+                    stash_tags=stash_tags,
+                )
+                scene_ids.append({"id": existing["id"], "index": i})
+                continue
+
+            audio_path = self._resolve_audio_path(
+                audio_info, audio_checksum, release_json_path.parent, release_data
+            )
+            if not audio_path:
+                continue
+
+            print(f"  Source: {audio_path.name}")
+            output_path = studio_dir / format_output_filename(
+                release_data, source, i, len(audio_sources)
+            )
+            print(f"  Output: {output_path.name}")
+
+            if not self._convert_audio_if_needed(audio_path, output_path):
+                continue
+
+            scene = self._scan_and_find_scene(output_path)
+
+            self._update_scene_metadata(
+                scene_id=scene["id"],
+                release_data=release_data,
+                source=source,
+                audio_info=audio_info,
+                audio_sources=audio_sources,
+                stash_tags=stash_tags,
+            )
+
+            self._finalize_scene(scene["id"], audio_path, audio_checksum)
+            scene_ids.append({"id": scene["id"], "index": i})
+
+        return scene_ids
+
+    def _find_existing_scene(self, audio_checksum: str | None) -> dict | None:
+        """Check Stashapp for an existing scene by audio fingerprint."""
+        if not audio_checksum:
+            return None
+
+        existing_scene = self.client.find_scene_by_fingerprint(
+            "audio_sha256", audio_checksum
+        )
+        if existing_scene:
+            print(f"  Found existing scene by fingerprint: {existing_scene['id']}")
+            print("  Updating metadata on existing scene...")
+        return existing_scene
+
+    def _resolve_audio_path(
+        self,
+        audio_info: dict,
+        audio_checksum: str | None,
+        release_dir: Path,
+        release_data: dict,
+    ) -> Path | None:
+        """Resolve local audio file path, recovering by checksum if needed."""
+        audio_path_str = audio_info.get("filePath", "")
+        audio_path = Path(audio_path_str) if audio_path_str else None
+        if audio_path and not audio_path.is_absolute():
+            audio_path = Path(__file__).parent / audio_path_str
+
+        if audio_path and audio_path.exists():
+            return audio_path
+
+        if not audio_checksum:
+            print(f"  Warning: Audio file not found: {audio_path_str}")
+            return None
+
+        recovered_path = find_audio_by_checksum(release_dir, audio_checksum)
+        if recovered_path:
+            print(f"  Recovered audio file by checksum: {recovered_path.name}")
+            audio_info["filePath"] = str(recovered_path)
+            release_data["_needs_save"] = True
+            return recovered_path
+
+        print(
+            f"  Warning: Audio file not found and could not recover: {audio_path_str}"
+        )
+        return None
+
+    def _convert_audio_if_needed(self, audio_path: Path, output_path: Path) -> bool:
+        """Convert audio to video, validating existing files. Returns False on failure."""
+        if output_path.exists():
+            if self._is_valid_existing_video(audio_path, output_path):
+                print("  Video already exists, skipping conversion")
+                return True
+            output_path.unlink()
+
+        has_space, free_gb = check_disk_space(output_path)
+        if not has_space:
+            raise OSError(
+                f"Insufficient disk space on {output_path.parent} "
+                f"({free_gb:.2f} GB free, need at least 1 GB)"
+            )
+
+        success = convert_audio_to_video(audio_path, output_path)
+        if not success:
+            print("  Error: Failed to convert audio to video")
+            return False
+        print(f"  Conversion successful: {output_path}")
+        return True
+
+    def _is_valid_existing_video(self, audio_path: Path, video_path: Path) -> bool:
+        """Check if an existing video file matches the source audio duration."""
+        audio_duration = get_media_duration(audio_path)
+        video_duration = get_media_duration(video_path)
+
+        if not audio_duration or not video_duration:
+            print("  Video file invalid, re-converting...")
+            return False
+
+        if abs(audio_duration - video_duration) <= 1.0:
+            return True
+
+        print(
+            f"  Video duration mismatch "
+            f"(audio: {audio_duration:.1f}s, video: {video_duration:.1f}s), "
+            "re-converting..."
+        )
+        return False
+
+    def _scan_and_find_scene(self, output_path: Path) -> dict:
+        """Trigger Stashapp scan and find the scene by oshash with retries."""
+        print("\n  Triggering Stashapp scan...")
+        try:
+            windows_path = local_path_to_windows(output_path.parent)
+            print(f"  Scanning: {windows_path}")
+            job_id = self.client.trigger_scan(paths=[windows_path])
+        except ValueError as e:
+            print(f"  Warning: Path mapping failed ({e}), scanning all")
+            job_id = self.client.trigger_scan()
+        print(f"  Scan job started: {job_id}")
+
+        print("  Waiting for scan to complete...")
+        scan_completed = self.client.wait_for_scan(60)
+        if not scan_completed:
+            raise StashScanStuckError(
+                f"Stashapp scan job {job_id} did not complete within 60 seconds. "
+                "The scan may be stuck. Please check Stashapp and restart if needed."
+            )
+
+        file_oshash = oshash.oshash(str(output_path))
+        max_retries = 10
+        retry_delay = 2
+
+        for retry in range(max_retries):
+            scene = self.client.find_scene_by_oshash(file_oshash)
+            if scene:
+                print(f"  Found scene ID: {scene['id']}")
+                return scene
+            if retry < max_retries - 1:
+                print(
+                    f"  Scene not found yet, retrying in {retry_delay}s... "
+                    f"({retry + 1}/{max_retries})"
+                )
+                time.sleep(retry_delay)
+
+        raise StashScanStuckError(
+            f"Scene not found after scan completed. oshash: {file_oshash}. "
+            "Stashapp may not be scanning the expected directory, or the scan is stuck."
+        )
+
+    def _finalize_scene(
+        self, scene_id: str, audio_path: Path, audio_checksum: str | None
+    ) -> None:
+        """Set audio fingerprint and clean up source audio file."""
+        if audio_checksum:
+            scene_with_files = self.client.get_scene_with_files(scene_id)
+            files = scene_with_files.get("files", []) if scene_with_files else []
+            file_id = files[0]["id"] if files else None
+            if file_id:
+                self.client.set_file_fingerprint(
+                    file_id, "audio_sha256", audio_checksum
+                )
+                print(f"  Set audio fingerprint: {audio_checksum[:16]}...")
+
+        if audio_path.exists():
+            audio_path.unlink()
+            print(f"  Cleaned up source audio: {audio_path.name}")
+
+    def _create_release_group(
+        self, release_data: dict, scene_ids: list[dict]
+    ) -> str | None:
+        """Create a Stashapp group for multi-audio releases."""
+        if len(scene_ids) <= 1:
+            return None
+
+        print("\n  Creating group for multi-audio release...")
+        group_name = generate_group_name(
+            release_data.get("title", ""),
+            release_data.get("primaryPerformer", ""),
+        )
+        print(f'  Group name: "{group_name}"')
+
+        group_options: dict = {}
+        release_date = release_data.get("releaseDate")
+        if release_date:
+            date = datetime.fromtimestamp(release_date, tz=UTC)
+            group_options["date"] = date.strftime("%Y-%m-%d")
+        reddit_data = release_data.get("enrichmentData", {}).get("reddit", {})
+        if reddit_data.get("url"):
+            group_options["urls"] = [reddit_data["url"]]
+
+        group = self.client.find_or_create_group(group_name, group_options)
+        group_id = group["id"]
+
+        for scene_info in scene_ids:
+            self.client.add_scene_to_group(
+                scene_info["id"], group_id, scene_info["index"] + 1
+            )
+            print(
+                f"    Added scene {scene_info['id']} to group at index "
+                f"{scene_info['index'] + 1}"
+            )
+        print(f"  Group created/updated: {STASH_BASE_URL}/groups/{group_id}")
+        return group_id
+
+    def _save_release_metadata(
+        self,
+        release_json_path: Path,
+        release_data: dict,
+        scene_ids: list[dict],
+        last_scene_id: str | None,
+        group_id: str | None,
+    ) -> None:
+        """Save Stashapp scene IDs to release.json for idempotency."""
+        needs_save = scene_ids or release_data.pop("_needs_save", False)
+        if not needs_save:
+            return
+
+        if scene_ids:
+            release_data["stashapp_scene_ids"] = [s["id"] for s in scene_ids]
+            release_data["stashapp_scene_id"] = last_scene_id
+            if group_id:
+                release_data["stashapp_group_id"] = group_id
+        release_json_path.write_text(
+            json.dumps(release_data, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
 
 
 def main() -> int:
