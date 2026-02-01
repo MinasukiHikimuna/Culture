@@ -60,18 +60,19 @@ def encode_square_webm(
     duration: float,
     bitrate: str,
     resolution: int | None,
-    anchor: float,
+    anchor_x: float,
+    anchor_y: float,
     zoom: float = 1.0,
 ) -> None:
     """Encode a square cropped VP9 WebM clip."""
-    # For landscape: crop height-sized square, anchor controls X position
-    # For portrait: crop width-sized square, anchor controls Y position
-    # Zoom shrinks the crop area (zoom>1 crops tighter), anchored around the same midpoint
+    # Zoom shrinks the crop area (zoom>1 crops tighter)
+    # anchor_x: 0.0=left, 0.5=center, 1.0=right
+    # anchor_y: 0.0=top, 0.5=center, 1.0=bottom
     vf = (
         f"crop="
         f"'min(iw,ih)/{zoom}:min(iw,ih)/{zoom}"
-        f":(iw-min(iw,ih)/{zoom})*{anchor}"
-        f":(ih-min(iw,ih)/{zoom})*{anchor}'"
+        f":(iw-min(iw,ih)/{zoom})*{anchor_x}"
+        f":(ih-min(iw,ih)/{zoom})*{anchor_y}'"
     )
     if resolution:
         vf += f",scale={resolution}:{resolution}"
@@ -105,7 +106,8 @@ def write_tag_metadata(
     duration: float,
     bitrate: str,
     resolution: int | None,
-    anchor: float,
+    anchor_x: float,
+    anchor_y: float,
     zoom: float = 1.0,
 ) -> None:
     """Write metadata JSON for a tag image with version history."""
@@ -116,7 +118,8 @@ def write_tag_metadata(
         "duration": duration,
         "bitrate": bitrate,
         "resolution": resolution,
-        "anchor": anchor,
+        "anchor_x": anchor_x,
+        "anchor_y": anchor_y,
         "zoom": zoom,
         "created_at": datetime.now(UTC).isoformat(),
     }
@@ -252,8 +255,11 @@ def set_image(
     duration: float = typer.Option(5.4, "--duration", "-t", help="Clip duration in seconds"),
     bitrate: str = typer.Option("2140k", "--bitrate", "-b", help="Target bitrate"),
     resolution: int | None = typer.Option(None, "--resolution", "-r", help="Target square size (e.g. 1080)"),
-    anchor: float = typer.Option(
-        0.5, "--anchor", "-a", help="Crop anchor (landscape: 0.0=left, 1.0=right; portrait: 0.0=top, 1.0=bottom)"
+    anchor_x: float = typer.Option(
+        0.5, "--anchor-x", help="Horizontal crop anchor (0.0=left, 0.5=center, 1.0=right)"
+    ),
+    anchor_y: float = typer.Option(
+        0.5, "--anchor-y", help="Vertical crop anchor (0.0=top, 0.5=center, 1.0=bottom)"
     ),
     zoom: float = typer.Option(
         1.0, "--zoom", "-z", help="Zoom factor to crop past black bars (1.0=none, 1.1=10% crop)"
@@ -295,9 +301,9 @@ def set_image(
             bitrate = f"{int(bitrate_value)}k"
             console.print(f"[yellow]Scaled bitrate to {bitrate} for {resolution}x{resolution}[/yellow]")
 
-    encode_square_webm(input_path, output_path, start, duration, bitrate, resolution, anchor, zoom)
+    encode_square_webm(input_path, output_path, start, duration, bitrate, resolution, anchor_x, anchor_y, zoom)
     console.print(f"[green]WebM saved to {output_path}[/green]")
 
-    write_tag_metadata(tag, input_path, start, duration, bitrate, resolution, anchor, zoom)
+    write_tag_metadata(tag, input_path, start, duration, bitrate, resolution, anchor_x, anchor_y, zoom)
 
     upload_tag_image(client, tag, tags[0]["id"], output_path)
