@@ -1067,6 +1067,46 @@ class StashappImporter:
         This is used both for newly imported scenes and for self-healing
         existing scenes found by fingerprint.
         """
+        reddit_data = release_data.get("enrichmentData", {}).get("reddit", {})
+        llm_analysis = release_data.get("enrichmentData", {}).get("llmAnalysis", {})
+
+        updates = self._build_basic_metadata(
+            release_data, source, audio_info, audio_sources, reddit_data, llm_analysis
+        )
+
+        print("    Processing performers...")
+        performer_ids = self._resolve_performer_ids(
+            release_data, source, reddit_data, llm_analysis
+        )
+        if performer_ids:
+            updates["performer_ids"] = performer_ids
+
+        print("    Processing studio...")
+        if release_data.get("primaryPerformer"):
+            studio = self.client.find_or_create_studio(
+                release_data["primaryPerformer"]
+            )
+            updates["studio_id"] = studio["id"]
+
+        print("    Processing tags...")
+        tag_ids = self._resolve_tag_ids(release_data, source, stash_tags)
+        if tag_ids:
+            updates["tag_ids"] = tag_ids
+
+        print("    Updating scene metadata...")
+        self.client.update_scene(scene_id, updates)
+        print("  Scene metadata updated successfully!")
+
+    def _build_basic_metadata(
+        self,
+        release_data: dict,
+        source: dict,
+        audio_info: dict,
+        audio_sources: list,
+        reddit_data: dict,
+        llm_analysis: dict,
+    ) -> dict:
+        """Build basic scene metadata: title, date, URLs, details, director."""
         updates: dict = {}
 
         # Title (add version name for multi-version releases)
@@ -1084,7 +1124,6 @@ class StashappImporter:
 
         # URLs
         urls: list[str] = []
-        reddit_data = release_data.get("enrichmentData", {}).get("reddit", {})
         if reddit_data.get("url"):
             urls.append(reddit_data["url"])
         if audio_info.get("sourceUrl"):
@@ -1095,14 +1134,12 @@ class StashappImporter:
         # Details (description)
         selftext = reddit_data.get("selftext", "")
         if selftext:
-            # Clean up markdown
             details = re.sub(r"\*\*([^*]+)\*\*", r"\1", selftext)  # Bold
             details = re.sub(r"\*([^*]+)\*", r"\1", details)  # Italic
             details = details.replace("\\", "")  # Escape chars
             updates["details"] = details[:5000]
 
         # Director (script author)
-        llm_analysis = release_data.get("enrichmentData", {}).get("llmAnalysis", {})
         script_author = llm_analysis.get("script", {}).get("author")
         if not script_author:
             script_author = release_data.get("scriptAuthor")
@@ -1110,107 +1147,131 @@ class StashappImporter:
             updates["director"] = script_author
             print(f"    Director (script author): {script_author}")
 
-        # Performers - use per-audio performers if available, fallback to release-level
-        print("    Processing performers...")
-        performer_ids: list[str] = []
+        return updates
 
-        # Check for per-audio performers first
+    def _resolve_performer_ids(
+        self,
+        release_data: dict,
+        source: dict,
+        reddit_data: dict,
+        llm_analysis: dict,
+    ) -> list[str]:
+        """Resolve performers to Stashapp IDs, using per-audio or release-level."""
         per_audio_performers = source.get("versionInfo", {}).get("performers", [])
 
         if per_audio_performers:
-            print(f"      Using per-audio performers: {', '.join(per_audio_performers)}")
-            for performer_name in per_audio_performers:
-                avatar_url = get_reddit_avatar(performer_name)
-                if avatar_url:
-                    print(f"      Found Reddit avatar for {performer_name}")
-                performer = self.client.find_or_create_performer(
-                    performer_name,
-                    image_url=avatar_url,
-                    reddit_username=performer_name,
-                )
-                performer_ids.append(performer["id"])
-        else:
-            # Fallback to release-level performers
-            primary_performer = release_data.get("primaryPerformer")
+            return self._resolve_per_audio_performers(per_audio_performers)
+        return self._resolve_release_performers(release_data, reddit_data, llm_analysis)
 
-            # Get author flair for gender (from Reddit post data)
-            author_flair_text = reddit_data.get("author_flair_text", "")
-            primary_gender = parse_gender_from_flair(author_flair_text)
-            if primary_gender:
-                print(
-                    f'      Detected gender from flair "{author_flair_text}": '
-                    f"{primary_gender}"
-                )
+    def _resolve_per_audio_performers(self, performer_names: list[str]) -> list[str]:
+        """Resolve per-audio performers to Stashapp IDs."""
+        print(f"      Using per-audio performers: {', '.join(performer_names)}")
+        performer_ids: list[str] = []
 
-            if primary_performer:
-                avatar_url = get_reddit_avatar(primary_performer)
-                if avatar_url:
-                    print(f"      Found Reddit avatar for {primary_performer}")
-                performer = self.client.find_or_create_performer(
-                    primary_performer,
-                    image_url=avatar_url,
-                    reddit_username=primary_performer,
-                    gender=primary_gender,
-                )
-                performer_ids.append(performer["id"])
-
-            # Additional performers
-            additional_performers = llm_analysis.get("performers", {}).get(
-                "additional", []
+        for performer_name in performer_names:
+            avatar_url = get_reddit_avatar(performer_name)
+            if avatar_url:
+                print(f"      Found Reddit avatar for {performer_name}")
+            performer = self.client.find_or_create_performer(
+                performer_name,
+                image_url=avatar_url,
+                reddit_username=performer_name,
             )
-            if not additional_performers:
-                additional_performers = release_data.get("additionalPerformers", [])
+            performer_ids.append(performer["id"])
 
-            for additional in additional_performers:
-                avatar_url = get_reddit_avatar(additional)
-                if avatar_url:
-                    print(f"      Found Reddit avatar for {additional}")
-                performer = self.client.find_or_create_performer(
-                    additional,
-                    image_url=avatar_url,
-                    reddit_username=additional,
-                )
-                performer_ids.append(performer["id"])
+        return performer_ids
 
-        if performer_ids:
-            updates["performer_ids"] = performer_ids
+    def _resolve_release_performers(
+        self,
+        release_data: dict,
+        reddit_data: dict,
+        llm_analysis: dict,
+    ) -> list[str]:
+        """Resolve release-level performers (primary + additional) to Stashapp IDs."""
+        performer_ids: list[str] = []
+        primary_performer = release_data.get("primaryPerformer")
 
-        # Studio (same as primary performer for solo releases)
-        print("    Processing studio...")
-        if release_data.get("primaryPerformer"):
-            studio = self.client.find_or_create_studio(
-                release_data["primaryPerformer"]
+        # Get author flair for gender (from Reddit post data)
+        author_flair_text = reddit_data.get("author_flair_text", "")
+        primary_gender = parse_gender_from_flair(author_flair_text)
+        if primary_gender:
+            print(
+                f'      Detected gender from flair "{author_flair_text}": '
+                f"{primary_gender}"
             )
-            updates["studio_id"] = studio["id"]
 
-        # Tags - for multi-audio posts use per-audio tags, for single audio extract all from title
-        print("    Processing tags...")
+        if primary_performer:
+            avatar_url = get_reddit_avatar(primary_performer)
+            if avatar_url:
+                print(f"      Found Reddit avatar for {primary_performer}")
+            performer = self.client.find_or_create_performer(
+                primary_performer,
+                image_url=avatar_url,
+                reddit_username=primary_performer,
+                gender=primary_gender,
+            )
+            performer_ids.append(performer["id"])
+
+        # Additional performers
+        additional_performers = llm_analysis.get("performers", {}).get("additional", [])
+        if not additional_performers:
+            additional_performers = release_data.get("additionalPerformers", [])
+
+        for additional in additional_performers:
+            avatar_url = get_reddit_avatar(additional)
+            if avatar_url:
+                print(f"      Found Reddit avatar for {additional}")
+            performer = self.client.find_or_create_performer(
+                additional,
+                image_url=avatar_url,
+                reddit_username=additional,
+            )
+            performer_ids.append(performer["id"])
+
+        return performer_ids
+
+    def _resolve_tag_ids(
+        self,
+        release_data: dict,
+        source: dict,
+        stash_tags: list,
+    ) -> list[str]:
+        """Extract and match tags from release data to Stashapp tag IDs."""
         audio_sources = release_data.get("audioSources", [])
         is_single_audio = len(audio_sources) == 1
         per_audio_tags = source.get("versionInfo", {}).get("tags", [])
 
+        extracted_tags = self._extract_tags(
+            release_data, is_single_audio, per_audio_tags
+        )
+
+        if not stash_tags or not extracted_tags:
+            return []
+
+        matched_tag_ids = match_tags_with_stash(extracted_tags, stash_tags)
+        if matched_tag_ids:
+            print(f"      Matched {len(matched_tag_ids)} tags")
+        return matched_tag_ids
+
+    def _extract_tags(
+        self,
+        release_data: dict,
+        is_single_audio: bool,
+        per_audio_tags: list[str],
+    ) -> list[str]:
+        """Extract tags based on audio source count and available data."""
         if is_single_audio:
-            # Single audio: extract ALL bracketed tags from title
             extracted_tags = extract_all_tags(release_data)
             print(f"      Single audio - extracted {len(extracted_tags)} tags from title/body")
-        elif per_audio_tags:
-            # Multi-audio: use version-specific tags from LLM
+            return extracted_tags
+
+        if per_audio_tags:
             print(f"      Multi-audio - using per-audio tags: {len(per_audio_tags)} tags")
-            extracted_tags = per_audio_tags
-        else:
-            extracted_tags = extract_all_tags(release_data)
-            print(f"      Fallback - extracted {len(extracted_tags)} tags from title/body")
+            return per_audio_tags
 
-        if stash_tags and extracted_tags:
-            matched_tag_ids = match_tags_with_stash(extracted_tags, stash_tags)
-            if matched_tag_ids:
-                updates["tag_ids"] = matched_tag_ids
-                print(f"      Matched {len(matched_tag_ids)} tags")
-
-        # Update scene
-        print("    Updating scene metadata...")
-        self.client.update_scene(scene_id, updates)
-        print("  Scene metadata updated successfully!")
+        extracted_tags = extract_all_tags(release_data)
+        print(f"      Fallback - extracted {len(extracted_tags)} tags from title/body")
+        return extracted_tags
 
     def process_release(self, release_dir: str | Path) -> dict:
         """
