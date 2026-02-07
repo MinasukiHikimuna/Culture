@@ -30,9 +30,9 @@ DATA_DIR = aural_config.RELEASES_DIR.parent
 ANALYSIS_DIR = aural_config.ANALYSIS_DIR
 EXTRACTED_DATA_DIR = aural_config.REDDIT_INDEX_DIR
 
-# Stashapp configuration
-STASH_URL = os.getenv("STASHAPP_URL")
-STASH_API_KEY = os.getenv("STASHAPP_API_KEY")
+# Stashapp configuration (aural instance)
+STASH_URL = os.getenv("AURAL_STASHAPP_URL")
+STASH_API_KEY = os.getenv("AURAL_STASHAPP_API_KEY")
 
 
 def stashapp_query(query: str, variables: dict | None = None) -> dict | None:

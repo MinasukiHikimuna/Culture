@@ -52,19 +52,22 @@ uv run python .claude/skills/stashapp-check/scripts/stashapp_check.py "ghost" --
 - `--verbose` / `-v` - Show verbose output including file paths and details
 - `--limit N` / `-l N` - Limit number of results (default: 10)
 - `--json` - Output results as JSON
-- `--instance {aural,main}` - Select Stashapp instance (default: aural)
+- `--prefix PREFIX` / `-P PREFIX` - Environment variable prefix for Stashapp config (default: AURAL_)
 
 ## Instance Selection
 
-The script supports multiple Stashapp instances:
-- `--instance aural` (default) - Uses `AURAL_STASHAPP_URL` and `AURAL_STASHAPP_API_KEY`
-- `--instance main` - Uses `STASHAPP_URL` and `STASHAPP_API_KEY`
+The script supports multiple Stashapp instances via environment variable prefixes:
+- `--prefix AURAL_` (default) - Uses `AURAL_STASHAPP_URL` and `AURAL_STASHAPP_API_KEY`
+- `--prefix MAIN_` - Uses `MAIN_STASHAPP_URL` and `MAIN_STASHAPP_API_KEY`
+- `--prefix MISSING_SDB_` - Uses `MISSING_SDB_STASHAPP_URL` and `MISSING_SDB_STASHAPP_API_KEY`
 
 ## Configuration
 
-Environment variables required (based on instance):
-- For `aural`: `AURAL_STASHAPP_URL` and `AURAL_STASHAPP_API_KEY`
-- For `main`: `STASHAPP_URL` and `STASHAPP_API_KEY`
+Environment variables required (based on prefix):
+- `{PREFIX}STASHAPP_URL` - Base URL of the Stashapp instance
+- `{PREFIX}STASHAPP_API_KEY` - API key for authentication
+
+Available prefixes in .env: `MAIN_`, `AURAL_`, `MISSING_SDB_`
 
 ## Output Format
 

@@ -39,10 +39,10 @@ class StashappClient:
             port: Stashapp port
             api_key: API key for authentication
         """
-        self.scheme = scheme or os.environ.get("STASHAPP_SCHEME", "http")
-        self.host = host or os.environ.get("STASHAPP_HOST", "localhost")
-        self.port = port or os.environ.get("STASHAPP_PORT", "9999")
-        self.api_key = api_key or os.environ.get("STASHAPP_API_KEY", "")
+        self.scheme = scheme or os.environ.get("MAIN_STASHAPP_SCHEME", "http")
+        self.host = host or os.environ.get("MAIN_STASHAPP_HOST", "localhost")
+        self.port = port or os.environ.get("MAIN_STASHAPP_PORT", "9999")
+        self.api_key = api_key or os.environ.get("MAIN_STASHAPP_API_KEY", "")
         self.endpoint = f"{self.scheme}://{self.host}:{self.port}/graphql"
 
     async def get_performer_by_stashdb_id(

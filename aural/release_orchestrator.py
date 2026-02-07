@@ -1301,20 +1301,8 @@ class ReleaseOrchestrator:
             raise ValueError(f"Reddit script extraction failed: {error}") from error
 
     def save_release(self, release: Release):
-        """Save release to storage using new naming structure."""
-        data_dir = Path(self.config["dataDir"])
-
-        # Use version naming if available
-        llm_analysis = release.enrichment_data.get("llmAnalysis") or {}
-        if llm_analysis.get("version_naming", {}).get("release_directory"):
-            release_dir = (
-                data_dir / "releases" /
-                release.primary_performer /
-                release.enrichment_data["llmAnalysis"]["version_naming"]["release_directory"]
-            )
-        else:
-            release_dir = data_dir / "releases" / release.primary_performer / release.id
-
+        """Save release to storage."""
+        release_dir = release.release_dir
         release_dir.mkdir(parents=True, exist_ok=True)
 
         # Save release metadata

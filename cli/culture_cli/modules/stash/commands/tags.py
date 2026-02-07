@@ -33,6 +33,56 @@ def create_tags_table(df: pl.DataFrame) -> Table:
     return table
 
 
+@app.command("todo")
+def todo_tags(
+    limit: int = typer.Option(40, "--limit", "-l", help="Number of tags to show"),
+    prefix: str = typer.Option("", "--prefix", "-p", help="Env var prefix for Stashapp connection"),
+) -> None:
+    """List tags without preview images, sorted by scene count."""
+    try:
+        client = StashAppClient(prefix=prefix)
+        console.print("[blue]Fetching tags without images...[/blue]")
+
+        result = client.stash.call_GQL(
+            """query FindTagsTodo($filter: FindFilterType, $tag_filter: TagFilterType) {
+                findTags(filter: $filter, tag_filter: $tag_filter) {
+                    count
+                    tags { id name scene_count }
+                }
+            }""",
+            {
+                "filter": {
+                    "per_page": limit,
+                    "sort": "scenes_count",
+                    "direction": "DESC",
+                },
+                "tag_filter": {"is_missing": "image"},
+            },
+        )
+
+        data = result["findTags"]
+        tags = data["tags"]
+        total = data["count"]
+
+        if not tags:
+            console.print("[yellow]All tags have preview images![/yellow]")
+            return
+
+        table = Table(title="Tags Without Previews", show_header=True, header_style="bold magenta")
+        table.add_column("Name", style="green")
+        table.add_column("Scenes", style="cyan", justify="right")
+
+        for tag in tags:
+            table.add_row(tag["name"], str(tag["scene_count"]))
+
+        console.print(table)
+        console.print(f"\n[green]Showing {len(tags)} of {total} tags without images[/green]")
+
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
 @app.command("list")
 def list_tags(
     name: str | None = typer.Option(

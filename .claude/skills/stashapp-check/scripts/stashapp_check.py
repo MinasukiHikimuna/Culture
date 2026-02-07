@@ -28,14 +28,10 @@ monorepo_root = Path(__file__).resolve().parents[4]
 load_dotenv(monorepo_root / ".env")
 
 
-def get_stash_config(instance: str) -> tuple[str | None, str | None]:
-    """Get Stashapp URL and API key for the specified instance."""
-    if instance == "aural":
-        base_url = os.getenv("AURAL_STASHAPP_URL")
-        api_key = os.getenv("AURAL_STASHAPP_API_KEY")
-    else:  # main
-        base_url = os.getenv("STASHAPP_URL")
-        api_key = os.getenv("STASHAPP_API_KEY")
+def get_stash_config(prefix: str) -> tuple[str | None, str | None]:
+    """Get Stashapp URL and API key for the specified prefix."""
+    base_url = os.getenv(f"{prefix}STASHAPP_URL")
+    api_key = os.getenv(f"{prefix}STASHAPP_API_KEY")
 
     url = f"{base_url}/graphql" if base_url else None
     return (url, api_key)
@@ -267,10 +263,10 @@ def main():
     parser.add_argument("--limit", "-l", type=int, default=10, help="Limit results (default: 10)")
     parser.add_argument("--json", action="store_true", help="Output as JSON")
     parser.add_argument(
-        "--instance",
-        choices=["aural", "main"],
-        default="aural",
-        help="Stashapp instance to query (default: aural)",
+        "--prefix",
+        "-P",
+        default="AURAL_",
+        help="Environment variable prefix for Stashapp config (default: AURAL_). Examples: MAIN_, AURAL_, MISSING_SDB_",
     )
 
     args = parser.parse_args()
@@ -280,14 +276,13 @@ def main():
         parser.print_help()
         sys.exit(1)
 
-    # Get configuration for selected instance
-    stash_url, stash_api_key = get_stash_config(args.instance)
+    # Get configuration for selected prefix
+    stash_url, stash_api_key = get_stash_config(args.prefix)
 
     # Validate required environment variables
     if not stash_url or not stash_api_key:
-        prefix = "AURAL_STASHAPP" if args.instance == "aural" else "STASHAPP"
-        print(f"Error: Missing required environment variables for '{args.instance}' instance.")
-        print(f"Please set {prefix}_URL and {prefix}_API_KEY in your .env file.")
+        print(f"Error: Missing required environment variables for prefix '{args.prefix}'.")
+        print(f"Please set {args.prefix}STASHAPP_URL and {args.prefix}STASHAPP_API_KEY in your .env file.")
         sys.exit(1)
 
     # Initialize client
