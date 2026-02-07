@@ -4,6 +4,7 @@
 # See: https://docs.scrapy.org/en/latest/topics/item-pipeline.html
 
 
+import json
 import logging
 import os
 import subprocess
@@ -48,6 +49,16 @@ class PostgresPipeline:
 
                 if existing_release:
                     # Update existing release
+                    available_files = (
+                        json.loads(item.available_files)
+                        if isinstance(item.available_files, str)
+                        else item.available_files
+                    )
+                    json_document = (
+                        json.loads(item.json_document)
+                        if isinstance(item.json_document, str)
+                        else item.json_document
+                    )
                     existing_release.release_date = (
                         datetime.fromisoformat(item.release_date) if item.release_date else None
                     )
@@ -57,8 +68,8 @@ class PostgresPipeline:
                     existing_release.description = item.description
                     existing_release.duration = item.duration
                     existing_release.last_updated = item.last_updated
-                    existing_release.available_files = item.available_files
-                    existing_release.json_document = item.json_document
+                    existing_release.available_files = available_files
+                    existing_release.json_document = json_document
                     existing_release.sub_site_uuid = (
                         str(item.sub_site_uuid) if item.sub_site_uuid else None
                     )
@@ -70,6 +81,16 @@ class PostgresPipeline:
                     release = existing_release
                 else:
                     # Create new release
+                    available_files = (
+                        json.loads(item.available_files)
+                        if isinstance(item.available_files, str)
+                        else item.available_files
+                    )
+                    json_document = (
+                        json.loads(item.json_document)
+                        if isinstance(item.json_document, str)
+                        else item.json_document
+                    )
                     release = Release(
                         uuid=item.id,
                         release_date=(
@@ -82,8 +103,8 @@ class PostgresPipeline:
                         duration=item.duration,
                         created=item.created,
                         last_updated=item.last_updated,
-                        available_files=item.available_files,
-                        json_document=item.json_document,
+                        available_files=available_files,
+                        json_document=json_document,
                         site_uuid=item.site_uuid,
                         sub_site_uuid=item.sub_site_uuid,
                     )
