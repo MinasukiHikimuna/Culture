@@ -105,7 +105,7 @@ FEED_EXPORT_ENCODING = "utf-8"
 # This fixes DNS lookup issues with certain domains like dd-vthumbs.wowgirls.com
 DNS_RESOLVER = "scrapy.resolver.CachingThreadedResolver"
 
-FILES_STORE = "/Volumes/Ripping/"
+FILES_STORE = "/Volumes/Sabrent/Ripping/"
 
 MEDIA_ALLOW_REDIRECTS = True
 DOWNLOAD_MAXSIZE = 0

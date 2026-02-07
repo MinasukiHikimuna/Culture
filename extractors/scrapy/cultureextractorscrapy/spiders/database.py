@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import threading
 
@@ -35,22 +36,22 @@ Base = declarative_base()
 release_performer = Table(
     "release_entity_site_performer_entity",
     Base.metadata,
-    Column("releases_uuid", String(36), ForeignKey("releases.uuid")),
-    Column("performers_uuid", String(36), ForeignKey("performers.uuid")),
+    Column("releases_uuid", UUID, ForeignKey("releases.uuid")),
+    Column("performers_uuid", UUID, ForeignKey("performers.uuid")),
 )
 
 # Junction table for releases and tags
 release_tag = Table(
     "release_entity_site_tag_entity",
     Base.metadata,
-    Column("releases_uuid", String(36), ForeignKey("releases.uuid")),
-    Column("tags_uuid", String(36), ForeignKey("tags.uuid")),
+    Column("releases_uuid", UUID, ForeignKey("releases.uuid")),
+    Column("tags_uuid", UUID, ForeignKey("tags.uuid")),
 )
 
 
 class Site(Base):
     __tablename__ = "sites"
-    uuid = Column(String(36), primary_key=True)
+    uuid = Column(UUID, primary_key=True)
     short_name = Column(String, nullable=False)
     name = Column(String, nullable=False)
     url = Column(String, nullable=False)
@@ -60,7 +61,7 @@ class Site(Base):
 
 class Release(Base):
     __tablename__ = "releases"
-    uuid = Column(String(36), primary_key=True)
+    uuid = Column(UUID, primary_key=True)
     release_date = Column(Date, nullable=False)
     short_name = Column(String, nullable=False)
     name = Column(String, nullable=False)
@@ -71,8 +72,8 @@ class Release(Base):
     last_updated = Column(DateTime, nullable=False)
     available_files = Column(String, nullable=False)
     json_document = Column(String, nullable=False)
-    site_uuid = Column(String(36), ForeignKey("sites.uuid"), nullable=False)
-    sub_site_uuid = Column(String(36), ForeignKey("sub_sites.uuid"), nullable=True)
+    site_uuid = Column(UUID, ForeignKey("sites.uuid"), nullable=False)
+    sub_site_uuid = Column(UUID, ForeignKey("sub_sites.uuid"), nullable=True)
     site = relationship("Site", back_populates="releases")
     sub_site = relationship("SubSite", back_populates="releases")
     downloads = relationship("DownloadedFile", back_populates="release")
@@ -82,11 +83,11 @@ class Release(Base):
 
 class Performer(Base):
     __tablename__ = "performers"
-    uuid = Column(String(36), primary_key=True)
+    uuid = Column(UUID, primary_key=True)
     short_name = Column(String, nullable=False)
     name = Column(String, nullable=False)
     url = Column(String, nullable=False)
-    site_uuid = Column(String(36), ForeignKey("sites.uuid"), nullable=False)
+    site_uuid = Column(UUID, ForeignKey("sites.uuid"), nullable=False)
     releases = relationship(
         "Release",
         secondary=release_performer,
@@ -97,11 +98,11 @@ class Performer(Base):
 
 class Tag(Base):
     __tablename__ = "tags"
-    uuid = Column(String(36), primary_key=True)
+    uuid = Column(UUID, primary_key=True)
     short_name = Column(String, nullable=False)
     name = Column(String, nullable=False)
     url = Column(String, nullable=False)
-    site_uuid = Column(String(36), ForeignKey("sites.uuid"), nullable=False)
+    site_uuid = Column(UUID, ForeignKey("sites.uuid"), nullable=False)
     releases = relationship(
         "Release", secondary=release_tag, back_populates="tags", overlaps="tags"
     )
@@ -126,10 +127,10 @@ class DownloadedFile(Base):
 
 class SubSite(Base):
     __tablename__ = "sub_sites"
-    uuid = Column(String(36), primary_key=True)
+    uuid = Column(UUID, primary_key=True)
     short_name = Column(String, nullable=False)
     name = Column(String, nullable=False)
-    site_uuid = Column(String(36), ForeignKey("sites.uuid"), nullable=False)
+    site_uuid = Column(UUID, ForeignKey("sites.uuid"), nullable=False)
     json_document = Column(JSON, nullable=True)
     site = relationship("Site", back_populates="sub_sites")
     releases = relationship("Release", back_populates="sub_site")
@@ -138,6 +139,26 @@ class SubSite(Base):
 # Create a single shared engine with connection pooling (thread-safe)
 _engine = None
 _engine_lock = threading.Lock()
+logger = logging.getLogger(__name__)
+
+
+def get_database_url() -> str:
+    db_url = os.getenv("CONNECTION_STRING")
+    if not db_url:
+        raise ValueError("CONNECTION_STRING environment variable is required")
+
+    if db_url.startswith("postgresql+psycopg2://"):
+        normalized_url = db_url.replace("postgresql+psycopg2://", "postgresql+psycopg://", 1)
+        logger.warning("CONNECTION_STRING uses deprecated psycopg2 dialect; using psycopg instead")
+        return normalized_url
+
+    if db_url.startswith("postgresql://"):
+        return db_url.replace("postgresql://", "postgresql+psycopg://", 1)
+
+    if db_url.startswith("postgres://"):
+        return db_url.replace("postgres://", "postgresql+psycopg://", 1)
+
+    return db_url
 
 
 def get_engine():
@@ -146,7 +167,7 @@ def get_engine():
         with _engine_lock:
             # Double-check pattern for thread safety
             if _engine is None:
-                db_url = os.getenv("CONNECTION_STRING")
+                db_url = get_database_url()
                 _engine = create_engine(
                     db_url,
                     pool_size=5,
@@ -309,7 +330,7 @@ def get_or_create_sub_site(site_uuid: str, short_name: str, name: str) -> SubSit
         )
 
         if sub_site is None:
-            new_uuid = str(newnewid.uuid7())
+            new_uuid = newnewid.uuid7()
             sub_site = SubSite(
                 uuid=new_uuid,
                 site_uuid=site_uuid,

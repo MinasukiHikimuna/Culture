@@ -7,6 +7,7 @@
 import logging
 import os
 import subprocess
+import uuid
 from datetime import datetime
 from urllib.parse import urlparse
 
@@ -43,7 +44,7 @@ class PostgresPipeline:
                     spider.logger.error(f"Site not found for UUID: {item.site_uuid}")
                     return item
 
-                existing_release = self.session.query(Release).filter_by(uuid=str(item.id)).first()
+                existing_release = self.session.query(Release).filter_by(uuid=item.id).first()
 
                 if existing_release:
                     # Update existing release
@@ -70,7 +71,7 @@ class PostgresPipeline:
                 else:
                     # Create new release
                     release = Release(
-                        uuid=str(item.id),
+                        uuid=item.id,
                         release_date=(
                             datetime.fromisoformat(item.release_date) if item.release_date else None
                         ),
@@ -83,8 +84,8 @@ class PostgresPipeline:
                         last_updated=item.last_updated,
                         available_files=item.available_files,
                         json_document=item.json_document,
-                        site_uuid=str(item.site_uuid),
-                        sub_site_uuid=(str(item.sub_site_uuid) if item.sub_site_uuid else None),
+                        site_uuid=item.site_uuid,
+                        sub_site_uuid=item.sub_site_uuid,
                     )
                     self.session.add(release)
                     spider.logger.info(f"Creating new release with ID: {item.id}")
@@ -93,9 +94,7 @@ class PostgresPipeline:
                 if item.performers:
                     for performer_item in item.performers:
                         performer = (
-                            self.session.query(Performer)
-                            .filter_by(uuid=str(performer_item.id))
-                            .first()
+                            self.session.query(Performer).filter_by(uuid=performer_item.id).first()
                         )
                         if performer:
                             release.performers.append(performer)
@@ -108,7 +107,7 @@ class PostgresPipeline:
                 # Add tags
                 if item.tags:
                     for tag_item in item.tags:
-                        tag = self.session.query(Tag).filter_by(uuid=str(tag_item.id)).first()
+                        tag = self.session.query(Tag).filter_by(uuid=tag_item.id).first()
                         if tag:
                             release.tags.append(tag)
                             spider.logger.info("Added tag %s to release %s", tag.name, item.id)
@@ -132,7 +131,11 @@ class PostgresPipeline:
                 )
                 # Create new downloaded file record
                 downloaded_file = DownloadedFile(
-                    uuid=str(item["uuid"]),
+                    uuid=(
+                        item["uuid"]
+                        if isinstance(item["uuid"], uuid.UUID)
+                        else uuid.UUID(str(item["uuid"]))
+                    ),
                     downloaded_at=item["downloaded_at"],
                     file_type=item["file_type"],
                     content_type=item["content_type"],
@@ -140,7 +143,11 @@ class PostgresPipeline:
                     available_file=item["available_file"],
                     original_filename=item["original_filename"],
                     saved_filename=item["saved_filename"],
-                    release_uuid=str(item["release_uuid"]),
+                    release_uuid=(
+                        item["release_uuid"]
+                        if isinstance(item["release_uuid"], uuid.UUID)
+                        else uuid.UUID(str(item["release_uuid"]))
+                    ),
                     file_metadata=item["file_metadata"],
                 )
                 self.session.add(downloaded_file)
@@ -213,6 +220,13 @@ class BaseDownloadPipeline:
         session = get_session()
         try:
             release = session.query(Release).filter_by(uuid=release_id).first()
+            if release is None:
+                try:
+                    release = (
+                        session.query(Release).filter_by(uuid=uuid.UUID(str(release_id))).first()
+                    )
+                except ValueError:
+                    release = None
             if not release:
                 raise ValueError(f"Release with ID {release_id} not found")
             site = session.query(Site).filter_by(uuid=release.site_uuid).first()
