@@ -191,7 +191,8 @@ class CultureAPIClient:
             params["limit"] = limit
         response = self.client.get("/performers", params=params)
         response.raise_for_status()
-        return response.json()
+        data = response.json()
+        return data.get("items", []) if isinstance(data, dict) else data
 
     def get_performer(self, uuid: str) -> dict:
         """Get detailed information about a specific performer.
