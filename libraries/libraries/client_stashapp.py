@@ -355,7 +355,7 @@ galleries_schema = {
 }
 
 
-def get_stashapp_client(prefix="") -> StashInterface:
+def get_stashapp_client(prefix="MAIN_") -> StashInterface:
     # Use the provided prefix to get environment variables
     scheme = os.getenv(f"{prefix}STASHAPP_SCHEME")
     host = os.getenv(f"{prefix}STASHAPP_HOST")
@@ -375,7 +375,7 @@ def get_stashapp_client(prefix="") -> StashInterface:
 
 
 class StashAppClient:
-    def __init__(self, prefix=""):
+    def __init__(self, prefix="MAIN_"):
         self.stash = get_stashapp_client(prefix)
 
     def create_stash_url(
