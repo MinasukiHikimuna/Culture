@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from datetime import UTC, datetime
 
 import newnewid
@@ -305,66 +306,106 @@ class XArtSpider(scrapy.Spider):
                 )
                 performers.append(performer)
 
-        # Build available files - video download URLs
-        # URL pattern: /members/videos/{slug}/xart_realty_erotica_{slug_underscored}_{resolution}.mp4
-        slug_underscored = slug.replace("-", "_")
+        # Parse video download URLs from the page HTML
         available_files = []
         download_items = []
 
-        # Video resolutions available on X-Art
-        video_variants = [
-            ("360", 640, 360),
-            ("540", 960, 540),
-            ("720", 1280, 720),
-            ("1080", 1920, 1080),
-            ("4k", 3840, 2160),
-        ]
+        # Find all video download links (they're in the download modal)
+        video_links = response.css('a[href*=".mp4"]')
+        best_video = None
+        best_resolution = 0
 
-        # Only download the highest quality (4K)
-        variant, width, height = video_variants[-1]  # 4K
-        video_url = f"{BASE_URL}/videos/{slug}/xart_realty_erotica_{slug_underscored}_{variant}.mp4"
+        for link in video_links:
+            url = link.attrib.get("href", "")
+            text = link.css("::text").getall()
+            text = " ".join(t.strip() for t in text if t.strip())
 
-        video_file = AvailableVideoFile(
-            file_type="video",
-            content_type="scene",
-            variant=variant,
-            url=video_url,
-            resolution_width=width,
-            resolution_height=height,
-        )
-        available_files.append(video_file)
+            # Parse resolution from text like "3840x2160" or "1920x1080"
+            width, height = 0, 0
+            resolution_match = re.search(r"(\d+)x(\d+)", text)
+            if resolution_match:
+                width = int(resolution_match.group(1))
+                height = int(resolution_match.group(2))
 
-        download_items.append(
-            DirectDownloadItem(
-                release_id=release_id,
-                file_info=ItemAdapter(video_file).asdict(),
-                url=video_url,
+            # Determine variant from resolution
+            if height >= 2160:
+                variant = "4k"
+            elif height >= 1080:
+                variant = "1080"
+            elif height >= 720:
+                variant = "720"
+            elif height >= 540:
+                variant = "540"
+            else:
+                variant = "360"
+
+            # Track the highest resolution video
+            if height > best_resolution:
+                best_resolution = height
+                best_video = {
+                    "url": url,
+                    "variant": variant,
+                    "width": width,
+                    "height": height,
+                }
+
+        # Use the highest resolution video found
+        if best_video:
+            video_file = AvailableVideoFile(
+                file_type="video",
+                content_type="scene",
+                variant=best_video["variant"],
+                url=best_video["url"],
+                resolution_width=best_video["width"],
+                resolution_height=best_video["height"],
             )
-        )
+            available_files.append(video_file)
 
-        # Add cover image for preview
-        cover_url = f"{BASE_URL}/videos/{slug}/{slug}-01-lrg.jpg"
-        cover_file = AvailableImageFile(
-            file_type="image",
-            content_type="cover",
-            variant="cover",
-            url=cover_url,
-        )
-        available_files.append(cover_file)
-
-        download_items.append(
-            DirectDownloadItem(
-                release_id=release_id,
-                file_info=ItemAdapter(cover_file).asdict(),
-                url=cover_file.url,
+            download_items.append(
+                DirectDownloadItem(
+                    release_id=release_id,
+                    file_info=ItemAdapter(video_file).asdict(),
+                    url=best_video["url"],
+                )
             )
-        )
+            video_url = best_video["url"]
+        else:
+            self.logger.warning(f"No video download links found for {slug}")
+            video_url = None
+
+        # Extract cover image URL from jwplayer script
+        cover_url = None
+        scripts = response.css("script::text").getall()
+        for script in scripts:
+            if "jwplayer" in script and "image:" in script:
+                match = re.search(r'image:\s*"([^"]+)"', script)
+                if match:
+                    cover_url = match.group(1)
+                    break
+
+        if cover_url:
+            cover_file = AvailableImageFile(
+                file_type="image",
+                content_type="cover",
+                variant="cover",
+                url=cover_url,
+            )
+            available_files.append(cover_file)
+
+            download_items.append(
+                DirectDownloadItem(
+                    release_id=release_id,
+                    file_info=ItemAdapter(cover_file).asdict(),
+                    url=cover_file.url,
+                )
+            )
 
         self.logger.info(f"Parsed video: {title}")
         self.logger.info(f"  Slug: {slug}")
         self.logger.info(f"  Date: {release_date}")
         self.logger.info(f"  Performers: {[p.name for p in performers]}")
         self.logger.info(f"  Video URL: {video_url}")
+        self.logger.info(f"  Cover URL: {cover_url}")
 
         # Create release item
         release_item = ReleaseItem(
@@ -448,53 +489,94 @@ class XArtSpider(scrapy.Spider):
                 )
                 performers.append(performer)
 
-        # Build available files - gallery ZIP download URLs
-        # URL pattern: /members/galleries/{slug}/{slug}-{size}.zip
+        # Parse gallery ZIP download URLs from the page HTML
         available_files = []
         download_items = []
 
-        # Gallery ZIP sizes available on X-Art
-        # Only download the highest quality (lrg = 4000px)
-        zip_file = AvailableGalleryZipFile(
-            file_type="gallery",
-            content_type="gallery",
-            variant="lrg",
-            url=f"{BASE_URL}/galleries/{slug}/{slug}-lrg.zip",
-            resolution_width=4000,
-        )
-        available_files.append(zip_file)
+        # Find all ZIP download links
+        zip_links = response.css('a[href*=".zip"]')
+        best_zip = None
+        best_resolution = 0
 
-        download_items.append(
-            DirectDownloadItem(
-                release_id=release_id,
-                file_info=ItemAdapter(zip_file).asdict(),
-                url=zip_file.url,
+        for link in zip_links:
+            url = link.attrib.get("href", "")
+            text = link.css("::text").getall()
+            text = " ".join(t.strip() for t in text if t.strip())
+
+            # Parse resolution from text like "4000 pixels ZIP" or "2000 pixels ZIP"
+            resolution_match = re.search(r"(\d+)\s*pixels?", text, re.IGNORECASE)
+            width = int(resolution_match.group(1)) if resolution_match else 0
+
+            # Determine variant from URL or resolution
+            if "lrg" in url or width >= 4000:
+                variant = "lrg"
+            elif "med" in url or width >= 2000:
+                variant = "med"
+            else:
+                variant = "sml"
+
+            # Track the highest resolution ZIP
+            if width > best_resolution:
+                best_resolution = width
+                best_zip = {
+                    "url": url,
+                    "variant": variant,
+                    "width": width,
+                }
+
+        # Use the highest resolution ZIP found
+        zip_url = None
+        if best_zip:
+            zip_file = AvailableGalleryZipFile(
+                file_type="gallery",
+                content_type="gallery",
+                variant=best_zip["variant"],
+                url=best_zip["url"],
+                resolution_width=best_zip["width"],
             )
-        )
+            available_files.append(zip_file)
 
-        # Add cover image for preview
-        cover_url = f"{BASE_URL}/galleries/{slug}/{slug}-01-lrg.jpg"
-        cover_file = AvailableImageFile(
-            file_type="image",
-            content_type="cover",
-            variant="cover",
-            url=cover_url,
-        )
-        available_files.append(cover_file)
-
-        download_items.append(
-            DirectDownloadItem(
-                release_id=release_id,
-                file_info=ItemAdapter(cover_file).asdict(),
-                url=cover_file.url,
+            download_items.append(
+                DirectDownloadItem(
+                    release_id=release_id,
+                    file_info=ItemAdapter(zip_file).asdict(),
+                    url=best_zip["url"],
+                )
             )
-        )
+            zip_url = best_zip["url"]
+        else:
+            self.logger.warning(f"No ZIP download links found for {slug}")
+
+        # Extract cover image URL from img.info-img
+        cover_url = response.css("img.info-img::attr(src)").get()
+
+        # For high-res cover, try to convert gsml to lrg in the URL
+        if cover_url and "-gsml." in cover_url:
+            cover_url = cover_url.replace("-gsml.", "-lrg.")
+
+        if cover_url:
+            cover_file = AvailableImageFile(
+                file_type="image",
+                content_type="cover",
+                variant="cover",
+                url=cover_url,
+            )
+            available_files.append(cover_file)
+
+            download_items.append(
+                DirectDownloadItem(
+                    release_id=release_id,
+                    file_info=ItemAdapter(cover_file).asdict(),
+                    url=cover_file.url,
+                )
+            )
 
         self.logger.info(f"Parsed gallery: {title}")
         self.logger.info(f"  Slug: {slug}")
         self.logger.info(f"  Date: {release_date}")
         self.logger.info(f"  Performers: {[p.name for p in performers]}")
-        self.logger.info(f"  ZIP URL: {zip_file.url}")
+        self.logger.info(f"  ZIP URL: {zip_url}")
+        self.logger.info(f"  Cover URL: {cover_url}")
 
         # Create release item
         release_item = ReleaseItem(
