@@ -33,7 +33,7 @@ def inject_data_to_window(
             # Skip console messages and other events
             if "method" in result and result["method"] == "Runtime.consoleAPICalled":
                 continue
-            elif "id" in result and result["id"] == 1:
+            if "id" in result and result["id"] == 1:
                 break
         else:
             print("Failed to enable Runtime domain")
@@ -61,7 +61,7 @@ def inject_data_to_window(
             # Skip console messages and other events
             if "method" in result and result["method"] == "Runtime.consoleAPICalled":
                 continue
-            elif "id" in result and result["id"] == 2:
+            if "id" in result and result["id"] == 2:
                 break
         else:
             print("Failed to get Runtime.evaluate response")

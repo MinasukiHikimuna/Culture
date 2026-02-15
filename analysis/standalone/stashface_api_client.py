@@ -162,9 +162,9 @@ class StashfaceAPIClient:
                             }
                         if data.get("msg") == "process_starts":
                             continue
-                        elif data.get("msg") == "estimation":
+                        if data.get("msg") == "estimation":
                             continue
-                        elif "error" in data.get("msg", "").lower():
+                        if "error" in data.get("msg", "").lower():
                             print(f"\n❌ Server error: {data}")
                             return {
                                 "success": False,
