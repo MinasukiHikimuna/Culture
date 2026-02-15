@@ -28,6 +28,7 @@ from exceptions import DiskSpaceError, LMStudioUnavailableError, StashappUnavail
 from platform_availability import PlatformAvailabilityTracker
 from release_orchestrator import ReleaseOrchestrator
 from stashapp_importer import STASH_BASE_URL, StashappImporter, StashScanStuckError
+import contextlib
 
 
 class RedditResolver:
@@ -731,10 +732,8 @@ class AnalyzeDownloadImportPipeline:
 
         # Also load original post data for heuristic checks
         original_post = None
-        try:
+        with contextlib.suppress(json.JSONDecodeError, FileNotFoundError):
             original_post = json.loads(post_file_path.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, FileNotFoundError):
-            pass
 
         # Heuristic detection for script offers (fallback for older analyses without post_type)
         is_script_offer_heuristic = (

@@ -23,6 +23,7 @@ from urllib.parse import urljoin
 import config as aural_config
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
+import contextlib
 
 
 class AO3Extractor:
@@ -299,10 +300,8 @@ class AO3Extractor:
             if not elem:
                 continue
             text = elem.get_text(strip=True).replace(",", "")
-            try:
+            with contextlib.suppress(ValueError):
                 result[key] = int(text)
-            except ValueError:
-                pass
         return result
 
     def _extract_content_sections(self, soup: BeautifulSoup) -> dict:
