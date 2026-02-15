@@ -74,7 +74,7 @@ class TestHasStudioCodeTag:
         result = has_studio_code_tag({"id": 7940}, studio)
 
         # Assert
-        assert result == True
+        assert result
 
     def test_false(self):
         # Arrange
@@ -90,7 +90,7 @@ class TestHasStudioCodeTag:
         result = has_studio_code_tag({"id": 7940}, studio)
 
         # Assert
-        assert result == False
+        assert not result
 
     def test_different_tag(self):
         # Arrange
@@ -106,14 +106,14 @@ class TestHasStudioCodeTag:
         result = has_studio_code_tag({"id": 7940}, studio)
 
         # Assert
-        assert result == False
+        assert not result
 
     def test_none_studio(self):
         # Act
         result = has_studio_code_tag({"id": 7940}, None)
 
         # Assert
-        assert result == False
+        assert not result
 
     def test_none_tag_param(self):
         # Arrange
