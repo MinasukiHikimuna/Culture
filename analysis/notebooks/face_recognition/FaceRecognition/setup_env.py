@@ -127,7 +127,7 @@ if __name__ == "__main__":
     for var in relevant_vars:
         value = os.environ.get(var, "Not set")
         if var == "PATH":
-            print(f"\nPATH entries:")
+            print("\nPATH entries:")
             for path in value.split(os.pathsep):
                 if "cuda" in path.lower() or "nvidia" in path.lower():
                     print(f"  {path}")

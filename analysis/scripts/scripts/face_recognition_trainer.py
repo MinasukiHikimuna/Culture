@@ -206,7 +206,7 @@ def train_model(dataset_path, batch_size=32, num_epochs=50, learning_rate=0.0001
     train_dir = copy_dataset_split(full_dataset, train_indices, output_dir, f"train_split_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
     val_dir = copy_dataset_split(full_dataset, val_indices, output_dir, f"val_split_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
 
-    print(f"\nDataset splits copied to:")
+    print("\nDataset splits copied to:")
     print(f"Training: {train_dir}")
     print(f"Validation: {val_dir}\n")
 

@@ -221,7 +221,7 @@ class FaceRecognitionTester:
                 print(f"max_conf: {max_conf:.4f}")
                 print(f"avg_conf: {avg_conf:.4f}")
                 print(f"detection_rate: {detection_rate:.4f}")
-                print(f"Final calculation:")
+                print("Final calculation:")
                 print(f"0.5 * {avg_conf:.4f} = {0.5 * avg_conf:.4f}")
                 print(f"0.3 * {max_conf:.4f} = {0.3 * max_conf:.4f}")
                 print(f"0.2 * {detection_rate:.4f} = {0.2 * detection_rate:.4f}")

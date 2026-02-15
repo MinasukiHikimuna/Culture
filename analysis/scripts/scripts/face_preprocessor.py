@@ -148,7 +148,7 @@ class FacePreprocessor:
 
     def process_dataset(self, num_workers=4):
         """Process entire dataset with progress tracking"""
-        print(f"\nStarting face preprocessing:")
+        print("\nStarting face preprocessing:")
         print(f"Input directory: {self.input_dir}")
         print(f"Output directory: {self.output_dir}")
         print(f"Using {num_workers} worker processes")
@@ -186,7 +186,7 @@ class FacePreprocessor:
         processed = sum(results)
         failed = total_images - processed
 
-        print(f"\nProcessing complete:")
+        print("\nProcessing complete:")
         print(f"Total images: {total_images}")
         print(f"Successfully processed: {processed} images ({processed/total_images*100:.1f}%)")
         print(f"Failed: {failed} images ({failed/total_images*100:.1f}%)")
@@ -216,7 +216,7 @@ def main():
             print(f"Error: Input directory does not exist: {input_dir}")
             return
 
-        print(f"\nPreprocessing face dataset:")
+        print("\nPreprocessing face dataset:")
         print(f"Input directory: {input_dir}")
         print(f"Output directory: {output_dir}")
 
