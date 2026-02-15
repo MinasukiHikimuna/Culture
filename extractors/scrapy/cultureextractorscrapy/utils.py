@@ -112,7 +112,7 @@ def get_log_filename(spider_name):
     log_dir = settings.get("LOG_DIR", "logs")
 
     if not os.path.exists(log_dir):
-        os.makedirs(log_dir)
+        Path(log_dir).mkdir(parents=True)
 
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     log_file = str(Path(log_dir) / f"{spider_name}_{timestamp}.log")
@@ -155,7 +155,7 @@ def check_available_disk_space(target_path, min_free_gb=50):
     """
     try:
         # Ensure the directory exists to get accurate disk space
-        os.makedirs(target_path, exist_ok=True)
+        Path(target_path).mkdir(parents=True, exist_ok=True)
 
         # Get disk usage statistics
         total, used, free = shutil.disk_usage(target_path)

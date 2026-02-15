@@ -64,7 +64,7 @@ def prepare_scenes_for_performer(performer_name: str, base_dir: str, exclude_vr:
 
     # Create pending directory
     pending_dir = base_path / SceneState.PENDING.value
-    os.makedirs(pending_dir, exist_ok=True)
+    pending_dir.mkdir(parents=True, exist_ok=True)
 
     # Queue scenes
     scenes_queued = 0

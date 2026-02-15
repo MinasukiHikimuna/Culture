@@ -30,8 +30,8 @@ class DatasetStructure:
 
         # Create all directories
         for dir in self.scenes.values():
-            os.makedirs(dir, exist_ok=True)
-        os.makedirs(self.scene_data, exist_ok=True)
+            dir.mkdir(parents=True, exist_ok=True)
+        self.scene_data.mkdir(parents=True, exist_ok=True)
 
         # Load or initialize dataset info
         self.load_dataset_info()

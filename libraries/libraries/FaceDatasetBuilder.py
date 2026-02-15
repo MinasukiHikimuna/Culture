@@ -55,11 +55,11 @@ class FaceDatasetBuilder:
         """Create necessary directory structure"""
         # Create scene status directories
         for status_dir in self.structure["scenes"].values():
-            os.makedirs(status_dir, exist_ok=True)
+            Path(status_dir).mkdir(parents=True, exist_ok=True)
 
         # Create performer directories
         for performer_dir in self.structure["performers"].values():
-            os.makedirs(performer_dir, exist_ok=True)
+            Path(performer_dir).mkdir(parents=True, exist_ok=True)
 
     def get_performer_directory_name(self, performer: Union[dict, str]) -> str:
         """Create directory name from performer data or ID"""
@@ -265,7 +265,7 @@ class FaceDatasetBuilder:
 
         # Create scene directory in extracting_frames
         scene_frames_dir = str(Path(self.structure["scenes"][SceneState.EXTRACTING_FRAMES.value]) / scene_id)
-        os.makedirs(scene_frames_dir, exist_ok=True)
+        Path(scene_frames_dir).mkdir(parents=True, exist_ok=True)
 
         try:
             # Extract frames using ffmpeg
@@ -298,16 +298,16 @@ class FaceDatasetBuilder:
 
             # Create unverified directory structure
             scene_unverified_dir = str(Path(self.structure["scenes"][SceneState.FACES_EXTRACTED.value]) / scene_id)
-            os.makedirs(scene_unverified_dir, exist_ok=True)
+            Path(scene_unverified_dir).mkdir(parents=True, exist_ok=True)
 
             # Create directories for each performer
             for performer in performers:
                 performer_dir = str(Path(scene_unverified_dir) / performer)
-                os.makedirs(performer_dir, exist_ok=True)
+                Path(performer_dir).mkdir(parents=True, exist_ok=True)
 
             # Create unknown directory
             unknown_dir = str(Path(scene_unverified_dir) / "unknown")
-            os.makedirs(unknown_dir, exist_ok=True)
+            Path(unknown_dir).mkdir(parents=True, exist_ok=True)
 
             # Process frames and detect faces
             faces_extracted = 0
@@ -371,7 +371,7 @@ class FaceDatasetBuilder:
         scene_id = face_filename.split("_")[0]  # Extract scene_id from filename
 
         rejected_dir = str(Path(self.structure["scenes"][SceneState.FACES_EXTRACTED.value]) / scene_id)
-        os.makedirs(rejected_dir, exist_ok=True)
+        Path(rejected_dir).mkdir(parents=True, exist_ok=True)
 
         rejected_path = str(Path(rejected_dir) / face_filename)
         shutil.move(face_path, rejected_path)

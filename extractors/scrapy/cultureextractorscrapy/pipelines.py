@@ -1355,7 +1355,7 @@ class PerformerImagePipeline:
 
         # Create base path for this performer
         performer_dir = str(Path(self.files_store) / site_name / "Performers" / performer_uuid)
-        os.makedirs(performer_dir, exist_ok=True)
+        Path(performer_dir).mkdir(parents=True, exist_ok=True)
 
         self.logger.info(f"[PerformerImagePipeline] Processing {performer.name} ({performer_uuid})")
 
@@ -1455,7 +1455,7 @@ class StashDbImagePipeline:
 
         # Create directory for this image type
         type_dir = str(Path(self.images_store) / f"{image_type}s")
-        os.makedirs(type_dir, exist_ok=True)
+        Path(type_dir).mkdir(parents=True, exist_ok=True)
 
         # Download first image
         url = image_urls[0]

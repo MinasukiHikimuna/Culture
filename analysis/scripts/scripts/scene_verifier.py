@@ -58,7 +58,7 @@ class SceneVerifier:
 
             # Create verified scene directory
             verified_dir = self.dataset.scenes[SceneState.VERIFIED.value] / scene_id
-            os.makedirs(verified_dir, exist_ok=True)
+            verified_dir.mkdir(parents=True, exist_ok=True)
 
             # Move faces to performer directories
             performers_dir = self.base_dir / "performers" / "verified"
@@ -69,7 +69,7 @@ class SceneVerifier:
 
                 # subdir.name should be like "d5061b46-796b-4204-8e4f-cff4569fdea6 - Alexis Crystal"
                 performer_dir = performers_dir / subdir.name
-                os.makedirs(performer_dir, exist_ok=True)
+                performer_dir.mkdir(parents=True, exist_ok=True)
 
                 # Move all faces to performer directory
                 for face_file in subdir.glob("*.jpg"):

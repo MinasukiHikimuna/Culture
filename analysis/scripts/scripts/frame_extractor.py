@@ -43,7 +43,7 @@ class FrameExtractor:
             try:
                 # Move to extracting state
                 scene_dir = self.dataset.scenes[SceneState.EXTRACTING_FRAMES.value] / scene_id
-                os.makedirs(scene_dir, exist_ok=True)
+                scene_dir.mkdir(parents=True, exist_ok=True)
 
                 # Extract frames
                 (
@@ -73,7 +73,7 @@ class FrameExtractor:
                 print(f"[{drive}] {scene_id}: Failed - {str(e)}")
                 # Move to failed state
                 failed_dir = self.dataset.scenes[SceneState.FAILED.value] / scene_id
-                os.makedirs(failed_dir, exist_ok=True)
+                failed_dir.mkdir(parents=True, exist_ok=True)
                 with open(failed_dir / "error.txt", "w") as f:
                     f.write(str(e))
                 if scene_dir.exists():

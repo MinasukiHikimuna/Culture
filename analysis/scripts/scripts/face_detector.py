@@ -87,7 +87,7 @@ class FaceDetector:
         for state in SceneState:
             dir_path = self.base_dir / "scenes" / state.value
             print(f"Creating directory: {dir_path}")
-            os.makedirs(dir_path, exist_ok=True)
+            dir_path.mkdir(parents=True, exist_ok=True)
 
         self.mtcnn = MTCNN(
             image_size=160,
@@ -182,7 +182,7 @@ class FaceDetector:
                 raise FileNotFoundError(f"Source directory not found: {source_dir}")
 
             shutil.move(str(source_dir), str(working_dir))
-            os.makedirs(faces_dir, exist_ok=True)
+            faces_dir.mkdir(parents=True, exist_ok=True)
             print(f"Directory setup took {time.time() - setup_start:.2f}s")
 
             print(f"Processing scene {scene_id}")
@@ -239,15 +239,15 @@ class FaceDetector:
             if len(face_files) > 5:
                 print(f"  ... and {len(face_files)-5} more files")
 
-            os.makedirs(output_dir, exist_ok=True)
+            output_dir.mkdir(parents=True, exist_ok=True)
 
             # Create performer directories
             for performer in performers:
                 performer_dir = output_dir / performer
-                os.makedirs(performer_dir, exist_ok=True)
+                performer_dir.mkdir(parents=True, exist_ok=True)
                 print(f"Created performer directory: {performer_dir}")
 
-            os.makedirs(output_dir / "unknown", exist_ok=True)
+            (output_dir / "unknown").mkdir(parents=True, exist_ok=True)
 
             # Move face files to the root of the scene directory
             moved_count = 0
@@ -286,7 +286,7 @@ class FaceDetector:
         except Exception as e:
             print(f"Error processing scene {scene_id}: {str(e)}")
             failed_dir = self.dataset.scenes[SceneState.FAILED.value] / scene_id
-            os.makedirs(failed_dir, exist_ok=True)
+            failed_dir.mkdir(parents=True, exist_ok=True)
             with open(failed_dir / "error.txt", "w") as f:
                 f.write(str(e))
             if working_dir and working_dir.exists():
