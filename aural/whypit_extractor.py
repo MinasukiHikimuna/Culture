@@ -322,6 +322,7 @@ class WhypitExtractor:
                     time.sleep(wait_time)
                 else:
                     raise
+        return None
 
     def save_html_backup(self, html_path: Path):
         """Save HTML content as backup."""
