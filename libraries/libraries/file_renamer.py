@@ -139,7 +139,7 @@ def _title_case_except_acronyms(text):
             # Rejoin the parts with an apostrophe
             title_cased_words.append("'".join(new_parts))
         # Check if word is all uppercase (acronym) - preserve it
-        elif word.isupper() and len(word) > 1 or any(c.isupper() for c in word[1:]):
+        elif (word.isupper() and len(word) > 1) or any(c.isupper() for c in word[1:]):
             title_cased_words.append(word)
         # Otherwise apply title case
         else:
