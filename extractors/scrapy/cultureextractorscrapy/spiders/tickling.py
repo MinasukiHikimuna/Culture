@@ -115,7 +115,8 @@ class TicklingSpider(scrapy.Spider):
         # Corrected XPath for duration
         duration_raw = (
             response.xpath(
-                'string(//div[contains(@class, "field-item")][div[contains(@class, "field-label-inline-first") and contains(text(), "Time:")]])'
+                'string(//div[contains(@class, "field-item")]'
+                '[div[contains(@class, "field-label-inline-first") and contains(text(), "Time:")]])'
             )
             .get()
             .strip()
@@ -165,7 +166,11 @@ class TicklingSpider(scrapy.Spider):
         # Extract downloadable files
         available_files = []
         file_elements = response.css(
-            "div.download-files-block span.views-field-field-mp4fullhd-url, div.download-files-block span.views-field-field-mp4hd-url, div.download-files-block span.views-field-field-mp4sd-url, div.download-files-block span.views-field-field-wmvhd-url, div.download-files-block span.views-field-field-wmv-url"
+            "div.download-files-block span.views-field-field-mp4fullhd-url, "
+            "div.download-files-block span.views-field-field-mp4hd-url, "
+            "div.download-files-block span.views-field-field-mp4sd-url, "
+            "div.download-files-block span.views-field-field-wmvhd-url, "
+            "div.download-files-block span.views-field-field-wmv-url"
         )
         highest_resolution_video = None
         highest_resolution = 0

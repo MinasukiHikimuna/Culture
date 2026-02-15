@@ -48,7 +48,10 @@ class GwasiExtractor:
         self.session = requests.Session()
         self.session.headers.update(
             {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                    " (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+                )
             }
         )
 
@@ -111,7 +114,8 @@ class GwasiExtractor:
                     # File exists but has no entries or invalid JSON
                     consecutive_404s += 1
                     print(
-                        f"⚠️  File {current_number} exists but has no valid entries (consecutive 404s: {consecutive_404s}/{self.consecutive_404_limit})"
+                        f"⚠️  File {current_number} exists but has no valid entries"
+                        f" (consecutive 404s: {consecutive_404s}/{self.consecutive_404_limit})"
                     )
 
             except requests.RequestException as e:
@@ -124,7 +128,8 @@ class GwasiExtractor:
                     # Other network errors, treat as 404
                     consecutive_404s += 1
                     print(
-                        f"🌐 Network error for file {current_number}: {e} (consecutive 404s: {consecutive_404s}/{self.consecutive_404_limit})"
+                        f"🌐 Network error for file {current_number}: {e}"
+                        f" (consecutive 404s: {consecutive_404s}/{self.consecutive_404_limit})"
                     )
             except json.JSONDecodeError:
                 # Invalid JSON, treat as 404

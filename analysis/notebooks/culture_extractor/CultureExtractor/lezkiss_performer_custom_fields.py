@@ -91,7 +91,9 @@ all_tags = stash_raw_client.find_tags()
 all_ce_sites = culture_extractor_client.get_sites()
 all_ce_sub_sites = culture_extractor_client.get_sub_sites()
 all_stash_studios = stash_client.get_studios()
-# all_ce_sites_stash_studios_joined = all_ce_sites.join(all_stash_studios, left_on="ce_sites_uuid", right_on="stash_studios_ce_id", how="left", coalesce=False)
+# all_ce_sites_stash_studios_joined = all_ce_sites.join(
+#     all_stash_studios, left_on="ce_sites_uuid", right_on="stash_studios_ce_id", how="left", coalesce=False
+# )
 all_ce_sites_stash_studios_joined = all_ce_sites.join(
     all_stash_studios,
     left_on="ce_sites_name",
@@ -122,7 +124,9 @@ selected_studio
 
 # Manual override
 # stash_client.set_studio_stash_id_for_endpoint(306, "https://culture.extractor/graphql", "018b94b1-b5e9-71d7-ab70-8665111e8bd8")
-# selected_studio = all_ce_sites_stash_studios_joined.filter(pl.col("ce_sites_uuid").eq("018b94b1-b5e9-71d7-ab70-8665111e8bd8")).to_dicts()[0]
+# selected_studio = all_ce_sites_stash_studios_joined.filter(
+#     pl.col("ce_sites_uuid").eq("018b94b1-b5e9-71d7-ab70-8665111e8bd8")
+# ).to_dicts()[0]
 # selected_studio
 
 # %%

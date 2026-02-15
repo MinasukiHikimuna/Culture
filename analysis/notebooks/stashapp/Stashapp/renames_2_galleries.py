@@ -85,12 +85,18 @@ from libraries.file_renamer import create_filename
 
 gallery_renames_df = galleries_df.select([
     pl.col("stashapp_id"),
-    pl.col("stashapp_primary_file_path").map_elements(lambda directory: os.path.dirname(directory), return_dtype=pl.Utf8).alias("directory"),
+    pl.col("stashapp_primary_file_path").map_elements(
+        lambda directory: os.path.dirname(directory), return_dtype=pl.Utf8,
+    ).alias("directory"),
     pl.col("stashapp_primary_file_basename").alias("old_filename"),
-    pl.struct(["*"]).map_elements(lambda row: create_filename(use_studio_code_tag, row), return_dtype=pl.Utf8).alias("new_filename"),
+    pl.struct(["*"]).map_elements(
+        lambda row: create_filename(use_studio_code_tag, row), return_dtype=pl.Utf8,
+    ).alias("new_filename"),
     pl.col("stashapp_primary_file_path").alias("old_path"),
 ]).with_columns([
-    pl.col("new_filename").map_elements(lambda filename: len(filename) if filename else 0, return_dtype=pl.Int32).alias("new_filename_length"),
+    pl.col("new_filename").map_elements(
+        lambda filename: len(filename) if filename else 0, return_dtype=pl.Int32,
+    ).alias("new_filename_length"),
     pl.concat_str([
         pl.col("directory"),
         pl.lit(os.sep),
@@ -177,7 +183,10 @@ for row in gallery_renames_df.iter_rows(named=True):
         print(failure_info["error_message"])
 
 galleries_success_df = pl.DataFrame(galleries_success_rows) if galleries_success_rows else pl.DataFrame(schema=gallery_renames_df.schema)
-galleries_failed_df = pl.DataFrame(galleries_failed_rows) if galleries_failed_rows else pl.DataFrame(schema={**gallery_renames_df.schema, "failure_reason": pl.Utf8, "error_message": pl.Utf8})
+galleries_failed_df = (
+    pl.DataFrame(galleries_failed_rows) if galleries_failed_rows
+    else pl.DataFrame(schema={**gallery_renames_df.schema, "failure_reason": pl.Utf8, "error_message": pl.Utf8})
+)
 
 paths = galleries_success_df.select(pl.col("directory").unique()).to_series().to_list()
 trigger_metadata_scan(paths)

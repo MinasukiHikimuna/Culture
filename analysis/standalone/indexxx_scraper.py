@@ -31,7 +31,10 @@ class Scraper:
         # Add comprehensive headers
         self.session.headers.update({
             "authority": "www.indexxx.com",
-            "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+            "accept": (
+                "text/html,application/xhtml+xml,application/xml;q=0.9,"
+                "image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"
+            ),
             "accept-encoding": "gzip, deflate, br, zstd",
             "accept-language": "en-US,en;q=0.9,fi;q=0.8",
             "cache-control": "no-cache",
@@ -44,13 +47,22 @@ class Scraper:
             "sec-fetch-site": "same-origin",
             "sec-fetch-user": "?1",
             "upgrade-insecure-requests": "1",
-            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36 Edg/133.0.0.0"
+            "user-agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                " (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36 Edg/133.0.0.0"
+            )
         })
 
         # Add cookies
         self.session.cookies.update({
             "ageVerified": "true",
-            "cf_clearance": "gws_iACWaFPjTCrarTjqpMa82rEgRmXK45l4ndArCEY-1738553527-1.2.1.1-Fn3Z5R5yOSuklpSjU6IAWyjXMtrIzGuJ1Ex9VzAjwSrfoqlXCqxjnJ2JPjxqdbg34iLDziG0KE4EnkIv1PH3g6ydFu77SzoUo0IL04ojYme2kHf7uczVsRTjk1MVaRBbX17a7SV2j2LyawuCMWIn3a2dqH0agRql0stNYOTT6MDHEpKkw8jA9_vP0L8hSeYcJ1YlD8g.tYmSZmBYsWZMhiS6Ip7VQhqsMiNY3iHI8Be30kWItk6FMTw2HcwMw4SeUkgOLv.GVjievGbzr4X4359LGWzold4LK1c9v.B0myA"
+            "cf_clearance": (
+                "gws_iACWaFPjTCrarTjqpMa82rEgRmXK45l4ndArCEY-1738553527-1.2.1.1-"
+                "Fn3Z5R5yOSuklpSjU6IAWyjXMtrIzGuJ1Ex9VzAjwSrfoqlXCqxjnJ2JPjxqdbg34iLDziG0KE4EnkIv1PH3g6ydFu77SzoUo0"
+                "IL04ojYme2kHf7uczVsRTjk1MVaRBbX17a7SV2j2LyawuCMWIn3a2dqH0agRql0stNYOTT6MDHEpKkw8jA9_vP0L8hSeYcJ1Yl"
+                "D8g.tYmSZmBYsWZMhiS6Ip7VQhqsMiNY3iHI8Be30kWItk6FMTw2HcwMw4SeUkgOLv.GVjievGbzr4X4359LGWzold4LK1c9v"
+                ".B0myA"
+            )
         })
 
     def get_site_url(self, page=None):

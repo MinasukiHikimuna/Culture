@@ -302,9 +302,15 @@ class BaseDownloadPipeline:
                     )
                 else:
                     resolution_part = ""
-                filename = f"{formatted_site_name} - {release_date} - {release_short_name} - {release_name}{resolution_part}{variant_part} - {release_id}{file_extension}"
+                filename = (
+                    f"{formatted_site_name} - {release_date} - {release_short_name}"
+                    f" - {release_name}{resolution_part}{variant_part} - {release_id}{file_extension}"
+                )
             else:
-                filename = f"{formatted_site_name} - {release_date} - {release_short_name} - {release_name} - {file_info['variant']} - {release_id}{file_extension}"
+                filename = (
+                    f"{formatted_site_name} - {release_date} - {release_short_name}"
+                    f" - {release_name} - {file_info['variant']} - {release_id}{file_extension}"
+                )
             # Sanitize each component separately to maintain structure
             sanitized_site = self.sanitize_component(formatted_site_name)
             sanitized_filename = self.sanitize_component(filename)

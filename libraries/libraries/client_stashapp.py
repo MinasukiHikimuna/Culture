@@ -482,7 +482,8 @@ class StashAppClient:
 
         print("=" * 50)
         print(
-            f"Found {sum(1 for attr in dir(tags) if not attr.startswith('_') and getattr(tags, attr) is not None)} out of {len(tag_names)} tags"
+            f"Found {sum(1 for attr in dir(tags) if not attr.startswith('_') and getattr(tags, attr) is not None)}"
+            f" out of {len(tag_names)} tags"
         )
 
         return tags

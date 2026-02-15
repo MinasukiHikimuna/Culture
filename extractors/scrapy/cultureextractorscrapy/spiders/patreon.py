@@ -228,7 +228,8 @@ class PatreonSpider(scrapy.Spider):
             # Start scraping posts for each campaign
             for campaign in campaigns:
                 self.logger.info(
-                    f"Starting post scraping for campaign: {campaign['name']} (will create subsite: {campaign.get('vanity', campaign['campaign_id'])})"
+                    f"Starting post scraping for campaign: {campaign['name']}"
+                    f" (will create subsite: {campaign.get('vanity', campaign['campaign_id'])})"
                 )
                 yield from self._start_campaign_scraping(campaign)
 
@@ -339,17 +340,48 @@ class PatreonSpider(scrapy.Spider):
     def _get_posts_api_params(self, campaign_id):
         """Get comprehensive parameters for Patreon posts API (actual working version)."""
         return {
-            "include": "campaign,access_rules,access_rules.tier.null,attachments_media,audio,audio_preview.null,custom_thumbnail_media.null,drop,images,media,native_video_insights,poll.choices,poll.current_user_responses.user,poll.current_user_responses.choice,poll.current_user_responses.poll,shows.null,user,user_defined_tags,video.null,content_unlock_options.product_variant.null,content_unlock_options.reward.null,content_unlock_options.product_variant.collection.null,livestream,livestream.state,livestream.display,rss_synced_feed",
-            "fields[campaign]": "currency,show_audio_post_download_links,avatar_photo_url,avatar_photo_image_urls,earnings_visibility,is_nsfw,is_monthly,name,url,patron_count,primary_theme_color",
-            "fields[post]": "change_visibility_at,comment_count,commenter_count,content,created_at,current_user_can_comment,current_user_can_delete,current_user_can_report,current_user_can_view,current_user_comment_disallowed_reason,current_user_has_liked,embed,image,insights_last_updated_at,is_paid,is_preview_blurred,has_custom_thumbnail,like_count,meta_image_url,min_cents_pledged_to_view,monetization_ineligibility_reason,post_file,post_metadata,published_at,patreon_url,post_type,pledge_url,preview_asset_type,thumbnail,thumbnail_url,teaser_text,content_teaser_text,cleaned_teaser_text,title,upgrade_url,url,was_posted_by_campaign_owner,has_ti_violation,moderation_status,post_level_suspension_removal_date,pls_one_liners_by_category,video,video_preview,view_count,content_unlock_options,is_new_to_current_user,watch_state",
+            "include": (
+                "campaign,access_rules,access_rules.tier.null,attachments_media,audio,audio_preview.null,"
+                "custom_thumbnail_media.null,drop,images,media,native_video_insights,poll.choices,"
+                "poll.current_user_responses.user,poll.current_user_responses.choice,"
+                "poll.current_user_responses.poll,shows.null,user,user_defined_tags,video.null,"
+                "content_unlock_options.product_variant.null,content_unlock_options.reward.null,"
+                "content_unlock_options.product_variant.collection.null,"
+                "livestream,livestream.state,livestream.display,rss_synced_feed"
+            ),
+            "fields[campaign]": (
+                "currency,show_audio_post_download_links,avatar_photo_url,avatar_photo_image_urls,"
+                "earnings_visibility,is_nsfw,is_monthly,name,url,patron_count,primary_theme_color"
+            ),
+            "fields[post]": (
+                "change_visibility_at,comment_count,commenter_count,content,created_at,"
+                "current_user_can_comment,current_user_can_delete,current_user_can_report,"
+                "current_user_can_view,current_user_comment_disallowed_reason,current_user_has_liked,"
+                "embed,image,insights_last_updated_at,is_paid,is_preview_blurred,has_custom_thumbnail,"
+                "like_count,meta_image_url,min_cents_pledged_to_view,monetization_ineligibility_reason,"
+                "post_file,post_metadata,published_at,patreon_url,post_type,pledge_url,"
+                "preview_asset_type,thumbnail,thumbnail_url,teaser_text,content_teaser_text,"
+                "cleaned_teaser_text,title,upgrade_url,url,was_posted_by_campaign_owner,"
+                "has_ti_violation,moderation_status,post_level_suspension_removal_date,"
+                "pls_one_liners_by_category,video,video_preview,view_count,content_unlock_options,"
+                "is_new_to_current_user,watch_state"
+            ),
             "fields[post_tag]": "tag_type,value",
             "fields[user]": "image_url,full_name,url",
             "fields[access_rule]": "access_rule_type,amount_cents",
             "fields[livestream]": "display,state",
             "fields[media]": "id,image_urls,display,download_url,metadata,file_name,state",
-            "fields[native_video_insights]": "average_view_duration,average_view_pct,has_preview,id,last_updated_at,num_views,preview_views,video_duration",
-            "fields[content-unlock-option]": "content_unlock_type,is_current_user_eligible,reward_benefit_categories",
-            "fields[product-variant]": "price_cents,currency_code,checkout_url,is_hidden,published_at_datetime,content_type,orders_count,access_metadata",
+            "fields[native_video_insights]": (
+                "average_view_duration,average_view_pct,has_preview,id,"
+                "last_updated_at,num_views,preview_views,video_duration"
+            ),
+            "fields[content-unlock-option]": (
+                "content_unlock_type,is_current_user_eligible,reward_benefit_categories"
+            ),
+            "fields[product-variant]": (
+                "price_cents,currency_code,checkout_url,is_hidden,"
+                "published_at_datetime,content_type,orders_count,access_metadata"
+            ),
             "fields[shows]": "id,title,description,thumbnail",
             "filter[campaign_id]": campaign_id,
             "filter[contains_exclusive_posts]": "true",

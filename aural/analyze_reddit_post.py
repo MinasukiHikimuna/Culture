@@ -333,7 +333,8 @@ Return this exact JSON structure:
             for i, v in enumerate(audio_versions)
         )
 
-        return f"""You are a file naming expert. Analyze this Reddit post and its audio versions to create optimal flat file naming within a single directory.
+        return f"""You are a file naming expert. Analyze this Reddit post and its audio versions \
+to create optimal flat file naming within a single directory.
 
 CRITICAL: Your response must be ONLY valid JSON. No reasoning or explanations.
 

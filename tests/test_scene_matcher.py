@@ -23,7 +23,8 @@ def test_scene_matcher_sample01():
     assert result["870f040525ef8bfe"] == expected_scene
 
 def test_scene_matcher_sample02():
-    # There are multiple results with the phash e796ec4d1b40a28f. Most matches have different duration so we need to filter out the ones with different duration.
+    # There are multiple results with the phash e796ec4d1b40a28f. Most matches have different duration
+    # so we need to filter out the ones with different duration.
     matcher = SceneMatcher()
     input_scenes, stashdb_scenes = load_sample_data("phash_to_scene.sample02.json")
     result = matcher.match_scenes(input_scenes, stashdb_scenes)
@@ -31,7 +32,8 @@ def test_scene_matcher_sample02():
     assert result["e796ec4d1b40a28f"] == expected_scene
 
 def test_scene_matcher_sample03():
-    # There are multiple results with the phash b414ba062f6bdc72. The incorrect match has more fingerprints with the correct phash but the incorrect fingerprint is also included.
+    # There are multiple results with the phash b414ba062f6bdc72. The incorrect match has more fingerprints
+    # with the correct phash but the incorrect fingerprint is also included.
     matcher = SceneMatcher()
     input_scenes, stashdb_scenes = load_sample_data("phash_to_scene.sample03.json")
     result = matcher.match_scenes(input_scenes, stashdb_scenes)

@@ -56,10 +56,14 @@ print("=>")
 print(target_tag)
 print()
 
-scenes = stash.find_scenes({ "tags": { "value": [to_be_merged_tag["id"]], "modifier": "INCLUDES" }}, fragment="id title tags { id name }")
-galleries = stash.find_galleries({ "tags": { "value": [to_be_merged_tag["id"]], "modifier": "INCLUDES" }}, fragment="id title tags { id name }")
-images = stash.find_images({ "tags": { "value": [to_be_merged_tag["id"]], "modifier": "INCLUDES" }}, fragment="id title tags { id name }")
-markers = stash.find_scene_markers({ "tags": { "value": [to_be_merged_tag["id"]], "modifier": "INCLUDES" }}, fragment="id scene { id title } title primary_tag { id name } tags { id name }")
+tag_filter = {"tags": {"value": [to_be_merged_tag["id"]], "modifier": "INCLUDES"}}
+scenes = stash.find_scenes(tag_filter, fragment="id title tags { id name }")
+galleries = stash.find_galleries(tag_filter, fragment="id title tags { id name }")
+images = stash.find_images(tag_filter, fragment="id title tags { id name }")
+markers = stash.find_scene_markers(
+    tag_filter,
+    fragment="id scene { id title } title primary_tag { id name } tags { id name }",
+)
 
 print(f"Scenes: {len(scenes)}")
 print(f"Markers: {len(markers)}")

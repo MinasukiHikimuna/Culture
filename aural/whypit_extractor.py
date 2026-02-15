@@ -45,7 +45,10 @@ class WhypitExtractor:
             self.playwright = sync_playwright().start()
             self.browser = self.playwright.chromium.launch(headless=True)
             self.context = self.browser.new_context(
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/76.0.3809.100 Safari/537.36"
+                user_agent=(
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                    " (KHTML, like Gecko) Chrome/76.0.3809.100 Safari/537.36"
+                )
             )
             self.page = self.context.new_page()
             self._owns_browser = True

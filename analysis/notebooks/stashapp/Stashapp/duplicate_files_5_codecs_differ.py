@@ -40,7 +40,10 @@ scenes_with_dupes = stash.find_scenes({
     "modifier": "INCLUDES",
     "excludes": [scenes_with_multiple_versions["id"]]
   }
-}, fragment="id title date studio { name } files { id duration path width height size fingerprints { type value } format video_codec audio_codec }")
+}, fragment=(
+    "id title date studio { name } files { id duration path width height size"
+    " fingerprints { type value } format video_codec audio_codec }"
+))
 # Create Polars DataFrame with strict=False to handle mixed numeric types
 scenes_with_dupes_df = pl.DataFrame(scenes_with_dupes, strict=False)
 scenes_with_dupes_df

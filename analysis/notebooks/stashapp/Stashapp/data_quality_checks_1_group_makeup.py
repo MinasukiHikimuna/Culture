@@ -21,7 +21,12 @@ multiple_sex_scenes_tag_id = stash.find_tag("Multiple Sex Scenes in a Scene")["i
 missing_performer_male_tag_id = stash.find_tag("Missing Performer (Male)")["id"]
 missing_performer_female_tag_id = stash.find_tag("Missing Performer (Female)")["id"]
 
-all_scenes = pl.DataFrame(stash.find_scenes({ "tags": { "value": [], "modifier": "INCLUDES", "excludes": [multiple_sex_scenes_tag_id, missing_performer_male_tag_id, missing_performer_female_tag_id] } }, fragment="id title performers { id name gender } tags { id name }"))
+all_scenes = pl.DataFrame(stash.find_scenes(
+    {"tags": {"value": [], "modifier": "INCLUDES", "excludes": [
+        multiple_sex_scenes_tag_id, missing_performer_male_tag_id, missing_performer_female_tag_id,
+    ]}},
+    fragment="id title performers { id name gender } tags { id name }",
+))
 all_tags = pl.DataFrame(stash.find_tags(fragment="id name"))
 
 group_makeup_tags = all_tags.filter(

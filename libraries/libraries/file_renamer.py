@@ -162,14 +162,22 @@ def _title_case_except_acronyms(text):
 
 def _clean_for_filename(input):
     input = _title_case_except_acronyms(input)
-    return input.replace(":", "꞉").replace("?", "？").replace("/", "∕").replace("\\", "＼").replace("*", "＊").replace("\"", "＂").replace("<", "＜").replace(">", "＞").replace("|", "｜").replace("  ", " ")
+    return (
+        input.replace(":", "꞉").replace("?", "？").replace("/", "∕").replace("\\", "＼")
+        .replace("*", "＊").replace("\"", "＂").replace("<", "＜").replace(">", "＞")
+        .replace("|", "｜").replace("  ", " ")
+    )
 
 def _clean_for_directory(input):
     """Clean text for use in directory names, but keep most characters allowed by filesystems"""
     input = _title_case_except_acronyms(input)
     # Remove or replace characters that are not allowed in Windows directory names
     # Keep colon as ꞉ for display purposes, but it will be handled specially in paths
-    return input.replace(":", "꞉").replace("?", "？").replace("/", "∕").replace("\\", "＼").replace("*", "＊").replace("\"", "＂").replace("<", "＜").replace(">", "＞").replace("|", "｜").replace("  ", " ")
+    return (
+        input.replace(":", "꞉").replace("?", "？").replace("/", "∕").replace("\\", "＼")
+        .replace("*", "＊").replace("\"", "＂").replace("<", "＜").replace(">", "＞")
+        .replace("|", "｜").replace("  ", " ")
+    )
 
 def get_suffix(primary_file_basename: str) -> str:
     if primary_file_basename is None:
