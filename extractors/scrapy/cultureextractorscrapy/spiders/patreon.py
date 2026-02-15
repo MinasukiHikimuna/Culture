@@ -716,7 +716,7 @@ class PatreonSpider(scrapy.Spider):
             return True
 
         # Check for post_file (audio files, podcasts, etc.)
-        if "post_file" in attributes and attributes["post_file"]:
+        if attributes.get("post_file"):
             post_file_data = attributes["post_file"]
             if isinstance(post_file_data, dict) and "url" in post_file_data:
                 url = post_file_data["url"]
@@ -791,7 +791,7 @@ class PatreonSpider(scrapy.Spider):
                 )
 
         # Check for direct image URLs
-        if "image" in attributes and attributes["image"]:
+        if attributes.get("image"):
             image_data = attributes["image"]
             if isinstance(image_data, dict):
                 url = None

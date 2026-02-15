@@ -339,7 +339,7 @@ class SexyHubSpider(scrapy.Spider):
         # Extract subsite from collections
         sub_site = None
         sub_site_uuid = None
-        if "collections" in release_data and release_data["collections"]:
+        if release_data.get("collections"):
             valid_collections = [
                 c for c in release_data["collections"] if c.get("id") and c.get("name")
             ]

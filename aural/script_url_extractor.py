@@ -233,7 +233,7 @@ class ScriptUrlExtractor:
             # Then check resolved Reddit posts for script URLs
             if not primary_url:
                 for url_info in script_info["resolved_urls"]:
-                    if "script_urls" in url_info and url_info["script_urls"]:
+                    if url_info.get("script_urls"):
                         primary_url = url_info["script_urls"][0][0]
                         break
 
