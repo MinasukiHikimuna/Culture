@@ -1265,7 +1265,7 @@ class StashAppClient:
         return results
 
     def bulk_scene_update(self, scene_ids: list[int], tag_ids: list[int], mode: str):
-        if mode != "ADD" and mode != "REMOVE":
+        if mode not in {"ADD", "REMOVE"}:
             raise ValueError("Mode must be either 'ADD' or 'REMOVE'")
 
         query = """
