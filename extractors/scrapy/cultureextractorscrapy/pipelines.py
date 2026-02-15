@@ -421,7 +421,7 @@ class BaseDownloadPipeline:
 
             result = subprocess.run(
                 videohashes_cmd,
-                capture_output=True,
+                check=False, capture_output=True,
                 text=True,
                 timeout=300,  # 5 minutes for video hash calculation
                 cwd=self.ffmpeg_dir,  # videohashes looks for ffmpeg/ffprobe in cwd
@@ -462,7 +462,7 @@ class BaseDownloadPipeline:
                 file_path,
             ]
 
-            result = subprocess.run(ffprobe_command, capture_output=True, text=True, timeout=60)
+            result = subprocess.run(ffprobe_command, check=False, capture_output=True, text=True, timeout=60)
 
             if result.returncode == 0:
                 ffprobe_data = json_lib.loads(result.stdout)
