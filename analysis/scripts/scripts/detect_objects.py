@@ -5,7 +5,7 @@ import argparse
 def process_directory(source_dir: str, model_name: str = "yolo11n.pt", save_results: bool = True):
     """
     Process all images in the given directory using YOLO11
-    
+
     Args:
         source_dir (str): Path to directory containing images
         model_name (str): Name of the YOLO model to use

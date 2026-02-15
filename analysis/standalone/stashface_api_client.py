@@ -32,10 +32,10 @@ class StashfaceAPIClient:
     def upload_file(self, file_path: str) -> str:
         """
         Upload a file to the Gradio server
-        
+
         Args:
             file_path: Path to the image file to upload
-            
+
         Returns:
             The uploaded file reference that can be used in API calls
         """
@@ -67,13 +67,13 @@ class StashfaceAPIClient:
                      max_results: int = 3, api_type: str = "json") -> Dict:
         """
         Analyze faces in an image using the Stashface API
-        
+
         Args:
             image_path: Path to the image file
             threshold: Confidence threshold for face matching (0.0-1.0)
             max_results: Maximum number of results to return (0-50)
             api_type: API endpoint type ("json" or "visual")
-            
+
         Returns:
             Dictionary containing the analysis results
         """

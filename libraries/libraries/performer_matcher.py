@@ -34,12 +34,12 @@ class PerformerMatcher:
                         stashdb_performers: Optional[pl.Series] = None) -> List[PerformerMatch]:
         """
         Match performers between Culture Extractor and Stashapp/StashDB
-        
+
         Args:
             ce_performers: Series of Culture Extractor performers (List[struct])
             stashapp_performers: Series of Stashapp performers (List[struct])
             stashdb_performers: Optional Series of StashDB performers (List[struct])
-            
+
         Returns:
             List of PerformerMatch objects
         """
@@ -315,10 +315,10 @@ class PerformerMatcher:
     def match_unmatched_performers(self, unmatched_performers: pl.DataFrame) -> List[UnmatchedPerformerMatch]:
         """
         Try to match previously unmatched performers against all Stashapp performers
-        
+
         Args:
             unmatched_performers: DataFrame with columns 'performer_uuid' and 'performer_name'
-            
+
         Returns:
             List of UnmatchedPerformerMatch objects for any new matches found
         """

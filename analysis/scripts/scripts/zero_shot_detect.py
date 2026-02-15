@@ -5,7 +5,7 @@ import argparse
 def detect_with_descriptions(source_dir: str, descriptions: list, save_results: bool = True):
     """
     Detect objects using natural language descriptions, excluding people
-    
+
     Args:
         source_dir (str): Path to directory containing images
         descriptions (list): List of object descriptions in natural language

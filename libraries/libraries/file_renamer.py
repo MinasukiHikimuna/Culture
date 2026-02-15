@@ -6,12 +6,12 @@ MAX_LENGTH = 255
 def create_filename_with_directory(use_studio_code_tag: Dict, row: Dict, base_directory: str = None) -> Dict[str, str]:
     """
     Create a filename and directory structure from a Polars DataFrame row dictionary.
-    
+
     Args:
         use_studio_code_tag: Tag information for studio codes
         row: Dictionary containing scene information with stashapp_ prefixed keys
         base_directory: Base directory path (if None, derives from file's drive + \\Culture\\Videos)
-    
+
     Returns:
         Dictionary with 'filename', 'directory', and 'full_path' keys
     """
@@ -78,10 +78,10 @@ def create_filename_with_directory(use_studio_code_tag: Dict, row: Dict, base_di
 def create_filename(use_studio_code_tag: Dict, row: Dict) -> str:
     """
     Create a filename from a Polars DataFrame row dictionary.
-    
+
     Args:
         row: Dictionary containing scene information with stashapp_ prefixed keys
-    
+
     Returns:
         Formatted filename string
     """
@@ -180,11 +180,11 @@ def get_suffix(primary_file_basename: str) -> str:
 def get_studio_value(studio: Optional[Dict]) -> str:
     """
     Format studio name with parent if available.
-    
+
     Args:
         studio: Dictionary containing studio information with optional parent_studio
                Example: {"name": "VIPissy", "parent_studio": {"name": "VIPissy Cash"}}
-    
+
     Returns:
         Formatted studio name. Examples:
         - "VIPissy Cash꞉ VIPissy" (with parent)
@@ -225,13 +225,13 @@ def has_studio_code_tag(use_studio_code_tag: Dict, studio: Dict) -> bool:
 def get_performers_value(performers: List[Dict]) -> str:
     """
     Format performers list with gender-based sorting and favorite prioritization.
-    
+
     Args:
         performers: List of dictionaries containing performer information
                   Example: [{"stashapp_performers_name": "Name", 
                            "stashapp_performers_gender": "FEMALE",
                            "stashapp_performers_favorite": True}]
-    
+
     Returns:
         Comma-separated string of performer names, sorted by:
         1. Gender priority (TRANSGENDER_FEMALE, FEMALE, MALE)
@@ -271,14 +271,14 @@ def get_performers_value(performers: List[Dict]) -> str:
 def process_scene_row(row: Dict) -> Dict:
     """
     Example function showing how to process an entire row from a Polars DataFrame.
-    
+
     Args:
         row: Dictionary containing all fields from a Polars DataFrame row
              The row is automatically converted to a dictionary when using map_elements
-             
+
     Returns:
         Dictionary with processed values
-        
+
     Example usage from Polars:
         df.map_elements(process_scene_row)
     """

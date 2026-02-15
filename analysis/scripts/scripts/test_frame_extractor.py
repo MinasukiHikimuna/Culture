@@ -15,7 +15,7 @@ class TestFrameExtractor:
     def extract_frames(self, video_path: str, scene_id: str = None):
         """
         Extract key frames from a video for performer testing
-        
+
         Args:
             video_path: Path to video file
             scene_id: Optional scene ID for naming the output directory

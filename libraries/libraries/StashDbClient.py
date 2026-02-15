@@ -390,10 +390,10 @@ class StashDbClient(StashboxClient):
     def submit_scene_draft(self, draft_input: dict) -> dict:
         """
         Submit a scene draft with just the title field.
-        
+
         Args:
             draft_input: The draft input to submit
-            
+
         Returns:
             dict: The response from the server containing the draft submission status
         """
@@ -672,11 +672,11 @@ class StashDbClient(StashboxClient):
     def query_scenes(self, scene_ids: Optional[List[str]] = None, phashes: Optional[List[str]] = None) -> pl.DataFrame:
         """
         Query scenes by either their StashDB IDs or phash values.
-        
+
         Args:
             scene_ids: Optional list of StashDB scene IDs
             phashes: Optional list of phash values
-            
+
         Returns:
             pl.DataFrame: DataFrame containing the scene data
         """

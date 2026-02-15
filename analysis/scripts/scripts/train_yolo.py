@@ -6,11 +6,11 @@ import yaml
 def create_dataset_config(data_dir: str, classes: list) -> str:
     """
     Create YOLO dataset configuration file
-    
+
     Args:
         data_dir (str): Path to dataset directory
         classes (list): List of class names
-    
+
     Returns:
         str: Path to created config file
     """
@@ -48,7 +48,7 @@ def create_dataset_config(data_dir: str, classes: list) -> str:
 def train_model(data_config: str, epochs: int = 100, batch_size: int = 16, imgsz: int = 640):
     """
     Train YOLO model on custom dataset
-    
+
     Args:
         data_config (str): Path to dataset config file
         epochs (int): Number of training epochs

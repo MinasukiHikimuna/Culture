@@ -48,11 +48,11 @@ class FaceRecognizer:
     def predict(self, image_path, top_k=3):
         """
         Predict the top k most likely performers for a face image
-        
+
         Args:
             image_path: Path to the image file
             top_k: Number of top predictions to return
-            
+
         Returns:
             List of tuples (performer_name, confidence_score)
         """
@@ -80,7 +80,7 @@ class FaceRecognitionTester:
     def __init__(self, model_path, device=None, verbose=False):
         """
         Initialize face recognition tester
-        
+
         Args:
             model_path: Path to trained model checkpoint
             device: torch device (will use CUDA if available)

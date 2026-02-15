@@ -15,11 +15,11 @@ class SABnzbdClient:
     def add_nzb_url(self, nzb_url: str, name: Optional[str] = None) -> Dict[str, Any]:
         """
         Add an NZB to SABnzbd queue via URL
-        
+
         Args:
             nzb_url: The URL of the NZB file
             name: Optional name for the download
-            
+
         Returns:
             dict: Response containing status and nzo_id if successful
                  Example: {'status': True, 'nzo_id': 'SABnzbd_nzo_xxx'}
@@ -75,10 +75,10 @@ class SABnzbdClient:
     def get_queue_details(self, nzo_id: str) -> Dict[str, Any]:
         """
         Get details about a specific item in the queue
-        
+
         Args:
             nzo_id: The SABnzbd NZO ID
-            
+
         Returns:
             dict: Queue item details including status and path information
         """
@@ -107,10 +107,10 @@ class SABnzbdClient:
     def get_history_details(self, nzo_id: str) -> Dict[str, Any]:
         """
         Get details about a completed download from history
-        
+
         Args:
             nzo_id: The SABnzbd NZO ID
-            
+
         Returns:
             dict: History item details including final path
         """
@@ -139,12 +139,12 @@ class SABnzbdClient:
     def wait_for_completion(self, nzo_id: str, timeout: int = 3600, check_interval: int = 10) -> Dict[str, Any]:
         """
         Wait for a download to complete and return its final details
-        
+
         Args:
             nzo_id: The SABnzbd NZO ID
             timeout: Maximum time to wait in seconds (default 1 hour)
             check_interval: Time between checks in seconds (default 10 seconds)
-            
+
         Returns:
             dict: Download details including status and path information
         """
