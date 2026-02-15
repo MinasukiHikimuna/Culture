@@ -124,8 +124,8 @@ class PatreonSpider(scrapy.Spider):
             "X-Requested-With": "XMLHttpRequest",
         }
 
-    def start_requests(self):
-        """Override start_requests to begin with campaign discovery."""
+    async def start(self):
+        """Begin with campaign discovery."""
         headers = self._create_authenticated_headers()
 
         # Parameters for the current_user API call

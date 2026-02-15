@@ -111,7 +111,7 @@ class MetArtSpider(scrapy.Spider):
 
         return spider
 
-    def start_requests(self):
+    async def start(self):
         """Start requests by iterating through A-Z for performer listing."""
         if self.mode == "performers":
             # Iterate through all letters A-Z

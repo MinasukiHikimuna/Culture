@@ -152,8 +152,8 @@ class SexyHubSpider(scrapy.Spider):
         query_string = "&".join(f"{k}={v}" for k, v in base_params.items())
         return f"{base_url}/v2/releases?{query_string}"
 
-    def start_requests(self):
-        """Override start_requests to handle enter declaration."""
+    async def start(self):
+        """Handle enter declaration before crawling."""
         headers = {
             "authority": "site-api.project1service.com",
             "accept": "application/json, text/plain, */*",

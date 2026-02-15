@@ -92,7 +92,7 @@ class VixenSpider(scrapy.Spider):
 
         return spider
 
-    def start_requests(self):
+    async def start(self):
         """Start requests by fetching the first page of performers."""
         if self.mode == "performers":
             yield scrapy.Request(

@@ -69,8 +69,8 @@ class LezKissSpider(scrapy.Spider):
         spider.existing_releases = get_existing_releases_with_status(site_item.id)
         return spider
 
-    def start_requests(self):
-        """Override start_requests to handle enter declaration."""
+    async def start(self):
+        """Handle enter declaration before crawling."""
         # First visit the enter.php page to handle age verification
         yield scrapy.Request(
             url=f"{base_url}/enter.php",

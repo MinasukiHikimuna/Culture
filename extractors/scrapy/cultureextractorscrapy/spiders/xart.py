@@ -109,7 +109,7 @@ class XArtSpider(scrapy.Spider):
             )
         return None
 
-    def start_requests(self):
+    async def start(self):
         if self.mode == "performers":
             # Start at the models page
             yield scrapy.Request(

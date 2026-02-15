@@ -79,7 +79,7 @@ class StashDBSpider(scrapy.Spider):
 
         return spider
 
-    def start_requests(self):
+    async def start(self):
         """Query StashDB and process scenes."""
         if self.mode == "performer":
             self.logger.info(f"Querying scenes for performer: {self.performer_id}")
@@ -97,7 +97,8 @@ class StashDBSpider(scrapy.Spider):
         self._process_scenes(scenes)
 
         if self.download_images:
-            yield from self._generate_image_requests(scenes)
+            for request in self._generate_image_requests(scenes):
+                yield request
 
     def _process_scenes(self, scenes: list[dict]) -> None:
         """Process and store scenes to Delta Lake."""
