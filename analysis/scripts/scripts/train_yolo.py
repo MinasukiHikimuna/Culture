@@ -61,7 +61,7 @@ def train_model(data_config: str, epochs: int = 100, batch_size: int = 16, imgsz
     model = YOLO("yolo11n.pt")  # load pretrained model
 
     # Train the model
-    results = model.train(
+    model.train(
         data=data_config,
         epochs=epochs,
         imgsz=imgsz,

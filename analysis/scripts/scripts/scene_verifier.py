@@ -54,7 +54,7 @@ class SceneVerifier:
                 raise ValueError(f"No metadata found for scene {scene_id}")
 
             with metadata_path.open("r") as f:
-                scene_data = json.load(f)
+                json.load(f)
 
             # Create verified scene directory
             verified_dir = self.dataset.scenes[SceneState.VERIFIED.value] / scene_id

@@ -435,7 +435,6 @@ class NZBSearch:
 
         for i, search_queries in enumerate(search_queries_list):
             target_results = None
-            used_query = None
             validation_data = (
                 validation_info[i]
                 if validation_info and i < len(validation_info)
@@ -473,7 +472,6 @@ class NZBSearch:
                         ]
                     )
                     target_results = results
-                    used_query = query
                     break
 
             if target_results is not None:

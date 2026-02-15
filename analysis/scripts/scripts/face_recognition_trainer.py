@@ -36,7 +36,7 @@ class FaceDataset(Dataset):
                     performer_id, performer_name = performer_dir.name.split(" - ", 1)
                 else:
                     # Scene format: Use directory name as both ID and name
-                    performer_id = performer_name = performer_dir.name
+                    performer_name = performer_dir.name
 
                 # Count images for this performer
                 image_files = list(performer_dir.glob("*.jpg")) + \

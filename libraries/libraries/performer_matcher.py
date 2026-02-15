@@ -124,7 +124,6 @@ class PerformerMatcher:
                               source: str,
                               min_confidence: float = 0.65) -> list[PerformerMatch]:
         """Match performers within a single scene"""
-        matches = []
         remaining_ce = list(ce_performers)
         remaining_performers = list(performers)
 

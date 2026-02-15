@@ -32,7 +32,7 @@ def backfill_stashapp_ids(dry_run: bool = False) -> dict:
     # Initialize Stashapp client and test connection
     client = StashappClient()
     print("Testing Stashapp connection...")
-    version = client.query("query { systemStatus { appSchema } }")
+    client.query("query { systemStatus { appSchema } }")
     print("Connected to Stashapp")
 
     # Find all release.json files

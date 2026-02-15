@@ -59,7 +59,7 @@ class FaceDetector:
                 print("\nTesting GPU computation...")
                 with tf.device("/GPU:0"):
                     dummy = tf.random.normal([1000, 1000])
-                    result = tf.matmul(dummy, tf.transpose(dummy))
+                    tf.matmul(dummy, tf.transpose(dummy))
                     print("GPU test successful")
             except RuntimeError as e:
                 print(f"GPU configuration error: {e}")
