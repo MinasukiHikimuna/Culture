@@ -20,7 +20,7 @@ def test_get_performer_makeup(sample_scene):
 def test_get_expected_group_tags_solo_female(group_makeup_tags, sample_scene):
     gm = GroupMakeup(tags=group_makeup_tags)
     expected_tags = gm.get_expected_group_tags(sample_scene["performers"])
-    
+
     # Should recommend both "Solo" and "Solo Female" tags
     expected_tag_names = {tag["name"] for tag in expected_tags}
     assert "Solo" in expected_tag_names
@@ -30,7 +30,7 @@ def test_get_expected_group_tags_solo_female(group_makeup_tags, sample_scene):
 def test_get_scene_group_makeup_issues(group_makeup_tags, sample_scene):
     gm = GroupMakeup(tags=group_makeup_tags)
     issues = gm.get_scene_group_makeup_issues(sample_scene)
-    
+
     assert issues is not None
     assert issues["scene_id"] == 2
     assert "Missing tags: Solo, Solo Female" in issues["issues"]

@@ -6,9 +6,9 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 
 def test_gpu():
     print("\n1. TensorFlow Version:", tf.__version__)
-    
+
     print("\n2. Available GPUs:", tf.config.list_physical_devices("GPU"))
-    
+
     print("\n3. GPU Test:")
     try:
         with tf.device("/GPU:0"):

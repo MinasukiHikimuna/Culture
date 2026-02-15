@@ -13,7 +13,7 @@ def process_directory(source_dir: str, model_name: str = "yolo11n.pt", save_resu
     """
     # Load the YOLO model
     model = YOLO(model_name)  # Using YOLO11 model
-    
+
     # Get all image files
     source_path = Path(source_dir)
     image_files = []
@@ -32,7 +32,7 @@ def process_directory(source_dir: str, model_name: str = "yolo11n.pt", save_resu
     # Process each image
     for img_path in image_files:
         print(f"\nProcessing {img_path}")
-        
+
         # Run inference and save results directly
         if save_results:
             # Save directly to the yolo directory
@@ -45,12 +45,12 @@ def process_directory(source_dir: str, model_name: str = "yolo11n.pt", save_resu
                           save_crop=False)
         else:
             results = model(img_path, verbose=False)
-        
+
         # Process and display results
         for result in results:
             boxes = result.boxes
             print(f"Found {len(boxes)} objects")
-            
+
             for box in boxes:
                 class_name = result.names[int(box.cls[0])]
                 confidence = float(box.conf[0])
@@ -72,14 +72,14 @@ def main():
                         help="YOLO11 model to use (default: yolo11n.pt)")
     parser.add_argument("--no-save", action="store_true",
                         help="Do not save annotated images")
-    
+
     args = parser.parse_args()
-    
+
     source_path = Path(args.source_dir)
     if not source_path.exists():
         print(f"Error: Directory {args.source_dir} does not exist")
         return
-    
+
     process_directory(str(source_path), args.model, not args.no_save)
 
 if __name__ == "__main__":

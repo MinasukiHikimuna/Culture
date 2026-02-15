@@ -18,7 +18,7 @@ def create_filename_with_directory(use_studio_code_tag: Dict, row: Dict, base_di
     filename = create_filename(use_studio_code_tag, row)
     if not filename:
         return {"filename": None, "directory": None, "full_path": None}
-    
+
     # Determine base directory if not provided
     if base_directory is None:
         current_file_path = row.get("stashapp_primary_file_path", "")
@@ -29,7 +29,7 @@ def create_filename_with_directory(use_studio_code_tag: Dict, row: Dict, base_di
         else:
             # No file path available - cannot determine directory
             return {"filename": filename, "directory": None, "full_path": None}
-    
+
     # Get studio information for directory structure
     studio = row.get("stashapp_studio")
     if not studio:
@@ -40,19 +40,19 @@ def create_filename_with_directory(use_studio_code_tag: Dict, row: Dict, base_di
             "directory": current_dir,
             "full_path": os.path.join(current_dir, filename)
         }
-    
+
     studio_name = studio.get("name", "Unknown Studio")
     parent_studio = studio.get("parent_studio")
-    
+
     if parent_studio:
         # Network structure: Sites\[Network]\[Network]: [Site]
         network_name = parent_studio.get("name", "Unknown Network")
         site_name = studio_name
-        
+
         # Clean network and site names for directory use
         clean_network = _clean_for_directory(network_name)
         clean_site = _clean_for_directory(site_name)
-        
+
         # Create directory structure
         directory = os.path.join(
             base_directory,
@@ -68,7 +68,7 @@ def create_filename_with_directory(use_studio_code_tag: Dict, row: Dict, base_di
             "Sites",
             clean_studio
         )
-    
+
     return {
         "filename": filename,
         "directory": directory,
@@ -104,32 +104,32 @@ def create_filename(use_studio_code_tag: Dict, row: Dict) -> str:
     # Get studio and format it
     studio = row.get("stashapp_studio")
     studio_name = get_studio_value(studio)
-    
+
     # Get date
     date = row.get("stashapp_date")
     date_str = date if isinstance(date, str) else date.strftime("%Y-%m-%d") if date else "Unknown Date"
-    
+
     # Get performers
     performers_str = get_performers_value(row.get("stashapp_performers"))
-    
+
     # Get title
     title = row.get("stashapp_title", "Unknown Title")
-    
+
     # Build base filename
     base_filename = f"{studio_name} – {date_str} – "
-    
+
     # Add studio code if needed
     has_tag = has_studio_code_tag(use_studio_code_tag, studio)
     if has_tag and row.get("stashapp_code"):
         base_filename += f"{_clean_for_filename(row['stashapp_code'])} – "
-    
+
     base_filename += _clean_for_filename(f"{title} – {performers_str}")
 
     # Check if the generated filename exceeds the maximum length
     if len(base_filename) + len(suffix) > max_length_wo_ce_uuid_suffix:
         # Truncate the base filename to fit within limits
         base_filename = base_filename[:max_length_wo_ce_uuid_suffix]
-        
+
     return base_filename + ce_uuid_fmt + suffix
 
 def _title_case_except_acronyms(text):
@@ -173,7 +173,7 @@ def _clean_for_directory(input):
 def get_suffix(primary_file_basename: str) -> str:
     if primary_file_basename is None:
         return None
-    
+
     file_suffix = os.path.splitext(primary_file_basename)[1]
     return file_suffix
 
@@ -193,10 +193,10 @@ def get_studio_value(studio: Optional[Dict]) -> str:
     """
     if studio is None:
         return "Unknown Studio"
-    
+
     if studio.get("parent_studio") is None:
         return studio["name"]
-    
+
     studio_name = studio["name"]
     parent_studio = studio.get("parent_studio")
     return f"{parent_studio['name']}꞉ {studio_name}"
@@ -204,7 +204,7 @@ def get_studio_value(studio: Optional[Dict]) -> str:
 def has_studio_code_tag(use_studio_code_tag: Dict, studio: Dict) -> bool:
     if use_studio_code_tag is None:
         raise ValueError("use_studio_code_tag is required")
-    
+
     if studio is None:
         return False
 
@@ -242,7 +242,7 @@ def get_performers_value(performers: List[Dict]) -> str:
     """
     if performers is None:
         raise ValueError("performers is required")
-    
+
     if len(performers) == 0:
         return "Unknown performers"
 

@@ -68,7 +68,7 @@ for scene in scenes_with_dupes:
         # Extract fingerprints
         oshash = next((fp["value"] for fp in file["fingerprints"] if fp["type"] == "oshash"), None)
         phash = next((fp["value"] for fp in file["fingerprints"] if fp["type"] == "phash"), None)
-        
+
         # Create a record for each file
         record = {
             "scene_id": scene["id"],
@@ -109,7 +109,7 @@ for scene in scenes_with_dupes:
         # Extract fingerprints
         oshash = next((fp["value"] for fp in file["fingerprints"] if fp["type"] == "oshash"), None)
         phash = next((fp["value"] for fp in file["fingerprints"] if fp["type"] == "phash"), None)
-        
+
         # Create a record for each file
         record = {
             "scene_id": scene["id"],
@@ -148,7 +148,7 @@ duration_mismatches = scenes_with_multiple_files_df.group_by("scene_id").agg([
 print("\nScenes with duration mismatches:")
 for row in duration_mismatches.iter_rows(named=True):
     print(f"\nScene {row['scene_id']} - {row['title']}")
-    
+
     for i, (duration, file_id, file_path, size, is_primary) in enumerate(zip(
         row["all_durations"], 
         row["all_file_ids"], 

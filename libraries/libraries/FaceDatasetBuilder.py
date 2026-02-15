@@ -20,7 +20,7 @@ class FaceDatasetBuilder:
         physical_devices = tf.config.list_physical_devices("GPU")
         if physical_devices:
             tf.config.experimental.set_memory_growth(physical_devices[0], True)
-        
+
         self.detector = MTCNN()
         self.base_dir = "H:\\Faces\\dataset"
         self.structure = {
@@ -51,7 +51,7 @@ class FaceDatasetBuilder:
         # Create scene status directories
         for status_dir in self.structure["scenes"].values():
             os.makedirs(status_dir, exist_ok=True)
-            
+
         # Create performer directories
         for performer_dir in self.structure["performers"].values():
             os.makedirs(performer_dir, exist_ok=True)
@@ -60,13 +60,13 @@ class FaceDatasetBuilder:
         """Create directory name from performer data or ID"""
         if isinstance(performer, str):
             return performer
-        
+
         stashdb_id = None
         for stash_id in performer.get("stashapp_performers_stash_ids", []):
             if stash_id["endpoint"] == "https://stashdb.org/graphql":
                 stashdb_id = stash_id["stash_id"]
                 break
-        
+
         name = performer.get("stashapp_performers_name", "")
         if stashdb_id:
             return f"{stashdb_id} - {name}"
@@ -78,38 +78,38 @@ class FaceDatasetBuilder:
         image = cv2.imread(frame_path)
         if image is None:
             return []
-        
+
         # Resize image for faster processing (adjust size as needed)
         scale = 0.5
         small_image = cv2.resize(image, None, fx=scale, fy=scale)
         image_rgb = cv2.cvtColor(small_image, cv2.COLOR_BGR2RGB)
-        
+
         # Detect faces
         faces = self.detector.detect_faces(image_rgb)
         faces_metadata = []
-        
+
         frame_file = os.path.basename(frame_path)
-        
+
         for i, face in enumerate(faces):
             if face["confidence"] < 0.95:
                 continue
 
             face_id = f"{scene_id}_{frame_file[:-4]}_face_{i}"
-            
+
             # Scale coordinates back to original size
             x, y, width, height = [int(coord/scale) for coord in face["box"]]
             margin = int(max(width, height) * 0.2)
-            
+
             # Extract face from original image
             face_img = image[
                 max(0, y-margin):min(image.shape[0], y+height+margin),
                 max(0, x-margin):min(image.shape[1], x+width+margin)
             ]
-            
+
             # Save face
             face_path = os.path.join(scene_dir, f"{face_id}.jpg")
             cv2.imwrite(face_path, face_img)
-            
+
             faces_metadata.append({
                 "face_id": face_id,
                 "scene_id": scene_id,
@@ -118,17 +118,17 @@ class FaceDatasetBuilder:
                 "possible_performers": [p if isinstance(p, str) else p.get("stashapp_performers_id") for p in performers],
                 "timestamp": datetime.now().isoformat()
             })
-            
+
         return faces_metadata
 
     def process_frame_batch(self, frame_paths: List[str], scene_dir: str, scene_id: str, performers: list) -> list:
         """Process a batch of frames for faces"""
         faces_metadata = []
-        
+
         # Pre-allocate lists
         images = []
         image_info = []
-        
+
         # Read all images in batch
         for frame_path in frame_paths:
             try:
@@ -145,46 +145,46 @@ class FaceDatasetBuilder:
             except Exception as e:
                 print(f"Error reading {frame_path}: {str(e)}")
                 continue
-        
+
         if not images:
             return []
-        
+
         # Process each image
         for idx, (frame_path, original_image, scale) in enumerate(image_info):
             try:
                 faces = self.detector.detect_faces(images[idx])
                 if not faces:
                     continue
-                    
+
                 frame_file = os.path.basename(frame_path)
-                
+
                 for i, face in enumerate(faces):
                     try:
                         if face["confidence"] < 0.95:
                             continue
 
                         face_id = f"{scene_id}_{frame_file[:-4]}_face_{i}"
-                        
+
                         # Scale coordinates back to original size
                         x, y, width, height = [int(coord/scale) for coord in face["box"]]
                         margin = int(max(width, height) * 0.2)
-                        
+
                         # Extract face from original image with bounds checking
                         y_start = max(0, y-margin)
                         y_end = min(original_image.shape[0], y+height+margin)
                         x_start = max(0, x-margin)
                         x_end = min(original_image.shape[1], x+width+margin)
-                        
+
                         if y_end <= y_start or x_end <= x_start:
                             print(f"Invalid face coordinates in {frame_file}")
                             continue
-                            
+
                         face_img = original_image[y_start:y_end, x_start:x_end]
-                        
+
                         # Save face
                         face_path = os.path.join(scene_dir, f"{face_id}.jpg")
                         cv2.imwrite(face_path, face_img, [cv2.IMWRITE_JPEG_QUALITY, 95])
-                        
+
                         faces_metadata.append({
                             "face_id": face_id,
                             "scene_id": scene_id,
@@ -196,17 +196,17 @@ class FaceDatasetBuilder:
                     except Exception as e:
                         print(f"Error processing face {i} in {frame_file}: {str(e)}")
                         continue
-                    
+
             except Exception as e:
                 print(f"Error processing frame {frame_path}: {str(e)}")
                 continue
-        
+
         return faces_metadata
 
     def process_multiple_scenes(self, scenes: List[Dict]) -> List[Dict]:
         """Process multiple scenes in parallel, balanced across drives"""
         results = []
-        
+
         # Group scenes by drive
         drive_scenes = {}
         for scene in scenes:
@@ -218,7 +218,7 @@ class FaceDatasetBuilder:
                 if drive not in self.drive_semaphores:
                     self.drive_semaphores[drive] = threading.Semaphore(self.max_per_drive)
             drive_scenes[drive].append(scene)
-        
+
         with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_concurrent_scenes) as executor:
             # Submit scenes for processing, using drive semaphores
             future_to_scene = {}
@@ -228,7 +228,7 @@ class FaceDatasetBuilder:
                                           scene, 
                                           self.drive_semaphores[drive])
                     future_to_scene[future] = scene
-            
+
             # Process results as they complete
             for future in concurrent.futures.as_completed(future_to_scene):
                 scene = future_to_scene[future]
@@ -241,7 +241,7 @@ class FaceDatasetBuilder:
                         "error": str(e),
                         "status": "error"
                     })
-        
+
         return results
 
     def _process_scene_with_semaphore(self, scene: Dict, drive_semaphore: threading.Semaphore) -> Dict:
@@ -364,13 +364,13 @@ class FaceDatasetBuilder:
         """Move a face image to the rejected directory"""
         face_filename = os.path.basename(face_path)
         scene_id = face_filename.split("_")[0]  # Extract scene_id from filename
-        
+
         rejected_dir = os.path.join(self.structure["scenes"][SceneState.FACES_EXTRACTED.value], scene_id)
         os.makedirs(rejected_dir, exist_ok=True)
-        
+
         rejected_path = os.path.join(rejected_dir, face_filename)
         shutil.move(face_path, rejected_path)
-        
+
         # Update metadata
         face_id = os.path.splitext(face_filename)[0]
         if face_id in self.metadata["verification_status"]:
@@ -429,7 +429,7 @@ class FaceDatasetBuilder:
         current_status = self.get_scene_status(scene_id)
         if not current_status:
             raise ValueError(f"Scene not found: {scene_id}")
-        
+
         if current_status == SceneState.VERIFIED.value:
             print(f"Scene {scene_id} is already verified")
             return

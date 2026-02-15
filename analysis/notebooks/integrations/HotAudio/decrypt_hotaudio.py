@@ -31,7 +31,7 @@ class HotAudioDecryptor:
         """Initialize decryptor with header data and decryption keys"""
         if not header_data.startswith(b"HAX0"):
             raise ValueError("Invalid HAX header magic")
-            
+
         self.header = self._parse_header(header_data)
         self.keys = {int(k): binascii.unhexlify(v) for k, v in keys.items()}
 
@@ -41,17 +41,17 @@ class HotAudioDecryptor:
         file_length = uint32(data, 4)
         header_length = uint32(data, 8)
         extra_length = uint32(data, 12)
-        
+
         logger.debug(f"Header lengths: file={file_length}, header={header_length}, extra={extra_length}")
-        
+
         try:
             # Decode the bencoded metadata section
             bencoded_data = data[16:header_length]
             logger.debug(f"Bencoded data (first 32 bytes): {bencoded_data[:32].hex()}")
-            
+
             meta = bencodepy.decode(bencoded_data)
             logger.debug(f"Decoded metadata: {meta}")
-            
+
             # Parse segments
             segments = []
             seg_data = meta[b"segments"]
@@ -110,7 +110,7 @@ class HotAudioDecryptor:
         """Decrypt a single segment"""
         if segment_num < 0:
             raise ValueError("Invalid segment number")
-            
+
         # Calculate key index
         h = 1 + (1 << (math.ceil(math.log2(len(self.header.segments))) + 1))
         key = self._derive_key(h + segment_num)

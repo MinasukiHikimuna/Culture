@@ -19,15 +19,15 @@ def test_header_parsing(sample_header):
     print(f"Header length: {int.from_bytes(sample_header[8:12], 'little')}")
     print(f"Extra length: {int.from_bytes(sample_header[12:16], 'little')}")
     print(f"Bencoded data (hex): {sample_header[16:50].hex()}")
-    
+
     decryptor = HotAudioDecryptor(sample_header, {})
     header = decryptor.header
-    
+
     # Test basic header fields
     assert header.header_length == 15268
     assert header.file_length == 27430737
     assert header.extra_length == 4871
-    
+
     # Test metadata
     assert "segmentCount" in header.meta
     assert header.meta["segmentCount"] == 1880
@@ -37,7 +37,7 @@ def test_header_parsing(sample_header):
 
 def test_key_derivation(sample_header, sample_keys):
     decryptor = HotAudioDecryptor(sample_header, sample_keys)
-    
+
     # Test deriving key for segment 0
     key = decryptor._derive_key(4096)
     assert len(key) == 32  # SHA-256 output length

@@ -15,7 +15,7 @@ def create_dataset_config(data_dir: str, classes: list) -> str:
         str: Path to created config file
     """
     data_path = Path(data_dir)
-    
+
     # Expected directory structure:
     # data_dir/
     #   ├── train/
@@ -27,22 +27,22 @@ def create_dataset_config(data_dir: str, classes: list) -> str:
     #   └── test/
     #       ├── images/
     #       └── labels/
-    
+
     config = {
         "path": str(data_path.absolute()),  # dataset root dir
         "train": "train/images",  # train images (relative to 'path')
         "val": "val/images",      # val images (relative to 'path')
         "test": "test/images",    # test images (optional)
-        
+
         "names": {i: name for i, name in enumerate(classes)},  # class names
         "nc": len(classes)  # number of classes
     }
-    
+
     # Save config file
     config_path = data_path / "dataset.yaml"
     with open(config_path, "w") as f:
         yaml.dump(config, f, sort_keys=False)
-    
+
     return str(config_path)
 
 def train_model(data_config: str, epochs: int = 100, batch_size: int = 16, imgsz: int = 640):
@@ -57,7 +57,7 @@ def train_model(data_config: str, epochs: int = 100, batch_size: int = 16, imgsz
     """
     # Initialize model
     model = YOLO("yolo11n.pt")  # load pretrained model
-    
+
     # Train the model
     results = model.train(
         data=data_config,
@@ -71,7 +71,7 @@ def train_model(data_config: str, epochs: int = 100, batch_size: int = 16, imgsz
         verbose=True,         # print training progress
         device="auto"         # device to use (cuda device, i.e. 0 or 0,1,2,3 or cpu)
     )
-    
+
     # Validate the model
     metrics = model.val()
     print("\nValidation Results:")
@@ -85,12 +85,12 @@ def main():
     parser.add_argument("--epochs", type=int, default=100, help="Number of training epochs")
     parser.add_argument("--batch-size", type=int, default=16, help="Batch size")
     parser.add_argument("--img-size", type=int, default=640, help="Image size")
-    
+
     args = parser.parse_args()
-    
+
     # Create dataset config
     config_path = create_dataset_config(args.data_dir, args.classes)
-    
+
     # Train model
     train_model(config_path, args.epochs, args.batch_size, args.img_size)
 

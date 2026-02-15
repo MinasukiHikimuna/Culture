@@ -13,35 +13,35 @@ class FrameExtractor:
         self.base_dir = Path(base_dir)
         self.max_per_drive = max_per_drive
         self.drive_semaphores = {}
-        
+
         # Initialize dataset structure
         self.dataset = DatasetStructure(base_dir)
-        
+
     def process_scene(self, scene_id: str, scene_data: Dict):
         # Check if already processed
         if self.dataset.is_scene_processed(scene_id):
             print(f"Skipping {scene_id} - already processed")
             return
-        
+
         # Store scene metadata permanently
         with open(self.dataset.scene_data / f"{scene_id}.json", "w") as f:
             json.dump(scene_data, f, indent=2)
-        
+
         video_path = scene_data["video_path"]
         drive = os.path.splitdrive(video_path)[0].upper()
-        
+
         print(f"[{drive}] {scene_id}: Starting frame extraction...")
-        
+
         # Get/create semaphore for this drive
         if drive not in self.drive_semaphores:
             self.drive_semaphores[drive] = threading.Semaphore(self.max_per_drive)
-        
+
         with self.drive_semaphores[drive]:
             try:
                 # Move to extracting state
                 scene_dir = self.dataset.scenes[SceneState.EXTRACTING_FRAMES.value] / scene_id
                 os.makedirs(scene_dir, exist_ok=True)
-                
+
                 # Extract frames
                 (
                     ffmpeg
@@ -56,16 +56,16 @@ class FrameExtractor:
                     .overwrite_output()
                     .run(capture_stdout=True, capture_stderr=True)
                 )
-                
+
                 # Move to frames extracted state
                 target_dir = self.dataset.scenes[SceneState.FRAMES_EXTRACTED.value] / scene_id
                 shutil.move(str(scene_dir), str(target_dir))
-                
+
                 print(f"[{drive}] {scene_id}: Completed frame extraction")
-                
+
                 # Update scene state after successful processing
                 self.dataset.update_scene_state(scene_id, SceneState.FRAMES_EXTRACTED)
-                
+
             except Exception as e:
                 print(f"[{drive}] {scene_id}: Failed - {str(e)}")
                 # Move to failed state
@@ -84,19 +84,19 @@ class FrameExtractor:
                 pending_dir = self.dataset.scenes[SceneState.PENDING.value]
                 for json_file in pending_dir.glob("*.json"):
                     scene_id = json_file.stem
-                    
+
                     # Load scene data
                     with open(json_file, "r") as f:
                         scene_data = json.load(f)
-                    
+
                     # Process the scene
                     self.process_scene(scene_id, scene_data)
-                    
+
                     # Remove JSON file after processing
                     json_file.unlink()
-                
+
                 time.sleep(1)  # Wait before checking again
-                
+
             except KeyboardInterrupt:
                 print("Shutting down frame extractor")
                 break

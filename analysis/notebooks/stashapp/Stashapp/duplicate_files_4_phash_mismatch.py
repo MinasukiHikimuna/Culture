@@ -62,7 +62,7 @@ for scene in scenes_with_dupes:
         # Extract fingerprints
         oshash = next((fp["value"] for fp in file["fingerprints"] if fp["type"] == "oshash"), None)
         phash = next((fp["value"] for fp in file["fingerprints"] if fp["type"] == "phash"), None)
-        
+
         # Create a record for each file
         record = {
             "scene_id": scene["id"],
@@ -89,12 +89,12 @@ phash_mismatches = []
 for scene_id, group in files_df.group_by("scene_id"):
     # Get all files for this scene
     scene_files = group.to_dicts()
-    
+
     # Skip if durations don't match
     durations = set(file["duration"] for file in scene_files)
     if len(durations) > 1:
         continue
-        
+
     # Compare phashes
     has_mismatch = False
     for i, file1 in enumerate(scene_files):
@@ -124,13 +124,13 @@ print("\nScenes with matching durations but differing phash values (>8 bits diff
 for scene_id, group in results_df.group_by("scene_id"):
     scene_files = group.to_dicts()
     print(f"\nScene {scene_id} - {scene_files[0]['title']}")
-    
+
     for file in scene_files:
         primary_status = " (Primary)" if file["is_primary"] else ""
         print(f"  File{primary_status}: {file['file_path']}")
         print(f"    Duration: {file['duration']}s")
         print(f"    pHash: {file['phash']}")
-        
+
         if not file["is_primary"]:
             primary_file = next(f for f in scene_files if f["is_primary"])
             hamming_dist = hamming_distance_hex(primary_file["phash"], file["phash"])

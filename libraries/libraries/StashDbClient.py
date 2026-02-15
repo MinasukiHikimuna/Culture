@@ -303,7 +303,7 @@ class StashDbClient(StashboxClient):
         scenes_without_ids = [scene for scene in scenes if not scene.get("stashdb_id")]
         if scenes_without_ids:
             raise ValueError(f"All scenes must have StashDB IDs. Found {len(scenes_without_ids)} scenes without IDs.")
-        
+
         scene_ids = [scene["stashdb_id"] for scene in scenes]
         return self.query_scenes(scene_ids=scene_ids)
 
@@ -404,7 +404,7 @@ class StashDbClient(StashboxClient):
             }
         }
         """
-        
+
         variables = {
             "input": draft_input
         }
@@ -535,7 +535,7 @@ class StashDbClient(StashboxClient):
         """Transform raw GraphQL scene data into standardized format"""
         if not scene_data:
             return {"queried_phash": queried_phash} if queried_phash else {}
-        
+
         return {
             **({"queried_phash": queried_phash} if queried_phash else {}),
             "id": scene_data["id"],
@@ -684,7 +684,7 @@ class StashDbClient(StashboxClient):
             raise ValueError("Must provide either scene_ids or phashes")
 
         fragment = self._get_scene_fragment()
-        
+
         # Query scenes by ID
         scenes_by_id = {}
         if scene_ids:
@@ -695,7 +695,7 @@ class StashDbClient(StashboxClient):
                     }}
                 }}
             """
-            
+
             for scene_id in scene_ids:
                 result = self._gql_query(find_scene_query, {"id": scene_id})
                 if result and "data" in result and "findScene" in result["data"]:
@@ -711,11 +711,11 @@ class StashDbClient(StashboxClient):
                     }}
                 }}
             """
-            
+
             variables = {
                 "fingerprints": [{"algorithm": "PHASH", "hash": phash} for phash in phashes]
             }
-            
+
             result = self._gql_query(find_scenes_query, variables)
             if result and "data" in result and "findScenesByFullFingerprints" in result["data"]:
                 stashdb_scenes = result["data"]["findScenesByFullFingerprints"]
@@ -726,10 +726,10 @@ class StashDbClient(StashboxClient):
 
         # Transform results
         transformed_scenes = []
-        
+
         for scene_id, scene_data in scenes_by_id.items():
             transformed_scenes.append(self._transform_scene_data(scene_data))
-            
+
         for phash, scene_data in scenes_by_phash.items():
             transformed_scenes.append(self._transform_scene_data(scene_data, phash))
 

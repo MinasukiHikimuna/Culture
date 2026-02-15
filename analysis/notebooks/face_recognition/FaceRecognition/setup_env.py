@@ -16,7 +16,7 @@ def setup_cuda_paths():
     """Setup CUDA paths for Windows"""
     if os.name != "nt":  # Only for Windows
         return
-        
+
     # Common CUDA paths for version 12.8
     possible_cuda_paths = [
         # CUDA Toolkit paths
@@ -30,7 +30,7 @@ def setup_cuda_paths():
         "C:\\Windows\\System32\\DriverStore\\FileRepository\\nvgpu",
         os.path.expandvars("%CONDA_PREFIX%\\Library\\bin"),
     ]
-    
+
     # Add paths if they exist
     for path in possible_cuda_paths:
         if os.path.exists(path):
@@ -44,20 +44,20 @@ def setup_gpu():
     """Setup GPU configuration"""
     try:
         import tensorflow as tf
-        
+
         # Log TensorFlow version
         logger.info(f"TensorFlow version: {tf.__version__}")
-        
+
         # Get GPU devices
         gpus = tf.config.list_physical_devices("GPU")
         if not gpus:
             logger.warning("No GPU devices found!")
             return False
-            
+
         logger.info(f"Found {len(gpus)} GPU(s):")
         for gpu in gpus:
             logger.info(f"  {gpu}")
-            
+
         # Configure memory growth
         for gpu in gpus:
             try:
@@ -65,11 +65,11 @@ def setup_gpu():
                 logger.info(f"Enabled memory growth for {gpu}")
             except RuntimeError as e:
                 logger.warning(f"Error setting memory growth: {e}")
-                
+
         # Enable mixed precision
         tf.keras.mixed_precision.set_global_policy("mixed_float16")
         logger.info("Enabled mixed precision training")
-        
+
         # Test GPU computation
         logger.info("Testing GPU computation...")
         with tf.device("/GPU:0"):
@@ -82,9 +82,9 @@ def setup_gpu():
             _ = c.numpy()
             end_time = time.time()
             logger.info(f"GPU matrix multiplication test completed in {end_time - start_time:.3f} seconds")
-        
+
         return True
-        
+
     except Exception as e:
         logger.error(f"Error setting up GPU: {e}")
         logger.error("Full exception:", exc_info=True)
@@ -102,18 +102,18 @@ else:
 if __name__ == "__main__":
     # Additional diagnostics when run directly
     import tensorflow as tf
-    
+
     print("\nSystem Information:")
     print(f"Python version: {sys.version}")
     print(f"OS: {os.name}")
     print(f"TensorFlow version: {tf.__version__}")
-    
+
     print("\nGPU Information:")
     gpus = tf.config.list_physical_devices("GPU")
     print(f"Number of GPUs available: {len(gpus)}")
     for gpu in gpus:
         print(f"GPU device: {gpu}")
-    
+
     print("\nEnvironment Variables:")
     relevant_vars = [
         "CUDA_PATH",
@@ -122,7 +122,7 @@ if __name__ == "__main__":
         "LD_LIBRARY_PATH",
         "PYTHONPATH"
     ]
-    
+
     for var in relevant_vars:
         value = os.environ.get(var, "Not set")
         if var == "PATH":

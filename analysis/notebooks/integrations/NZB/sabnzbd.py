@@ -37,11 +37,11 @@ class SABnzbdClient:
         try:
             response = requests.get(f"{self.host}/api", params=params)
             response.raise_for_status()
-            
+
             # SABnzbd might return empty response for success
             if not response.text:
                 return {"status": True, "error": "No nzo_id returned"}
-                
+
             try:
                 result = response.json()
                 # SABnzbd returns different response formats
@@ -63,7 +63,7 @@ class SABnzbdClient:
                     "status": True,
                     "error": "Invalid JSON response"
                 }
-                
+
         except Exception as e:
             print(f"Error adding NZB to SABnzbd: {e}")
             print(f"Response content: {response.text if 'response' in locals() else 'No response'}")
@@ -93,7 +93,7 @@ class SABnzbdClient:
             response = requests.get(f"{self.host}/api", params=params)
             response.raise_for_status()
             data = response.json()
-            
+
             # Find the specific queue item
             if "queue" in data and "slots" in data["queue"]:
                 for item in data["queue"]["slots"]:
@@ -125,7 +125,7 @@ class SABnzbdClient:
             response = requests.get(f"{self.host}/api", params=params)
             response.raise_for_status()
             data = response.json()
-            
+
             # Find the specific history item
             if "history" in data and "slots" in data["history"]:
                 for item in data["history"]["slots"]:
@@ -149,7 +149,7 @@ class SABnzbdClient:
             dict: Download details including status and path information
         """
         start_time = time.time()
-        
+
         while time.time() - start_time < timeout:
             # Check queue first
             queue_item = self.get_queue_details(nzo_id)
@@ -159,7 +159,7 @@ class SABnzbdClient:
                 # Still in queue, wait and check again
                 time.sleep(check_interval)
                 continue
-                
+
             # Not in queue, check history
             history_item = self.get_history_details(nzo_id)
             if history_item:
@@ -175,8 +175,8 @@ class SABnzbdClient:
                     }
                 elif status == "failed":
                     return {"status": "failed", "error": history_item.get("fail_message", "Unknown error")}
-                    
+
             # Not found in either queue or history
             time.sleep(check_interval)
-            
+
         return {"status": "timeout", "error": f"Download did not complete within {timeout} seconds"} 
