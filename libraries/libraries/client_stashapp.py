@@ -2,8 +2,8 @@ import os
 from datetime import datetime
 
 import polars as pl
-from stashapi import log
 from dotenv import load_dotenv
+from stashapi import log
 from stashapi.stashapp import StashInterface
 
 
