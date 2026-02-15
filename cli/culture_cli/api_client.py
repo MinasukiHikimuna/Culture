@@ -144,6 +144,51 @@ class CultureAPIClient:
         response.raise_for_status()
         return response.json()
 
+    def get_download_summary(
+        self,
+        site: str,
+        downloads: str = "all",
+        has_file: str | None = None,
+        missing_file: str | None = None,
+        has_content: str | None = None,
+        missing_content: str | None = None,
+        limit: int | None = None,
+        desc: bool = False,
+    ) -> list[dict]:
+        """Get per-release download summary for a site.
+
+        Args:
+            site: Site identifier (UUID, short_name, or name)
+            downloads: Basic filter: 'all' (default) or 'none'
+            has_file: Filter to releases with this file_type
+            missing_file: Filter to releases missing this file_type
+            has_content: Filter to releases with this content_type
+            missing_content: Filter to releases missing this content_type
+            limit: Optional limit on number of results
+            desc: Sort by release date descending (newest first)
+
+        Returns:
+            List of release download summary dictionaries
+        """
+        params: dict[str, str | int] = {"site": site}
+        if downloads != "all":
+            params["downloads"] = downloads
+        if has_file is not None:
+            params["has_file"] = has_file
+        if missing_file is not None:
+            params["missing_file"] = missing_file
+        if has_content is not None:
+            params["has_content"] = has_content
+        if missing_content is not None:
+            params["missing_content"] = missing_content
+        if limit is not None:
+            params["limit"] = limit
+        if desc:
+            params["desc"] = "true"
+        response = self.client.get("/downloads", params=params)
+        response.raise_for_status()
+        return response.json()
+
     def get_release(self, uuid: str) -> dict:
         """Get detailed information about a specific release.
 

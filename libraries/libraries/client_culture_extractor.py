@@ -245,6 +245,90 @@ class ClientCultureExtractor:
                 site_uuid=site_uuid,
             )
 
+    def get_release_download_summary(self, site_uuid: str) -> pl.DataFrame:
+        """Get download summary per release for a site.
+
+        Returns a lightweight DataFrame with release info and aggregated download
+        counts/types, suitable for listing download status across all releases.
+
+        Args:
+            site_uuid: UUID of the site
+
+        Returns:
+            DataFrame with release info and download counts/types per release
+        """
+        with self.connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT name, uuid
+                FROM sites
+                WHERE uuid = %s
+                """,
+                (site_uuid,),
+            )
+            site_row = cursor.fetchone()
+            if not site_row:
+                return pl.DataFrame()
+            site_name = site_row[0]
+
+            cursor.execute(
+                """
+                SELECT
+                    r.uuid,
+                    NULLIF(r.release_date, '-infinity') as release_date,
+                    r.short_name,
+                    r.name,
+                    r.site_uuid,
+                    COUNT(d.uuid) as download_count,
+                    string_agg(DISTINCT d.file_type, ',' ORDER BY d.file_type)
+                        as download_file_types,
+                    string_agg(DISTINCT d.content_type, ',' ORDER BY d.content_type)
+                        as download_content_types,
+                    string_agg(
+                        DISTINCT d.file_type || '/' || d.content_type, ', '
+                        ORDER BY d.file_type || '/' || d.content_type
+                    ) as download_type_pairs
+                FROM releases r
+                LEFT JOIN downloads d ON d.release_uuid = r.uuid
+                WHERE r.site_uuid = %s
+                GROUP BY r.uuid, r.release_date, r.short_name, r.name, r.site_uuid
+                """,
+                (site_uuid,),
+            )
+            rows = cursor.fetchall()
+
+            releases = []
+            for row in rows:
+                releases.append(
+                    {
+                        "ce_site_uuid": str(site_uuid),
+                        "ce_site_name": site_name,
+                        "ce_release_uuid": str(row[0]),
+                        "ce_release_date": row[1],
+                        "ce_release_short_name": row[2],
+                        "ce_release_name": row[3],
+                        "ce_release_download_count": row[5],
+                        "ce_release_download_file_types": row[6],
+                        "ce_release_download_content_types": row[7],
+                        "ce_release_download_type_pairs": row[8],
+                    }
+                )
+
+            schema = {
+                "ce_site_uuid": pl.Utf8,
+                "ce_site_name": pl.Utf8,
+                "ce_release_uuid": pl.Utf8,
+                "ce_release_date": pl.Date,
+                "ce_release_short_name": pl.Utf8,
+                "ce_release_name": pl.Utf8,
+                "ce_release_download_count": pl.Int64,
+                "ce_release_download_file_types": pl.Utf8,
+                "ce_release_download_content_types": pl.Utf8,
+                "ce_release_download_type_pairs": pl.Utf8,
+            }
+
+            return pl.DataFrame(releases, schema=schema)
+
     def _get_releases_by_query(
         self, cursor, where_clause: str, params: tuple, site_name: str, site_uuid: str
     ) -> pl.DataFrame:

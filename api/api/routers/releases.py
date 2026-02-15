@@ -7,6 +7,7 @@ from fastapi.responses import FileResponse
 
 from api.config import get_metadata_base_path
 from api.dependencies import get_ce_client
+from api.routers.utils import resolve_site
 from api.schemas.releases import (
     DeletedDownload,
     DeleteReleaseResponse,
@@ -50,7 +51,7 @@ def list_releases(
     ] = False,
 ) -> list[Release]:
     """List releases for a site with optional filtering."""
-    site_uuid, _site_name = _resolve_site(client, site)
+    site_uuid, _site_name = resolve_site(client, site)
     tag_uuid = _resolve_tag(client, site_uuid, tag) if tag else None
     performer_uuid = _resolve_performer(client, site_uuid, performer) if performer else None
 
@@ -112,20 +113,6 @@ def get_release_thumbnail(
         filename=saved_filename,
     )
 
-
-def _resolve_site(client: ClientCultureExtractor, site: str) -> tuple[str, str]:
-    """Resolve site identifier to UUID and name."""
-    sites_df = client.get_sites()
-    site_match = sites_df.filter(
-        (sites_df["ce_sites_short_name"] == site)
-        | (sites_df["ce_sites_uuid"] == site)
-        | (sites_df["ce_sites_name"] == site)
-    )
-
-    if site_match.is_empty():
-        raise HTTPException(status_code=404, detail=f"Site '{site}' not found")
-
-    return site_match["ce_sites_uuid"][0], site_match["ce_sites_name"][0]
 
 
 def _resolve_tag(client: ClientCultureExtractor, site_uuid: str, tag: str) -> str:

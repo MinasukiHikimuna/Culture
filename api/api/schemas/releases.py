@@ -22,6 +22,27 @@ class Release(BaseModel):
     ce_release_json_document: str | None = Field(default=None, description="Raw JSON document")
 
 
+class ReleaseDownloadSummary(BaseModel):
+    """Per-release download summary for the downloads list endpoint."""
+
+    ce_site_uuid: str = Field(description="Site UUID")
+    ce_site_name: str = Field(description="Site name")
+    ce_release_uuid: str = Field(description="Release UUID")
+    ce_release_date: date | None = Field(description="Release date")
+    ce_release_short_name: str = Field(description="Short name identifier")
+    ce_release_name: str = Field(description="Release title")
+    ce_release_download_count: int = Field(description="Number of downloaded files")
+    ce_release_download_file_types: str | None = Field(
+        default=None, description="Comma-separated distinct file types with downloads"
+    )
+    ce_release_download_content_types: str | None = Field(
+        default=None, description="Comma-separated distinct content types with downloads"
+    )
+    ce_release_download_type_pairs: str | None = Field(
+        default=None, description="Distinct file_type/content_type pairs (e.g. 'video/scene, image/cover')"
+    )
+
+
 class ReleaseExternalId(BaseModel):
     """External ID mapping for a release."""
 

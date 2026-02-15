@@ -101,6 +101,81 @@ def format_releases_table_from_list(releases: list[dict], site_name: str | None 
     return table
 
 
+def format_download_summary_table(
+    summaries: list[dict], site_name: str | None = None
+) -> Table:
+    """Format per-release download summary as a Rich table.
+
+    Args:
+        summaries: List of release download summary dictionaries
+        site_name: Optional site name for table title
+
+    Returns:
+        Rich Table object ready for display
+    """
+    title = f"Download status for {site_name}" if site_name else "Download status"
+    table = Table(title=title, show_header=True, header_style="bold cyan", expand=False)
+
+    table.add_column("Date", style="dim")
+    table.add_column("Name", style="green")
+    table.add_column("Short Name", style="yellow")
+    table.add_column("Downloads", justify="right")
+
+    for row in summaries:
+        release_date = str(row.get("ce_release_date", "")) or "-"
+        release_name = str(row.get("ce_release_name", "")) or "-"
+        release_short_name = str(row.get("ce_release_short_name", "")) or "-"
+
+        if release_name != "-" and len(release_name) > 50:
+            release_name = release_name[:47] + "..."
+
+        download_count = row.get("ce_release_download_count", 0)
+        type_pairs = row.get("ce_release_download_type_pairs")
+        if download_count > 0 and type_pairs:
+            downloads_cell = f"[bold]{download_count}[/bold] ({type_pairs})"
+        elif download_count > 0:
+            downloads_cell = f"[bold]{download_count}[/bold]"
+        else:
+            downloads_cell = "[dim]\u2014[/dim]"
+
+        table.add_row(
+            release_date,
+            release_name,
+            release_short_name,
+            downloads_cell,
+        )
+
+    return table
+
+
+def format_download_type_summary(summaries: list[dict]) -> str:
+    """Build a summary string of all distinct file_types and content_types across results.
+
+    Args:
+        summaries: List of release download summary dictionaries
+
+    Returns:
+        Formatted summary string
+    """
+    file_types: set[str] = set()
+    content_types: set[str] = set()
+
+    for row in summaries:
+        ft = row.get("ce_release_download_file_types")
+        if ft:
+            file_types.update(t.strip() for t in ft.split(","))
+        ct = row.get("ce_release_download_content_types")
+        if ct:
+            content_types.update(t.strip() for t in ct.split(","))
+
+    lines = []
+    if file_types:
+        lines.append(f"File types: {', '.join(sorted(file_types))}")
+    if content_types:
+        lines.append(f"Content types: {', '.join(sorted(content_types))}")
+    return "\n".join(lines)
+
+
 def format_release_detail(release_df: pl.DataFrame, external_ids: dict | None = None) -> str:
     """Format a single release as detailed text view.
 
