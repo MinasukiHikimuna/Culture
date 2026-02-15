@@ -41,7 +41,7 @@ class PostgresPipeline:
     def process_item(self, item, spider):
         if isinstance(item, ReleaseAndDownloadsItem):
             return self.process_release_and_downloads(item, spider)
-        elif isinstance(item, ReleaseItem):
+        if isinstance(item, ReleaseItem):
             try:
                 site = self.session.query(Site).filter_by(uuid=item.site_uuid).first()
                 if not site:
@@ -147,7 +147,7 @@ class PostgresPipeline:
                 raise
 
             return defer.succeed(item)
-        elif isinstance(item, DownloadedFileItem):
+        if isinstance(item, DownloadedFileItem):
             try:
                 spider.logger.info(
                     "[PostgresPipeline] Processing DownloadedFileItem: %s",
@@ -390,10 +390,9 @@ class BaseDownloadPipeline:
         try:
             if file_type == "video":
                 return self.process_video_metadata(file_path)
-            elif file_type == "audio":
+            if file_type == "audio":
                 return self.process_audio_metadata(file_path)
-            else:
-                return self.process_generic_metadata(file_path, file_type)
+            return self.process_generic_metadata(file_path, file_type)
         except Exception as e:
             return {"error": f"Failed to process metadata: {e!s}"}
 
@@ -555,11 +554,10 @@ class AvailableFilesPipeline(BaseDownloadPipeline, FilesPipeline):
                         },
                     )
                 ]
-            else:
-                spider.logger.info(
-                    "[AvailableFilesPipeline] File already exists, skipping download: %s",
-                    full_path,
-                )
+            spider.logger.info(
+                "[AvailableFilesPipeline] File already exists, skipping download: %s",
+                full_path,
+            )
         return []
 
     def item_completed(self, results, item, info):
@@ -595,10 +593,9 @@ class AvailableFilesPipeline(BaseDownloadPipeline, FilesPipeline):
                 full_path = str(Path(self.store_uri) / file_paths[0])
                 spider.logger.info("[AvailableFilesPipeline] Processing file: %s", full_path)
                 return self.create_downloaded_item_from_path(item, file_paths[0], spider)
-            else:
-                spider.logger.warning(
-                    "[AvailableFilesPipeline] No successful downloads for URL: %s", item["url"]
-                )
+            spider.logger.warning(
+                "[AvailableFilesPipeline] No successful downloads for URL: %s", item["url"]
+            )
         return item
 
 
@@ -678,11 +675,10 @@ class M3u8DownloadPipeline(BaseDownloadPipeline):
                 # Convert full path back to relative path for create_downloaded_item_from_path
                 relative_path = os.path.relpath(actual_path, self.store_uri)
                 return self.create_downloaded_item_from_path(item, relative_path, spider)
-            else:
-                spider.logger.error("[M3u8DownloadPipeline] Download failed: %s", item["url"])
-                from scrapy.exceptions import DropItem
+            spider.logger.error("[M3u8DownloadPipeline] Download failed: %s", item["url"])
+            from scrapy.exceptions import DropItem
 
-                raise DropItem(f"M3U8 download failed: {item['url']}")
+            raise DropItem(f"M3U8 download failed: {item['url']}")
 
         return item
 
@@ -829,30 +825,29 @@ class M3u8DownloadPipeline(BaseDownloadPipeline):
                         file_size / (1024 * 1024),
                     )
                     return output_path
-                else:
-                    # Get any remaining stderr output
-                    stderr_output = process.stderr.read()
+                # Get any remaining stderr output
+                stderr_output = process.stderr.read()
+                spider.logger.error(
+                    "[M3u8DownloadPipeline] yt-dlp failed with return code %s (attempt %d): %s",
+                    return_code,
+                    attempt + 1,
+                    stderr_output,
+                )
+
+                # Clean up partial file
+                if Path(output_path).exists():
+                    try:
+                        Path(output_path).unlink()
+                        spider.logger.info("[M3u8DownloadPipeline] Cleaned up partial file")
+                    except OSError:
+                        pass
+
+                # Don't retry on certain permanent failures
+                if return_code in [1, 2] and "not available" in stderr_output.lower():
                     spider.logger.error(
-                        "[M3u8DownloadPipeline] yt-dlp failed with return code %s (attempt %d): %s",
-                        return_code,
-                        attempt + 1,
-                        stderr_output,
+                        "[M3u8DownloadPipeline] Permanent failure, not retrying"
                     )
-
-                    # Clean up partial file
-                    if Path(output_path).exists():
-                        try:
-                            Path(output_path).unlink()
-                            spider.logger.info("[M3u8DownloadPipeline] Cleaned up partial file")
-                        except OSError:
-                            pass
-
-                    # Don't retry on certain permanent failures
-                    if return_code in [1, 2] and "not available" in stderr_output.lower():
-                        spider.logger.error(
-                            "[M3u8DownloadPipeline] Permanent failure, not retrying"
-                        )
-                        break
+                    break
 
             except subprocess.TimeoutExpired:
                 spider.logger.error(
@@ -1029,11 +1024,10 @@ class FfmpegDownloadPipeline(BaseDownloadPipeline):
                 # Convert full path back to relative path for create_downloaded_item_from_path
                 relative_path = os.path.relpath(actual_path, self.store_uri)
                 return self.create_downloaded_item_from_path(item, relative_path, spider)
-            else:
-                spider.logger.error("[FfmpegDownloadPipeline] Download failed: %s", item["url"])
-                from scrapy.exceptions import DropItem
+            spider.logger.error("[FfmpegDownloadPipeline] Download failed: %s", item["url"])
+            from scrapy.exceptions import DropItem
 
-                raise DropItem(f"FFmpeg download failed: {item['url']}")
+            raise DropItem(f"FFmpeg download failed: {item['url']}")
 
         return item
 
@@ -1098,15 +1092,14 @@ class FfmpegDownloadPipeline(BaseDownloadPipeline):
                     "[FfmpegDownloadPipeline] ffmpeg download successful: %s", output_path
                 )
                 return output_path
-            else:
-                # Get any remaining stderr output
-                remaining_stderr = process.stderr.read()
-                spider.logger.error(
-                    "[FfmpegDownloadPipeline] ffmpeg failed with return code %s: %s",
-                    return_code,
-                    remaining_stderr,
-                )
-                return False
+            # Get any remaining stderr output
+            remaining_stderr = process.stderr.read()
+            spider.logger.error(
+                "[FfmpegDownloadPipeline] ffmpeg failed with return code %s: %s",
+                return_code,
+                remaining_stderr,
+            )
+            return False
 
         except subprocess.TimeoutExpired:
             spider.logger.error("[FfmpegDownloadPipeline] ffmpeg download timed out for: %s", url)
@@ -1192,11 +1185,10 @@ class Aria2DownloadPipeline(BaseDownloadPipeline):
                     full_path,
                 )
                 return self.create_downloaded_item_from_path(item, file_path, spider)
-            else:
-                self.logger.error("[Aria2DownloadPipeline] Download failed: %s", item["url"])
-                from scrapy.exceptions import DropItem
+            self.logger.error("[Aria2DownloadPipeline] Download failed: %s", item["url"])
+            from scrapy.exceptions import DropItem
 
-                raise DropItem(f"aria2c download failed: {item['url']}")
+            raise DropItem(f"aria2c download failed: {item['url']}")
 
         return item
 
@@ -1292,21 +1284,20 @@ class Aria2DownloadPipeline(BaseDownloadPipeline):
                     file_size / (1024 * 1024),
                 )
                 return True
-            else:
-                self.logger.error(
-                    "[Aria2DownloadPipeline] aria2c failed with return code %s",
-                    return_code,
-                )
+            self.logger.error(
+                "[Aria2DownloadPipeline] aria2c failed with return code %s",
+                return_code,
+            )
 
-                # Clean up partial file if exists
-                if Path(output_path).exists():
-                    try:
-                        Path(output_path).unlink()
-                        self.logger.info("[Aria2DownloadPipeline] Cleaned up partial file")
-                    except OSError:
-                        pass
+            # Clean up partial file if exists
+            if Path(output_path).exists():
+                try:
+                    Path(output_path).unlink()
+                    self.logger.info("[Aria2DownloadPipeline] Cleaned up partial file")
+                except OSError:
+                    pass
 
-                return False
+            return False
 
         except subprocess.TimeoutExpired:
             self.logger.error("[Aria2DownloadPipeline] aria2c download timed out for: %s", url)

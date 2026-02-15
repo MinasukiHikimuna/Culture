@@ -434,10 +434,9 @@ class WowGirlsSpider(scrapy.Spider):
         existing = self.existing_releases.get(short_name)
         if existing and not self.force_update:
             return "exists", f"  [EXISTS] {title} [{content_type}]"
-        elif existing and self.force_update:
+        if existing and self.force_update:
             return "forced", f"  [FORCED] {title} [{content_type}]"
-        else:
-            return "new", f"  [NEW]    {title} [{content_type}]"
+        return "new", f"  [NEW]    {title} [{content_type}]"
 
     def _log_page_summary(self, page_type, page_num, new_count, forced_count, exists_count, lines):
         """Log a summary of releases found on a page."""

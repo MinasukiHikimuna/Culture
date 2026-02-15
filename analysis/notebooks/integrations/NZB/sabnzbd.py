@@ -53,7 +53,7 @@ class SABnzbdClient:
                             "status": True,
                             "nzo_id": result["nzo_ids"][0]
                         }
-                    elif "error" in result:
+                    if "error" in result:
                         return {
                             "status": False,
                             "error": result["error"]
@@ -175,7 +175,7 @@ class SABnzbdClient:
                         "size": history_item.get("size", ""),
                         "category": history_item.get("category", "")
                     }
-                elif status == "failed":
+                if status == "failed":
                     return {"status": "failed", "error": history_item.get("fail_message", "Unknown error")}
 
             # Not found in either queue or history

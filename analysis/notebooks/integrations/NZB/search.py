@@ -584,17 +584,15 @@ class NZBSearch:
         """
         if isinstance(query_or_queries, str):
             return self.search_single(query_or_queries)
-        elif isinstance(query_or_queries, list):
+        if isinstance(query_or_queries, list):
             if all(isinstance(x, str) for x in query_or_queries):
                 # Single list of fallback queries
                 return self.search_multiple([query_or_queries])
-            else:
-                # List of lists of fallback queries
-                return self.search_multiple(query_or_queries)
-        else:
-            raise ValueError(
-                "Query must be a string or list of strings or list of lists of strings"
-            )
+            # List of lists of fallback queries
+            return self.search_multiple(query_or_queries)
+        raise ValueError(
+            "Query must be a string or list of strings or list of lists of strings"
+        )
 
     def _search_implementation(self, query: str) -> pl.DataFrame:
         """Internal method containing the original search implementation"""

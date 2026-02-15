@@ -51,11 +51,10 @@ class StashDbClient(StashboxClient):
                 and len(performer_data["images"]) > 0
             ):
                 return performer_data["images"][0]["url"]
-            else:
-                logger.error(
-                    f"No image found for performer with Stash ID {performer_stash_id}."
-                )
-                return None
+            logger.error(
+                f"No image found for performer with Stash ID {performer_stash_id}."
+            )
+            return None
 
         logger.error(f"Failed to query performer with Stash ID {performer_stash_id}.")
         return None
@@ -81,11 +80,10 @@ class StashDbClient(StashboxClient):
                 and len(performer_data["images"]) > 0
             ):
                 return [image["url"] for image in performer_data["images"]]
-            else:
-                logger.error(
-                    f"No images found for performer with Stash ID {performer_stash_id}."
-                )
-                return None
+            logger.error(
+                f"No images found for performer with Stash ID {performer_stash_id}."
+            )
+            return None
 
         logger.error(f"Failed to query performer with Stash ID {performer_stash_id}.")
         return None
@@ -111,11 +109,10 @@ class StashDbClient(StashboxClient):
                 and len(performer_data["images"]) > 0
             ):
                 return performer_data["images"][0]["url"]
-            else:
-                logger.error(
-                    f"No image found for studio with Stash ID {performer_stash_id}."
-                )
-                return None
+            logger.error(
+                f"No image found for studio with Stash ID {performer_stash_id}."
+            )
+            return None
 
         logger.error(f"Failed to query studio with Stash ID {performer_stash_id}.")
         return None
@@ -423,11 +420,10 @@ class StashDbClient(StashboxClient):
         )
         if response.status_code == 200:
             return response.json()
-        else:
-            logger.error(
-                f"Query failed with status code {response.status_code}: {response.text}"
-            )
-            return None
+        logger.error(
+            f"Query failed with status code {response.status_code}: {response.text}"
+        )
+        return None
 
     def _get_scene_fragment(self):
         """Returns the GraphQL fragment for querying scene data"""

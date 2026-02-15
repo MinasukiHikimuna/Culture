@@ -76,9 +76,8 @@ def inject_data_to_window(
         if "result" in result and "exceptionDetails" not in result["result"]:
             print(f"Successfully injected data into window.{namespace}")
             return True
-        else:
-            print(f"Failed to inject data: {result}")
-            return False
+        print(f"Failed to inject data: {result}")
+        return False
 
     except Exception as e:
         print(f"Exception while injecting data: {e!s}")

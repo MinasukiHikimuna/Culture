@@ -160,7 +160,7 @@ class StashfaceAPIClient:
                                     "raw_response": data  # Include full response for debugging
                                 }
                             }
-                        elif data.get("msg") == "process_starts":
+                        if data.get("msg") == "process_starts":
                             continue
                         elif data.get("msg") == "estimation":
                             continue

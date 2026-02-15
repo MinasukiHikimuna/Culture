@@ -257,12 +257,11 @@ def format_type_ref(type_ref: dict) -> str:
 
     if kind == "NON_NULL":
         return f"{format_type_ref(of_type)}!"
-    elif kind == "LIST":
+    if kind == "LIST":
         return f"[{format_type_ref(of_type)}]"
-    elif name:
+    if name:
         return name
-    else:
-        return "Unknown"
+    return "Unknown"
 
 
 def print_types(types: list[dict], verbose: bool = False):

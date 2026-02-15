@@ -702,11 +702,10 @@ class PatreonSpider(scrapy.Spider):
                 if existing_url:
                     # Same hash = same image, skip duplicate
                     return False
-                else:
-                    # New hash, add to tracking
-                    url_to_hash[unique_hash] = url
-                    # Update variant to include hash for unique filenames
-                    media_item["variant"] = f"{media_item['variant']}-{unique_hash[:8]}"
+                # New hash, add to tracking
+                url_to_hash[unique_hash] = url
+                # Update variant to include hash for unique filenames
+                media_item["variant"] = f"{media_item['variant']}-{unique_hash[:8]}"
             else:
                 # No hash found, use URL as fallback
                 if url in seen_urls:
