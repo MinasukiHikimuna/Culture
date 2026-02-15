@@ -104,7 +104,7 @@ class NZBSearch:
 
             if category_name and subcat_name:
                 return f"{category_name}/{subcat_name}"
-        except (ValueError, IndexError) as e:
+        except (ValueError, IndexError):
             pass
         return str(cat_id)
 

@@ -70,7 +70,7 @@ def select_best_quality_file(files):
                 "is_primary": files.index(file) == 0  # Mark if this is the primary file
             }
             files_data.append(file_dict)
-        except Exception as e:
+        except Exception:
             continue
 
     if not files_data:
