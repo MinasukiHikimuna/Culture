@@ -292,9 +292,9 @@ class FaceDatasetBuilder:
             shutil.move(scene_frames_dir, scene_faces_dir)
 
             # Process frames and detect faces
-            frame_files = sorted([str(Path(scene_faces_dir) / f)
-                                for f in os.listdir(scene_faces_dir)
-                                if f.endswith(".jpg")])
+            frame_files = sorted([str(f)
+                                for f in Path(scene_faces_dir).iterdir()
+                                if f.suffix == ".jpg"])
 
             # Create unverified directory structure
             scene_unverified_dir = str(Path(self.structure["scenes"][SceneState.FACES_EXTRACTED.value]) / scene_id)
@@ -442,12 +442,12 @@ class FaceDatasetBuilder:
         scene_dir = str(Path(self.structure["scenes"][current_status]) / scene_id)
 
         # Process each face in the scene directory
-        for face_file in os.listdir(scene_dir):
-            if not face_file.endswith(".jpg"):
+        for face_path in Path(scene_dir).iterdir():
+            if face_path.suffix != ".jpg":
                 continue
 
             # Update metadata
-            face_id = os.path.splitext(face_file)[0]
+            face_id = face_path.stem
             if face_id in self.metadata["face_entries"]:
                 self.metadata["verification_status"][face_id] = "verified"
 
@@ -464,18 +464,16 @@ class FaceDatasetBuilder:
 
         if performer_id:
             # Find specific performer directory
-            for dir_name in os.listdir(verified_base):
-                if dir_name.startswith(performer_id):
-                    dir_path = str(Path(verified_base) / dir_name)
-                    face_count = len([f for f in os.listdir(dir_path) if f.endswith(".jpg")])
-                    counts[dir_name] = face_count
+            for dir_entry in Path(verified_base).iterdir():
+                if dir_entry.name.startswith(performer_id):
+                    face_count = len([f for f in dir_entry.iterdir() if f.suffix == ".jpg"])
+                    counts[dir_entry.name] = face_count
                     break
         else:
             # Count for all performers
-            for dir_name in os.listdir(verified_base):
-                dir_path = str(Path(verified_base) / dir_name)
-                if os.path.isdir(dir_path):
-                    face_count = len([f for f in os.listdir(dir_path) if f.endswith(".jpg")])
-                    counts[dir_name] = face_count
+            for dir_entry in Path(verified_base).iterdir():
+                if dir_entry.is_dir():
+                    face_count = len([f for f in dir_entry.iterdir() if f.suffix == ".jpg"])
+                    counts[dir_entry.name] = face_count
 
         return counts

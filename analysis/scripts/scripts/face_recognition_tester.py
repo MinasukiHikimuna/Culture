@@ -268,12 +268,12 @@ def test_directory(model_path, dir_path, top_k=3):
     recognizer = FaceRecognizer(model_path)
 
     # Test all images in directory
-    for image_file in sorted(os.listdir(dir_path)):
-        if image_file.lower().endswith((".png", ".jpg", ".jpeg")):
-            image_path = str(Path(dir_path) / image_file)
+    for image_path_obj in sorted(Path(dir_path).iterdir()):
+        if image_path_obj.suffix.lower() in {".png", ".jpg", ".jpeg"}:
+            image_path = str(image_path_obj)
             predictions = recognizer.predict(image_path, top_k=top_k)
 
-            print(f"\nPredictions for {image_file}:")
+            print(f"\nPredictions for {image_path_obj.name}:")
             for performer, confidence in predictions:
                 print(f"{performer}: {confidence*100:.2f}%")
 

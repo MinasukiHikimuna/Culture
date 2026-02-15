@@ -55,7 +55,7 @@ def prepare_scenes_for_performer(performer_name: str, base_dir: str, exclude_vr:
     base_path = Path(base_dir) / "scenes"
     for state_dir in base_path.glob("*"):
         if state_dir.is_dir():
-            processed_scenes.update(os.listdir(state_dir))
+            processed_scenes.update(p.name for p in state_dir.iterdir())
 
     # Filter out processed scenes
     unprocessed_scenes = scenes.filter(
