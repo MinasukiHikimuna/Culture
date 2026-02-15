@@ -15,12 +15,12 @@ TAG_NAME = "Completionist"
 
 
 def connect():
-    scheme = os.getenv("STASHAPP_SCHEME")
-    host = os.getenv("STASHAPP_HOST")
-    port = int(os.getenv("STASHAPP_PORT", "443"))
-    api_key = os.getenv("STASHAPP_API_KEY")
+    scheme = os.getenv("MAIN_STASHAPP_SCHEME")
+    host = os.getenv("MAIN_STASHAPP_HOST")
+    port = int(os.getenv("MAIN_STASHAPP_PORT", "443"))
+    api_key = os.getenv("MAIN_STASHAPP_API_KEY")
     if not host or not api_key:
-        print("STASHAPP_HOST and STASHAPP_API_KEY must be set in .env")
+        print("MAIN_STASHAPP_HOST and MAIN_STASHAPP_API_KEY must be set in .env")
         sys.exit(1)
     return StashInterface({"scheme": scheme, "host": host, "port": port, "apikey": api_key})
 
