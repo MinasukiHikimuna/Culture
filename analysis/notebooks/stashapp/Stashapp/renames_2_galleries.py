@@ -161,10 +161,10 @@ for row in gallery_renames_df.iter_rows(named=True):
         continue
 
     # Attempt to move the file if the old path is a file and the new path does not exist
-    if os.path.isfile(old_path):
+    if Path(old_path).is_file():
         if not Path(new_path).exists():
             try:
-                os.rename(old_path, new_path)
+                Path(old_path).rename(new_path)
                 print(f"Rename file:\n{old_path}\n{new_path}\n")
                 galleries_success_rows.append(row)
             except Exception as e:
