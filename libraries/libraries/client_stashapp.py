@@ -1225,7 +1225,7 @@ class StashAppClient:
             tag = tag_lookup.get(tag_name)
             if not tag:
                 print(f"Warning: Tag '{tag_name}' not found")
-                return {scene_id: False for scene_id in scene_ids}
+                return dict.fromkeys(scene_ids, False)
             add_tags.append(tag)
 
         # Create set of tags to remove
