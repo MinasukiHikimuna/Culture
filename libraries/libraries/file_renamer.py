@@ -175,7 +175,7 @@ def get_suffix(primary_file_basename: str) -> str:
     if primary_file_basename is None:
         return None
 
-    file_suffix = os.path.splitext(primary_file_basename)[1]
+    file_suffix = Path(primary_file_basename).suffix
     return file_suffix
 
 def get_studio_value(studio: Optional[dict]) -> str:

@@ -279,7 +279,7 @@ class BaseDownloadPipeline:
                 formatted_site_name = f"{site_name}꞉ {release.sub_site.name}"
             # Extract file extension from the URL or use original filename from json_document
             url_path = urlparse(file_info["url"]).path
-            file_extension = os.path.splitext(url_path)[1]
+            file_extension = Path(url_path).suffix
 
             # Convert .m3u8 to .mp4 since ffmpeg downloads HLS streams as MP4
             if file_extension == ".m3u8":
@@ -1400,7 +1400,7 @@ class PerformerImagePipeline:
         path = parsed.path
         # Remove query parameters
         path = path.split("?")[0]
-        ext = os.path.splitext(path)[1]
+        ext = Path(path).suffix
         return ext if ext else ".jpg"
 
     def _download_image(self, url, filepath, spider):
@@ -1490,7 +1490,7 @@ class StashDbImagePipeline:
         parsed = urlparse(url)
         path = parsed.path
         path = path.split("?")[0]
-        ext = os.path.splitext(path)[1]
+        ext = Path(path).suffix
         return ext if ext else ".jpg"
 
     def _download_image(self, url, filepath):

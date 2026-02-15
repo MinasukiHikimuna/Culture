@@ -377,7 +377,7 @@ class FaceDatasetBuilder:
         shutil.move(face_path, rejected_path)
 
         # Update metadata
-        face_id = os.path.splitext(face_filename)[0]
+        face_id = Path(face_filename).stem
         if face_id in self.metadata["verification_status"]:
             self.metadata["verification_status"][face_id] = "rejected"
             self.save_metadata()
