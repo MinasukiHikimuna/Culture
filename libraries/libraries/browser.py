@@ -81,7 +81,7 @@ def inject_data_to_window(
             return False
 
     except Exception as e:
-        print(f"Exception while injecting data: {str(e)}")
+        print(f"Exception while injecting data: {e!s}")
         return False
 
 
@@ -189,14 +189,14 @@ def open_or_update_tabs_with_data(
                 results[url] = inject_success
 
             except Exception as e:
-                print(f"Error processing {url}: {str(e)}")
+                print(f"Error processing {url}: {e!s}")
                 results[url] = False
 
         browser_ws.close()
         return results
 
     except Exception as e:
-        print(f"Fatal error occurred: {str(e)}")
+        print(f"Fatal error occurred: {e!s}")
         # Mark all remaining URLs as failed
         for url in urls:
             if url not in results:

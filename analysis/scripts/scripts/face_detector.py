@@ -255,7 +255,7 @@ class FaceDetector:
                     shutil.move(str(face_file), str(target_path))
                     moved_count += 1
                 except Exception as e:
-                    print(f"Error moving file {face_file}: {str(e)}")
+                    print(f"Error moving file {face_file}: {e!s}")
 
             print(f"Successfully moved {moved_count} files")
 
@@ -281,7 +281,7 @@ class FaceDetector:
             print(f"Faces extracted: {total_faces}")
 
         except Exception as e:
-            print(f"Error processing scene {scene_id}: {str(e)}")
+            print(f"Error processing scene {scene_id}: {e!s}")
             failed_dir = self.dataset.scenes[SceneState.FAILED.value] / scene_id
             failed_dir.mkdir(parents=True, exist_ok=True)
             with (failed_dir / "error.txt").open("w") as f:

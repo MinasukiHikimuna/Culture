@@ -81,7 +81,7 @@ class TestFrameExtractor:
             return original_dir, processed_dir
 
         except Exception as e:
-            print(f"Error processing scene: {str(e)}")
+            print(f"Error processing scene: {e!s}")
             if self.verbose:
                 import traceback
                 traceback.print_exc()

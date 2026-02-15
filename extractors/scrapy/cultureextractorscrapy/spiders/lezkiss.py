@@ -730,7 +730,7 @@ class LezKissSpider(scrapy.Spider):
             return f"{base_url}/media/misc/model{model_id}.jpg"
         except Exception as e:
             self.logger.error(
-                f"Error extracting model ID from performer short name: {performer_short_name} - {str(e)}"
+                f"Error extracting model ID from performer short name: {performer_short_name} - {e!s}"
             )
             return None
 

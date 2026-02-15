@@ -90,7 +90,7 @@ class SceneVerifier:
             print(f"Scene {scene_id} verified and faces moved to performer directories")
 
         except Exception as e:
-            print(f"Error verifying scene {scene_id}: {str(e)}")
+            print(f"Error verifying scene {scene_id}: {e!s}")
 
     def run(self):
         print(f"Starting scene verifier (monitoring {self.dataset.scenes[SceneState.FACES_EXTRACTED.value]})")

@@ -226,7 +226,7 @@ def main():
     except KeyboardInterrupt:
         print("\nProcessing interrupted by user")
     except Exception as e:
-        print(f"\nError: {str(e)}")
+        print(f"\nError: {e!s}")
         raise
 
 if __name__ == "__main__":

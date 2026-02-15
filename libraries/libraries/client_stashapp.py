@@ -476,7 +476,7 @@ class StashAppClient:
                     print(f"❌ {var_name:30} -> {tag_name} (NOT FOUND)")
             except Exception as e:
                 setattr(tags, var_name, None)
-                print(f"⚠️  {var_name:30} -> {tag_name} (ERROR: {str(e)})")
+                print(f"⚠️  {var_name:30} -> {tag_name} (ERROR: {e!s})")
 
         print("=" * 50)
         print(
@@ -1259,7 +1259,7 @@ class StashAppClient:
                 results[scene_id] = True
 
             except Exception as e:
-                print(f"Error updating scene {scene_id}: {str(e)}")
+                print(f"Error updating scene {scene_id}: {e!s}")
                 results[scene_id] = False
 
         return results

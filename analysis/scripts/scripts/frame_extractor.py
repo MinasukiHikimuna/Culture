@@ -69,7 +69,7 @@ class FrameExtractor:
                 self.dataset.update_scene_state(scene_id, SceneState.FRAMES_EXTRACTED)
 
             except Exception as e:
-                print(f"[{drive}] {scene_id}: Failed - {str(e)}")
+                print(f"[{drive}] {scene_id}: Failed - {e!s}")
                 # Move to failed state
                 failed_dir = self.dataset.scenes[SceneState.FAILED.value] / scene_id
                 failed_dir.mkdir(parents=True, exist_ok=True)

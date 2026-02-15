@@ -146,7 +146,7 @@ class FaceDatasetBuilder:
                     images.append(image_rgb)
                     image_info.append((frame_path, image, scale))
             except Exception as e:
-                print(f"Error reading {frame_path}: {str(e)}")
+                print(f"Error reading {frame_path}: {e!s}")
                 continue
 
         if not images:
@@ -197,11 +197,11 @@ class FaceDatasetBuilder:
                             "timestamp": datetime.now().isoformat()
                         })
                     except Exception as e:
-                        print(f"Error processing face {i} in {frame_file}: {str(e)}")
+                        print(f"Error processing face {i} in {frame_file}: {e!s}")
                         continue
 
             except Exception as e:
-                print(f"Error processing frame {frame_path}: {str(e)}")
+                print(f"Error processing frame {frame_path}: {e!s}")
                 continue
 
         return faces_metadata

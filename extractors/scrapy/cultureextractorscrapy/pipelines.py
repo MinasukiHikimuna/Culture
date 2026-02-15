@@ -395,7 +395,7 @@ class BaseDownloadPipeline:
             else:
                 return self.process_generic_metadata(file_path, file_type)
         except Exception as e:
-            return {"error": f"Failed to process metadata: {str(e)}"}
+            return {"error": f"Failed to process metadata: {e!s}"}
 
     def process_video_metadata(self, file_path):
         """Process video file metadata with both video hashes and ffprobe data"""
@@ -447,7 +447,7 @@ class BaseDownloadPipeline:
                 logging.error(f"Failed to get video hashes: {result.stderr}")
                 metadata["video_hashes_error"] = result.stderr
         except Exception as e:
-            logging.error(f"Video hashes calculation failed: {str(e)}")
+            logging.error(f"Video hashes calculation failed: {e!s}")
             metadata["video_hashes_error"] = str(e)
 
         # Get ffprobe metadata for additional technical details
@@ -472,7 +472,7 @@ class BaseDownloadPipeline:
                 logging.error(f"ffprobe failed: {result.stderr}")
                 metadata["ffprobe_error"] = result.stderr
         except Exception as e:
-            logging.error(f"ffprobe failed: {str(e)}")
+            logging.error(f"ffprobe failed: {e!s}")
             metadata["ffprobe_error"] = str(e)
 
         return metadata

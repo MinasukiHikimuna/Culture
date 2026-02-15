@@ -151,7 +151,7 @@ with engine.connect() as conn:
         for rel_perf in rel_perfs:
             print(f"Release: {rel_perf[0]}, Performer: {rel_perf[1]}")
     except Exception as e:
-        print(f"Error querying release_entity_site_performer_entity: {str(e)}")
+        print(f"Error querying release_entity_site_performer_entity: {e!s}")
 
     print("\nRelease-Tag relationships:")
     rel_tag_query = text(
@@ -169,7 +169,7 @@ with engine.connect() as conn:
         for rel_tag in rel_tags:
             print(f"Release: {rel_tag[0]}, Tag: {rel_tag[1]}")
     except Exception as e:
-        print(f"Error querying release_entity_site_tag_entity: {str(e)}")
+        print(f"Error querying release_entity_site_tag_entity: {e!s}")
 
     print("\nLezKiss Downloads:")
     downloads_query = text(

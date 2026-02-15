@@ -50,7 +50,7 @@ class NZBSearch:
             try:
                 response_json = response.json()
             except json.JSONDecodeError as e:
-                print(f"Invalid JSON response from {api_url}: {str(e)}")
+                print(f"Invalid JSON response from {api_url}: {e!s}")
                 print(
                     f"Response text: {response.text[:200]}..."
                 )  # Print first 200 chars of response
@@ -87,7 +87,7 @@ class NZBSearch:
             return response_json
 
         except Exception as e:
-            print(f"Error fetching results from {api_url}: {str(e)}")
+            print(f"Error fetching results from {api_url}: {e!s}")
             return {"item": []}
 
     def get_category_info(self, api_name: str, cat_id: str) -> str:
@@ -231,11 +231,11 @@ class NZBSearch:
                     all_results.append(nzb_results_df)
 
                 except Exception as e:
-                    print(f"Error processing results from {api_name}: {str(e)}")
+                    print(f"Error processing results from {api_name}: {e!s}")
                     continue
 
             except Exception as e:
-                print(f"Error fetching results from {api_name}: {str(e)}")
+                print(f"Error fetching results from {api_name}: {e!s}")
                 continue
 
         if not all_results:
@@ -395,11 +395,11 @@ class NZBSearch:
                     all_results.append(nzb_results_df)
 
                 except Exception as e:
-                    print(f"Error processing results from {api_name}: {str(e)}")
+                    print(f"Error processing results from {api_name}: {e!s}")
                     continue
 
             except Exception as e:
-                print(f"Error fetching results from {api_name}: {str(e)}")
+                print(f"Error fetching results from {api_name}: {e!s}")
                 continue
 
         if not all_results:
