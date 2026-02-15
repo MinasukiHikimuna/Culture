@@ -1,12 +1,13 @@
 # %%
 import os
 import sys
+from pathlib import Path
 
 import polars as pl
 from dotenv import load_dotenv
 
 
-sys.path.append(os.path.dirname(os.getcwd()))
+sys.path.append(str(Path.cwd().parent))
 
 from libraries.client_stashapp import StashAppClient, get_stashapp_client
 
@@ -86,7 +87,7 @@ from libraries.file_renamer import create_filename
 gallery_renames_df = galleries_df.select([
     pl.col("stashapp_id"),
     pl.col("stashapp_primary_file_path").map_elements(
-        lambda directory: os.path.dirname(directory), return_dtype=pl.Utf8,
+        lambda directory: str(Path(directory).parent), return_dtype=pl.Utf8,
     ).alias("directory"),
     pl.col("stashapp_primary_file_basename").alias("old_filename"),
     pl.struct(["*"]).map_elements(

@@ -204,7 +204,7 @@ def train_model(dataset_path, batch_size=32, num_epochs=50, learning_rate=0.0001
     train_indices, val_indices = full_dataset.split_dataset(val_ratio=0.2)
 
     # Copy splits for inspection
-    output_dir = Path(os.path.dirname(log_file)).parent if log_file else Path("training_runs")
+    output_dir = Path(log_file).parent.parent if log_file else Path("training_runs")
     train_dir = copy_dataset_split(full_dataset, train_indices, output_dir, f"train_split_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
     val_dir = copy_dataset_split(full_dataset, val_indices, output_dir, f"val_split_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
 
@@ -373,7 +373,7 @@ if __name__ == "__main__":
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     # Create output directory
-    output_dir = Path(os.path.dirname(__file__)) / "training_runs"
+    output_dir = Path(__file__).parent / "training_runs"
     output_dir.mkdir(exist_ok=True)
 
     # Setup paths for model and log file

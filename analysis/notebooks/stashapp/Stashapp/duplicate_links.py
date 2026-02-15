@@ -4,13 +4,13 @@
 # This notebook removes duplicate links from scenes and galleries.
 
 # %%
-import os
 import sys
+from pathlib import Path
 
 import polars as pl
 
 
-sys.path.append(os.path.dirname(os.path.abspath("")))
+sys.path.append(str(Path.cwd().parent))
 
 from libraries.client_stashapp import StashAppClient, get_stashapp_client
 

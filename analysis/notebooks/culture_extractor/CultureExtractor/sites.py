@@ -1,12 +1,13 @@
 # %%
 import os
 import sys
+from pathlib import Path
 
 import polars as pl
 from dotenv import load_dotenv
 
 
-sys.path.append(os.path.dirname(os.getcwd()))
+sys.path.append(str(Path.cwd().parent))
 
 import libraries.client_culture_extractor as client_culture_extractor
 

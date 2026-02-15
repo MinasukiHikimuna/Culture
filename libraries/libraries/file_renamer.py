@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from typing import Dict, List, Optional
 
 
@@ -35,7 +36,7 @@ def create_filename_with_directory(use_studio_code_tag: dict, row: dict, base_di
     studio = row.get("stashapp_studio")
     if not studio:
         # Fallback to current directory if no studio
-        current_dir = os.path.dirname(row.get("stashapp_primary_file_path", ""))
+        current_dir = str(Path(row.get("stashapp_primary_file_path", "")).parent)
         return {
             "filename": filename,
             "directory": current_dir,

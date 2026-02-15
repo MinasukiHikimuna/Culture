@@ -4,9 +4,11 @@
 # See: https://docs.scrapy.org/en/latest/topics/item-pipeline.html
 
 
+import hashlib
 import json
 import logging
 import os
+from pathlib import Path
 import shutil
 import subprocess
 import uuid
@@ -232,7 +234,7 @@ class BaseDownloadPipeline:
                 raise RuntimeError(
                     "ffmpeg not found in PATH. Install it with: brew install ffmpeg"
                 )
-            self._ffmpeg_dir = os.path.dirname(ffmpeg_path)
+            self._ffmpeg_dir = str(Path(ffmpeg_path).parent)
         return self._ffmpeg_dir
 
     def file_path(self, request, response=None, info=None, *, item=None):
@@ -336,6 +338,17 @@ class BaseDownloadPipeline:
         # Remove any leading/trailing spaces or dots
         text = text.strip(" .")
         return text
+
+    def _calculate_sha256(self, file_path):
+        """Calculate SHA-256 hash of a file using chunked reading."""
+        try:
+            sha256 = hashlib.sha256()
+            with open(file_path, "rb") as f:
+                for chunk in iter(lambda: f.read(65536), b""):
+                    sha256.update(chunk)
+            return sha256.hexdigest()
+        except OSError:
+            return None
 
     def file_exists_check(self, file_path):
         """Check if file already exists at the given path"""
@@ -467,16 +480,25 @@ class BaseDownloadPipeline:
         return metadata
 
     def process_audio_metadata(self, file_path):
-        """Process audio file metadata"""
-        # For now, just return basic file info - can be enhanced later
+        """Process audio file metadata including SHA-256 hash."""
         file_size = os.path.getsize(file_path) if os.path.exists(file_path) else 0
+        sha256_sum = self._calculate_sha256(file_path)
         metadata = {"$type": "AudioFileMetadata", "file_size": file_size}
+        if sha256_sum:
+            metadata["sha256Sum"] = sha256_sum
         return metadata
 
     def process_generic_metadata(self, file_path, file_type):
-        """Process generic file metadata"""
+        """Process generic file metadata including SHA-256 hash."""
         file_size = os.path.getsize(file_path) if os.path.exists(file_path) else 0
-        metadata = {"$type": "GenericFileMetadata", "file_type": file_type, "file_size": file_size}
+        sha256_sum = self._calculate_sha256(file_path)
+        metadata = {
+            "$type": "GenericFileMetadata",
+            "file_type": file_type,
+            "file_size": file_size,
+        }
+        if sha256_sum:
+            metadata["sha256Sum"] = sha256_sum
         return metadata
 
 
@@ -668,7 +690,6 @@ class M3u8DownloadPipeline(BaseDownloadPipeline):
 
     def download_hls_with_ytdlp(self, url, output_path, spider):
         """Download HLS stream using yt-dlp with timeout detection and retry logic"""
-        import os
         import time
 
         for attempt in range(self.max_retries + 1):
@@ -683,7 +704,7 @@ class M3u8DownloadPipeline(BaseDownloadPipeline):
 
             try:
                 # Ensure the directory exists
-                os.makedirs(os.path.dirname(output_path), exist_ok=True)
+                Path(output_path).parent.mkdir(parents=True, exist_ok=True)
 
                 # Configure yt-dlp command with robust options
                 cmd = [
@@ -1020,11 +1041,9 @@ class FfmpegDownloadPipeline(BaseDownloadPipeline):
 
     def download_hls_with_ffmpeg(self, url, output_path, spider):
         """Download HLS stream using ffmpeg"""
-        import os
-
         try:
             # Ensure the directory exists
-            os.makedirs(os.path.dirname(output_path), exist_ok=True)
+            Path(output_path).parent.mkdir(parents=True, exist_ok=True)
 
             # Run ffmpeg command to download HLS stream
             cmd = [
@@ -1187,7 +1206,7 @@ class Aria2DownloadPipeline(BaseDownloadPipeline):
         """Download file using aria2c with multi-connection support"""
         try:
             # Ensure the directory exists
-            os.makedirs(os.path.dirname(output_path), exist_ok=True)
+            Path(output_path).parent.mkdir(parents=True, exist_ok=True)
 
             # Get cookies from spider if available
             cookie_header = None
@@ -1219,7 +1238,7 @@ class Aria2DownloadPipeline(BaseDownloadPipeline):
                 "--allow-overwrite=false",
                 "--auto-file-renaming=false",
                 "--dir",
-                os.path.dirname(output_path),
+                str(Path(output_path).parent),
                 "--out",
                 os.path.basename(output_path),
             ]
