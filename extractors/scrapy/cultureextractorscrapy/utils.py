@@ -111,7 +111,7 @@ def get_log_filename(spider_name):
     settings = get_project_settings()
     log_dir = settings.get("LOG_DIR", "logs")
 
-    if not os.path.exists(log_dir):
+    if not Path(log_dir).exists():
         Path(log_dir).mkdir(parents=True)
 
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")

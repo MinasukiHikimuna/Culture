@@ -357,7 +357,7 @@ class FaceDatasetBuilder:
             # Clean up any leftover directories in case of error
             for state_dir in [SceneState.EXTRACTING_FRAMES.value, SceneState.EXTRACTING_FACES.value]:
                 error_dir = str(Path(self.structure["scenes"][state_dir]) / scene_id)
-                if os.path.exists(error_dir):
+                if Path(error_dir).exists():
                     shutil.rmtree(error_dir)
             return {
                 "scene_id": scene_id,
@@ -384,7 +384,7 @@ class FaceDatasetBuilder:
 
     def load_metadata(self):
         """Load or initialize metadata"""
-        if os.path.exists(self.metadata_file):
+        if Path(self.metadata_file).exists():
             with open(self.metadata_file, "r") as f:
                 self.metadata = json.load(f)
         else:
@@ -402,7 +402,7 @@ class FaceDatasetBuilder:
     def get_scene_status(self, scene_id: str) -> str:
         """Get the current status of a scene"""
         for status, directory in self.structure["scenes"].items():
-            if os.path.exists(str(Path(directory) / scene_id)):
+            if (Path(directory) / scene_id).exists():
                 return status
         return None
 

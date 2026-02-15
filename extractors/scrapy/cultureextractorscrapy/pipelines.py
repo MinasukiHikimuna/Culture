@@ -353,7 +353,7 @@ class BaseDownloadPipeline:
     def file_exists_check(self, file_path):
         """Check if file already exists at the given path"""
         full_path = str(Path(self.store_uri) / file_path)
-        return os.path.exists(full_path)
+        return Path(full_path).exists()
 
     def create_downloaded_item_from_path(self, item, file_path, spider):
         """Create DownloadedFileItem from a file path"""
@@ -417,8 +417,8 @@ class BaseDownloadPipeline:
                 f"[process_video_metadata] Running videohashes command: {' '.join(videohashes_cmd)}"
             )
             logging.info(f"[process_video_metadata] File path: {file_path}")
-            logging.info(f"[process_video_metadata] File exists: {os.path.exists(file_path)}")
-            if os.path.exists(file_path):
+            logging.info(f"[process_video_metadata] File exists: {Path(file_path).exists()}")
+            if Path(file_path).exists():
                 file_size = os.path.getsize(file_path)
                 logging.info(f"[process_video_metadata] File size: {file_size} bytes")
 
@@ -481,7 +481,7 @@ class BaseDownloadPipeline:
 
     def process_audio_metadata(self, file_path):
         """Process audio file metadata including SHA-256 hash."""
-        file_size = os.path.getsize(file_path) if os.path.exists(file_path) else 0
+        file_size = os.path.getsize(file_path) if Path(file_path).exists() else 0
         sha256_sum = self._calculate_sha256(file_path)
         metadata = {"$type": "AudioFileMetadata", "file_size": file_size}
         if sha256_sum:
@@ -490,7 +490,7 @@ class BaseDownloadPipeline:
 
     def process_generic_metadata(self, file_path, file_type):
         """Process generic file metadata including SHA-256 hash."""
-        file_size = os.path.getsize(file_path) if os.path.exists(file_path) else 0
+        file_size = os.path.getsize(file_path) if Path(file_path).exists() else 0
         sha256_sum = self._calculate_sha256(file_path)
         metadata = {
             "$type": "GenericFileMetadata",
@@ -640,7 +640,7 @@ class M3u8DownloadPipeline(BaseDownloadPipeline):
             )
             spider.logger.info(
                 "[M3u8DownloadPipeline] DEBUG: File exists result: %s",
-                os.path.exists(full_path_check),
+                Path(full_path_check).exists(),
             )
 
             if self.file_exists_check(file_path):
@@ -823,7 +823,7 @@ class M3u8DownloadPipeline(BaseDownloadPipeline):
                 # Check final result
                 return_code = process.wait()
 
-                if return_code == 0 and os.path.exists(output_path):
+                if return_code == 0 and Path(output_path).exists():
                     file_size = os.path.getsize(output_path)
                     spider.logger.info(
                         "[M3u8DownloadPipeline] Download successful: %s (%.1f MB)",
@@ -842,7 +842,7 @@ class M3u8DownloadPipeline(BaseDownloadPipeline):
                     )
 
                     # Clean up partial file
-                    if os.path.exists(output_path):
+                    if Path(output_path).exists():
                         try:
                             os.remove(output_path)
                             spider.logger.info("[M3u8DownloadPipeline] Cleaned up partial file")
@@ -991,7 +991,7 @@ class FfmpegDownloadPipeline(BaseDownloadPipeline):
             )
             spider.logger.info(
                 "[FfmpegDownloadPipeline] DEBUG: File exists result: %s",
-                os.path.exists(full_path_check),
+                Path(full_path_check).exists(),
             )
 
             if self.file_exists_check(file_path):
@@ -1286,7 +1286,7 @@ class Aria2DownloadPipeline(BaseDownloadPipeline):
             # Wait for process to complete
             return_code = process.wait()
 
-            if return_code == 0 and os.path.exists(output_path):
+            if return_code == 0 and Path(output_path).exists():
                 file_size = os.path.getsize(output_path)
                 self.logger.info(
                     "[Aria2DownloadPipeline] Download successful: %s (%.1f MB)",
@@ -1301,7 +1301,7 @@ class Aria2DownloadPipeline(BaseDownloadPipeline):
                 )
 
                 # Clean up partial file if exists
-                if os.path.exists(output_path):
+                if Path(output_path).exists():
                     try:
                         os.remove(output_path)
                         self.logger.info("[Aria2DownloadPipeline] Cleaned up partial file")
@@ -1381,7 +1381,7 @@ class PerformerImagePipeline:
             filepath = str(Path(performer_dir) / filename)
 
             # Check if file exists (unless force_update is True)
-            if not force_update and os.path.exists(filepath):
+            if not force_update and Path(filepath).exists():
                 self.logger.info(f"[PerformerImagePipeline] Skipping {filename} (already exists)")
                 continue
 
@@ -1464,7 +1464,7 @@ class StashDbImagePipeline:
         filepath = str(Path(type_dir) / filename)
 
         # Skip if file already exists
-        if os.path.exists(filepath):
+        if Path(filepath).exists():
             self.logger.debug(
                 f"[StashDbImagePipeline] Skipping {image_type} {entity_id} (already exists)"
             )

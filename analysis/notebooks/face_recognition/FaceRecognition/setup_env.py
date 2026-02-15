@@ -34,7 +34,7 @@ def setup_cuda_paths():
 
     # Add paths if they exist
     for path in possible_cuda_paths:
-        if os.path.exists(path):
+        if Path(path).exists():
             try:
                 os.add_dll_directory(path)
                 logger.info(f"Added DLL directory: {path}")

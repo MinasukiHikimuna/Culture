@@ -162,7 +162,7 @@ for row in gallery_renames_df.iter_rows(named=True):
 
     # Attempt to move the file if the old path is a file and the new path does not exist
     if os.path.isfile(old_path):
-        if not os.path.exists(new_path):
+        if not Path(new_path).exists():
             try:
                 os.rename(old_path, new_path)
                 print(f"Rename file:\n{old_path}\n{new_path}\n")

@@ -17,6 +17,7 @@ import json
 import os
 import time
 import uuid
+from pathlib import Path
 from typing import Dict
 
 import requests
@@ -39,7 +40,7 @@ class StashfaceAPIClient:
         Returns:
             The uploaded file reference that can be used in API calls
         """
-        if not os.path.exists(file_path):
+        if not Path(file_path).exists():
             raise FileNotFoundError(f"Image file not found: {file_path}")
 
         # Generate upload ID
@@ -252,7 +253,7 @@ Examples:
     if not 0 <= args.results <= 50:
         parser.error("Results must be between 0 and 50")
 
-    if not os.path.exists(args.image):
+    if not Path(args.image).exists():
         parser.error(f"Image file not found: {args.image}")
 
     # Create API client
