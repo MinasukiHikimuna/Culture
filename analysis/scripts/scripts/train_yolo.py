@@ -36,7 +36,7 @@ def create_dataset_config(data_dir: str, classes: list) -> str:
         "val": "val/images",      # val images (relative to 'path')
         "test": "test/images",    # test images (optional)
 
-        "names": {i: name for i, name in enumerate(classes)},  # class names
+        "names": dict(enumerate(classes)),  # class names
         "nc": len(classes)  # number of classes
     }
 
