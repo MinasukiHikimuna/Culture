@@ -7,6 +7,7 @@
 import json
 import logging
 import os
+import shutil
 import subprocess
 import uuid
 from datetime import datetime
@@ -194,6 +195,7 @@ class BaseDownloadPipeline:
     def __init__(self, store_uri, settings=None):
         self.store_uri = store_uri
         self.settings = settings
+        self._ffmpeg_dir = None
         # Add Windows invalid characters list
         self.INVALID_CHARS = r'<>:"/\|?*'
         self.INVALID_NAMES = {
@@ -220,6 +222,18 @@ class BaseDownloadPipeline:
             "LPT8",
             "LPT9",
         }
+
+    @property
+    def ffmpeg_dir(self):
+        """Lazily resolve the directory containing ffmpeg."""
+        if self._ffmpeg_dir is None:
+            ffmpeg_path = shutil.which("ffmpeg")
+            if not ffmpeg_path:
+                raise RuntimeError(
+                    "ffmpeg not found in PATH. Install it with: brew install ffmpeg"
+                )
+            self._ffmpeg_dir = os.path.dirname(ffmpeg_path)
+        return self._ffmpeg_dir
 
     def file_path(self, request, response=None, info=None, *, item=None):
         """Standard Scrapy FilesPipeline file_path method - extracts data from request"""
@@ -394,6 +408,7 @@ class BaseDownloadPipeline:
                 capture_output=True,
                 text=True,
                 timeout=300,  # 5 minutes for video hash calculation
+                cwd=self.ffmpeg_dir,  # videohashes looks for ffmpeg/ffprobe in cwd
             )
 
             logging.info(f"[process_video_metadata] videohashes return code: {result.returncode}")
