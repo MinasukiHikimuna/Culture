@@ -27,13 +27,13 @@ class UnmatchedPerformerMatch:
 
 class PerformerMatcher:
     def __init__(self, all_stashapp_performers: Optional[pl.DataFrame] = None):
-        self.matches: List[PerformerMatch] = []
+        self.matches: list[PerformerMatch] = []
         self.all_stashapp_performers = all_stashapp_performers
 
     def match_performers(self,
                         ce_performers: pl.Series,
                         stashapp_performers: pl.Series,
-                        stashdb_performers: Optional[pl.Series] = None) -> List[PerformerMatch]:
+                        stashdb_performers: Optional[pl.Series] = None) -> list[PerformerMatch]:
         """
         Match performers between Culture Extractor and Stashapp/StashDB
 
@@ -120,10 +120,10 @@ class PerformerMatcher:
         return unique_matches
 
     def _match_scene_performers(self,
-                              ce_performers: List[Dict],
-                              performers: List[Dict],
+                              ce_performers: list[dict],
+                              performers: list[dict],
                               source: str,
-                              min_confidence: float = 0.65) -> List[PerformerMatch]:
+                              min_confidence: float = 0.65) -> list[PerformerMatch]:
         """Match performers within a single scene"""
         matches = []
         remaining_ce = list(ce_performers)
@@ -168,8 +168,8 @@ class PerformerMatcher:
         return high_conf_matches
 
     def _find_best_match(self,
-                        ce_perf: Dict,
-                        performers: List[Dict],
+                        ce_perf: dict,
+                        performers: list[dict],
                         source: str,
                         context_confidence_boost: float = 0.0) -> Optional[PerformerMatch]:
         """Find the best matching performer for a CE performer"""
@@ -241,7 +241,7 @@ class PerformerMatcher:
     def _calculate_match_confidence(self,
                                   ce_name: str,
                                   stash_name: str,
-                                  aliases: List[str]) -> tuple[float, str]:
+                                  aliases: list[str]) -> tuple[float, str]:
         """Calculate match confidence between performer names"""
         # Normalize names
         ce_name = ce_name.lower().strip()
@@ -283,7 +283,7 @@ class PerformerMatcher:
 
         return 0.0, "No match"
 
-    def _deduplicate_matches(self, matches: List[PerformerMatch]) -> List[PerformerMatch]:
+    def _deduplicate_matches(self, matches: list[PerformerMatch]) -> list[PerformerMatch]:
         """Remove duplicate matches, keeping highest confidence match for each CE UUID"""
         unique_matches = {}
 
@@ -294,7 +294,7 @@ class PerformerMatcher:
 
         return list(unique_matches.values())
 
-    def get_stashapp_custom_fields(self, match: PerformerMatch) -> List[Dict[str, str]]:
+    def get_stashapp_custom_fields(self, match: PerformerMatch) -> list[dict[str, str]]:
         """Generate Stashapp custom fields for a match"""
         return [
             {
@@ -314,7 +314,7 @@ class PerformerMatcher:
             f"Reason: {match.reason}\n"
         )
 
-    def match_unmatched_performers(self, unmatched_performers: pl.DataFrame) -> List[UnmatchedPerformerMatch]:
+    def match_unmatched_performers(self, unmatched_performers: pl.DataFrame) -> list[UnmatchedPerformerMatch]:
         """
         Try to match previously unmatched performers against all Stashapp performers
 

@@ -14,11 +14,11 @@ class Subcat:
 class Category:
     id: int
     name: str
-    subcats: List[Subcat]
+    subcats: list[Subcat]
 
 class Categories:
     def __init__(self):
-        self.categories: List[Category] = []
+        self.categories: list[Category] = []
 
     def fetch_categories(self, api_url: str, api_key: str) -> None:
         """Fetch categories from the API endpoint"""

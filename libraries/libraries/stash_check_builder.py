@@ -38,7 +38,7 @@ class TagReference:
     name: str
 
     @classmethod
-    def from_dict(cls, tag_dict: Dict[str, Any]) -> "TagReference":
+    def from_dict(cls, tag_dict: dict[str, Any]) -> "TagReference":
         return cls(id=tag_dict["id"], name=tag_dict["name"])
 
 
@@ -50,7 +50,7 @@ class StudioReference:
     name: str
 
     @classmethod
-    def from_dict(cls, studio_dict: Dict[str, Any]) -> "StudioReference":
+    def from_dict(cls, studio_dict: dict[str, Any]) -> "StudioReference":
         return cls(id=studio_dict["id"], name=studio_dict["name"])
 
 
@@ -59,10 +59,10 @@ class FixAction:
     """Represents a fix action with tags to add or remove"""
 
     name: str
-    add_tags: List[TagReference] = field(default_factory=list)
-    remove_tags: List[TagReference] = field(default_factory=list)
+    add_tags: list[TagReference] = field(default_factory=list)
+    remove_tags: list[TagReference] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "addTags": [{"id": tag.id, "name": tag.name} for tag in self.add_tags],
@@ -76,8 +76,8 @@ class QueryTagsBuilder:
     """Builder for tag-based query filters"""
 
     def __init__(self):
-        self._included_tags: List[TagReference] = []
-        self._excluded_tags: List[TagReference] = []
+        self._included_tags: list[TagReference] = []
+        self._excluded_tags: list[TagReference] = []
         self._modifier = "INCLUDES"
         self._depth = 0
 
@@ -111,7 +111,7 @@ class QueryTagsBuilder:
         self._depth = depth
         return self
 
-    def build(self, tag_resolver) -> Dict[str, Any]:
+    def build(self, tag_resolver) -> dict[str, Any]:
         """Build the query filter"""
         # Resolve tag names to IDs
         resolved_included = []
@@ -138,7 +138,7 @@ class QueryTagsBuilder:
             "depth": self._depth,
         }
 
-    def build_url_query(self, tag_resolver) -> Dict[str, Any]:
+    def build_url_query(self, tag_resolver) -> dict[str, Any]:
         """Build URL query format"""
         # Resolve tag names to IDs first
         resolved_included = []
@@ -177,8 +177,8 @@ class QueryPerformerTagsBuilder:
     """Builder for performer tag-based query filters"""
 
     def __init__(self):
-        self._included_tags: List[TagReference] = []
-        self._excluded_tags: List[TagReference] = []
+        self._included_tags: list[TagReference] = []
+        self._excluded_tags: list[TagReference] = []
         self._modifier = "INCLUDES"
         self._depth = 0
 
@@ -210,7 +210,7 @@ class QueryPerformerTagsBuilder:
         self._depth = depth
         return self
 
-    def build(self, tag_resolver) -> Dict[str, Any]:
+    def build(self, tag_resolver) -> dict[str, Any]:
         """Build the query filter"""
         # Resolve tag names to IDs
         resolved_included = []
@@ -237,7 +237,7 @@ class QueryPerformerTagsBuilder:
             "depth": self._depth,
         }
 
-    def build_url_query(self, tag_resolver) -> Dict[str, Any]:
+    def build_url_query(self, tag_resolver) -> dict[str, Any]:
         """Build URL query format"""
         # Resolve tag names to IDs first
         resolved_included = []
@@ -276,8 +276,8 @@ class QueryStudiosBuilder:
     """Builder for studio-based query filters"""
 
     def __init__(self):
-        self._included_studios: List[StudioReference] = []
-        self._excluded_studios: List[StudioReference] = []
+        self._included_studios: list[StudioReference] = []
+        self._excluded_studios: list[StudioReference] = []
         self._modifier = "INCLUDES"
         self._depth = 0
 
@@ -309,7 +309,7 @@ class QueryStudiosBuilder:
         self._depth = depth
         return self
 
-    def build(self, studio_resolver) -> Dict[str, Any]:
+    def build(self, studio_resolver) -> dict[str, Any]:
         """Build the query filter"""
         # Resolve studio names to IDs
         resolved_included = []
@@ -336,7 +336,7 @@ class QueryStudiosBuilder:
             "depth": self._depth,
         }
 
-    def build_url_query(self, studio_resolver) -> Dict[str, Any]:
+    def build_url_query(self, studio_resolver) -> dict[str, Any]:
         """Build URL query format"""
         # Resolve studio names to IDs first
         resolved_included = []
@@ -380,7 +380,7 @@ class QueryBuilder:
         self._tags_builder: Optional[QueryTagsBuilder] = None
         self._performer_tags_builder: Optional[QueryPerformerTagsBuilder] = None
         self._studios_builder: Optional[QueryStudiosBuilder] = None
-        self._performer_count: Optional[Dict[str, Any]] = None
+        self._performer_count: Optional[dict[str, Any]] = None
 
     def tags(self, tags_builder: QueryTagsBuilder) -> "QueryBuilder":
         """Add tag-based filters"""
@@ -404,7 +404,7 @@ class QueryBuilder:
         self._performer_count = {"modifier": modifier, "value": value}
         return self
 
-    def build(self, stash) -> Dict[str, Any]:
+    def build(self, stash) -> dict[str, Any]:
         """Build the complete query"""
         query = {}
 
@@ -425,7 +425,7 @@ class QueryBuilder:
 
         return query
 
-    def build_url_query(self, stash) -> List[Dict[str, Any]]:
+    def build_url_query(self, stash) -> list[dict[str, Any]]:
         """Build URL query format"""
         url_query = []
 
@@ -458,8 +458,8 @@ class FixBuilder:
 
     def __init__(self, name: str):
         self._name = name
-        self._add_tags: List[TagReference] = []
-        self._remove_tags: List[TagReference] = []
+        self._add_tags: list[TagReference] = []
+        self._remove_tags: list[TagReference] = []
 
     def add_tags(self, *tags: Union[str, TagReference]) -> "FixBuilder":
         """Add tags to be added in the fix"""
@@ -515,7 +515,7 @@ class StashCheckBuilder:
         self._name: str = ""
         self._query_builder: Optional[QueryBuilder] = None
         self._fragment: str = "id title date tags { id name }"
-        self._fix_builders: List[FixBuilder] = []
+        self._fix_builders: list[FixBuilder] = []
 
     def name(self, name: str) -> "StashCheckBuilder":
         """Set the name of the check"""
@@ -537,7 +537,7 @@ class StashCheckBuilder:
         self._fix_builders.append(fix_builder)
         return self
 
-    def build(self, stash) -> Dict[str, Any]:
+    def build(self, stash) -> dict[str, Any]:
         """Build the complete check"""
         if not self._query_builder:
             raise ValueError("Query builder is required")

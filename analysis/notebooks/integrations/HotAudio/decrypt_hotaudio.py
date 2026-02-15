@@ -25,11 +25,11 @@ class HotAudioHeader:
     header_length: int
     extra_length: int
     meta: dict
-    segments: List[dict]  # List of dicts with 'off' and 'pts' keys
+    segments: list[dict]  # List of dicts with 'off' and 'pts' keys
     base_key: bytes
 
 class HotAudioDecryptor:
-    def __init__(self, header_data: bytes, keys: Dict[str, str]):
+    def __init__(self, header_data: bytes, keys: dict[str, str]):
         """Initialize decryptor with header data and decryption keys"""
         if not header_data.startswith(b"HAX0"):
             raise ValueError("Invalid HAX header magic")

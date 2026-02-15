@@ -292,13 +292,13 @@ class StashDbClient(StashboxClient):
 
         return scenes
 
-    def query_scenes_by_phash(self, scenes: List[Dict]) -> pl.DataFrame:
+    def query_scenes_by_phash(self, scenes: list[dict]) -> pl.DataFrame:
         """Legacy method for querying scenes by phash"""
         phashes = [scene["phash"] for scene in scenes]
         scene_ids = [scene["stashdb_id"] for scene in scenes if scene.get("stashdb_id")]
         return self.query_scenes(scene_ids=scene_ids, phashes=phashes)
 
-    def query_scenes_by_phash_optimized(self, scenes: List[Dict]) -> pl.DataFrame:
+    def query_scenes_by_phash_optimized(self, scenes: list[dict]) -> pl.DataFrame:
         """Optimized method for querying scenes by phash"""
         # Validate that all scenes have StashDB IDs
         scenes_without_ids = [scene for scene in scenes if not scene.get("stashdb_id")]
@@ -670,7 +670,7 @@ class StashDbClient(StashboxClient):
             "stashdb_data": json.dumps(scene_data)
         }
 
-    def query_scenes(self, scene_ids: Optional[List[str]] = None, phashes: Optional[List[str]] = None) -> pl.DataFrame:
+    def query_scenes(self, scene_ids: Optional[list[str]] = None, phashes: Optional[list[str]] = None) -> pl.DataFrame:
         """
         Query scenes by either their StashDB IDs or phash values.
 

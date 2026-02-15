@@ -4,7 +4,7 @@ from typing import Dict, List, Optional
 
 MAX_LENGTH = 255
 
-def create_filename_with_directory(use_studio_code_tag: Dict, row: Dict, base_directory: str = None) -> Dict[str, str]:
+def create_filename_with_directory(use_studio_code_tag: dict, row: dict, base_directory: str = None) -> dict[str, str]:
     """
     Create a filename and directory structure from a Polars DataFrame row dictionary.
 
@@ -76,7 +76,7 @@ def create_filename_with_directory(use_studio_code_tag: Dict, row: Dict, base_di
         "full_path": os.path.join(directory, filename)
     }
 
-def create_filename(use_studio_code_tag: Dict, row: Dict) -> str:
+def create_filename(use_studio_code_tag: dict, row: dict) -> str:
     """
     Create a filename from a Polars DataFrame row dictionary.
 
@@ -178,7 +178,7 @@ def get_suffix(primary_file_basename: str) -> str:
     file_suffix = os.path.splitext(primary_file_basename)[1]
     return file_suffix
 
-def get_studio_value(studio: Optional[Dict]) -> str:
+def get_studio_value(studio: Optional[dict]) -> str:
     """
     Format studio name with parent if available.
 
@@ -202,7 +202,7 @@ def get_studio_value(studio: Optional[Dict]) -> str:
     parent_studio = studio.get("parent_studio")
     return f"{parent_studio['name']}꞉ {studio_name}"
 
-def has_studio_code_tag(use_studio_code_tag: Dict, studio: Dict) -> bool:
+def has_studio_code_tag(use_studio_code_tag: dict, studio: dict) -> bool:
     if use_studio_code_tag is None:
         raise ValueError("use_studio_code_tag is required")
 
@@ -223,7 +223,7 @@ def has_studio_code_tag(use_studio_code_tag: Dict, studio: Dict) -> bool:
 
     return False
 
-def get_performers_value(performers: List[Dict]) -> str:
+def get_performers_value(performers: list[dict]) -> str:
     """
     Format performers list with gender-based sorting and favorite prioritization.
 
@@ -269,7 +269,7 @@ def get_performers_value(performers: List[Dict]) -> str:
 
     return ", ".join(p["stashapp_performers_name"] for p in sorted_performers)
 
-def process_scene_row(row: Dict) -> Dict:
+def process_scene_row(row: dict) -> dict:
     """
     Example function showing how to process an entire row from a Polars DataFrame.
 

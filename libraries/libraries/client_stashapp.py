@@ -628,7 +628,7 @@ class StashAppClient:
                     result["stash_studios_ce_id"] = stash_id["stash_id"]
         return result
 
-    def find_scenes_by_oshash(self, oshashes: List[str]) -> pl.DataFrame:
+    def find_scenes_by_oshash(self, oshashes: list[str]) -> pl.DataFrame:
         scenes = []
         for oshash in oshashes:
             stash_scene = self.stash.find_scene_by_hash(
@@ -642,7 +642,7 @@ class StashAppClient:
 
         return df_scenes
 
-    def find_scenes_by_studio(self, studio_ids: List[int]) -> pl.DataFrame:
+    def find_scenes_by_studio(self, studio_ids: list[int]) -> pl.DataFrame:
         scenes = self.stash.find_scenes(
             {"studios": {"value": studio_ids, "excludes": [], "modifier": "INCLUDES"}},
             fragment=scenes_fragment,
@@ -652,7 +652,7 @@ class StashAppClient:
 
         return df_scenes
 
-    def find_scenes_by_performers(self, performer_ids: List[int]) -> pl.DataFrame:
+    def find_scenes_by_performers(self, performer_ids: list[int]) -> pl.DataFrame:
         scenes = self.stash.find_scenes(
             {
                 "performers": {
@@ -834,7 +834,7 @@ class StashAppClient:
         }
         return scene_data
 
-    def find_galleries_by_sha256(self, sha256s: List[str]) -> pl.DataFrame:
+    def find_galleries_by_sha256(self, sha256s: list[str]) -> pl.DataFrame:
         # Get all galleries in one request
         stash_galleries = self.stash.find_galleries(f={}, fragment=galleries_fragment)
 
@@ -866,7 +866,7 @@ class StashAppClient:
 
         return df_galleries
 
-    def find_galleries_by_studio(self, studio_ids: List[int]) -> pl.DataFrame:
+    def find_galleries_by_studio(self, studio_ids: list[int]) -> pl.DataFrame:
         galleries = self.stash.find_galleries(
             {"studios": {"value": studio_ids, "excludes": [], "modifier": "INCLUDES"}},
             fragment=galleries_fragment,
@@ -1185,14 +1185,14 @@ class StashAppClient:
         return self.stash.create_performer(performer_data)
 
     def update_performer_custom_fields(
-        self, performer_id: int, custom_fields: Dict[str, str]
+        self, performer_id: int, custom_fields: dict[str, str]
     ):
         self.stash.update_performer(
             {"id": performer_id, "custom_fields": {"partial": custom_fields}}
         )
 
     def update_performer_custom_fields_full(
-        self, performer_id: int, custom_fields: Dict[str, str]
+        self, performer_id: int, custom_fields: dict[str, str]
     ):
         self.stash.update_performer(
             {"id": performer_id, "custom_fields": {"full": custom_fields}}
@@ -1200,9 +1200,9 @@ class StashAppClient:
 
     def update_tags_for_scenes(
         self,
-        scene_ids: List[int],
-        add_tag_names: List[str],
-        remove_tag_names: List[str],
+        scene_ids: list[int],
+        add_tag_names: list[str],
+        remove_tag_names: list[str],
     ):
         """Update tags for multiple scenes by adding and removing specified tags by name.
 
@@ -1265,7 +1265,7 @@ class StashAppClient:
 
         return results
 
-    def bulk_scene_update(self, scene_ids: List[int], tag_ids: List[int], mode: str):
+    def bulk_scene_update(self, scene_ids: list[int], tag_ids: list[int], mode: str):
         if mode != "ADD" and mode != "REMOVE":
             raise ValueError("Mode must be either 'ADD' or 'REMOVE'")
 

@@ -14,7 +14,7 @@ class SABnzbdClient:
         if not self.api_key:
             raise ValueError("SABNZBD_API_KEY not found in environment variables")
 
-    def add_nzb_url(self, nzb_url: str, name: Optional[str] = None) -> Dict[str, Any]:
+    def add_nzb_url(self, nzb_url: str, name: Optional[str] = None) -> dict[str, Any]:
         """
         Add an NZB to SABnzbd queue via URL
 
@@ -74,7 +74,7 @@ class SABnzbdClient:
                 "error": str(e)
             }
 
-    def get_queue_details(self, nzo_id: str) -> Dict[str, Any]:
+    def get_queue_details(self, nzo_id: str) -> dict[str, Any]:
         """
         Get details about a specific item in the queue
 
@@ -106,7 +106,7 @@ class SABnzbdClient:
             print(f"Error getting queue details: {e}")
             return {}
 
-    def get_history_details(self, nzo_id: str) -> Dict[str, Any]:
+    def get_history_details(self, nzo_id: str) -> dict[str, Any]:
         """
         Get details about a completed download from history
 
@@ -138,7 +138,7 @@ class SABnzbdClient:
             print(f"Error getting history details: {e}")
             return {}
 
-    def wait_for_completion(self, nzo_id: str, timeout: int = 3600, check_interval: int = 10) -> Dict[str, Any]:
+    def wait_for_completion(self, nzo_id: str, timeout: int = 3600, check_interval: int = 10) -> dict[str, Any]:
         """
         Wait for a download to complete and return its final details
 

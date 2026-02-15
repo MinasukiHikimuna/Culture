@@ -64,7 +64,7 @@ class StashfaceAPIClient:
         return upload_info[0]
 
     def analyze_faces(self, image_path: str, threshold: float = 0.5,
-                     max_results: int = 3, api_type: str = "json") -> Dict:
+                     max_results: int = 3, api_type: str = "json") -> dict:
         """
         Analyze faces in an image using the Stashface API
 
@@ -178,7 +178,7 @@ class StashfaceAPIClient:
         print(f"\n❌ Timeout after {max_attempts} seconds")
         return {"success": False, "error": "Processing timeout"}
 
-    def format_results(self, results: Dict) -> str:
+    def format_results(self, results: dict) -> str:
         """Format analysis results for display"""
         if not results.get("success"):
             return f"❌ Analysis failed: {results.get('error', 'Unknown error')}"

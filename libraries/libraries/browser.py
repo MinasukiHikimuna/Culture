@@ -7,7 +7,7 @@ import websocket
 
 
 def inject_data_to_window(
-    ws, data: Dict[str, Any], namespace: str = "stashData"
+    ws, data: dict[str, Any], namespace: str = "stashData"
 ) -> bool:
     """
     Injects data into the window global object using Chrome DevTools Protocol.
@@ -86,8 +86,8 @@ def inject_data_to_window(
 
 
 def open_or_update_tabs_with_data(
-    urls: List[str], data: Optional[Dict[str, Any]] = None, namespace: str = "stashData"
-) -> Dict[str, bool]:
+    urls: list[str], data: Optional[dict[str, Any]] = None, namespace: str = "stashData"
+) -> dict[str, bool]:
     """
     Opens or updates multiple tabs for the given URLs and optionally injects data into window global object.
 
@@ -204,7 +204,7 @@ def open_or_update_tabs_with_data(
         return results
 
 
-def open_or_update_tabs(urls: List[str]) -> Dict[str, bool]:
+def open_or_update_tabs(urls: list[str]) -> dict[str, bool]:
     """
     Opens or updates multiple tabs for the given URLs.
     Returns a dictionary mapping URLs to success status.

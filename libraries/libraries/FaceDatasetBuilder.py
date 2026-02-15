@@ -59,7 +59,7 @@ class FaceDatasetBuilder:
         for performer_dir in self.structure["performers"].values():
             os.makedirs(performer_dir, exist_ok=True)
 
-    def get_performer_directory_name(self, performer: Union[Dict, str]) -> str:
+    def get_performer_directory_name(self, performer: Union[dict, str]) -> str:
         """Create directory name from performer data or ID"""
         if isinstance(performer, str):
             return performer
@@ -124,7 +124,7 @@ class FaceDatasetBuilder:
 
         return faces_metadata
 
-    def process_frame_batch(self, frame_paths: List[str], scene_dir: str, scene_id: str, performers: list) -> list:
+    def process_frame_batch(self, frame_paths: list[str], scene_dir: str, scene_id: str, performers: list) -> list:
         """Process a batch of frames for faces"""
         faces_metadata = []
 
@@ -206,7 +206,7 @@ class FaceDatasetBuilder:
 
         return faces_metadata
 
-    def process_multiple_scenes(self, scenes: List[Dict]) -> List[Dict]:
+    def process_multiple_scenes(self, scenes: list[dict]) -> list[dict]:
         """Process multiple scenes in parallel, balanced across drives"""
         results = []
 
@@ -247,12 +247,12 @@ class FaceDatasetBuilder:
 
         return results
 
-    def _process_scene_with_semaphore(self, scene: Dict, drive_semaphore: threading.Semaphore) -> Dict:
+    def _process_scene_with_semaphore(self, scene: dict, drive_semaphore: threading.Semaphore) -> dict:
         """Process a scene while respecting drive semaphore"""
         with drive_semaphore:
             return self._process_scene_wrapper(scene)
 
-    def _process_scene_wrapper(self, scene: Dict) -> Dict:
+    def _process_scene_wrapper(self, scene: dict) -> dict:
         """Wrapper method to handle scene processing for parallel execution"""
         scene_id = scene.get("stashapp_stashdb_id")
         video_path = scene.get("video_path", scene.get("stashapp_primary_file_path"))
@@ -453,7 +453,7 @@ class FaceDatasetBuilder:
         self.move_scene_to_status(scene_id, SceneState.VERIFIED.value)
         print(f"Scene {scene_id} verification completed")
 
-    def get_performer_face_count(self, performer_id: str = None) -> Dict[str, int]:
+    def get_performer_face_count(self, performer_id: str = None) -> dict[str, int]:
         """
         Get count of verified faces for performers.
         """

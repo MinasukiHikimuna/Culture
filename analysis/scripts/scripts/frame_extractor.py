@@ -20,7 +20,7 @@ class FrameExtractor:
         # Initialize dataset structure
         self.dataset = DatasetStructure(base_dir)
 
-    def process_scene(self, scene_id: str, scene_data: Dict):
+    def process_scene(self, scene_id: str, scene_data: dict):
         # Check if already processed
         if self.dataset.is_scene_processed(scene_id):
             print(f"Skipping {scene_id} - already processed")
