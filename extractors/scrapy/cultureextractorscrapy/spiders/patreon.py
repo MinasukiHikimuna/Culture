@@ -656,7 +656,7 @@ class PatreonSpider(scrapy.Spider):
     def _parse_post_date(self, published_at):
         """Parse post publication date to YYYY-MM-DD format."""
         if not published_at:
-            return datetime.now().strftime("%Y-%m-%d")
+            return datetime.now(tz=UTC).strftime("%Y-%m-%d")
 
         try:
             if isinstance(published_at, str):
@@ -667,9 +667,9 @@ class PatreonSpider(scrapy.Spider):
                 return dt.strftime("%Y-%m-%d")
         except (ValueError, TypeError):
             self.logger.warning(f"Could not parse date: {published_at}")
-            return datetime.now().strftime("%Y-%m-%d")
+            return datetime.now(tz=UTC).strftime("%Y-%m-%d")
 
-        return datetime.now().strftime("%Y-%m-%d")
+        return datetime.now(tz=UTC).strftime("%Y-%m-%d")
 
     def _extract_media_from_post(self, post, campaign, included_data):
         """Extract media URLs from a single post."""

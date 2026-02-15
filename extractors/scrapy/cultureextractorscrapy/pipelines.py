@@ -13,7 +13,7 @@ import shutil
 import subprocess
 import time
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -370,7 +370,7 @@ class BaseDownloadPipeline:
         # Create DownloadedFileItem
         downloaded_item = DownloadedFileItem(
             uuid=newnewid.uuid7(),
-            downloaded_at=datetime.now(),
+            downloaded_at=datetime.now(tz=UTC),
             file_type=file_info["file_type"],
             content_type=file_info["content_type"],
             variant=file_info["variant"],

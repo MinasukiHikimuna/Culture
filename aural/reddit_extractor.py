@@ -20,7 +20,7 @@ import os
 import re
 import sys
 import time
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 import praw
@@ -547,7 +547,7 @@ class RedditExtractor:
         print(f"❌ Failed: {len(failed_posts)}")
 
         # Save results
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now(tz=UTC).strftime("%Y%m%d_%H%M%S")
 
         if save_format in ["csv", "both"]:
             self.save_to_csv(enriched_data, f"reddit_enriched_{timestamp}.csv")

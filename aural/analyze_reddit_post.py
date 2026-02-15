@@ -13,7 +13,7 @@ import re
 import sys
 import time
 import urllib.parse
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 import httpx
@@ -993,7 +993,7 @@ Return JSON:
                 "title": post_data["reddit_data"]["title"],
                 "date": post_data.get("date"),
                 "reddit_url": post_data.get("reddit_url"),
-                "analyzed_at": datetime.now().isoformat(),
+                "analyzed_at": datetime.now(tz=UTC).isoformat(),
                 "extraction_method": "llm",
                 "model": self.model,
             }
@@ -1025,7 +1025,7 @@ Return JSON:
                     {
                         "error": str(e),
                         "file": str(file),
-                        "analyzed_at": datetime.now().isoformat(),
+                        "analyzed_at": datetime.now(tz=UTC).isoformat(),
                     }
                 )
 

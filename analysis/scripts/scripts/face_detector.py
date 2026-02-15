@@ -10,7 +10,7 @@ import pstats
 import shutil
 import time
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 import cv2
@@ -345,7 +345,7 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("\nStopping profiler and saving stats...")
         pr.disable()
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now(tz=UTC).strftime("%Y%m%d_%H%M%S")
         stats_file = f"face_detector_profile_{timestamp}.stats"
         with Path(stats_file).open("w") as f:
             stats = pstats.Stats(pr, stream=f)

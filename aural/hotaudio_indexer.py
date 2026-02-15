@@ -275,7 +275,7 @@ def main():
         index_data = indexer.index_user_profile(user_url, args.depth)
 
         # Generate timestamp for filename
-        timestamp = datetime.now().strftime("%Y-%m-%d")
+        timestamp = datetime.now(tz=UTC).strftime("%Y-%m-%d")
         output_file = Path(args.output) / f"{args.user}_index_{timestamp}.json"
 
         indexer.save_index(index_data, output_file)

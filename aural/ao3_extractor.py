@@ -584,7 +584,7 @@ class AO3Extractor:
 
         # Save failed URLs if any
         if failed_urls:
-            timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+            timestamp = datetime.now(tz=UTC).strftime("%Y-%m-%d_%H%M%S")
             failed_filepath = self.output_dir / f"failed_urls_{timestamp}.json"
             try:
                 failed_filepath.write_text(

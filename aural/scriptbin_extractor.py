@@ -537,7 +537,7 @@ class ScriptBinExtractor:
 
         # Save failed URLs if any
         if failed_urls:
-            timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+            timestamp = datetime.now(tz=UTC).strftime("%Y-%m-%d_%H%M%S")
             self.save_to_json(failed_urls, f"failed_urls_{timestamp}.json")
 
         return extracted_data

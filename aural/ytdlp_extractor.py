@@ -504,7 +504,7 @@ def main() -> int:
 
             if results:
                 # Generate filename from URL
-                timestamp = datetime.now().strftime("%Y-%m-%d")
+                timestamp = datetime.now(tz=UTC).strftime("%Y-%m-%d")
                 filename = f"index_{timestamp}.json"
                 extractor.save_index(results, filename)
 

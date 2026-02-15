@@ -4,7 +4,7 @@ import os
 import queue as thread_queue
 import shutil
 import threading
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 import cv2
@@ -118,7 +118,7 @@ class FaceDatasetBuilder:
                 "frame": frame_file,
                 "confidence": face["confidence"],
                 "possible_performers": [p if isinstance(p, str) else p.get("stashapp_performers_id") for p in performers],
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now(tz=UTC).isoformat()
             })
 
         return faces_metadata
@@ -193,7 +193,7 @@ class FaceDatasetBuilder:
                             "frame": frame_file,
                             "confidence": face["confidence"],
                             "possible_performers": performers,
-                            "timestamp": datetime.now().isoformat()
+                            "timestamp": datetime.now(tz=UTC).isoformat()
                         })
                     except Exception as e:
                         print(f"Error processing face {i} in {frame_file}: {e!s}")
@@ -340,7 +340,7 @@ class FaceDatasetBuilder:
                 "faces_extracted": faces_extracted,
                 "state": SceneState.FACES_EXTRACTED.value,
                 "verified": False,
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now(tz=UTC).isoformat()
             }
             self._save_metadata()
 
@@ -421,7 +421,7 @@ class FaceDatasetBuilder:
         # Update metadata
         if scene_id in self.metadata["processed_scenes"]:
             self.metadata["processed_scenes"][scene_id]["status"] = new_status
-            self.metadata["processed_scenes"][scene_id]["status_updated"] = datetime.now().isoformat()
+            self.metadata["processed_scenes"][scene_id]["status_updated"] = datetime.now(tz=UTC).isoformat()
             self.save_metadata()
 
     def verify_scene(self, scene_id: str):
