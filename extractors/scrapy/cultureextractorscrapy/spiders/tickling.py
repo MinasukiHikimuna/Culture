@@ -68,7 +68,7 @@ class TicklingSpider(scrapy.Spider):
             last_page = int(last_page)
             # The page nuumbering is weird. First page is 0 but last page is the total number of pages.
             # If last page is 116, then there are 117 pages.
-            for page_number in range(0, last_page):
+            for page_number in range(last_page):
                 yield scrapy.Request(
                     url=f"{response.url}?page={page_number}",
                     callback=self.parse_updates,
