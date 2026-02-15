@@ -63,9 +63,9 @@ SCHEDULER_MEMORY_QUEUE = "scrapy.squeues.LifoMemoryQueue"
 
 # Enable or disable extensions
 # See https://docs.scrapy.org/en/latest/topics/extensions.html
-# EXTENSIONS = {
-#    "scrapy.extensions.telnet.TelnetConsole": None,
-# }
+EXTENSIONS = {
+    "cultureextractorscrapy.extensions.LogSummaryExtension": 900,
+}
 
 # Configure item pipelines
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
