@@ -56,6 +56,7 @@ select = [
 # Ignore specific rules
 ignore = [
     "B008",   # do not perform function calls in argument defaults
+    "RUF001", # Ambiguous Unicode characters are intentional (filesystem-safe replacements)
     "S101",   # use of assert detected (common in scrapy)
     "S603",   # subprocess call with non-literal args (all calls use trusted internal commands)
     "ARG002", # unused method argument (common in scrapy callbacks)

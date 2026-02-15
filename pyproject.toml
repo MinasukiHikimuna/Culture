@@ -71,6 +71,7 @@ ignore = [
     "PLR0913",  # Too many arguments to function call
     "PLR2004",  # Magic value used in comparison
     "RET504",   # Unnecessary assignment before return
+    "RUF001",   # Ambiguous Unicode characters are intentional (filesystem-safe replacements)
     "TC001",    # Move import into type-checking block (breaks runtime for FastAPI deps)
     "TC003",    # Move stdlib import into type-checking block (breaks runtime)
 ]

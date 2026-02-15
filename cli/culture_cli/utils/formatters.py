@@ -252,7 +252,7 @@ def print_info(message: str) -> None:
     Args:
         message: Info message to display
     """
-    console.print(f"[blue]ℹ[/blue] {message}")  # noqa: RUF001 - Intentional info icon
+    console.print(f"[blue]ℹ[/blue] {message}")
 
 
 def print_success(message: str) -> None:
