@@ -67,7 +67,7 @@ def calculate_hamming_distance(phash1, phash2):
         raise ValueError("Binary strings must be of equal length")
 
     # Calculate Hamming distance
-    return sum(c1 != c2 for c1, c2 in zip(binary1, binary2))
+    return sum(c1 != c2 for c1, c2 in zip(binary1, binary2, strict=False))
 
 
 # Example usage:

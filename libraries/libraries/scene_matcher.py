@@ -10,7 +10,7 @@ class SceneMatcher:
         """Calculate the Hamming distance between two hex strings."""
         bin1 = bin(int(hash1, 16))[2:].zfill(64)
         bin2 = bin(int(hash2, 16))[2:].zfill(64)
-        return sum(b1 != b2 for b1, b2 in zip(bin1, bin2))
+        return sum(b1 != b2 for b1, b2 in zip(bin1, bin2, strict=False))
 
     def match_scenes(self, input_scenes: list[dict], stashdb_scenes: list[dict]) -> dict[str, dict | None]:
         """

@@ -157,7 +157,7 @@ for row in duration_mismatches.iter_rows(named=True):
         row["all_file_ids"],
         row["all_file_paths"],
         row["all_file_sizes"],
-        row["all_is_primary"]
+        row["all_is_primary"], strict=False
     )):
         primary_status = " (Primary)" if is_primary else ""
         print(f"  File{primary_status}: {file_path}")

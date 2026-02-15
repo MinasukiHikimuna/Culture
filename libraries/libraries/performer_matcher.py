@@ -50,7 +50,7 @@ class PerformerMatcher:
         for ce_list, stashapp_list, stashdb_list in zip(
             ce_performers,
             stashapp_performers,
-            stashdb_performers if stashdb_performers is not None else [None] * len(ce_performers)
+            stashdb_performers if stashdb_performers is not None else [None] * len(ce_performers), strict=False
         ):
             if ce_list is None or len(ce_list) == 0:
                 continue

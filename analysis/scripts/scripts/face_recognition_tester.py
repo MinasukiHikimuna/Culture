@@ -72,7 +72,7 @@ class FaceRecognizer:
             # Convert to list of (performer, probability) tuples
             predictions = [
                 (self.classes[idx], prob.item())
-                for prob, idx in zip(top_probs, top_indices)
+                for prob, idx in zip(top_probs, top_indices, strict=False)
             ]
 
         return predictions
@@ -161,7 +161,7 @@ class FaceRecognitionTester:
 
                     face_predictions = [
                         (self.classes[idx], prob.item())
-                        for idx, prob in zip(top_indices, top_probs)
+                        for idx, prob in zip(top_indices, top_probs, strict=False)
                     ]
                     predictions.append(face_predictions)
 

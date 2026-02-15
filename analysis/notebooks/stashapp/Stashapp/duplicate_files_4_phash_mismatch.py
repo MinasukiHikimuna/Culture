@@ -23,7 +23,7 @@ def hamming_distance_hex(hash1: str, hash2: str) -> int:
     try:
         bin1 = bin(int(hash1, 16))[2:].zfill(64)
         bin2 = bin(int(hash2, 16))[2:].zfill(64)
-        return sum(b1 != b2 for b1, b2 in zip(bin1, bin2))
+        return sum(b1 != b2 for b1, b2 in zip(bin1, bin2, strict=False))
     except (ValueError, TypeError):
         return 0
 
