@@ -216,7 +216,7 @@ class FaceRecognitionTester:
                 0.2 * detection_rate    # Portion of frames where detected
             )
 
-            if performer == list(all_predictions.keys())[0]:  # Debug first performer
+            if performer == next(iter(all_predictions.keys())):  # Debug first performer
                 print(f"\nDetailed calculation for {performer}:")
                 print(f"max_conf: {max_conf:.4f}")
                 print(f"avg_conf: {avg_conf:.4f}")
