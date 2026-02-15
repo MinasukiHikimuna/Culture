@@ -94,7 +94,7 @@ for scene_id, group in files_df.group_by("scene_id"):
     scene_files = group.to_dicts()
 
     # Skip if durations don't match
-    durations = set(file["duration"] for file in scene_files)
+    durations = {file["duration"] for file in scene_files}
     if len(durations) > 1:
         continue
 
