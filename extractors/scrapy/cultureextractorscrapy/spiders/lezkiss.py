@@ -108,7 +108,6 @@ class LezKissSpider(scrapy.Spider):
     def parse(self, response):
         """Initial parse method - entry point for the spider."""
         # This is now handled by start_requests
-        pass
 
     def parse_videos(self, response):
         """Parse the videos listing page."""

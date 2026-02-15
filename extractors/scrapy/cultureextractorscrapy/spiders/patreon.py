@@ -1200,4 +1200,3 @@ class PatreonSpider(scrapy.Spider):
         """Main parse method - this spider uses start_requests for initial discovery."""
         # This spider uses start_requests() to begin with campaign discovery
         # The actual parsing logic is in parse_user_memberships() and parse_posts_page()
-        pass

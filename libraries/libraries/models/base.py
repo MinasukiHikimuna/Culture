@@ -14,7 +14,6 @@ load_dotenv()
 class Base(DeclarativeBase):
     """Base class for all SQLAlchemy models."""
 
-    pass
 
 
 # Thread-safe engine singleton
