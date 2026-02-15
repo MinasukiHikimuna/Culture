@@ -150,7 +150,12 @@ class LezKissSpider(scrapy.Spider):
             # Check if we already have this release
             existing_release = self.existing_releases.get(external_id)
 
-            if self.force_update or not existing_release:
+            has_no_downloads = existing_release and not existing_release["downloaded_files"]
+            if self.force_update or not existing_release or has_no_downloads:
+                if has_no_downloads:
+                    self.logger.info(
+                        f"Re-processing release with no downloads: {external_id}"
+                    )
                 yield scrapy.Request(
                     url=response.urljoin(detail_url),
                     callback=self.parse_video_detail,
@@ -207,7 +212,12 @@ class LezKissSpider(scrapy.Spider):
             # Check if we already have this release
             existing_release = self.existing_releases.get(external_id)
 
-            if self.force_update or not existing_release:
+            has_no_downloads = existing_release and not existing_release["downloaded_files"]
+            if self.force_update or not existing_release or has_no_downloads:
+                if has_no_downloads:
+                    self.logger.info(
+                        f"Re-processing release with no downloads: {external_id}"
+                    )
                 yield scrapy.Request(
                     url=response.urljoin(detail_url),
                     callback=self.parse_gallery_detail,

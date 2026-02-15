@@ -237,7 +237,12 @@ class BralessForeverSpider(scrapy.Spider):
                 f"🎥 {category_name} → '{title}' ({duration or 'No duration'}){cast_info}"
             )
 
-            if self.force_update or not existing_release:
+            has_no_downloads = existing_release and not existing_release["downloaded_files"]
+            if self.force_update or not existing_release or has_no_downloads:
+                if has_no_downloads:
+                    self.logger.info(
+                        f"🔄 Re-processing release with no downloads: '{title}' (ID: {video_id})"
+                    )
                 videos_processed += 1
 
                 yield scrapy.Request(
