@@ -5,10 +5,10 @@ from datetime import UTC, datetime
 from urllib.parse import urlencode
 
 import newnewid
+import scrapy
 from dotenv import load_dotenv
 from itemadapter import ItemAdapter
 
-import scrapy
 from cultureextractorscrapy.items import (
     AvailableAudioFile,
     AvailableFileEncoder,

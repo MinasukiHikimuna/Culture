@@ -3,9 +3,9 @@ import os
 from datetime import UTC, datetime
 
 import newnewid
+import scrapy
 from dotenv import load_dotenv
 
-import scrapy
 from cultureextractorscrapy.items import (
     AvailableFileEncoder,
     AvailableGalleryZipFile,

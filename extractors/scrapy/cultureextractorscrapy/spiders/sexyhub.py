@@ -4,11 +4,11 @@ from datetime import UTC, datetime
 from urllib.parse import parse_qs, urlparse
 
 import newnewid
+import scrapy
 from dotenv import load_dotenv
 from itemadapter import ItemAdapter
 from scrapy.exceptions import CloseSpider
 
-import scrapy
 from cultureextractorscrapy.items import (
     AvailableFileEncoder,
     AvailableGalleryZipFile,
