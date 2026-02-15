@@ -405,7 +405,7 @@ class HegreSpider(scrapy.Spider):
             parsed_release_date = datetime.strptime(raw_release_date.strip(), '%B %d, %Y').date()
             post_data['release_date'] = parsed_release_date.isoformat()
         except ValueError as e:
-            raise ValueError(f"Failed to parse release date '{raw_release_date}' for movie {external_id}: {str(e)}")
+            raise ValueError(f"Failed to parse release date '{raw_release_date}' for movie {external_id}: {str(e)}") from e
 
         # Get duration from format details
         runtime_text = response.css('ul.format-details li:first-child strong::text').get()
@@ -439,11 +439,11 @@ class HegreSpider(scrapy.Spider):
                         duration = int(value)
                     else:
                         raise ValueError(f"Unexpected time unit: {unit}")
-                except ValueError:
-                    raise ValueError(f"Could not parse time value: {time_str}")
+                except ValueError as e:
+                    raise ValueError(f"Could not parse time value: {time_str}") from e
 
         except (ValueError, IndexError) as e:
-            raise ValueError(f"Failed to parse runtime '{runtime_text}' for movie {external_id}: {str(e)}")
+            raise ValueError(f"Failed to parse runtime '{runtime_text}' for movie {external_id}: {str(e)}") from e
 
         # Check if this release already exists
         existing_release_id = self.existing_releases.get(external_id)
