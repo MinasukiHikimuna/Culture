@@ -315,7 +315,7 @@ class FaceDetector:
 
         aligned_faces = []
         if boxes is not None:
-            for i, (box, landmark) in enumerate(zip(boxes, landmarks)):
+            for _i, (box, landmark) in enumerate(zip(boxes, landmarks)):
                 # Extract face using box
                 face = image.crop(box)
 

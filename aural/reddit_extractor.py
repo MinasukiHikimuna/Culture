@@ -649,7 +649,7 @@ class RedditExtractor:
 
             # Check for new format (any file starting with post_id_)
             if user_dir.exists():
-                for file in user_dir.glob(f"{post_id}_*.json"):
+                for _file in user_dir.glob(f"{post_id}_*.json"):
                     return True
 
         # Also check in deleted_users directory
@@ -662,7 +662,7 @@ class RedditExtractor:
 
         # Check new format
         if deleted_user_dir.exists():
-            for file in deleted_user_dir.glob(f"{post_id}_*.json"):
+            for _file in deleted_user_dir.glob(f"{post_id}_*.json"):
                 return True
 
         return False

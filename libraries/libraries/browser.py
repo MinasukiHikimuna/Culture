@@ -26,7 +26,7 @@ def inject_data_to_window(
 
         # Wait for the Runtime.enable response, ignoring console messages
         max_attempts = 10
-        for attempt in range(max_attempts):
+        for _attempt in range(max_attempts):
             response = ws.recv()
             result = json.loads(response)
 
@@ -54,7 +54,7 @@ def inject_data_to_window(
         )
 
         # Wait for the Runtime.evaluate response, ignoring console messages
-        for attempt in range(max_attempts):
+        for _attempt in range(max_attempts):
             response = ws.recv()
             result = json.loads(response)
 
