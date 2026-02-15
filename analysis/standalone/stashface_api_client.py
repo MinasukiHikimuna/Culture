@@ -48,7 +48,7 @@ class StashfaceAPIClient:
 
         # Upload the file
         with open(file_path, "rb") as f:
-            files = {"files": (os.path.basename(file_path), f, "image/jpeg")}
+            files = {"files": (Path(file_path).name, f, "image/jpeg")}
             response = self.session.post(
                 f"{self.base_url}/gradio_api/upload",
                 files=files,
@@ -102,7 +102,7 @@ class StashfaceAPIClient:
             "path": file_ref,
             "url": None,
             "size": None,
-            "orig_name": os.path.basename(image_path),
+            "orig_name": Path(image_path).name,
             "mime_type": None,
             "is_file": True
         }

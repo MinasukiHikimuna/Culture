@@ -93,7 +93,7 @@ class FaceDatasetBuilder:
         faces = self.detector.detect_faces(image_rgb)
         faces_metadata = []
 
-        frame_file = os.path.basename(frame_path)
+        frame_file = Path(frame_path).name
 
         for i, face in enumerate(faces):
             if face["confidence"] < 0.95:
@@ -161,7 +161,7 @@ class FaceDatasetBuilder:
                 if not faces:
                     continue
 
-                frame_file = os.path.basename(frame_path)
+                frame_file = Path(frame_path).name
 
                 for i, face in enumerate(faces):
                     try:
@@ -328,7 +328,7 @@ class FaceDatasetBuilder:
                         max(0, x-margin):min(frame.shape[1], x+width+margin)
                     ]
 
-                    frame_number = os.path.splitext(os.path.basename(frame_path))[0].split("_")[1]
+                    frame_number = Path(frame_path).stem.split("_")[1]
                     face_id = f"{scene_id}_{frame_number}_face_{face_idx}"
                     face_path = str(Path(scene_unverified_dir) / f"{face_id}.jpg")
                     cv2.imwrite(face_path, face_img)
@@ -367,7 +367,7 @@ class FaceDatasetBuilder:
 
     def move_to_rejected(self, face_path: str):
         """Move a face image to the rejected directory"""
-        face_filename = os.path.basename(face_path)
+        face_filename = Path(face_path).name
         scene_id = face_filename.split("_")[0]  # Extract scene_id from filename
 
         rejected_dir = str(Path(self.structure["scenes"][SceneState.FACES_EXTRACTED.value]) / scene_id)

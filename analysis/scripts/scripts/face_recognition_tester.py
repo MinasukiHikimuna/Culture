@@ -259,7 +259,7 @@ def test_single_image(model_path, image_path, top_k=3):
     predictions = recognizer.predict(image_path, top_k=top_k)
 
     # Print results
-    print(f"\nPredictions for {os.path.basename(image_path)}:")
+    print(f"\nPredictions for {Path(image_path).name}:")
     for performer, confidence in predictions:
         print(f"{performer}: {confidence*100:.2f}%")
 

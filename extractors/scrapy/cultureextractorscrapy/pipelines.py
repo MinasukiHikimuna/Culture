@@ -374,8 +374,8 @@ class BaseDownloadPipeline:
             content_type=file_info["content_type"],
             variant=file_info["variant"],
             available_file=file_info,
-            original_filename=os.path.basename(file_info["url"]),
-            saved_filename=os.path.basename(file_path),
+            original_filename=Path(file_info["url"]).name,
+            saved_filename=Path(file_path).name,
             release_uuid=item["release_id"],
             file_metadata=file_metadata,
         )
@@ -1240,7 +1240,7 @@ class Aria2DownloadPipeline(BaseDownloadPipeline):
                 "--dir",
                 str(Path(output_path).parent),
                 "--out",
-                os.path.basename(output_path),
+                Path(output_path).name,
             ]
 
             # Add cookie header if available
