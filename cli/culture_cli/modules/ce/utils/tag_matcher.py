@@ -3,7 +3,10 @@
 from dataclasses import dataclass
 
 import Levenshtein
-import polars as pl
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import polars as pl
 
 
 @dataclass
