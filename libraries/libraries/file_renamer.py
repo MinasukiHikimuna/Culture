@@ -224,7 +224,7 @@ def get_performers_value(performers: list[dict]) -> str:
 
     Args:
         performers: List of dictionaries containing performer information
-                  Example: [{"stashapp_performers_name": "Name", 
+                  Example: [{"stashapp_performers_name": "Name",
                            "stashapp_performers_gender": "FEMALE",
                            "stashapp_performers_favorite": True}]
 
