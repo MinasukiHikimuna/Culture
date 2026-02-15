@@ -147,3 +147,57 @@ def link_site(
             detail = e.response.json().get("detail", str(e)) if e.response.content else str(e)
             print_error(f"API error: {detail}")
         raise typer.Exit(code=1) from e
+
+
+@sites_app.command("create")
+def create_site(
+    short_name: Annotated[str, typer.Argument(help="Short identifier for the site")],
+    name: Annotated[str, typer.Argument(help="Full site name")],
+    url: Annotated[str, typer.Argument(help="Base URL of the site")],
+    username: Annotated[
+        str | None,
+        typer.Option("--username", "-u", help="Username for site authentication"),
+    ] = None,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", "-j", help="Output as JSON instead of formatted text"),
+    ] = False,
+) -> None:
+    """Create a new site in the Culture Extractor database.
+
+    Creates a new site with the given identifiers. If --username is provided,
+    you will be prompted securely for the password.
+
+    Examples:
+        ce sites create example "Example Site" https://example.com
+        ce sites create mysite "My Site" https://mysite.com --username user
+        ce sites create mysite "My Site" https://mysite.com --json
+    """
+    try:
+        # Prompt for password securely if username is provided
+        password: str | None = None
+        if username is not None:
+            password = typer.prompt("Password", hide_input=True)
+
+        with _get_api_client() as api:
+            result = api.create_site(
+                short_name=short_name,
+                name=name,
+                url=url,
+                username=username,
+                password=password,
+            )
+
+        if json_output:
+            print_json(result)
+        else:
+            print_success(f"Created site '{result['name']}' with UUID: {result['uuid']}")
+
+    except httpx.ConnectError:
+        print_error("Cannot connect to Culture API. Is the API server running?")
+        print_info("Start the API with: cd api && uv run uvicorn api.main:app --port 8000")
+        raise typer.Exit(code=1) from None
+    except httpx.HTTPStatusError as e:
+        detail = e.response.json().get("detail", str(e)) if e.response.content else str(e)
+        print_error(f"API error: {detail}")
+        raise typer.Exit(code=1) from e

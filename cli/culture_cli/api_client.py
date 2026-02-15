@@ -80,6 +80,35 @@ class CultureAPIClient:
         response.raise_for_status()
         return response.json()
 
+    def create_site(
+        self,
+        short_name: str,
+        name: str,
+        url: str,
+        username: str | None = None,
+        password: str | None = None,
+    ) -> dict:
+        """Create a new site.
+
+        Args:
+            short_name: Short identifier for the site
+            name: Full site name
+            url: Base URL of the site
+            username: Optional username for site authentication
+            password: Optional password for site authentication
+
+        Returns:
+            Dictionary with created site info including uuid
+        """
+        payload: dict[str, str] = {"short_name": short_name, "name": name, "url": url}
+        if username is not None:
+            payload["username"] = username
+        if password is not None:
+            payload["password"] = password
+        response = self.client.post("/sites", json=payload)
+        response.raise_for_status()
+        return response.json()
+
     # Releases endpoints
 
     def get_releases(

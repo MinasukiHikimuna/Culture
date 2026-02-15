@@ -6,6 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from api.dependencies import get_ce_client
 from api.schemas.sites import (
+    CreateSiteRequest,
+    CreateSiteResponse,
     LinkSiteRequest,
     Site,
     SiteDetail,
@@ -54,6 +56,34 @@ def list_sites(
             results.append(SiteWithLinkStatus(**row, **status))
 
     return results
+
+
+@router.post("", status_code=201)
+def create_site(
+    request: CreateSiteRequest,
+    client: Annotated[ClientCultureExtractor, Depends(get_ce_client)],
+) -> CreateSiteResponse:
+    """Create a new site in the Culture Extractor database."""
+    try:
+        site_uuid = client.create_site(
+            short_name=request.short_name,
+            name=request.name,
+            url=request.url,
+            username=request.username,
+            password=request.password,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to create site") from None
+
+    return CreateSiteResponse(
+        message=f"Created site '{request.name}'",
+        uuid=site_uuid,
+        short_name=request.short_name,
+        name=request.name,
+        url=request.url,
+    )
 
 
 @router.get("/{uuid}")

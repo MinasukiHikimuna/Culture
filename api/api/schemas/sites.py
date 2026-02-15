@@ -37,3 +37,23 @@ class LinkSiteRequest(BaseModel):
 
     target: str = Field(description="Target system name (stashapp or stashdb)")
     external_id: str = Field(description="External ID value")
+
+
+class CreateSiteRequest(BaseModel):
+    """Request body for creating a new site."""
+
+    short_name: str = Field(min_length=1, pattern=r"^[a-z0-9_-]+$", description="Short identifier for the site")
+    name: str = Field(min_length=1, description="Full site name")
+    url: str = Field(min_length=1, description="Base URL of the site")
+    username: str | None = Field(default=None, description="Optional username for authentication")
+    password: str | None = Field(default=None, description="Optional password for authentication")
+
+
+class CreateSiteResponse(BaseModel):
+    """Response from creating a new site."""
+
+    message: str = Field(description="Success message")
+    uuid: str = Field(description="UUID of the created site")
+    short_name: str = Field(description="Short identifier")
+    name: str = Field(description="Full site name")
+    url: str = Field(description="Site URL")
