@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 
 sys.path.append(str(Path.cwd().parent))
 
-import libraries.client_culture_extractor as client_culture_extractor
+from libraries import client_culture_extractor
 
 
 load_dotenv()

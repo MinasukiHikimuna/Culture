@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 
 import torch
-import torch.nn as nn
+from torch import nn
 from facenet_pytorch import InceptionResnetV1
 from PIL import Image
 from torch.utils.data import DataLoader, Dataset
