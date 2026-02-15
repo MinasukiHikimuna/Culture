@@ -81,7 +81,7 @@ class QueryTagsBuilder:
         self._modifier = "INCLUDES"
         self._depth = 0
 
-    def include(self, *tags: Union[str, TagReference]) -> QueryTagsBuilder:
+    def include(self, *tags: str | TagReference) -> QueryTagsBuilder:
         """Include tags in the query"""
         for tag in tags:
             if isinstance(tag, str):
@@ -91,7 +91,7 @@ class QueryTagsBuilder:
                 self._included_tags.append(tag)
         return self
 
-    def exclude(self, *tags: Union[str, TagReference]) -> QueryTagsBuilder:
+    def exclude(self, *tags: str | TagReference) -> QueryTagsBuilder:
         """Exclude tags from the query"""
         for tag in tags:
             if isinstance(tag, str):
@@ -182,7 +182,7 @@ class QueryPerformerTagsBuilder:
         self._modifier = "INCLUDES"
         self._depth = 0
 
-    def include(self, *tags: Union[str, TagReference]) -> QueryPerformerTagsBuilder:
+    def include(self, *tags: str | TagReference) -> QueryPerformerTagsBuilder:
         """Include performer tags in the query"""
         for tag in tags:
             if isinstance(tag, str):
@@ -191,7 +191,7 @@ class QueryPerformerTagsBuilder:
                 self._included_tags.append(tag)
         return self
 
-    def exclude(self, *tags: Union[str, TagReference]) -> QueryPerformerTagsBuilder:
+    def exclude(self, *tags: str | TagReference) -> QueryPerformerTagsBuilder:
         """Exclude performer tags from the query"""
         for tag in tags:
             if isinstance(tag, str):
@@ -281,7 +281,7 @@ class QueryStudiosBuilder:
         self._modifier = "INCLUDES"
         self._depth = 0
 
-    def include(self, *studios: Union[str, StudioReference]) -> QueryStudiosBuilder:
+    def include(self, *studios: str | StudioReference) -> QueryStudiosBuilder:
         """Include studios in the query"""
         for studio in studios:
             if isinstance(studio, str):
@@ -290,7 +290,7 @@ class QueryStudiosBuilder:
                 self._included_studios.append(studio)
         return self
 
-    def exclude(self, *studios: Union[str, StudioReference]) -> QueryStudiosBuilder:
+    def exclude(self, *studios: str | StudioReference) -> QueryStudiosBuilder:
         """Exclude studios from the query"""
         for studio in studios:
             if isinstance(studio, str):
@@ -461,7 +461,7 @@ class FixBuilder:
         self._add_tags: list[TagReference] = []
         self._remove_tags: list[TagReference] = []
 
-    def add_tags(self, *tags: Union[str, TagReference]) -> FixBuilder:
+    def add_tags(self, *tags: str | TagReference) -> FixBuilder:
         """Add tags to be added in the fix"""
         for tag in tags:
             if isinstance(tag, str):
@@ -470,7 +470,7 @@ class FixBuilder:
                 self._add_tags.append(tag)
         return self
 
-    def remove_tags(self, *tags: Union[str, TagReference]) -> FixBuilder:
+    def remove_tags(self, *tags: str | TagReference) -> FixBuilder:
         """Add tags to be removed in the fix"""
         for tag in tags:
             if isinstance(tag, str):

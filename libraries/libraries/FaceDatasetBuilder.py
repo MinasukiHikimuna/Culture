@@ -59,7 +59,7 @@ class FaceDatasetBuilder:
         for performer_dir in self.structure["performers"].values():
             Path(performer_dir).mkdir(parents=True, exist_ok=True)
 
-    def get_performer_directory_name(self, performer: Union[dict, str]) -> str:
+    def get_performer_directory_name(self, performer: dict | str) -> str:
         """Create directory name from performer data or ID"""
         if isinstance(performer, str):
             return performer
