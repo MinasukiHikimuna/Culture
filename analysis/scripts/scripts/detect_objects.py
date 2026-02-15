@@ -38,7 +38,7 @@ def process_directory(source_dir: str, model_name: str = "yolo11n.pt", save_resu
         # Run inference and save results directly
         if save_results:
             # Save directly to the yolo directory
-            results = model(img_path, verbose=False, save=True, 
+            results = model(img_path, verbose=False, save=True,
                           project=str(output_dir),
                           name="",
                           exist_ok=True,
@@ -85,4 +85,4 @@ def main():
     process_directory(str(source_path), args.model, not args.no_save)
 
 if __name__ == "__main__":
-    main() 
+    main()

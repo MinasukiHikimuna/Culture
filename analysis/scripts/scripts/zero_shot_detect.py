@@ -113,4 +113,4 @@ def main():
     detect_with_descriptions(args.source_dir, args.descriptions, not args.no_save)
 
 if __name__ == "__main__":
-    main() 
+    main()

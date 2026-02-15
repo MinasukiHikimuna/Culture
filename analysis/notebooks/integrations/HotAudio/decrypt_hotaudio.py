@@ -22,7 +22,7 @@ def uint32(data, offset):
 @dataclass
 class HotAudioHeader:
     file_length: int
-    header_length: int 
+    header_length: int
     extra_length: int
     meta: dict
     segments: List[dict]  # List of dicts with 'off' and 'pts' keys

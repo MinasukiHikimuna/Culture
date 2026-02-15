@@ -20,7 +20,7 @@ class DatasetStructure:
         self.base_dir = Path(base_dir)
 
         # Scene processing states
-        self.scenes = {state.value: self.base_dir / "scenes" / state.value 
+        self.scenes = {state.value: self.base_dir / "scenes" / state.value
                       for state in SceneState}
 
         # Permanent metadata storage

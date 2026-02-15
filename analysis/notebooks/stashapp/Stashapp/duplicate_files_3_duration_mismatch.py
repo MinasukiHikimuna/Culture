@@ -46,7 +46,7 @@ stash_client.update_tags_for_scenes(
 
 
 # %%
-scenes_with_dupes = stash.find_scenes({ 
+scenes_with_dupes = stash.find_scenes({
   "file_count": {
     "modifier": "GREATER_THAN",
     "value": 1
@@ -153,8 +153,8 @@ for row in duration_mismatches.iter_rows(named=True):
     print(f"\nScene {row['scene_id']} - {row['title']}")
 
     for i, (duration, file_id, file_path, size, is_primary) in enumerate(zip(
-        row["all_durations"], 
-        row["all_file_ids"], 
+        row["all_durations"],
+        row["all_file_ids"],
         row["all_file_paths"],
         row["all_file_sizes"],
         row["all_is_primary"]

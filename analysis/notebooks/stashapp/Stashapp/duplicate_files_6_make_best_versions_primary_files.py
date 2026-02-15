@@ -24,7 +24,7 @@ duration_mismatch_tag = stash.find_tag({ "name": "Duplicate: Duration Mismatch" 
 # # Making higher quality versions the primary file
 
 # %%
-scenes_with_dupes = stash.find_scenes({ 
+scenes_with_dupes = stash.find_scenes({
   "file_count": {
     "modifier": "GREATER_THAN",
     "value": 1
@@ -81,7 +81,7 @@ def select_best_quality_file(files):
 
     # Only return different files if the best file is better than the primary
     if best_file["id"] != primary_file["id"] and (
-        best_file["resolution"] > primary_file["resolution"] or 
+        best_file["resolution"] > primary_file["resolution"] or
         (best_file["resolution"] == primary_file["resolution"] and best_file["size"] > primary_file["size"])
     ):
         return {

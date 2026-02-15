@@ -30,7 +30,7 @@ duration_mismatch_tag = stash.find_tag({ "name": "Duplicate: Duration Mismatch" 
 # # Making higher quality versions the primary file
 
 # %%
-scenes_with_dupes = stash.find_scenes({ 
+scenes_with_dupes = stash.find_scenes({
   "file_count": {
     "modifier": "GREATER_THAN",
     "value": 1

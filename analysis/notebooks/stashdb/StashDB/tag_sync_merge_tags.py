@@ -29,8 +29,8 @@ def contains_cjk(text):
         (0xAC00, 0xD7AF),   # Korean Hangul Syllables
     ]
 
-    return any(any(ord(char) >= start and ord(char) <= end 
-               for start, end in cjk_ranges) 
+    return any(any(ord(char) >= start and ord(char) <= end
+               for start, end in cjk_ranges)
                for char in text)
 
 

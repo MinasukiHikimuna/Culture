@@ -1,6 +1,6 @@
 # %% [markdown]
 # # Duplicate Links
-# 
+#
 # This notebook removes duplicate links from scenes and galleries.
 
 # %%

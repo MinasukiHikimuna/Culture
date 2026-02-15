@@ -227,8 +227,8 @@ class FaceDatasetBuilder:
             future_to_scene = {}
             for drive, drive_scene_list in drive_scenes.items():
                 for scene in drive_scene_list:
-                    future = executor.submit(self._process_scene_with_semaphore, 
-                                          scene, 
+                    future = executor.submit(self._process_scene_with_semaphore,
+                                          scene,
                                           self.drive_semaphores[drive])
                     future_to_scene[future] = scene
 
@@ -290,8 +290,8 @@ class FaceDatasetBuilder:
             shutil.move(scene_frames_dir, scene_faces_dir)
 
             # Process frames and detect faces
-            frame_files = sorted([os.path.join(scene_faces_dir, f) 
-                                for f in os.listdir(scene_faces_dir) 
+            frame_files = sorted([os.path.join(scene_faces_dir, f)
+                                for f in os.listdir(scene_faces_dir)
                                 if f.endswith(".jpg")])
 
             # Create unverified directory structure

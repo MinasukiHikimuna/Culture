@@ -721,7 +721,7 @@ class StashDbClient(StashboxClient):
             if result and "data" in result and "findScenesByFullFingerprints" in result["data"]:
                 stashdb_scenes = result["data"]["findScenesByFullFingerprints"]
                 scenes_by_phash = self.scene_matcher.match_scenes(
-                    [{"phash": phash} for phash in phashes], 
+                    [{"phash": phash} for phash in phashes],
                     stashdb_scenes
                 )
 

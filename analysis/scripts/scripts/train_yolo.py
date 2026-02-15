@@ -97,4 +97,4 @@ def main():
     train_model(config_path, args.epochs, args.batch_size, args.img_size)
 
 if __name__ == "__main__":
-    main() 
+    main()

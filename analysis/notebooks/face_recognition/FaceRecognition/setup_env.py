@@ -132,4 +132,4 @@ if __name__ == "__main__":
                 if "cuda" in path.lower() or "nvidia" in path.lower():
                     print(f"  {path}")
         else:
-            print(f"{var}: {value}") 
+            print(f"{var}: {value}")

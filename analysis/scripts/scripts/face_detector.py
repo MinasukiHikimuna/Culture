@@ -354,4 +354,4 @@ if __name__ == "__main__":
             stats = pstats.Stats(pr, stream=f)
             stats.sort_stats("cumulative")
             stats.print_stats()
-        print(f"Profile stats saved to {stats_file}") 
+        print(f"Profile stats saved to {stats_file}")

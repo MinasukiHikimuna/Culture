@@ -27,4 +27,4 @@ def test_gpu():
         print("   GPU test failed:", str(e))
 
 if __name__ == "__main__":
-    test_gpu() 
+    test_gpu()

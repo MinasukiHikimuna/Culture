@@ -63,7 +63,7 @@ class StashfaceAPIClient:
         # Return the file reference
         return upload_info[0]
 
-    def analyze_faces(self, image_path: str, threshold: float = 0.5, 
+    def analyze_faces(self, image_path: str, threshold: float = 0.5,
                      max_results: int = 3, api_type: str = "json") -> Dict:
         """
         Analyze faces in an image using the Stashface API
@@ -91,7 +91,7 @@ class StashfaceAPIClient:
 
         # Join the processing queue
         # Based on the Gradio interface structure:
-        # Tab 0: Visual Search (multiple_image_search_with_visual) 
+        # Tab 0: Visual Search (multiple_image_search_with_visual)
         # Tab 1: JSON API (multiple_image_search)
         # Tab 2: Faces in Sprite
 
@@ -168,7 +168,7 @@ class StashfaceAPIClient:
                         elif "error" in data.get("msg", "").lower():
                             print(f"\n❌ Server error: {data}")
                             return {
-                                "success": False, 
+                                "success": False,
                                 "error": f"Server error: {data.get('msg', 'Unknown error')}"
                             }
                     except json.JSONDecodeError as e:
@@ -232,7 +232,7 @@ Examples:
     )
 
     parser.add_argument("image", help="Path to the image file to analyze")
-    parser.add_argument("--threshold", type=float, default=0.5, 
+    parser.add_argument("--threshold", type=float, default=0.5,
                        help="Confidence threshold (0.0-1.0, default: 0.5)")
     parser.add_argument("--results", type=int, default=3,
                        help="Maximum number of results (0-50, default: 3)")
@@ -261,8 +261,8 @@ Examples:
     try:
         # Analyze the image
         results = client.analyze_faces(
-            args.image, 
-            args.threshold, 
+            args.image,
+            args.threshold,
             args.results,
             args.api
         )

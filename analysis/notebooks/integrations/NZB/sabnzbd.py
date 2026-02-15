@@ -181,4 +181,4 @@ class SABnzbdClient:
             # Not found in either queue or history
             time.sleep(check_interval)
 
-        return {"status": "timeout", "error": f"Download did not complete within {timeout} seconds"} 
+        return {"status": "timeout", "error": f"Download did not complete within {timeout} seconds"}

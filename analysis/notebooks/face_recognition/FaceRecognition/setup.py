@@ -10,4 +10,4 @@ setup(
         "requests",
         "python-dotenv"
     ]
-) 
+)

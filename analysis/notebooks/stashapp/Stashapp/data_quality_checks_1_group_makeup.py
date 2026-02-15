@@ -53,7 +53,7 @@ def get_expected_group_tags(performers, all_tags_df):
     count_map = {
         1: "Solo",
         2: "Twosome",
-        3: "Threesome", 
+        3: "Threesome",
         4: "Foursome",
         5: "Fivesome",
         6: "Sixsome",
@@ -104,7 +104,7 @@ def get_expected_group_tags(performers, all_tags_df):
             tag_names.append(f"{base_tag} ({makeup})")
 
     # Convert tag names to structs with id and name
-    return [{"id": row["id"], "name": row["name"]} 
+    return [{"id": row["id"], "name": row["name"]}
             for row in all_tags_df.filter(pl.col("name").is_in(tag_names)).to_dicts()]
 
 def get_scene_group_makeup_issues(scene, group_makeup_tags, exclude_tag_ids, all_tags_df):
@@ -123,9 +123,9 @@ def get_scene_group_makeup_issues(scene, group_makeup_tags, exclude_tag_ids, all
         return None
 
     scene_tags = {tag["name"]: tag["id"] for tag in scene["tags"]}
-    group_makeup_tags = {tag["name"]: tag["id"] 
-                        for tag in scene["tags"] 
-                        if any(tag["name"].startswith(prefix) 
+    group_makeup_tags = {tag["name"]: tag["id"]
+                        for tag in scene["tags"]
+                        if any(tag["name"].startswith(prefix)
                             for prefix in ["Solo", "Twosome", "Threesome", "Foursome", "Fivesome", "Sixsome", "Sevensome"])}
 
     expected_tags = get_expected_group_tags(scene["performers"], all_tags_df)
@@ -134,7 +134,7 @@ def get_scene_group_makeup_issues(scene, group_makeup_tags, exclude_tag_ids, all
     issues = []
 
     # Check for missing expected tags
-    missing_tags = [{"id": tag["id"], "name": tag["name"]} 
+    missing_tags = [{"id": tag["id"], "name": tag["name"]}
                    for tag in expected_tags if tag["name"] not in scene_tags]
     if missing_tags:
         issues.append(f"Missing tags: {', '.join(tag['name'] for tag in missing_tags)}")
@@ -150,8 +150,8 @@ def get_scene_group_makeup_issues(scene, group_makeup_tags, exclude_tag_ids, all
 
             # Check for incorrect specific tags
             if any(tag["name"].startswith(prefix) for tag in expected_tags):
-                unexpected_tags = [{"id": id, "name": name} 
-                                 for name, id in matching_tags 
+                unexpected_tags = [{"id": id, "name": name}
+                                 for name, id in matching_tags
                                  if name not in expected_tag_dict]
                 if unexpected_tags:
                     issues.append(f"Has incorrect specific tags: {', '.join(tag['name'] for tag in unexpected_tags)}")
@@ -201,29 +201,29 @@ issues_df
 # # %%
 # selected = issues_df.head(1).to_dicts()[0]
 # selected
-# 
+#
 # # %%
 # # Update the scene with the expected tags
 # expected_tags = selected['expected_tags']
 # expected_tag_ids = [tag['id'] for tag in expected_tags]
 # expected_tag_ids
-# 
+#
 # refreshed_scene = stash.find_scene(selected['scene_id'])
 # current_tags = refreshed_scene['tags']
 # current_tag_ids = [tag['id'] for tag in current_tags]
 # print(current_tag_ids)
 # updated_tag_ids = current_tag_ids + expected_tag_ids
 # print(updated_tag_ids)
-# 
+#
 # stash.update_scene({
 #     'id': selected['scene_id'],
 #     'tag_ids': updated_tag_ids
 # })
-# 
+#
 # # %%
 # # Update the scene with Non-Sex Performer tag
 # non_sex_performer_tag = all_tags.filter(pl.col('name') == "Non-Sex Performer").to_dicts()[0]['id']
-# 
+#
 # stash.update_scene({
 #     'id': selected['scene_id'],
 #     'tag_ids': updated_tag_ids + [non_sex_performer_tag]

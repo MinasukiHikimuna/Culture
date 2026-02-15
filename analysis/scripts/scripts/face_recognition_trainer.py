@@ -413,4 +413,4 @@ if __name__ == "__main__":
 
     print(f"\nTraining run {timestamp} completed:")
     print(f"Model saved to: {model_path}")
-    print(f"Training log saved to: {log_path}") 
+    print(f"Training log saved to: {log_path}")

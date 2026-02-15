@@ -34,8 +34,8 @@ def prepare_scenes_for_performer(performer_name: str, base_dir: str, exclude_vr:
     # Get scenes
     query = {
         "performers": {
-            "value": [performer["stashapp_id"]], 
-            "excludes": [], 
+            "value": [performer["stashapp_id"]],
+            "excludes": [],
             "modifier": "INCLUDES"
         }
     }
@@ -43,8 +43,8 @@ def prepare_scenes_for_performer(performer_name: str, base_dir: str, exclude_vr:
     if exclude_vr:
         vr_tag = stash.find_tag("Virtual Reality")["id"]
         query["tags"] = {
-            "value": [], 
-            "excludes": [vr_tag], 
+            "value": [],
+            "excludes": [vr_tag],
             "modifier": "INCLUDES"
         }
 
@@ -91,4 +91,4 @@ def prepare_scenes_for_performer(performer_name: str, base_dir: str, exclude_vr:
         "total_scenes": len(scenes),
         "already_processed": len(processed_scenes),
         "newly_queued": scenes_queued
-    } 
+    }

@@ -109,4 +109,4 @@ class FrameExtractor:
 
 if __name__ == "__main__":
     extractor = FrameExtractor("H:\\Faces\\dataset")
-    extractor.run() 
+    extractor.run()

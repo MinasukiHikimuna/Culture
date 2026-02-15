@@ -78,7 +78,7 @@ class GroupMakeup:
                 tag_names.append(f"{base_tag} ({makeup})")
 
         # Convert tag names to structs with id and name
-        return [{"id": self.tags[name], "name": name} 
+        return [{"id": self.tags[name], "name": name}
                 for name in tag_names if name in self.tags]
 
     def get_scene_group_makeup_issues(self, scene):
@@ -89,9 +89,9 @@ class GroupMakeup:
             return None
 
         scene_tags = {tag["name"]: tag["id"] for tag in scene["tags"]}
-        group_makeup_tags = {tag["name"]: tag["id"] 
-                            for tag in scene["tags"] 
-                            if any(tag["name"].startswith(prefix) 
+        group_makeup_tags = {tag["name"]: tag["id"]
+                            for tag in scene["tags"]
+                            if any(tag["name"].startswith(prefix)
                                 for prefix in self.COUNT_MAP.values())}
 
         expected_tags = self.get_expected_group_tags(scene["performers"])
@@ -100,7 +100,7 @@ class GroupMakeup:
         issues = []
 
         # Check for missing expected tags
-        missing_tags = [{"id": tag["id"], "name": tag["name"]} 
+        missing_tags = [{"id": tag["id"], "name": tag["name"]}
                        for tag in expected_tags if tag["name"] not in scene_tags]
         if missing_tags:
             issues.append(f"Missing tags: {', '.join(tag['name'] for tag in missing_tags)}")
@@ -115,8 +115,8 @@ class GroupMakeup:
 
                 # Check for incorrect specific tags
                 if any(tag["name"].startswith(prefix) for tag in expected_tags):
-                    unexpected_tags = [{"id": id, "name": name} 
-                                     for name, id in matching_tags 
+                    unexpected_tags = [{"id": id, "name": name}
+                                     for name, id in matching_tags
                                      if name not in expected_tag_dict]
                     if unexpected_tags:
                         issues.append(f"Has incorrect specific tags: {', '.join(tag['name'] for tag in unexpected_tags)}")

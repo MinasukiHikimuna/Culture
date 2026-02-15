@@ -118,4 +118,4 @@ class SceneVerifier:
 
 if __name__ == "__main__":
     verifier = SceneVerifier("H:\\Faces\\dataset")
-    verifier.run() 
+    verifier.run()

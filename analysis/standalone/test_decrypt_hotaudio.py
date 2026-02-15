@@ -47,17 +47,17 @@ def test_key_derivation(sample_header, sample_keys):
 
 # def test_segment_decryption(sample_header, sample_keys):
 #     decryptor = HotAudioDecryptor(sample_header, sample_keys)
-#     
+#
 #     # Read first segment data
 #     with open('hm6aq9rrzwtt2drebe64hmjf00.hax', 'rb') as f:
 #         f.seek(decryptor.header.header_length + decryptor.header.extra_length)
 #         segment_data = f.read(decryptor.header.segments[1][0] - decryptor.header.segments[0][0])
-#     
+#
 #     # Decrypt first segment
 #     decrypted = decryptor.decrypt_segment(0, segment_data)
-#     
+#
 #     # Basic validation of decrypted data
 #     assert len(decrypted) > 0
 #     # Check for AAC ADTS header magic bytes
 #     assert decrypted.startswith(b'\xff\xf1') or decrypted.startswith(b'\xff\xf9')
-# 
+#

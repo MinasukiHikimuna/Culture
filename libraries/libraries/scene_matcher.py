@@ -27,7 +27,7 @@ class SceneMatcher:
             input_duration = input_scene.get("duration")
 
             for stashdb_scene in stashdb_scenes:
-                phash_fingerprints = [f for f in stashdb_scene["fingerprints"] 
+                phash_fingerprints = [f for f in stashdb_scene["fingerprints"]
                                     if f["algorithm"] == "PHASH"]
 
                 # Calculate quality score for this scene
@@ -68,4 +68,4 @@ class SceneMatcher:
 
             phash_to_scene[input_scene["phash"]] = matching_scene
 
-        return phash_to_scene 
+        return phash_to_scene

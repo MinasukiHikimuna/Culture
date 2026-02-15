@@ -314,4 +314,4 @@ def main():
         print(f"{performer:<40} {confidence:>8.4f} {detections:>10}")
 
 if __name__ == "__main__":
-    main() 
+    main()

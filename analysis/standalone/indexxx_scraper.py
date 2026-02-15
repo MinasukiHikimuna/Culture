@@ -173,4 +173,4 @@ def main():
     # releases2 = scraper2.scrape_all_pages()
 
 if __name__ == "__main__":
-    main() 
+    main()

@@ -114,7 +114,7 @@ def discover_objects(source_dir: str, confidence_threshold: float = 0.25, save_r
             cluster_dir = objects_dir / f"cluster_{cluster_id}"
             cluster_dir.mkdir(exist_ok=True)
 
-            cluster_locations = [loc for i, loc in enumerate(locations) 
+            cluster_locations = [loc for i, loc in enumerate(locations)
                                if clusters[i] == cluster_id]
 
             cluster_features = features_array[clusters == cluster_id]
@@ -148,4 +148,4 @@ def main():
     discover_objects(args.source_dir, args.confidence, not args.no_save)
 
 if __name__ == "__main__":
-    main() 
+    main()
