@@ -255,9 +255,13 @@ class XArtSpider(scrapy.Spider):
                 continue
 
             # Check if we already have this release
-            if slug in self.existing_releases and not self.force_update:
+            existing_release = self.existing_releases.get(slug)
+            has_no_downloads = existing_release and not existing_release["downloaded_files"]
+            if existing_release and not self.force_update and not has_no_downloads:
                 self.logger.info(f"Skipping existing release: {slug}")
                 continue
+            if has_no_downloads:
+                self.logger.info(f"Re-processing release with no downloads: {slug}")
 
             # Handle plural forms correctly (video→videos, gallery→galleries)
             url_path = "galleries" if content_type == "gallery" else f"{content_type}s"
@@ -451,8 +455,21 @@ class XArtSpider(scrapy.Spider):
 
         yield release_item
 
-        # Yield download items
-        yield from download_items
+        # Filter download items to only yield missing files
+        if existing_release and not self.force_update:
+            downloaded_files = existing_release["downloaded_files"]
+            missing_items = [
+                item
+                for item, af in zip(download_items, available_files, strict=True)
+                if (af.file_type, af.content_type, af.variant) not in downloaded_files
+            ]
+            if missing_items:
+                self.logger.info(f"Release {slug} exists but missing {len(missing_items)} files. Downloading them.")
+            else:
+                self.logger.info(f"Release {slug} already has all files downloaded. Skipping downloads.")
+            yield from missing_items
+        else:
+            yield from download_items
 
     def parse_gallery(self, response):
         """Parse a gallery detail page and extract release data."""
@@ -622,5 +639,18 @@ class XArtSpider(scrapy.Spider):
 
         yield release_item
 
-        # Yield download items
-        yield from download_items
+        # Filter download items to only yield missing files
+        if existing_release and not self.force_update:
+            downloaded_files = existing_release["downloaded_files"]
+            missing_items = [
+                item
+                for item, af in zip(download_items, available_files, strict=True)
+                if (af.file_type, af.content_type, af.variant) not in downloaded_files
+            ]
+            if missing_items:
+                self.logger.info(f"Release {slug} exists but missing {len(missing_items)} files. Downloading them.")
+            else:
+                self.logger.info(f"Release {slug} already has all files downloaded. Skipping downloads.")
+            yield from missing_items
+        else:
+            yield from download_items
