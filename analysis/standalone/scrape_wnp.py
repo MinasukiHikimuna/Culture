@@ -62,7 +62,6 @@ print(response.text)
 import base64
 
 
-
 soup = BeautifulSoup(response.text, "html.parser")
 
 # Find the video element by ID
