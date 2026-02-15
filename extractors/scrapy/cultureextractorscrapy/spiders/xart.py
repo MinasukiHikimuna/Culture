@@ -88,6 +88,27 @@ class XArtSpider(scrapy.Spider):
 
         return spider
 
+    MAX_PAGES = 200
+
+    def _follow_next_page(self, response, callback):
+        """Follow the next pagination link if one exists."""
+        current_page = response.meta.get("page", 1)
+        if current_page >= self.MAX_PAGES:
+            self.logger.warning(f"Reached max page limit ({self.MAX_PAGES}), stopping pagination")
+            return None
+        next_page_link = response.xpath(
+            f'//nav[@aria-label="Page navigation"]//a[normalize-space(text())="{current_page + 1}"]/@href'
+        ).get()
+        if next_page_link:
+            self.logger.info(f"Found next page: {current_page + 1} -> {next_page_link}")
+            return scrapy.Request(
+                url=response.urljoin(next_page_link),
+                callback=callback,
+                cookies=self.cookies_list,
+                meta={"page": current_page + 1},
+            )
+        return None
+
     def start_requests(self):
         if self.mode == "performers":
             # Start at the models page
@@ -135,9 +156,10 @@ class XArtSpider(scrapy.Spider):
                 meta={"slug": slug},
             )
 
-            # For now, only process the first model for testing
-            self.logger.info("Stopping after first model (test mode)")
-            return
+        # Handle pagination
+        next_req = self._follow_next_page(response, self.parse_models_page)
+        if next_req:
+            yield next_req
 
     def parse_model(self, response):
         """Parse a model detail page and extract performer data."""
@@ -249,9 +271,10 @@ class XArtSpider(scrapy.Spider):
                 meta={"slug": slug, "content_type": content_type},
             )
 
-            # For testing, only process the first release
-            self.logger.info("Stopping after first release (test mode)")
-            return
+        # Handle pagination
+        next_req = self._follow_next_page(response, self.parse_updates_page)
+        if next_req:
+            yield next_req
 
     def parse_video(self, response):
         """Parse a video detail page and extract release data."""
