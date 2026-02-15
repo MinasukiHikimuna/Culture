@@ -146,7 +146,7 @@ def train_model(dataset_path, batch_size=32, num_epochs=50, learning_rate=0.0001
         class Logger:
             def __init__(self, filename):
                 self.terminal = sys.stdout
-                self.log = open(filename, "w")
+                self.log = Path(filename).open("w")
 
             def write(self, message):
                 self.terminal.write(message)

@@ -162,7 +162,7 @@ class FaceDetector:
             metadata_start = time.time()
             metadata_path = self.dataset.scene_data / f"{scene_id}.json"
             if metadata_path.exists():
-                with open(metadata_path, "r") as f:
+                with metadata_path.open("r") as f:
                     scene_data = json.load(f)
                     performers = scene_data.get("performers", [])
             else:
@@ -285,7 +285,7 @@ class FaceDetector:
             print(f"Error processing scene {scene_id}: {str(e)}")
             failed_dir = self.dataset.scenes[SceneState.FAILED.value] / scene_id
             failed_dir.mkdir(parents=True, exist_ok=True)
-            with open(failed_dir / "error.txt", "w") as f:
+            with (failed_dir / "error.txt").open("w") as f:
                 f.write(str(e))
             if working_dir and working_dir.exists():
                 shutil.rmtree(working_dir)
@@ -348,7 +348,7 @@ if __name__ == "__main__":
         pr.disable()
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         stats_file = f"face_detector_profile_{timestamp}.stats"
-        with open(stats_file, "w") as f:
+        with Path(stats_file).open("w") as f:
             stats = pstats.Stats(pr, stream=f)
             stats.sort_stats("cumulative")
             stats.print_stats()

@@ -2,6 +2,7 @@ import json
 import os
 import re
 from datetime import UTC, datetime
+from pathlib import Path
 from urllib.parse import urlencode
 
 import newnewid
@@ -1185,7 +1186,7 @@ class PatreonSpider(scrapy.Spider):
             import hashlib
 
             hash_sha256 = hashlib.sha256()
-            with open(file_path, "rb") as f:
+            with Path(file_path).open("rb") as f:
                 # Read file in chunks to handle large files
                 for chunk in iter(lambda: f.read(4096), b""):
                     hash_sha256.update(chunk)

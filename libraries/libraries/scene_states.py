@@ -38,7 +38,7 @@ class DatasetStructure:
     def load_dataset_info(self):
         """Load or initialize dataset info tracking processed scenes"""
         if self.dataset_info.exists():
-            with open(self.dataset_info, "r") as f:
+            with self.dataset_info.open("r") as f:
                 self.info = json.load(f)
         else:
             self.info = {
@@ -50,7 +50,7 @@ class DatasetStructure:
     def save_dataset_info(self):
         """Save dataset info"""
         self.info["last_updated"] = time.strftime("%Y-%m-%d %H:%M:%S")
-        with open(self.dataset_info, "w") as f:
+        with self.dataset_info.open("w") as f:
             json.dump(self.info, f, indent=2)
 
     def is_scene_processed(self, scene_id: str) -> bool:

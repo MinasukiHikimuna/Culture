@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 import pytest
 from decrypt_hotaudio import HotAudioDecryptor
@@ -6,12 +7,12 @@ from decrypt_hotaudio import HotAudioDecryptor
 
 @pytest.fixture
 def sample_keys():
-    with open("hm6aq9rrzwtt2drebe64hmjf00.json") as f:
+    with Path("hm6aq9rrzwtt2drebe64hmjf00.json").open() as f:
         return json.load(f)["keys"]
 
 @pytest.fixture
 def sample_header():
-    with open("hm6aq9rrzwtt2drebe64hmjf00.hax", "rb") as f:
+    with Path("hm6aq9rrzwtt2drebe64hmjf00.hax").open("rb") as f:
         return f.read()  # Read enough for header
 
 def test_header_parsing(sample_header):

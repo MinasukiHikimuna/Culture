@@ -1,5 +1,6 @@
 import json
 import time
+from pathlib import Path
 
 import requests
 from bs4 import BeautifulSoup
@@ -167,7 +168,7 @@ class Scraper:
 
     def save_releases(self, releases, filename):
         """Save releases to JSON file"""
-        with open(filename, "w", encoding="utf-8") as f:
+        with Path(filename).open("w", encoding="utf-8") as f:
             json.dump([r.to_dict() for r in releases], f, indent=2)
 
 def main():

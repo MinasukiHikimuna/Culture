@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 import polars as pl
 import pytest
@@ -21,17 +22,17 @@ def all_stashapp_performers():
 
 @pytest.fixture
 def sample01():
-    with open("tests/data/performer_matcher.sample01.json", "r") as f:
+    with Path("tests/data/performer_matcher.sample01.json").open("r") as f:
         return json.load(f)
 
 @pytest.fixture
 def sample02():
-    with open("tests/data/performer_matcher.sample02.json", "r") as f:
+    with Path("tests/data/performer_matcher.sample02.json").open("r") as f:
         return json.load(f)
 
 @pytest.fixture
 def sample03():
-    with open("tests/data/performer_matcher.sample03.json", "r") as f:
+    with Path("tests/data/performer_matcher.sample03.json").open("r") as f:
         return json.load(f)
 
 @pytest.fixture

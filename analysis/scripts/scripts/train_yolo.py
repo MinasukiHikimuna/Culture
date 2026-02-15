@@ -42,7 +42,7 @@ def create_dataset_config(data_dir: str, classes: list) -> str:
 
     # Save config file
     config_path = data_path / "dataset.yaml"
-    with open(config_path, "w") as f:
+    with config_path.open("w") as f:
         yaml.dump(config, f, sort_keys=False)
 
     return str(config_path)

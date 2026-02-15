@@ -383,7 +383,7 @@ class FaceDatasetBuilder:
     def load_metadata(self):
         """Load or initialize metadata"""
         if Path(self.metadata_file).exists():
-            with open(self.metadata_file, "r") as f:
+            with Path(self.metadata_file).open("r") as f:
                 self.metadata = json.load(f)
         else:
             self.metadata = {
@@ -394,7 +394,7 @@ class FaceDatasetBuilder:
 
     def save_metadata(self):
         """Save metadata to file"""
-        with open(self.metadata_file, "w") as f:
+        with Path(self.metadata_file).open("w") as f:
             json.dump(self.metadata, f, indent=2)
 
     def get_scene_status(self, scene_id: str) -> str:

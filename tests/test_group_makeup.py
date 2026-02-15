@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 import pytest
 
@@ -7,12 +8,12 @@ from libraries.GroupMakeup import GroupMakeup
 
 @pytest.fixture
 def group_makeup_tags():
-    with open("tests/data/group_makeup.tags.json", "r") as f:
+    with Path("tests/data/group_makeup.tags.json").open("r") as f:
         return json.load(f)
 
 @pytest.fixture
 def sample_scene():
-    with open("tests/data/group_makeup.sample01.json", "r") as f:
+    with Path("tests/data/group_makeup.sample01.json").open("r") as f:
         return json.load(f)[0]
 
 def test_get_performer_makeup(sample_scene):

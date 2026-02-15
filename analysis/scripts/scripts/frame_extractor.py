@@ -26,7 +26,7 @@ class FrameExtractor:
             return
 
         # Store scene metadata permanently
-        with open(self.dataset.scene_data / f"{scene_id}.json", "w") as f:
+        with (self.dataset.scene_data / f"{scene_id}.json").open("w") as f:
             json.dump(scene_data, f, indent=2)
 
         video_path = scene_data["video_path"]
@@ -73,7 +73,7 @@ class FrameExtractor:
                 # Move to failed state
                 failed_dir = self.dataset.scenes[SceneState.FAILED.value] / scene_id
                 failed_dir.mkdir(parents=True, exist_ok=True)
-                with open(failed_dir / "error.txt", "w") as f:
+                with (failed_dir / "error.txt").open("w") as f:
                     f.write(str(e))
                 if scene_dir.exists():
                     shutil.rmtree(scene_dir)
@@ -88,7 +88,7 @@ class FrameExtractor:
                     scene_id = json_file.stem
 
                     # Load scene data
-                    with open(json_file, "r") as f:
+                    with json_file.open("r") as f:
                         scene_data = json.load(f)
 
                     # Process the scene

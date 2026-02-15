@@ -53,7 +53,7 @@ class SceneVerifier:
             if not metadata_path.exists():
                 raise ValueError(f"No metadata found for scene {scene_id}")
 
-            with open(metadata_path, "r") as f:
+            with metadata_path.open("r") as f:
                 scene_data = json.load(f)
 
             # Create verified scene directory

@@ -343,7 +343,7 @@ class BaseDownloadPipeline:
         """Calculate SHA-256 hash of a file using chunked reading."""
         try:
             sha256 = hashlib.sha256()
-            with open(file_path, "rb") as f:
+            with Path(file_path).open("rb") as f:
                 for chunk in iter(lambda: f.read(65536), b""):
                     sha256.update(chunk)
             return sha256.hexdigest()
@@ -1413,7 +1413,7 @@ class PerformerImagePipeline:
         response = requests.get(url, cookies=cookies, timeout=30)
         response.raise_for_status()
 
-        with open(filepath, "wb") as f:
+        with Path(filepath).open("wb") as f:
             f.write(response.content)
 
 
@@ -1498,5 +1498,5 @@ class StashDbImagePipeline:
         response = requests.get(url, timeout=30)
         response.raise_for_status()
 
-        with open(filepath, "wb") as f:
+        with Path(filepath).open("wb") as f:
             f.write(response.content)

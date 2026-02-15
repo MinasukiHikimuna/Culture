@@ -8,7 +8,7 @@ def load_sample_data(filename: str):
     """Load test data from sample JSON file"""
     test_dir = Path(__file__).parent
     sample_path = test_dir / "data" / filename
-    with open(sample_path) as f:
+    with sample_path.open() as f:
         data = json.load(f)
     return data["input_scenes"], data["results"]["data"]["findScenesByFullFingerprints"]
 

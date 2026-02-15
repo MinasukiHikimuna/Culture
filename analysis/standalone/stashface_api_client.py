@@ -45,7 +45,7 @@ class StashfaceAPIClient:
         upload_id = "".join(str(uuid.uuid4()).split("-"))[:15]
 
         # Upload the file
-        with open(file_path, "rb") as f:
+        with Path(file_path).open("rb") as f:
             files = {"files": (Path(file_path).name, f, "image/jpeg")}
             response = self.session.post(
                 f"{self.base_url}/gradio_api/upload",
@@ -268,7 +268,7 @@ Examples:
 
         # Save to file if requested
         if args.output:
-            with open(args.output, "w") as f:
+            with Path(args.output).open("w") as f:
                 json.dump(results, f, indent=2)
             print(f"💾 Results saved to {args.output}")
 

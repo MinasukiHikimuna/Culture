@@ -81,7 +81,7 @@ def prepare_scenes_for_performer(performer_name: str, base_dir: str, exclude_vr:
             }
 
             json_path = pending_dir / f"{scene_id}.json"
-            with open(json_path, "w") as f:
+            with json_path.open("w") as f:
                 json.dump(scene_data, f, indent=2)
             scenes_queued += 1
 
