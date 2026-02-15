@@ -39,9 +39,7 @@ def include_object(object, name, type_, reflected, compare_to):
     Excludes:
     - __EFMigrationsHistory table (EF Core's migration tracking)
     """
-    if type_ == "table" and name == "__EFMigrationsHistory":
-        return False
-    return True
+    return not (type_ == "table" and name == "__EFMigrationsHistory")
 
 
 def run_migrations_offline() -> None:
