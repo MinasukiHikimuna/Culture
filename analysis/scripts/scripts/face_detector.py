@@ -311,7 +311,7 @@ class FaceDetector:
     def detect_and_align(self, image):
         """Detect faces and align them using eye landmarks"""
         # Detect faces and landmarks
-        boxes, probs, landmarks = self.mtcnn.detect(image, landmarks=True)
+        boxes, _probs, landmarks = self.mtcnn.detect(image, landmarks=True)
 
         aligned_faces = []
         if boxes is not None:

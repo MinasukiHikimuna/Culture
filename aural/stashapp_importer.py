@@ -902,7 +902,7 @@ def check_disk_space(target_path: Path, min_free_gb: float = 1.0) -> tuple[bool,
     """
     try:
         target_path.parent.mkdir(parents=True, exist_ok=True)
-        total, used, free = shutil.disk_usage(target_path.parent)
+        _total, _used, free = shutil.disk_usage(target_path.parent)
         free_gb = free / (1024**3)
         return free_gb >= min_free_gb, free_gb
     except OSError:

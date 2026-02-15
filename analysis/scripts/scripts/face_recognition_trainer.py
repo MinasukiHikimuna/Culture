@@ -33,7 +33,7 @@ class FaceDataset(Dataset):
                 # Get performer ID and name based on source type
                 if source_type == "stashdb":
                     # StashDB format: "uuid - Name"
-                    performer_id, performer_name = performer_dir.name.split(" - ", 1)
+                    _performer_id, performer_name = performer_dir.name.split(" - ", 1)
                 else:
                     # Scene format: Use directory name as both ID and name
                     performer_name = performer_dir.name

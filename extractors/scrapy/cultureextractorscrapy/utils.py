@@ -156,7 +156,7 @@ def check_available_disk_space(target_path, min_free_gb=50):
         Path(target_path).mkdir(parents=True, exist_ok=True)
 
         # Get disk usage statistics
-        total, used, free = shutil.disk_usage(target_path)
+        _total, _used, free = shutil.disk_usage(target_path)
 
         # Convert bytes to gigabytes
         free_gb = free / (1024 ** 3)
