@@ -2,10 +2,10 @@ import concurrent.futures
 import json
 import os
 import queue as thread_queue
-from pathlib import Path
 import shutil
 import threading
 from datetime import datetime
+from pathlib import Path
 from typing import Union
 
 import cv2
