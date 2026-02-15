@@ -1,5 +1,4 @@
 import logging
-import os
 import re
 from pathlib import Path
 import shutil
@@ -104,7 +103,6 @@ def parse_resolution_height(resolution_string):
 
 def get_log_filename(spider_name):
     import datetime
-    import os
 
     from scrapy.utils.project import get_project_settings
 

@@ -357,7 +357,6 @@ class BaseDownloadPipeline:
 
     def create_downloaded_item_from_path(self, item, file_path, spider):
         """Create DownloadedFileItem from a file path"""
-        import os
         from datetime import datetime
 
         file_info = item["file_info"]
@@ -401,7 +400,6 @@ class BaseDownloadPipeline:
     def process_video_metadata(self, file_path):
         """Process video file metadata with both video hashes and ffprobe data"""
         import json as json_lib
-        import os
 
         metadata = {"$type": "VideoFileMetadata"}
 

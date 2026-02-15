@@ -3,7 +3,7 @@ Builder pattern for creating Stash data quality checks with a fluent API.
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Optional, Union
 
 
 def create_tag_resolver(stash):

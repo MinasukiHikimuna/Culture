@@ -1,14 +1,12 @@
 import argparse
-import os
 import random
 import sys
 from datetime import datetime
 from pathlib import Path
 
-import numpy as np
 import torch
 import torch.nn as nn
-from facenet_pytorch import MTCNN, InceptionResnetV1
+from facenet_pytorch import InceptionResnetV1
 from PIL import Image
 from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms

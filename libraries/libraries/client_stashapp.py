@@ -1,8 +1,6 @@
 import os
 from datetime import datetime
-from typing import Dict, List
 
-import numpy as np
 import polars as pl
 import stashapi.log as log
 from dotenv import load_dotenv

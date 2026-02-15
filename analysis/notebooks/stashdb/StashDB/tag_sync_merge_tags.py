@@ -4,7 +4,6 @@ import sys
 from pathlib import Path
 
 import dotenv
-import polars as pl
 
 
 sys.path.append(str(Path.cwd().parent))

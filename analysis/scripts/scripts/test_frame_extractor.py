@@ -1,9 +1,6 @@
 import argparse
-import json
-import os
 import shutil
 from pathlib import Path
-from typing import Dict
 
 import ffmpeg
 from face_preprocessor import FacePreprocessor

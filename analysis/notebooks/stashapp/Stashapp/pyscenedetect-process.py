@@ -1,10 +1,7 @@
-import os
-import re
 import subprocess
 import sys
 from pathlib import Path
 
-import polars as pl
 
 
 sys.path.append(str(Path.cwd().parent))

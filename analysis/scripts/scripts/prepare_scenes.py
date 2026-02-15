@@ -1,7 +1,5 @@
 import json
-import os
 from pathlib import Path
-from typing import Dict, List
 
 from libraries.client_stashapp import StashAppClient, get_stashapp_client
 from libraries.scene_states import SceneState

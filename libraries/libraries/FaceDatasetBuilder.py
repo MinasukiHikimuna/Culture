@@ -4,11 +4,9 @@ import os
 import queue as thread_queue
 from pathlib import Path
 import shutil
-import subprocess
 import threading
 from datetime import datetime
-from multiprocessing import cpu_count
-from typing import Dict, List, Union
+from typing import Union
 
 import cv2
 import ffmpeg

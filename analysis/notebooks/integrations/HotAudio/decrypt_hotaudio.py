@@ -1,11 +1,9 @@
 import binascii
 import hashlib
-import json
 import logging
 import math
 import struct
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
 
 import bencodepy
 from cryptography.hazmat.backends import default_backend

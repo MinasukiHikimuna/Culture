@@ -14,11 +14,9 @@ Dependencies:
 
 import argparse
 import json
-import os
 import time
 import uuid
 from pathlib import Path
-from typing import Dict
 
 import requests
 

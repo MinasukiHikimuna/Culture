@@ -1,6 +1,5 @@
 import os
 
-import setup_env  # Add this at the very top
 
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"  # Suppress TF logging
@@ -16,7 +15,6 @@ from datetime import datetime
 from pathlib import Path
 
 import cv2
-import numpy as np
 import tensorflow as tf
 import torch
 from facenet_pytorch import MTCNN
