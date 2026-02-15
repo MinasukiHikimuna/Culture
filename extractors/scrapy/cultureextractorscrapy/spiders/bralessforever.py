@@ -318,15 +318,14 @@ class BralessForeverSpider(scrapy.Spider):
                     meta={"category": category, "current_page": next_page},
                     dont_filter=True,
                 )
+            elif is_next_disabled:
+                self.logger.info(
+                    f"🏁 Reached last page for category '{category_name}' (page {current_page})"
+                )
             else:
-                if is_next_disabled:
-                    self.logger.info(
-                        f"🏁 Reached last page for category '{category_name}' (page {current_page})"
-                    )
-                else:
-                    self.logger.info(
-                        f"🔚 No more videos to process for category '{category_name}' (page {current_page})"
-                    )
+                self.logger.info(
+                    f"🔚 No more videos to process for category '{category_name}' (page {current_page})"
+                )
         else:
             self.logger.warning(f"⚠️ No pagination navigation found for category '{category_name}'")
 

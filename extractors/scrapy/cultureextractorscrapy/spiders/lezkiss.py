@@ -365,19 +365,18 @@ class LezKissSpider(scrapy.Spider):
             elif "480" in quality_text:
                 priority = 10  # Base priority for 480p
                 width, height = 854, 480
+            # Try to extract resolution from URL
+            elif "1080" in url:
+                priority = 30
+                width, height = 1920, 1080
+            elif "720" in url:
+                priority = 20
+                width, height = 1280, 720
+            elif "480" in url:
+                priority = 10
+                width, height = 854, 480
             else:
-                # Try to extract resolution from URL
-                if "1080" in url:
-                    priority = 30
-                    width, height = 1920, 1080
-                elif "720" in url:
-                    priority = 20
-                    width, height = 1280, 720
-                elif "480" in url:
-                    priority = 10
-                    width, height = 854, 480
-                else:
-                    width = height = None
+                width = height = None
 
             # Add format bonus - prefer MP4 over WMV at the same resolution
             if url.endswith(".mp4"):
