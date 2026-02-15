@@ -14,12 +14,12 @@ Dependencies:
 
 import argparse
 import json
+import sys
 import time
 import uuid
 from pathlib import Path
 
 import requests
-import sys
 
 
 class StashfaceAPIClient:

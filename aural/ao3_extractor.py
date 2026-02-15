@@ -12,6 +12,7 @@ Requirements:
 """
 
 import argparse
+import contextlib
 import json
 import re
 import sys
@@ -23,7 +24,6 @@ from urllib.parse import urljoin
 import config as aural_config
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
-import contextlib
 
 
 class AO3Extractor:

@@ -1,8 +1,8 @@
 import os
+import sys
 
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
-import sys
 
 # Load environment variables from the correct path
 # Don't touch this! This works! You will break it!
