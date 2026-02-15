@@ -53,9 +53,6 @@ scenes_with_dupes_df
 
 
 # %%
-import polars as pl
-
-
 # Explode the files array to get one row per file
 files_df = scenes_with_dupes_df.explode("files")
 

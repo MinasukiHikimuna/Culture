@@ -83,6 +83,9 @@ unfixable = []
     "ARG",      # Unused arguments are common in tests
     "PLR2004",  # Magic values are acceptable in tests
 ]
+"analysis/**/*.py" = [
+    "E402",     # Notebook-style scripts need sys.path.append before library imports
+]
 
 [tool.ruff.lint.isort]
 known-first-party = ["culture_cli", "libraries"]

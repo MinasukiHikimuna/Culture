@@ -13,12 +13,9 @@ from dotenv import load_dotenv
 
 sys.path.append(str(Path.cwd().parent))
 
-
+from libraries.client_stashapp import StashAppClient, get_stashapp_client
 
 load_dotenv()
-
-# StashApp
-from libraries.client_stashapp import StashAppClient, get_stashapp_client
 
 
 stash_client = StashAppClient()

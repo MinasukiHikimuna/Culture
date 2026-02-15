@@ -3,6 +3,7 @@ import os
 import sys
 from pathlib import Path
 
+import dotenv
 import polars as pl
 from dotenv import load_dotenv
 
@@ -10,6 +11,8 @@ from dotenv import load_dotenv
 sys.path.append(str(Path.cwd().parent))
 
 from libraries import client_culture_extractor
+from libraries.client_stashapp import StashAppClient, get_stashapp_client
+from libraries.StashDbClient import StashDbClient
 
 
 load_dotenv()
@@ -27,23 +30,11 @@ culture_extractor_client = client_culture_extractor.ClientCultureExtractor(
     connection_string
 )
 
-
 # StashApp
-from libraries.client_stashapp import StashAppClient, get_stashapp_client
-
-
 stash_client = StashAppClient()
 stash_raw_client = get_stashapp_client()
 
-
 # StashDB
-import os
-
-import dotenv
-
-from libraries.StashDbClient import StashDbClient
-
-
 dotenv.load_dotenv()
 
 stashbox_client = StashDbClient(

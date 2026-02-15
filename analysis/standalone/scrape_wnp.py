@@ -1,7 +1,13 @@
 # %%
+import base64
 import os
+import re
 import sys
+from datetime import datetime
 from pathlib import Path
+
+import requests
+from bs4 import BeautifulSoup
 
 
 sys.path.append(str(Path.cwd().parent))
@@ -22,8 +28,6 @@ scene_id = 29817
 existing_scene = stash_client.find_scenes({ "id": { "value": scene_id, "modifier": "EQUALS" } })
 existing_scene
 
-import re
-
 
 # Function to parse slug from filename
 def parse_slug(filename):
@@ -41,12 +45,6 @@ slug = "ana-video-dido-angel"
 
 
 # %%
-from datetime import datetime
-
-import requests
-from bs4 import BeautifulSoup
-
-
 headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
 }
@@ -59,9 +57,6 @@ print(response.text)
 
 
 # %%
-import base64
-
-
 soup = BeautifulSoup(response.text, "html.parser")
 
 # Find the video element by ID

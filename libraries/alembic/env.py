@@ -5,6 +5,8 @@ from alembic import context
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, pool
 
+from libraries.models import Base
+
 
 # Load environment variables from .env file
 load_dotenv()
@@ -17,9 +19,6 @@ config = context.config
 # This line sets up loggers basically.
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
-
-# Import models for autogenerate support
-from libraries.models import Base
 
 
 target_metadata = Base.metadata
