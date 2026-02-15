@@ -299,10 +299,7 @@ def get_existing_releases_with_status(site_uuid):
     result = {}
     for r in releases:
         if r.short_name not in result:
-            if isinstance(r.available_files, str):
-                available_files = json.loads(r.available_files)
-            else:
-                available_files = r.available_files or []
+            available_files = json.loads(r.available_files) if isinstance(r.available_files, str) else r.available_files or []
 
             result[r.short_name] = {
                 "uuid": r.uuid,

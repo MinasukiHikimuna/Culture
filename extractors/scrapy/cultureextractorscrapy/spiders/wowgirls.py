@@ -570,10 +570,7 @@ class WowGirlsSpider(scrapy.Spider):
                 if size_match:
                     size_value = float(size_match.group(1))
                     size_unit = size_match.group(2)
-                    if size_unit == "Gb":
-                        file_size = size_value * 1024 * 1024 * 1024
-                    else:
-                        file_size = size_value * 1024 * 1024
+                    file_size = size_value * 1024 * 1024 * 1024 if size_unit == "Gb" else size_value * 1024 * 1024
 
             # Format variant to match existing database format: "H.264 1920x1080 60fps"
             variant = f"{codec} {width}x{height} {fps}fps"
@@ -792,10 +789,7 @@ class WowGirlsSpider(scrapy.Spider):
                 if size_match:
                     size_value = float(size_match.group(1))
                     size_unit = size_match.group(2)
-                    if size_unit == "Gb":
-                        file_size = size_value * 1024 * 1024 * 1024
-                    else:
-                        file_size = size_value * 1024 * 1024
+                    file_size = size_value * 1024 * 1024 * 1024 if size_unit == "Gb" else size_value * 1024 * 1024
 
             # Extract resolution width from variant if numeric
             resolution_width = None

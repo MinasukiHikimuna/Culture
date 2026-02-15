@@ -120,14 +120,7 @@ def get_download_stats(conn, site_name: str) -> DownloadStats | None:
         release_statuses = []
 
         for release_uuid, name, release_date, url, available_files, performers in releases:
-            if not available_files:
-                files = []
-            else:
-                files = (
-                    available_files
-                    if isinstance(available_files, list)
-                    else json.loads(available_files)
-                )
+            files = [] if not available_files else available_files if isinstance(available_files, list) else json.loads(available_files)
 
             has_video = has_video_file(files)
             has_gallery = has_gallery_file(files)

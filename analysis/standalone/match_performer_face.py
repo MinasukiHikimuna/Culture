@@ -528,10 +528,7 @@ def run_manual_search_workflow(  # noqa: PLR0912, PLR0915
     """
     console.print(f"\n[bold]Searching {source.upper()} for: {query}[/bold]")
 
-    if source == "stashapp":
-        performers = search_stashapp_performers(stashapp_client, query)
-    else:
-        performers = search_stashdb_performers(query)
+    performers = search_stashapp_performers(stashapp_client, query) if source == "stashapp" else search_stashdb_performers(query)
 
     selected = display_manual_search_results(
         performers,

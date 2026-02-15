@@ -705,10 +705,7 @@ class SyncEngine:
         ]
 
         if matched_tag_ids or overwrite:
-            if overwrite:
-                final_tag_ids = matched_tag_ids
-            else:
-                final_tag_ids = list(set(plan.existing_stashapp_tag_ids + matched_tag_ids))
+            final_tag_ids = matched_tag_ids if overwrite else list(set(plan.existing_stashapp_tag_ids + matched_tag_ids))
 
             if final_tag_ids:
                 update_data["tag_ids"] = final_tag_ids

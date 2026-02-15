@@ -256,10 +256,7 @@ class HegreSpider(scrapy.Spider):
                     # Handle 'originals' case
                     if resolution == "originals":
                         # Try to get resolution from the file size text
-                        if "px" in file_size_text:
-                            width = int(file_size_text.split("px")[0].strip())
-                        else:
-                            width = 0
+                        width = int(file_size_text.split("px")[0].strip()) if "px" in file_size_text else 0
                     else:
                         width = int(resolution.replace("px", ""))
 

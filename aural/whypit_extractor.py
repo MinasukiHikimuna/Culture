@@ -132,10 +132,7 @@ class WhypitExtractor:
 
             # Determine audio format from URL
             clean_audio_url = audio_url.split("?")[0]
-            if clean_audio_url.endswith(".flac"):
-                audio_format = "flac"
-            else:
-                audio_format = "mp3"
+            audio_format = "flac" if clean_audio_url.endswith(".flac") else "mp3"
 
             # Download audio
             audio_file_path = target_dir / f"{basename}.{audio_format}"
