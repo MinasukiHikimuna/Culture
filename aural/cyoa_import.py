@@ -258,7 +258,7 @@ class CYOAImporter:
 
         print("\nFinding imported scenes...")
 
-        for audio_key in cyoa_data["audios"].keys():
+        for audio_key in cyoa_data["audios"]:
             # Search by path
             query = """
                 query FindScenes($scene_filter: SceneFilterType!, $filter: FindFilterType!) {
