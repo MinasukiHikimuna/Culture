@@ -419,7 +419,7 @@ class BaseDownloadPipeline:
             logging.info(f"[process_video_metadata] File path: {file_path}")
             logging.info(f"[process_video_metadata] File exists: {Path(file_path).exists()}")
             if Path(file_path).exists():
-                file_size = os.path.getsize(file_path)
+                file_size = Path(file_path).stat().st_size
                 logging.info(f"[process_video_metadata] File size: {file_size} bytes")
 
             result = subprocess.run(
@@ -481,7 +481,7 @@ class BaseDownloadPipeline:
 
     def process_audio_metadata(self, file_path):
         """Process audio file metadata including SHA-256 hash."""
-        file_size = os.path.getsize(file_path) if Path(file_path).exists() else 0
+        file_size = Path(file_path).stat().st_size if Path(file_path).exists() else 0
         sha256_sum = self._calculate_sha256(file_path)
         metadata = {"$type": "AudioFileMetadata", "file_size": file_size}
         if sha256_sum:
@@ -490,7 +490,7 @@ class BaseDownloadPipeline:
 
     def process_generic_metadata(self, file_path, file_type):
         """Process generic file metadata including SHA-256 hash."""
-        file_size = os.path.getsize(file_path) if Path(file_path).exists() else 0
+        file_size = Path(file_path).stat().st_size if Path(file_path).exists() else 0
         sha256_sum = self._calculate_sha256(file_path)
         metadata = {
             "$type": "GenericFileMetadata",
@@ -824,7 +824,7 @@ class M3u8DownloadPipeline(BaseDownloadPipeline):
                 return_code = process.wait()
 
                 if return_code == 0 and Path(output_path).exists():
-                    file_size = os.path.getsize(output_path)
+                    file_size = Path(output_path).stat().st_size
                     spider.logger.info(
                         "[M3u8DownloadPipeline] Download successful: %s (%.1f MB)",
                         output_path,
@@ -844,7 +844,7 @@ class M3u8DownloadPipeline(BaseDownloadPipeline):
                     # Clean up partial file
                     if Path(output_path).exists():
                         try:
-                            os.remove(output_path)
+                            Path(output_path).unlink()
                             spider.logger.info("[M3u8DownloadPipeline] Cleaned up partial file")
                         except OSError:
                             pass
@@ -1287,7 +1287,7 @@ class Aria2DownloadPipeline(BaseDownloadPipeline):
             return_code = process.wait()
 
             if return_code == 0 and Path(output_path).exists():
-                file_size = os.path.getsize(output_path)
+                file_size = Path(output_path).stat().st_size
                 self.logger.info(
                     "[Aria2DownloadPipeline] Download successful: %s (%.1f MB)",
                     output_path,
@@ -1303,7 +1303,7 @@ class Aria2DownloadPipeline(BaseDownloadPipeline):
                 # Clean up partial file if exists
                 if Path(output_path).exists():
                     try:
-                        os.remove(output_path)
+                        Path(output_path).unlink()
                         self.logger.info("[Aria2DownloadPipeline] Cleaned up partial file")
                     except OSError:
                         pass
