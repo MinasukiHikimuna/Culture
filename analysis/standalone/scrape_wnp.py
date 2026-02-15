@@ -61,7 +61,6 @@ print(response.text)
 # %%
 import base64
 
-from bs4 import BeautifulSoup
 
 
 soup = BeautifulSoup(response.text, "html.parser")

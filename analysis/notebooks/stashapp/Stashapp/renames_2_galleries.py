@@ -79,7 +79,6 @@ print(len(galleries_df))
 
 
 # %%
-import os
 
 from libraries.file_renamer import create_filename
 
