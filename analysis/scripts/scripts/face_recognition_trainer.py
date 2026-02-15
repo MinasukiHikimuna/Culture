@@ -94,7 +94,7 @@ class FaceDataset(Dataset):
 
 class FaceRecognitionModel(nn.Module):
     def __init__(self, num_classes):
-        super(FaceRecognitionModel, self).__init__()
+        super().__init__()
         # Load pretrained FaceNet model
         self.backbone = InceptionResnetV1(pretrained="vggface2")
 
