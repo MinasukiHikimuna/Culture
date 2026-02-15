@@ -30,10 +30,9 @@ class SceneVerifier:
         # Check that at least one performer directory has faces
         has_sorted_faces = False
         for subdir in scene_dir.iterdir():
-            if subdir.is_dir() and subdir.name != "unknown":
-                if list(subdir.glob("*.jpg")):
-                    has_sorted_faces = True
-                    break
+            if subdir.is_dir() and subdir.name != "unknown" and list(subdir.glob("*.jpg")):
+                has_sorted_faces = True
+                break
 
         return has_sorted_faces
 

@@ -282,10 +282,9 @@ def run_analyze_download_import(
             post_id = post["id"]
             if is_post_processed(post_id, processed_data):
                 saved_post_file = post.get("file")
-                if saved_post_file and saved_post_file.exists():
-                    if archive_saved_post(saved_post_file, dry_run):
-                        user_stats.archived += 1
-                        print(f"  [ALREADY PROCESSED] Archived: {saved_post_file.name}")
+                if saved_post_file and saved_post_file.exists() and archive_saved_post(saved_post_file, dry_run):
+                    user_stats.archived += 1
+                    print(f"  [ALREADY PROCESSED] Archived: {saved_post_file.name}")
             else:
                 posts_to_process.append(post)
 

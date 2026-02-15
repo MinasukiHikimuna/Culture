@@ -63,20 +63,18 @@ def get_user_flair(reddit, username: str, subreddit_name: str = "gonewildaudio")
 
         # Search user's submissions in the target subreddit
         for submission in redditor.submissions.new(limit=50):
-            if submission.subreddit.display_name.lower() == subreddit_name.lower():
-                if submission.author_flair_text:
-                    flair_text = submission.author_flair_text
-                    flair_css_class = submission.author_flair_css_class
-                    break
+            if submission.subreddit.display_name.lower() == subreddit_name.lower() and submission.author_flair_text:
+                flair_text = submission.author_flair_text
+                flair_css_class = submission.author_flair_css_class
+                break
 
         # If no submissions found, try comments
         if not flair_text:
             for comment in redditor.comments.new(limit=50):
-                if comment.subreddit.display_name.lower() == subreddit_name.lower():
-                    if comment.author_flair_text:
-                        flair_text = comment.author_flair_text
-                        flair_css_class = comment.author_flair_css_class
-                        break
+                if comment.subreddit.display_name.lower() == subreddit_name.lower() and comment.author_flair_text:
+                    flair_text = comment.author_flair_text
+                    flair_css_class = comment.author_flair_css_class
+                    break
 
         if flair_text:
             # Parse gender from flair
