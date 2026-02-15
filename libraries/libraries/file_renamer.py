@@ -27,7 +27,7 @@ def create_filename_with_directory(use_studio_code_tag: dict, row: dict, base_di
         if current_file_path:
             # Get the drive letter from the current file path
             drive = os.path.splitdrive(current_file_path)[0]
-            base_directory = os.path.join(drive, os.sep, "Culture", "Videos")
+            base_directory = str(Path(drive) / os.sep / "Culture" / "Videos")
         else:
             # No file path available - cannot determine directory
             return {"filename": filename, "directory": None, "full_path": None}
@@ -40,7 +40,7 @@ def create_filename_with_directory(use_studio_code_tag: dict, row: dict, base_di
         return {
             "filename": filename,
             "directory": current_dir,
-            "full_path": os.path.join(current_dir, filename)
+            "full_path": str(Path(current_dir) / filename)
         }
 
     studio_name = studio.get("name", "Unknown Studio")
@@ -56,25 +56,16 @@ def create_filename_with_directory(use_studio_code_tag: dict, row: dict, base_di
         clean_site = _clean_for_directory(site_name)
 
         # Create directory structure
-        directory = os.path.join(
-            base_directory,
-            "Sites",
-            clean_network,
-            f"{clean_network}꞉ {clean_site}"
-        )
+        directory = str(Path(base_directory) / "Sites" / clean_network / f"{clean_network}꞉ {clean_site}")
     else:
         # No parent studio, use studio name directly
         clean_studio = _clean_for_directory(studio_name)
-        directory = os.path.join(
-            base_directory,
-            "Sites",
-            clean_studio
-        )
+        directory = str(Path(base_directory) / "Sites" / clean_studio)
 
     return {
         "filename": filename,
         "directory": directory,
-        "full_path": os.path.join(directory, filename)
+        "full_path": str(Path(directory) / filename)
     }
 
 def create_filename(use_studio_code_tag: dict, row: dict) -> str:

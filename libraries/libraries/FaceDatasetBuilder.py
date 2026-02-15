@@ -2,6 +2,7 @@ import concurrent.futures
 import json
 import os
 import queue as thread_queue
+from pathlib import Path
 import shutil
 import subprocess
 import threading
@@ -26,21 +27,22 @@ class FaceDatasetBuilder:
 
         self.detector = MTCNN()
         self.base_dir = "H:\\Faces\\dataset"
+        base = Path(self.base_dir)
         self.structure = {
             "scenes": {
-                SceneState.PENDING.value: os.path.join(self.base_dir, "scenes", SceneState.PENDING.value),
-                SceneState.EXTRACTING_FRAMES.value: os.path.join(self.base_dir, "scenes", SceneState.EXTRACTING_FRAMES.value),
-                SceneState.FRAMES_EXTRACTED.value: os.path.join(self.base_dir, "scenes", SceneState.FRAMES_EXTRACTED.value),
-                SceneState.EXTRACTING_FACES.value: os.path.join(self.base_dir, "scenes", SceneState.EXTRACTING_FACES.value),
-                SceneState.FACES_EXTRACTED.value: os.path.join(self.base_dir, "scenes", SceneState.FACES_EXTRACTED.value),
-                SceneState.VERIFIED.value: os.path.join(self.base_dir, "scenes", SceneState.VERIFIED.value),
-                SceneState.FAILED.value: os.path.join(self.base_dir, "scenes", SceneState.FAILED.value),
+                SceneState.PENDING.value: str(base / "scenes" / SceneState.PENDING.value),
+                SceneState.EXTRACTING_FRAMES.value: str(base / "scenes" / SceneState.EXTRACTING_FRAMES.value),
+                SceneState.FRAMES_EXTRACTED.value: str(base / "scenes" / SceneState.FRAMES_EXTRACTED.value),
+                SceneState.EXTRACTING_FACES.value: str(base / "scenes" / SceneState.EXTRACTING_FACES.value),
+                SceneState.FACES_EXTRACTED.value: str(base / "scenes" / SceneState.FACES_EXTRACTED.value),
+                SceneState.VERIFIED.value: str(base / "scenes" / SceneState.VERIFIED.value),
+                SceneState.FAILED.value: str(base / "scenes" / SceneState.FAILED.value),
             },
             "performers": {
-                "verified": os.path.join(self.base_dir, "performers", "verified"),
+                "verified": str(base / "performers" / "verified"),
             }
         }
-        self.metadata_file = os.path.join(self.base_dir, "metadata.json")
+        self.metadata_file = str(base / "metadata.json")
         self.setup_directories()
         self.load_metadata()
         self.max_concurrent_scenes = max_concurrent_scenes
@@ -110,7 +112,7 @@ class FaceDatasetBuilder:
             ]
 
             # Save face
-            face_path = os.path.join(scene_dir, f"{face_id}.jpg")
+            face_path = str(Path(scene_dir) / f"{face_id}.jpg")
             cv2.imwrite(face_path, face_img)
 
             faces_metadata.append({
@@ -185,7 +187,7 @@ class FaceDatasetBuilder:
                         face_img = original_image[y_start:y_end, x_start:x_end]
 
                         # Save face
-                        face_path = os.path.join(scene_dir, f"{face_id}.jpg")
+                        face_path = str(Path(scene_dir) / f"{face_id}.jpg")
                         cv2.imwrite(face_path, face_img, [cv2.IMWRITE_JPEG_QUALITY, 95])
 
                         faces_metadata.append({
@@ -262,7 +264,7 @@ class FaceDatasetBuilder:
             return {"scene_id": scene_id, "error": "Missing required scene data", "status": "error"}
 
         # Create scene directory in extracting_frames
-        scene_frames_dir = os.path.join(self.structure["scenes"][SceneState.EXTRACTING_FRAMES.value], scene_id)
+        scene_frames_dir = str(Path(self.structure["scenes"][SceneState.EXTRACTING_FRAMES.value]) / scene_id)
         os.makedirs(scene_frames_dir, exist_ok=True)
 
         try:
@@ -273,7 +275,7 @@ class FaceDatasetBuilder:
                     .input(video_path, skip_frame="nokey")
                     .filter("select", "not(mod(n,10))")
                     .output(
-                        os.path.join(scene_frames_dir, "frame_%04d.jpg"),
+                        str(Path(scene_frames_dir) / "frame_%04d.jpg"),
                         qscale=3,
                         vsync=0,
                         threads=10
@@ -286,25 +288,25 @@ class FaceDatasetBuilder:
                 raise
 
             # Move to extracting_faces state
-            scene_faces_dir = os.path.join(self.structure["scenes"][SceneState.EXTRACTING_FACES.value], scene_id)
+            scene_faces_dir = str(Path(self.structure["scenes"][SceneState.EXTRACTING_FACES.value]) / scene_id)
             shutil.move(scene_frames_dir, scene_faces_dir)
 
             # Process frames and detect faces
-            frame_files = sorted([os.path.join(scene_faces_dir, f)
+            frame_files = sorted([str(Path(scene_faces_dir) / f)
                                 for f in os.listdir(scene_faces_dir)
                                 if f.endswith(".jpg")])
 
             # Create unverified directory structure
-            scene_unverified_dir = os.path.join(self.structure["scenes"][SceneState.FACES_EXTRACTED.value], scene_id)
+            scene_unverified_dir = str(Path(self.structure["scenes"][SceneState.FACES_EXTRACTED.value]) / scene_id)
             os.makedirs(scene_unverified_dir, exist_ok=True)
 
             # Create directories for each performer
             for performer in performers:
-                performer_dir = os.path.join(scene_unverified_dir, performer)
+                performer_dir = str(Path(scene_unverified_dir) / performer)
                 os.makedirs(performer_dir, exist_ok=True)
 
             # Create unknown directory
-            unknown_dir = os.path.join(scene_unverified_dir, "unknown")
+            unknown_dir = str(Path(scene_unverified_dir) / "unknown")
             os.makedirs(unknown_dir, exist_ok=True)
 
             # Process frames and detect faces
@@ -328,7 +330,7 @@ class FaceDatasetBuilder:
 
                     frame_number = os.path.splitext(os.path.basename(frame_path))[0].split("_")[1]
                     face_id = f"{scene_id}_{frame_number}_face_{face_idx}"
-                    face_path = os.path.join(scene_unverified_dir, f"{face_id}.jpg")
+                    face_path = str(Path(scene_unverified_dir) / f"{face_id}.jpg")
                     cv2.imwrite(face_path, face_img)
                     faces_extracted += 1
 
@@ -354,7 +356,7 @@ class FaceDatasetBuilder:
         except Exception as e:
             # Clean up any leftover directories in case of error
             for state_dir in [SceneState.EXTRACTING_FRAMES.value, SceneState.EXTRACTING_FACES.value]:
-                error_dir = os.path.join(self.structure["scenes"][state_dir], scene_id)
+                error_dir = str(Path(self.structure["scenes"][state_dir]) / scene_id)
                 if os.path.exists(error_dir):
                     shutil.rmtree(error_dir)
             return {
@@ -368,10 +370,10 @@ class FaceDatasetBuilder:
         face_filename = os.path.basename(face_path)
         scene_id = face_filename.split("_")[0]  # Extract scene_id from filename
 
-        rejected_dir = os.path.join(self.structure["scenes"][SceneState.FACES_EXTRACTED.value], scene_id)
+        rejected_dir = str(Path(self.structure["scenes"][SceneState.FACES_EXTRACTED.value]) / scene_id)
         os.makedirs(rejected_dir, exist_ok=True)
 
-        rejected_path = os.path.join(rejected_dir, face_filename)
+        rejected_path = str(Path(rejected_dir) / face_filename)
         shutil.move(face_path, rejected_path)
 
         # Update metadata
@@ -400,7 +402,7 @@ class FaceDatasetBuilder:
     def get_scene_status(self, scene_id: str) -> str:
         """Get the current status of a scene"""
         for status, directory in self.structure["scenes"].items():
-            if os.path.exists(os.path.join(directory, scene_id)):
+            if os.path.exists(str(Path(directory) / scene_id)):
                 return status
         return None
 
@@ -413,8 +415,8 @@ class FaceDatasetBuilder:
         if not current_status:
             raise ValueError(f"Scene not found: {scene_id}")
 
-        current_path = os.path.join(self.structure["scenes"][current_status], scene_id)
-        new_path = os.path.join(self.structure["scenes"][new_status], scene_id)
+        current_path = str(Path(self.structure["scenes"][current_status]) / scene_id)
+        new_path = str(Path(self.structure["scenes"][new_status]) / scene_id)
 
         # Move the directory
         shutil.move(current_path, new_path)
@@ -437,7 +439,7 @@ class FaceDatasetBuilder:
             print(f"Scene {scene_id} is already verified")
             return
 
-        scene_dir = os.path.join(self.structure["scenes"][current_status], scene_id)
+        scene_dir = str(Path(self.structure["scenes"][current_status]) / scene_id)
 
         # Process each face in the scene directory
         for face_file in os.listdir(scene_dir):
@@ -464,14 +466,14 @@ class FaceDatasetBuilder:
             # Find specific performer directory
             for dir_name in os.listdir(verified_base):
                 if dir_name.startswith(performer_id):
-                    dir_path = os.path.join(verified_base, dir_name)
+                    dir_path = str(Path(verified_base) / dir_name)
                     face_count = len([f for f in os.listdir(dir_path) if f.endswith(".jpg")])
                     counts[dir_name] = face_count
                     break
         else:
             # Count for all performers
             for dir_name in os.listdir(verified_base):
-                dir_path = os.path.join(verified_base, dir_name)
+                dir_path = str(Path(verified_base) / dir_name)
                 if os.path.isdir(dir_path):
                     face_count = len([f for f in os.listdir(dir_path) if f.endswith(".jpg")])
                     counts[dir_name] = face_count

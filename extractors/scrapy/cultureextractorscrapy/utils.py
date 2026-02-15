@@ -1,6 +1,7 @@
 import logging
 import os
 import re
+from pathlib import Path
 import shutil
 import sys
 
@@ -114,7 +115,7 @@ def get_log_filename(spider_name):
         os.makedirs(log_dir)
 
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_file = os.path.join(log_dir, f"{spider_name}_{timestamp}.log")
+    log_file = str(Path(log_dir) / f"{spider_name}_{timestamp}.log")
 
     # Set up logging to both file and console
     logger = logging.getLogger()

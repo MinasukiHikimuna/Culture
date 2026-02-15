@@ -1,6 +1,7 @@
 import json
 import os
 from datetime import UTC, datetime
+from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 import newnewid
@@ -747,9 +748,7 @@ class LezKissSpider(scrapy.Spider):
             "content_type": "performer",
             "variant": "profile",
             "url": image_url,
-            "target_path": os.path.join(
-                self.performer_image_path, f"{performer.short_name}.jpg"
-            ),
+            "target_path": str(Path(self.performer_image_path) / f"{performer.short_name}.jpg"),
         }
 
         return DirectDownloadItem(

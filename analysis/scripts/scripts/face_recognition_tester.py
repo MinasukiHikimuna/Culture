@@ -270,7 +270,7 @@ def test_directory(model_path, dir_path, top_k=3):
     # Test all images in directory
     for image_file in sorted(os.listdir(dir_path)):
         if image_file.lower().endswith((".png", ".jpg", ".jpeg")):
-            image_path = os.path.join(dir_path, image_file)
+            image_path = str(Path(dir_path) / image_file)
             predictions = recognizer.predict(image_path, top_k=top_k)
 
             print(f"\nPredictions for {image_file}:")

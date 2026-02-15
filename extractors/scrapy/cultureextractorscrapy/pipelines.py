@@ -352,7 +352,7 @@ class BaseDownloadPipeline:
 
     def file_exists_check(self, file_path):
         """Check if file already exists at the given path"""
-        full_path = os.path.join(self.store_uri, file_path)
+        full_path = str(Path(self.store_uri) / file_path)
         return os.path.exists(full_path)
 
     def create_downloaded_item_from_path(self, item, file_path, spider):
@@ -363,7 +363,7 @@ class BaseDownloadPipeline:
         file_info = item["file_info"]
 
         # Process file metadata
-        full_path = os.path.join(self.store_uri, file_path)
+        full_path = str(Path(self.store_uri) / file_path)
         file_metadata = self.process_file_metadata(full_path, file_info["file_type"])
 
         # Create DownloadedFileItem
@@ -521,7 +521,7 @@ class AvailableFilesPipeline(BaseDownloadPipeline, FilesPipeline):
 
             file_path = self.get_file_path(item["release_id"], item["file_info"])
 
-            full_path = os.path.join(self.store.basedir, file_path)
+            full_path = str(Path(self.store.basedir) / file_path)
             # Use %s formatting to avoid encoding issues in logging
             spider.logger.info("[AvailableFilesPipeline] Full file path: %s", full_path)
             spider.logger.info("[AvailableFilesPipeline] File info: %s", item["file_info"])
@@ -594,7 +594,7 @@ class AvailableFilesPipeline(BaseDownloadPipeline, FilesPipeline):
             spider.logger.info("[AvailableFilesPipeline] File paths from results: %s", file_paths)
             if file_paths:
                 # Get full path by combining store_uri with relative path
-                full_path = os.path.join(self.store_uri, file_paths[0])
+                full_path = str(Path(self.store_uri) / file_paths[0])
                 spider.logger.info("[AvailableFilesPipeline] Processing file: %s", full_path)
                 return self.create_downloaded_item_from_path(item, file_paths[0], spider)
             else:
@@ -634,7 +634,7 @@ class M3u8DownloadPipeline(BaseDownloadPipeline):
             spider.logger.info(
                 "[M3u8DownloadPipeline] DEBUG: Checking file existence for path: %s", file_path
             )
-            full_path_check = os.path.join(self.store_uri, file_path)
+            full_path_check = str(Path(self.store_uri) / file_path)
             spider.logger.info(
                 "[M3u8DownloadPipeline] DEBUG: Full path for existence check: %s", full_path_check
             )
@@ -664,7 +664,7 @@ class M3u8DownloadPipeline(BaseDownloadPipeline):
                 )
 
             # File doesn't exist, download with yt-dlp
-            full_path = os.path.join(self.store_uri, file_path)
+            full_path = str(Path(self.store_uri) / file_path)
             spider.logger.info(
                 "[M3u8DownloadPipeline] Downloading with yt-dlp to (%.2fGB available): %s",
                 available_gb,
@@ -985,7 +985,7 @@ class FfmpegDownloadPipeline(BaseDownloadPipeline):
             spider.logger.info(
                 "[FfmpegDownloadPipeline] DEBUG: Checking file existence for path: %s", file_path
             )
-            full_path_check = os.path.join(self.store_uri, file_path)
+            full_path_check = str(Path(self.store_uri) / file_path)
             spider.logger.info(
                 "[FfmpegDownloadPipeline] DEBUG: Full path for existence check: %s", full_path_check
             )
@@ -1015,7 +1015,7 @@ class FfmpegDownloadPipeline(BaseDownloadPipeline):
                 )
 
             # File doesn't exist, download with ffmpeg
-            full_path = os.path.join(self.store_uri, file_path)
+            full_path = str(Path(self.store_uri) / file_path)
             spider.logger.info(
                 "[FfmpegDownloadPipeline] Downloading with ffmpeg to (%.2fGB available): %s",
                 available_gb,
@@ -1152,7 +1152,7 @@ class Aria2DownloadPipeline(BaseDownloadPipeline):
             )
 
             file_path = self.get_file_path(item["release_id"], item["file_info"])
-            full_path = os.path.join(self.store_uri, file_path)
+            full_path = str(Path(self.store_uri) / file_path)
 
             self.logger.info("[Aria2DownloadPipeline] Full file path: %s", full_path)
 
@@ -1354,7 +1354,7 @@ class PerformerImagePipeline:
         force_update = getattr(spider, "force_update", False)
 
         # Create base path for this performer
-        performer_dir = os.path.join(self.files_store, site_name, "Performers", performer_uuid)
+        performer_dir = str(Path(self.files_store) / site_name / "Performers" / performer_uuid)
         os.makedirs(performer_dir, exist_ok=True)
 
         self.logger.info(f"[PerformerImagePipeline] Processing {performer.name} ({performer_uuid})")
@@ -1378,7 +1378,7 @@ class PerformerImagePipeline:
                 ext = self._get_extension(url)
                 filename = f"{performer_uuid}-{idx + 1}{ext}"
 
-            filepath = os.path.join(performer_dir, filename)
+            filepath = str(Path(performer_dir) / filename)
 
             # Check if file exists (unless force_update is True)
             if not force_update and os.path.exists(filepath):
@@ -1454,14 +1454,14 @@ class StashDbImagePipeline:
             return item
 
         # Create directory for this image type
-        type_dir = os.path.join(self.images_store, f"{image_type}s")
+        type_dir = str(Path(self.images_store) / f"{image_type}s")
         os.makedirs(type_dir, exist_ok=True)
 
         # Download first image
         url = image_urls[0]
         ext = self._get_extension(url)
         filename = f"{entity_id}{ext}"
-        filepath = os.path.join(type_dir, filename)
+        filepath = str(Path(type_dir) / filename)
 
         # Skip if file already exists
         if os.path.exists(filepath):
