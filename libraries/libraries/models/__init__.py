@@ -21,16 +21,13 @@ from .culture_extractor import (
 
 
 __all__ = [
-    # Base
     "Base",
     "Download",
     "Performer",
     "PerformerExternalId",
     "Release",
     "ReleaseExternalId",
-    # Models
     "Site",
-    # External ID models
     "SiteExternalId",
     "StorageState",
     "SubSite",
@@ -40,7 +37,6 @@ __all__ = [
     "TargetSystem",
     "get_engine",
     "get_session",
-    # Junction tables
     "release_performer",
     "release_tag",
 ]
