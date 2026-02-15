@@ -155,7 +155,7 @@ def _clean_for_filename(input):
     input = _title_case_except_acronyms(input)
     return (
         input.replace(":", "꞉").replace("?", "？").replace("/", "∕").replace("\\", "＼")
-        .replace("*", "＊").replace("\"", "＂").replace("<", "＜").replace(">", "＞")
+        .replace("*", "＊").replace('"', "＂").replace("<", "＜").replace(">", "＞")
         .replace("|", "｜").replace("  ", " ")
     )
 
@@ -166,7 +166,7 @@ def _clean_for_directory(input):
     # Keep colon as ꞉ for display purposes, but it will be handled specially in paths
     return (
         input.replace(":", "꞉").replace("?", "？").replace("/", "∕").replace("\\", "＼")
-        .replace("*", "＊").replace("\"", "＂").replace("<", "＜").replace(">", "＞")
+        .replace("*", "＊").replace('"', "＂").replace("<", "＜").replace(">", "＞")
         .replace("|", "｜").replace("  ", " ")
     )
 
