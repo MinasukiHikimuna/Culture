@@ -3,7 +3,7 @@ import polars as pl
 import sys
 import os
 
-sys.path.append(os.path.dirname(os.path.abspath('')))
+sys.path.append(os.path.dirname(os.path.abspath("")))
 
 from libraries.client_stashapp import get_stashapp_client, StashAppClient
 from libraries.StashDbClient import StashDbClient
@@ -25,7 +25,7 @@ import re
 def parse_slug(filename):
     # Remove resolution and extension using regex
     # This will match _<numbers>P.mp4 at the end of the string
-    return re.sub(r'_\d+P\.mp4$', '', filename)
+    return re.sub(r"_\d+P\.mp4$", "", filename)
 
 slug = parse_slug(existing_scene.to_dicts()[0]["stashapp_primary_file_basename"])
 slug
@@ -42,7 +42,7 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 
 headers = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
 }
 
 site_url = f"https://www.puffynetwork.com/videos/{slug}/"
@@ -56,17 +56,17 @@ print(response.text)
 import base64
 from bs4 import BeautifulSoup
 
-soup = BeautifulSoup(response.text, 'html.parser')
+soup = BeautifulSoup(response.text, "html.parser")
 
 # Find the video element by ID
 video_element = soup.find(id="video")
 if video_element:
-    poster_url = video_element.get('poster')
+    poster_url = video_element.get("poster")
     if poster_url:
         # Download the image and convert to base64
         image_response = requests.get(poster_url, headers=headers)
         if image_response.status_code == 200:
-            base64_image = base64.b64encode(image_response.content).decode('utf-8')
+            base64_image = base64.b64encode(image_response.content).decode("utf-8")
             cover_image_base64 = f"data:image/jpeg;base64,{base64_image}"
             print(f"Cover Image Base64: {cover_image_base64}")
         else:

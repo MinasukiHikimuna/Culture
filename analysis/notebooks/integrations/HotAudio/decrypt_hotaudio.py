@@ -29,7 +29,7 @@ class HotAudioHeader:
 class HotAudioDecryptor:
     def __init__(self, header_data: bytes, keys: Dict[str, str]):
         """Initialize decryptor with header data and decryption keys"""
-        if not header_data.startswith(b'HAX0'):
+        if not header_data.startswith(b"HAX0"):
             raise ValueError("Invalid HAX header magic")
             
         self.header = self._parse_header(header_data)
@@ -54,16 +54,16 @@ class HotAudioDecryptor:
             
             # Parse segments
             segments = []
-            seg_data = meta[b'segments']
+            seg_data = meta[b"segments"]
             for i in range(0, len(seg_data), 8):
                 offset = uint32(seg_data, i)
                 pts = uint32(seg_data, i + 4)
-                segments.append({'off': offset, 'pts': pts})
+                segments.append({"off": offset, "pts": pts})
 
             # Add final segment
             segments.append({
-                'off': file_length,
-                'pts': meta[b'durationMs']
+                "off": file_length,
+                "pts": meta[b"durationMs"]
             })
 
             return HotAudioHeader(
@@ -72,7 +72,7 @@ class HotAudioDecryptor:
                 extra_length=extra_length,
                 meta={k.decode() if isinstance(k, bytes) else k: v for k, v in meta.items()},
                 segments=segments,
-                base_key=meta[b'baseKey']
+                base_key=meta[b"baseKey"]
             )
         except Exception as e:
             logger.error(f"Error parsing header: {e}")

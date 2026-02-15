@@ -1,6 +1,6 @@
 import setup_env  # Add this at the very top
 import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # Suppress TF logging
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"  # Suppress TF logging
 
 import json
 import time
@@ -23,7 +23,7 @@ from PIL import Image
 class FaceDetector:
     def __init__(self, base_dir: str, max_concurrent: int = 4):
         # Convert Windows path to WSL path if needed
-        if base_dir.startswith(('C:', 'D:', 'E:', 'F:', 'G:', 'H:')):
+        if base_dir.startswith(("C:", "D:", "E:", "F:", "G:", "H:")):
             drive_letter = base_dir[0].lower()
             wsl_path = f"/mnt/{drive_letter}/{base_dir[3:].replace('\\', '/')}"
             self.base_dir = Path(wsl_path)
@@ -36,7 +36,7 @@ class FaceDetector:
         print(f"GPU devices: {tf.config.list_physical_devices('GPU')}")
         print(f"Built with CUDA: {tf.test.is_built_with_cuda()}")
         
-        physical_devices = tf.config.list_physical_devices('GPU')
+        physical_devices = tf.config.list_physical_devices("GPU")
         if physical_devices:
             print(f"\nFound {len(physical_devices)} GPU(s):")
             for device in physical_devices:
@@ -49,12 +49,12 @@ class FaceDetector:
                 print("GPU memory growth enabled for all GPUs")
                 
                 # Enable mixed precision
-                tf.keras.mixed_precision.set_global_policy('mixed_float16')
+                tf.keras.mixed_precision.set_global_policy("mixed_float16")
                 print("Mixed precision enabled")
                 
                 # Test GPU computation
                 print("\nTesting GPU computation...")
-                with tf.device('/GPU:0'):
+                with tf.device("/GPU:0"):
                     dummy = tf.random.normal([1000, 1000])
                     result = tf.matmul(dummy, tf.transpose(dummy))
                     print("GPU test successful")
@@ -79,7 +79,7 @@ class FaceDetector:
         
         # Create all required directories
         for state in SceneState:
-            dir_path = self.base_dir / 'scenes' / state.value
+            dir_path = self.base_dir / "scenes" / state.value
             print(f"Creating directory: {dir_path}")
             os.makedirs(dir_path, exist_ok=True)
         
@@ -88,7 +88,7 @@ class FaceDetector:
             margin=10,
             post_process=False,
             select_largest=True,
-            device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+            device=torch.device("cuda" if torch.cuda.is_available() else "cpu")
         )
     
     def preprocess_frame(self, frame):
@@ -120,10 +120,10 @@ class FaceDetector:
         
         faces_extracted = 0
         for face_idx, face in enumerate(faces):
-            if face['confidence'] < 0.95:
+            if face["confidence"] < 0.95:
                 continue
             
-            x, y, width, height = face['box']
+            x, y, width, height = face["box"]
             margin = int(max(width, height) * 0.2)
             face_img = frame[
                 max(0, y-margin):min(frame.shape[0], y+height+margin),
@@ -147,7 +147,7 @@ class FaceDetector:
         try:
             # State and metadata checks
             if self.dataset.is_scene_processed(scene_id) and \
-               self.dataset.info['processed_scenes'][scene_id] in [
+               self.dataset.info["processed_scenes"][scene_id] in [
                    SceneState.FACES_EXTRACTED.value,
                    SceneState.VERIFIED.value,
                    SceneState.NO_FACES_FOUND.value
@@ -158,9 +158,9 @@ class FaceDetector:
             metadata_start = time.time()
             metadata_path = self.dataset.scene_data / f"{scene_id}.json"
             if metadata_path.exists():
-                with open(metadata_path, 'r') as f:
+                with open(metadata_path, "r") as f:
                     scene_data = json.load(f)
-                    performers = scene_data.get('performers', [])
+                    performers = scene_data.get("performers", [])
             else:
                 print(f"Warning: No metadata found for scene {scene_id}")
                 performers = []
@@ -170,7 +170,7 @@ class FaceDetector:
             setup_start = time.time()
             source_dir = Path(str(self.dataset.scenes[SceneState.FRAMES_EXTRACTED.value] / scene_id))
             working_dir = Path(str(self.dataset.scenes[SceneState.EXTRACTING_FACES.value] / scene_id))
-            faces_dir = working_dir / 'faces'
+            faces_dir = working_dir / "faces"
             
             if not source_dir.exists():
                 raise FileNotFoundError(f"Source directory not found: {source_dir}")
@@ -182,7 +182,7 @@ class FaceDetector:
             print(f"Processing scene {scene_id}")
             
             # Face detection with parallel frame processing
-            frame_files = list(working_dir.glob('*.jpg'))
+            frame_files = list(working_dir.glob("*.jpg"))
             print(f"Found {len(frame_files)} frames to process")
             
             total_faces = 0
@@ -226,7 +226,7 @@ class FaceDetector:
             print(f"Target directory (output_dir): {output_dir}")
             
             # List files before moving
-            face_files = list(faces_dir.glob('*.jpg'))
+            face_files = list(faces_dir.glob("*.jpg"))
             print(f"Files found in faces_dir: {len(face_files)}")
             for file in face_files[:5]:  # Show first 5 files as sample
                 print(f"  - {file}")
@@ -241,11 +241,11 @@ class FaceDetector:
                 os.makedirs(performer_dir, exist_ok=True)
                 print(f"Created performer directory: {performer_dir}")
             
-            os.makedirs(output_dir / 'unknown', exist_ok=True)
+            os.makedirs(output_dir / "unknown", exist_ok=True)
             
             # Move face files to the root of the scene directory
             moved_count = 0
-            for face_file in faces_dir.glob('*.jpg'):
+            for face_file in faces_dir.glob("*.jpg"):
                 target_path = output_dir / face_file.name
                 print(f"Moving {face_file} to {target_path}")
                 try:
@@ -257,7 +257,7 @@ class FaceDetector:
             print(f"Successfully moved {moved_count} files")
             
             # Verify files after moving
-            final_files = list(output_dir.glob('*.jpg'))
+            final_files = list(output_dir.glob("*.jpg"))
             print(f"Files found in output_dir after move: {len(final_files)}")
             
             print(f"Moving files took {time.time() - move_start:.2f}s")
@@ -281,7 +281,7 @@ class FaceDetector:
             print(f"Error processing scene {scene_id}: {str(e)}")
             failed_dir = self.dataset.scenes[SceneState.FAILED.value] / scene_id
             os.makedirs(failed_dir, exist_ok=True)
-            with open(failed_dir / 'error.txt', 'w') as f:
+            with open(failed_dir / "error.txt", "w") as f:
                 f.write(str(e))
             if working_dir and working_dir.exists():
                 shutil.rmtree(working_dir)
@@ -291,7 +291,7 @@ class FaceDetector:
         while True:
             try:
                 # Check for scenes with extracted frames
-                frames_dir = self.base_dir / 'scenes' / SceneState.FRAMES_EXTRACTED.value
+                frames_dir = self.base_dir / "scenes" / SceneState.FRAMES_EXTRACTED.value
                 for scene_dir in frames_dir.iterdir():
                     if scene_dir.is_dir():
                         self.process_scene(scene_dir.name)
@@ -327,9 +327,9 @@ class FaceDetector:
         return aligned_faces
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Face Detector for WSL2')
-    parser.add_argument('--base-dir', type=str, required=True,
-                       help='Base directory for dataset (Windows or WSL2 path)')
+    parser = argparse.ArgumentParser(description="Face Detector for WSL2")
+    parser.add_argument("--base-dir", type=str, required=True,
+                       help="Base directory for dataset (Windows or WSL2 path)")
     args = parser.parse_args()
     
     # Setup profiler
@@ -344,8 +344,8 @@ if __name__ == "__main__":
         pr.disable()
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         stats_file = f"face_detector_profile_{timestamp}.stats"
-        with open(stats_file, 'w') as f:
+        with open(stats_file, "w") as f:
             stats = pstats.Stats(pr, stream=f)
-            stats.sort_stats('cumulative')
+            stats.sort_stats("cumulative")
             stats.print_stats()
         print(f"Profile stats saved to {stats_file}") 

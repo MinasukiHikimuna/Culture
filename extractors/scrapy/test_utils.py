@@ -82,5 +82,5 @@ class TestParseResolutionHeight(unittest.TestCase):
     def test_parse_resolution_height_720p(self):
         self.assertEqual(parse_resolution_height("720p"), 720)
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

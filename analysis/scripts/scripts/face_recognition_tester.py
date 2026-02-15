@@ -16,21 +16,21 @@ class FaceRecognizer:
     def __init__(self, model_path):
         # Load the saved model and classes
         checkpoint = torch.load(model_path)
-        self.classes = checkpoint['classes']
+        self.classes = checkpoint["classes"]
         
         # Print model info if available
-        if 'training_params' in checkpoint:
+        if "training_params" in checkpoint:
             print("\nModel Information:")
             print("-" * 50)
             print(f"Training timestamp: {checkpoint.get('timestamp', 'Unknown')}")
-            params = checkpoint['training_params']
+            params = checkpoint["training_params"]
             for key, value in params.items():
                 print(f"{key}: {value}")
             print("-" * 50 + "\n")
         
         # Initialize model
         self.model = FaceRecognitionModel(num_classes=len(self.classes))
-        self.model.load_state_dict(checkpoint['model_state_dict'])
+        self.model.load_state_dict(checkpoint["model_state_dict"])
         self.model.eval()
         
         # Use GPU if available
@@ -57,7 +57,7 @@ class FaceRecognizer:
             List of tuples (performer_name, confidence_score)
         """
         # Load and transform image
-        image = Image.open(image_path).convert('RGB')
+        image = Image.open(image_path).convert("RGB")
         image_tensor = self.transform(image).unsqueeze(0).to(self.device)
         
         # Get model predictions
@@ -88,17 +88,17 @@ class FaceRecognitionTester:
         """
         self.verbose = verbose
         if device is None:
-            self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         else:
             self.device = device
             
         # Load model checkpoint
         checkpoint = torch.load(model_path, map_location=self.device)
-        self.classes = checkpoint['classes']
+        self.classes = checkpoint["classes"]
         
         # Initialize model
         self.model = FaceRecognitionModel(num_classes=len(self.classes))
-        self.model.load_state_dict(checkpoint['model_state_dict'])
+        self.model.load_state_dict(checkpoint["model_state_dict"])
         self.model = self.model.to(self.device)
         self.model.eval()
         
@@ -120,7 +120,7 @@ class FaceRecognitionTester:
             if self.verbose:
                 print(f"\nTesting image: {image_path}")
             
-            img = Image.open(image_path).convert('RGB')
+            img = Image.open(image_path).convert("RGB")
             faces = self.face_detector(img)
             
             if faces is None:
@@ -238,15 +238,15 @@ class FaceRecognitionTester:
         return aggregated_predictions
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='Test face recognition model')
-    parser.add_argument('--model', type=str, required=True,
-                      help='Path to the trained model file')
-    parser.add_argument('--image', type=str,
-                      help='Path to a single image to test')
-    parser.add_argument('--dir', type=str,
-                      help='Path to directory containing test images')
-    parser.add_argument('--top-k', type=int, default=3,
-                      help='Number of top predictions to show')
+    parser = argparse.ArgumentParser(description="Test face recognition model")
+    parser.add_argument("--model", type=str, required=True,
+                      help="Path to the trained model file")
+    parser.add_argument("--image", type=str,
+                      help="Path to a single image to test")
+    parser.add_argument("--dir", type=str,
+                      help="Path to directory containing test images")
+    parser.add_argument("--top-k", type=int, default=3,
+                      help="Number of top predictions to show")
     return parser.parse_args()
 
 def test_single_image(model_path, image_path, top_k=3):
@@ -267,7 +267,7 @@ def test_directory(model_path, dir_path, top_k=3):
     
     # Test all images in directory
     for image_file in sorted(os.listdir(dir_path)):
-        if image_file.lower().endswith(('.png', '.jpg', '.jpeg')):
+        if image_file.lower().endswith((".png", ".jpg", ".jpeg")):
             image_path = os.path.join(dir_path, image_file)
             predictions = recognizer.predict(image_path, top_k=top_k)
             
@@ -276,15 +276,15 @@ def test_directory(model_path, dir_path, top_k=3):
                 print(f"{performer}: {confidence*100:.2f}%")
 
 def main():
-    parser = argparse.ArgumentParser(description='Test face recognition model on scene frames')
-    parser.add_argument('--model', type=str, required=True,
-                      help='Path to trained model checkpoint')
-    parser.add_argument('--input', type=str, required=True,
-                      help='Directory containing scene frames')
-    parser.add_argument('--confidence', type=float, default=0.1,
-                      help='Minimum confidence threshold')
-    parser.add_argument('--verbose', action='store_true',
-                      help='Enable verbose output')
+    parser = argparse.ArgumentParser(description="Test face recognition model on scene frames")
+    parser.add_argument("--model", type=str, required=True,
+                      help="Path to trained model checkpoint")
+    parser.add_argument("--input", type=str, required=True,
+                      help="Directory containing scene frames")
+    parser.add_argument("--confidence", type=float, default=0.1,
+                      help="Minimum confidence threshold")
+    parser.add_argument("--verbose", action="store_true",
+                      help="Enable verbose output")
     args = parser.parse_args()
     
     tester = FaceRecognitionTester(args.model, verbose=args.verbose)
@@ -292,8 +292,8 @@ def main():
     # Get all image files
     image_dir = Path(args.input)
     image_files = []
-    for ext in ['.jpg', '.png', '.webp']:
-        image_files.extend(list(image_dir.glob(f'*{ext}')))
+    for ext in [".jpg", ".png", ".webp"]:
+        image_files.extend(list(image_dir.glob(f"*{ext}")))
     
     if not image_files:
         print(f"No images found in {image_dir}")

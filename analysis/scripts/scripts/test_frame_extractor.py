@@ -43,10 +43,10 @@ class TestFrameExtractor:
             (
                 ffmpeg
                 .input(str(video_path))
-                .filter('select', 'eq(pict_type,I)')  # Extract I-frames only
-                .filter('select', 'not(mod(n,2))')    # Take every other I-frame
+                .filter("select", "eq(pict_type,I)")  # Extract I-frames only
+                .filter("select", "not(mod(n,2))")    # Take every other I-frame
                 .output(
-                    str(original_dir / 'frame_%04d.jpg'),
+                    str(original_dir / "frame_%04d.jpg"),
                     qscale=2,  # Higher quality for better face detection
                     vsync=0,
                     threads=4
@@ -59,7 +59,7 @@ class TestFrameExtractor:
                 print(f"Successfully extracted frames to {original_dir}")
             
             # Count extracted frames
-            frame_count = len(list(original_dir.glob('*.jpg')))
+            frame_count = len(list(original_dir.glob("*.jpg")))
             print(f"Extracted {frame_count} frames")
             
             # Process faces from extracted frames
@@ -76,7 +76,7 @@ class TestFrameExtractor:
             face_preprocessor.process_dataset(num_workers=4)
             
             # Count processed faces
-            processed_count = len(list(processed_dir.glob('*.jpg')))
+            processed_count = len(list(processed_dir.glob("*.jpg")))
             print(f"Processed {processed_count} faces")
             
             return original_dir, processed_dir
@@ -92,15 +92,15 @@ class TestFrameExtractor:
             return None, None
 
 def main():
-    parser = argparse.ArgumentParser(description='Extract and process frames from video for performer testing')
-    parser.add_argument('--video', type=str, required=True,
-                      help='Path to video file')
-    parser.add_argument('--scene-id', type=str,
-                      help='Optional scene ID for naming output directory')
-    parser.add_argument('--output', type=str, default="/mnt/h/Faces",
-                      help='Base output directory (default: /mnt/h/Faces)')
-    parser.add_argument('--verbose', action='store_true',
-                      help='Enable verbose output')
+    parser = argparse.ArgumentParser(description="Extract and process frames from video for performer testing")
+    parser.add_argument("--video", type=str, required=True,
+                      help="Path to video file")
+    parser.add_argument("--scene-id", type=str,
+                      help="Optional scene ID for naming output directory")
+    parser.add_argument("--output", type=str, default="/mnt/h/Faces",
+                      help="Base output directory (default: /mnt/h/Faces)")
+    parser.add_argument("--verbose", action="store_true",
+                      help="Enable verbose output")
     
     args = parser.parse_args()
     

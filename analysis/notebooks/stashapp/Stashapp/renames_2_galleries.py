@@ -117,7 +117,7 @@ if len(duplicate_filenames) > 0:
     for row in duplicate_filenames.iter_rows(named=True):
         print(f"\nNew filename: {row['new_filename']}")
         print(f"Used {row['count']} times for files:")
-        for old_name in row['old_filenames']:
+        for old_name in row["old_filenames"]:
             print(f"- {old_name}")
 
 gallery_renames_df
@@ -134,16 +134,16 @@ galleries_success_rows = []
 galleries_failed_rows = []
 
 for row in gallery_renames_df.iter_rows(named=True):
-    old_path = row['old_path']
-    new_path = row['new_path']
+    old_path = row["old_path"]
+    new_path = row["new_path"]
     failure_info = dict(row)  # Create a copy of the row data
 
     # Check for missing new path
     if new_path is None:
-        failure_info['failure_reason'] = "Missing new path"
-        failure_info['error_message'] = f"New path not found for {old_path}"
+        failure_info["failure_reason"] = "Missing new path"
+        failure_info["error_message"] = f"New path not found for {old_path}"
         galleries_failed_rows.append(failure_info)
-        print(failure_info['error_message'])
+        print(failure_info["error_message"])
         continue
 
     # Attempt to move the file if the old path is a file and the new path does not exist
@@ -154,23 +154,23 @@ for row in gallery_renames_df.iter_rows(named=True):
                 print(f"Rename file:\n{old_path}\n{new_path}\n")
                 galleries_success_rows.append(row)
             except Exception as e:
-                failure_info['failure_reason'] = "Rename failed"
-                failure_info['error_message'] = str(e)
+                failure_info["failure_reason"] = "Rename failed"
+                failure_info["error_message"] = str(e)
                 galleries_failed_rows.append(failure_info)
                 print(f"Failed to rename:\n{old_path}\n{new_path}\n{e}")
         else:
-            failure_info['failure_reason'] = "File exists"
-            failure_info['error_message'] = f"A file already exists in the new path: {new_path}"
+            failure_info["failure_reason"] = "File exists"
+            failure_info["error_message"] = f"A file already exists in the new path: {new_path}"
             galleries_failed_rows.append(failure_info)
-            print(failure_info['error_message'])
+            print(failure_info["error_message"])
     else:
-        failure_info['failure_reason'] = "File not found"
-        failure_info['error_message'] = f"File does not exist: {old_path}"
+        failure_info["failure_reason"] = "File not found"
+        failure_info["error_message"] = f"File does not exist: {old_path}"
         galleries_failed_rows.append(failure_info)
-        print(failure_info['error_message'])
+        print(failure_info["error_message"])
 
 galleries_success_df = pl.DataFrame(galleries_success_rows) if galleries_success_rows else pl.DataFrame(schema=gallery_renames_df.schema)
-galleries_failed_df = pl.DataFrame(galleries_failed_rows) if galleries_failed_rows else pl.DataFrame(schema={**gallery_renames_df.schema, 'failure_reason': pl.Utf8, 'error_message': pl.Utf8})
+galleries_failed_df = pl.DataFrame(galleries_failed_rows) if galleries_failed_rows else pl.DataFrame(schema={**gallery_renames_df.schema, "failure_reason": pl.Utf8, "error_message": pl.Utf8})
 
 paths = galleries_success_df.select(pl.col("directory").unique()).to_series().to_list()
 trigger_metadata_scan(paths)

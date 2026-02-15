@@ -3,7 +3,7 @@ import polars as pl
 import sys
 import os
 
-sys.path.append(os.path.dirname(os.path.abspath('')))
+sys.path.append(os.path.dirname(os.path.abspath("")))
 
 from libraries.client_stashapp import get_stashapp_client, StashAppClient
 
@@ -35,7 +35,7 @@ scenes_with_dupes = stash.find_scenes({
   "tags": {
     "value": [],
     "modifier": "INCLUDES",
-    "excludes": [scenes_with_multiple_versions['id']]
+    "excludes": [scenes_with_multiple_versions["id"]]
   }
 }, fragment="id title date studio { name } files { id duration path width height size fingerprints { type value } format video_codec audio_codec }")
 # Create Polars DataFrame with strict=False to handle mixed numeric types
@@ -50,27 +50,27 @@ scenes_with_dupes_df
 import polars as pl
 
 # Explode the files array to get one row per file
-files_df = scenes_with_dupes_df.explode('files')
+files_df = scenes_with_dupes_df.explode("files")
 
 # Group by scene ID and check if there are different codecs within each group
 codec_analysis = (files_df
     .select([
-        'id',
-        'title',
-        pl.col('files').struct.field('video_codec').alias('video_codec'),
-        pl.col('files').struct.field('audio_codec').alias('audio_codec')
+        "id",
+        "title",
+        pl.col("files").struct.field("video_codec").alias("video_codec"),
+        pl.col("files").struct.field("audio_codec").alias("audio_codec")
     ])
-    .group_by('id')
+    .group_by("id")
     .agg([
-        pl.col('title').first(),
-        pl.col('video_codec').alias('video_codecs'),
-        pl.col('audio_codec').alias('audio_codecs'),
-        pl.col('video_codec').n_unique().alias('unique_video_codecs'),
-        pl.col('audio_codec').n_unique().alias('unique_audio_codecs')
+        pl.col("title").first(),
+        pl.col("video_codec").alias("video_codecs"),
+        pl.col("audio_codec").alias("audio_codecs"),
+        pl.col("video_codec").n_unique().alias("unique_video_codecs"),
+        pl.col("audio_codec").n_unique().alias("unique_audio_codecs")
     ])
     .filter(
-        (pl.col('unique_video_codecs') > 1) |
-        (pl.col('unique_audio_codecs') > 1)
+        (pl.col("unique_video_codecs") > 1) |
+        (pl.col("unique_audio_codecs") > 1)
     )
 )
 codec_analysis

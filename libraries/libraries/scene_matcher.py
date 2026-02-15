@@ -21,9 +21,9 @@ class SceneMatcher:
         
         for input_scene in input_scenes:
             matching_scene = None
-            min_distance = float('inf')
+            min_distance = float("inf")
             max_quality_score = 0.0  # Higher score = better match
-            input_duration = input_scene.get('duration')
+            input_duration = input_scene.get("duration")
             
             for stashdb_scene in stashdb_scenes:
                 phash_fingerprints = [f for f in stashdb_scene["fingerprints"] 
@@ -31,7 +31,7 @@ class SceneMatcher:
                 
                 # Calculate quality score for this scene
                 quality_score = 0
-                min_scene_distance = float('inf')
+                min_scene_distance = float("inf")
                 
                 for fingerprint in phash_fingerprints:
                     distance = self._hamming_distance(input_scene["phash"], fingerprint["hash"])
@@ -39,8 +39,8 @@ class SceneMatcher:
                     
                     # Only consider fingerprints within MAX_DISTANCE
                     if distance <= self.MAX_DISTANCE:
-                        fingerprint_duration = fingerprint.get('duration')
-                        duration_diff = float('inf')
+                        fingerprint_duration = fingerprint.get("duration")
+                        duration_diff = float("inf")
                         
                         if input_duration and fingerprint_duration:
                             duration_diff = abs(input_duration - fingerprint_duration)

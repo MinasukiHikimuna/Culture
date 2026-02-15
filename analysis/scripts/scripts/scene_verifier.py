@@ -1,5 +1,5 @@
 import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # Suppress TF logging
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"  # Suppress TF logging
 
 import json
 import time
@@ -17,7 +17,7 @@ class SceneVerifier:
     def is_scene_ready_for_verification(self, scene_dir: Path) -> bool:
         """Check if all faces have been sorted into performer directories"""
         # Get all jpg files in the scene directory
-        face_files = list(scene_dir.glob('*.jpg'))
+        face_files = list(scene_dir.glob("*.jpg"))
         
         # If there are any face files left in root, scene is not ready
         if face_files:
@@ -26,8 +26,8 @@ class SceneVerifier:
         # Check that at least one performer directory has faces
         has_sorted_faces = False
         for subdir in scene_dir.iterdir():
-            if subdir.is_dir() and subdir.name != 'unknown':
-                if list(subdir.glob('*.jpg')):
+            if subdir.is_dir() and subdir.name != "unknown":
+                if list(subdir.glob("*.jpg")):
                     has_sorted_faces = True
                     break
         
@@ -37,7 +37,7 @@ class SceneVerifier:
         """Process a verified scene and move it to final state"""
         # Check if already verified
         if self.dataset.is_scene_processed(scene_id) and \
-           self.dataset.info['processed_scenes'][scene_id] == SceneState.VERIFIED.value:
+           self.dataset.info["processed_scenes"][scene_id] == SceneState.VERIFIED.value:
             print(f"Skipping {scene_id} - already verified")
             return
         
@@ -49,7 +49,7 @@ class SceneVerifier:
             if not metadata_path.exists():
                 raise ValueError(f"No metadata found for scene {scene_id}")
             
-            with open(metadata_path, 'r') as f:
+            with open(metadata_path, "r") as f:
                 scene_data = json.load(f)
             
             # Create verified scene directory
@@ -57,10 +57,10 @@ class SceneVerifier:
             os.makedirs(verified_dir, exist_ok=True)
             
             # Move faces to performer directories
-            performers_dir = self.base_dir / 'performers' / 'verified'
+            performers_dir = self.base_dir / "performers" / "verified"
             
             for subdir in scene_dir.iterdir():
-                if not subdir.is_dir() or subdir.name == 'unknown':
+                if not subdir.is_dir() or subdir.name == "unknown":
                     continue
                 
                 # subdir.name should be like "d5061b46-796b-4204-8e4f-cff4569fdea6 - Alexis Crystal"
@@ -68,14 +68,14 @@ class SceneVerifier:
                 os.makedirs(performer_dir, exist_ok=True)
                 
                 # Move all faces to performer directory
-                for face_file in subdir.glob('*.jpg'):
+                for face_file in subdir.glob("*.jpg"):
                     target_path = performer_dir / face_file.name
                     shutil.move(str(face_file), str(target_path))
             
             # Move unknown faces to verified scene directory
-            unknown_dir = scene_dir / 'unknown'
+            unknown_dir = scene_dir / "unknown"
             if unknown_dir.exists():
-                shutil.move(str(unknown_dir), str(verified_dir / 'unknown'))
+                shutil.move(str(unknown_dir), str(verified_dir / "unknown"))
             
             # Clean up original directory
             shutil.rmtree(scene_dir)

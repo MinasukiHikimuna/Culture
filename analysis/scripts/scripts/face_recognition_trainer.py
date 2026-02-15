@@ -85,7 +85,7 @@ class FaceDataset(Dataset):
 
     def __getitem__(self, idx):
         img_path, label = self.samples[idx]
-        image = Image.open(img_path).convert('RGB')
+        image = Image.open(img_path).convert("RGB")
         
         if self.transform:
             image = self.transform(image)
@@ -96,7 +96,7 @@ class FaceRecognitionModel(nn.Module):
     def __init__(self, num_classes):
         super(FaceRecognitionModel, self).__init__()
         # Load pretrained FaceNet model
-        self.backbone = InceptionResnetV1(pretrained='vggface2')
+        self.backbone = InceptionResnetV1(pretrained="vggface2")
         
         # Freeze more layers to reduce overfitting (freeze 80%)
         trainable_layers = int(len(list(self.backbone.parameters())) * 0.2)  # Changed from 0.4
@@ -146,7 +146,7 @@ def train_model(dataset_path, batch_size=32, num_epochs=50, learning_rate=0.0001
         class Logger:
             def __init__(self, filename):
                 self.terminal = sys.stdout
-                self.log = open(filename, 'w')
+                self.log = open(filename, "w")
             
             def write(self, message):
                 self.terminal.write(message)
@@ -240,8 +240,8 @@ def train_model(dataset_path, batch_size=32, num_epochs=50, learning_rate=0.0001
     classifier_params = model.classifier.parameters()
     
     optimizer = torch.optim.AdamW([
-        {'params': backbone_params, 'lr': learning_rate * 0.1},
-        {'params': classifier_params, 'lr': learning_rate}
+        {"params": backbone_params, "lr": learning_rate * 0.1},
+        {"params": classifier_params, "lr": learning_rate}
     ], weight_decay=0.01)  # Increased weight decay
     
     # Improved scheduler with longer cycles
@@ -263,8 +263,8 @@ def train_model(dataset_path, batch_size=32, num_epochs=50, learning_rate=0.0001
         total = 0
         
         # Progress tracking
-        print(f'\nEpoch {epoch+1}/{num_epochs}')
-        print('-' * 60)
+        print(f"\nEpoch {epoch+1}/{num_epochs}")
+        print("-" * 60)
         
         for batch_idx, (inputs, labels) in enumerate(train_loader):
             inputs, labels = inputs.to(device), labels.to(device)
@@ -282,9 +282,9 @@ def train_model(dataset_path, batch_size=32, num_epochs=50, learning_rate=0.0001
             
             # Print batch progress
             if (batch_idx + 1) % 10 == 0:
-                print(f'Batch [{batch_idx+1}/{len(train_loader)}] | '
-                      f'Loss: {running_loss/(batch_idx+1):.3f} | '
-                      f'Acc: {100.*correct/total:.2f}%')
+                print(f"Batch [{batch_idx+1}/{len(train_loader)}] | "
+                      f"Loss: {running_loss/(batch_idx+1):.3f} | "
+                      f"Acc: {100.*correct/total:.2f}%")
         
         train_accuracy = 100. * correct / total
         
@@ -294,7 +294,7 @@ def train_model(dataset_path, batch_size=32, num_epochs=50, learning_rate=0.0001
         val_correct = 0
         val_total = 0
         
-        print('\nValidating...')
+        print("\nValidating...")
         with torch.no_grad():
             for inputs, labels in val_loader:
                 inputs, labels = inputs.to(device), labels.to(device)
@@ -309,11 +309,11 @@ def train_model(dataset_path, batch_size=32, num_epochs=50, learning_rate=0.0001
         val_accuracy = 100. * val_correct / val_total
         
         # Print epoch summary
-        print('\nEpoch Summary:')
-        print(f'Training Loss: {running_loss/len(train_loader):.3f}')
-        print(f'Training Accuracy: {train_accuracy:.2f}%')
-        print(f'Validation Loss: {val_loss/len(val_loader):.3f}')
-        print(f'Validation Accuracy: {val_accuracy:.2f}%')
+        print("\nEpoch Summary:")
+        print(f"Training Loss: {running_loss/len(train_loader):.3f}")
+        print(f"Training Accuracy: {train_accuracy:.2f}%")
+        print(f"Validation Loss: {val_loss/len(val_loader):.3f}")
+        print(f"Validation Accuracy: {val_accuracy:.2f}%")
         print(f'Learning Rate: {optimizer.param_groups[0]["lr"]:.6f}')
         
         # Update learning rate
@@ -321,13 +321,13 @@ def train_model(dataset_path, batch_size=32, num_epochs=50, learning_rate=0.0001
         
         # Save best model
         if val_accuracy > best_val_acc:
-            print(f'Validation accuracy improved from {best_val_acc:.2f}% to {val_accuracy:.2f}%')
+            print(f"Validation accuracy improved from {best_val_acc:.2f}% to {val_accuracy:.2f}%")
             best_val_acc = val_accuracy
             best_model_state = model.state_dict()
             patience_counter = 0
         else:
             patience_counter += 1
-            print(f'Validation accuracy did not improve. {patience-patience_counter} epochs until early stopping.')
+            print(f"Validation accuracy did not improve. {patience-patience_counter} epochs until early stopping.")
         
         if patience_counter >= patience:
             print("\nEarly stopping triggered!")
@@ -336,7 +336,7 @@ def train_model(dataset_path, batch_size=32, num_epochs=50, learning_rate=0.0001
     # Restore best model
     if best_model_state is not None:
         model.load_state_dict(best_model_state)
-        print(f'\nRestored best model with validation accuracy: {best_val_acc:.2f}%')
+        print(f"\nRestored best model with validation accuracy: {best_val_acc:.2f}%")
     
     # Print final results
     print("\nTraining completed!")
@@ -358,7 +358,7 @@ class TransformSubset(Dataset):
     
     def __getitem__(self, idx):
         image, label = self.dataset.samples[self.indices[idx]]
-        image = Image.open(image).convert('RGB')
+        image = Image.open(image).convert("RGB")
         if self.transform:
             image = self.transform(image)
         return image, label
@@ -381,8 +381,8 @@ if __name__ == "__main__":
     # Set dataset path
     dataset_path = "/mnt/h/Faces/StashDB_processed"
     
-    parser = argparse.ArgumentParser(description='Train face recognition model')
-    parser.add_argument('--source', type=str, default="stashdb", choices=["scene", "stashdb"],
+    parser = argparse.ArgumentParser(description="Train face recognition model")
+    parser.add_argument("--source", type=str, default="stashdb", choices=["scene", "stashdb"],
                       help='Source type: "scene" or "stashdb"')
     args = parser.parse_args()
     
@@ -398,14 +398,14 @@ if __name__ == "__main__":
     
     # Save the model
     torch.save({
-        'model_state_dict': model.state_dict(),
-        'classes': classes,
-        'timestamp': timestamp,
-        'training_params': {
-            'batch_size': 32,
-            'learning_rate': 0.001,
-            'architecture': 'FaceNet + Custom Classifier',
-            'dataset_path': dataset_path
+        "model_state_dict": model.state_dict(),
+        "classes": classes,
+        "timestamp": timestamp,
+        "training_params": {
+            "batch_size": 32,
+            "learning_rate": 0.001,
+            "architecture": "FaceNet + Custom Classifier",
+            "dataset_path": dataset_path
         }
     }, model_path)
     

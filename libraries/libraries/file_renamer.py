@@ -21,7 +21,7 @@ def create_filename_with_directory(use_studio_code_tag: Dict, row: Dict, base_di
     
     # Determine base directory if not provided
     if base_directory is None:
-        current_file_path = row.get('stashapp_primary_file_path', '')
+        current_file_path = row.get("stashapp_primary_file_path", "")
         if current_file_path:
             # Get the drive letter from the current file path
             drive = os.path.splitdrive(current_file_path)[0]
@@ -31,10 +31,10 @@ def create_filename_with_directory(use_studio_code_tag: Dict, row: Dict, base_di
             return {"filename": filename, "directory": None, "full_path": None}
     
     # Get studio information for directory structure
-    studio = row.get('stashapp_studio')
+    studio = row.get("stashapp_studio")
     if not studio:
         # Fallback to current directory if no studio
-        current_dir = os.path.dirname(row.get('stashapp_primary_file_path', ''))
+        current_dir = os.path.dirname(row.get("stashapp_primary_file_path", ""))
         return {
             "filename": filename,
             "directory": current_dir,
@@ -86,11 +86,11 @@ def create_filename(use_studio_code_tag: Dict, row: Dict) -> str:
         Formatted filename string
     """
     # Get the file suffix
-    suffix = get_suffix(row.get('stashapp_primary_file_basename'))
+    suffix = get_suffix(row.get("stashapp_primary_file_basename"))
     if not suffix:
         return None
 
-    ce_uuid = row.get('stashapp_ce_id')
+    ce_uuid = row.get("stashapp_ce_id")
     if ce_uuid:
         ce_uuid_fmt = f" [{ce_uuid}]"
         ce_uuid_length = len(ce_uuid_fmt)
@@ -102,25 +102,25 @@ def create_filename(use_studio_code_tag: Dict, row: Dict) -> str:
     max_length_wo_ce_uuid_suffix = MAX_LENGTH - ce_uuid_length - suffix_length
 
     # Get studio and format it
-    studio = row.get('stashapp_studio')
+    studio = row.get("stashapp_studio")
     studio_name = get_studio_value(studio)
     
     # Get date
-    date = row.get('stashapp_date')
+    date = row.get("stashapp_date")
     date_str = date if isinstance(date, str) else date.strftime("%Y-%m-%d") if date else "Unknown Date"
     
     # Get performers
-    performers_str = get_performers_value(row.get('stashapp_performers'))
+    performers_str = get_performers_value(row.get("stashapp_performers"))
     
     # Get title
-    title = row.get('stashapp_title', 'Unknown Title')
+    title = row.get("stashapp_title", "Unknown Title")
     
     # Build base filename
     base_filename = f"{studio_name} – {date_str} – "
     
     # Add studio code if needed
     has_tag = has_studio_code_tag(use_studio_code_tag, studio)
-    if has_tag and row.get('stashapp_code'):
+    if has_tag and row.get("stashapp_code"):
         base_filename += f"{_clean_for_filename(row['stashapp_code'])} – "
     
     base_filename += _clean_for_filename(f"{title} – {performers_str}")
@@ -157,7 +157,7 @@ def _title_case_except_acronyms(text):
             else:
                 title_cased_words.append(word.title())
 
-    return ' '.join(title_cased_words)
+    return " ".join(title_cased_words)
 
 def _clean_for_filename(input):
     input = _title_case_except_acronyms(input)
@@ -248,11 +248,11 @@ def get_performers_value(performers: List[Dict]) -> str:
 
     # Define gender priority
     gender_priority = {
-        'TRANSGENDER_FEMALE': 1,
-        'FEMALE': 2,
-        'NON_BINARY': 3,
-        'TRANSGENDER_MALE': 4,
-        'MALE': 5
+        "TRANSGENDER_FEMALE": 1,
+        "FEMALE": 2,
+        "NON_BINARY": 3,
+        "TRANSGENDER_MALE": 4,
+        "MALE": 5
     }
 
     # Sort performers by gender priority, favorite status (True comes before False), and name

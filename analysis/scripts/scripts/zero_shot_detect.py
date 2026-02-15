@@ -12,17 +12,17 @@ def detect_with_descriptions(source_dir: str, descriptions: list, save_results: 
         save_results (bool): Whether to save annotated images
     """
     # Load YOLO model
-    model = YOLO('yolo11n.pt')
+    model = YOLO("yolo11n.pt")
     
     # Get all image files
     source_path = Path(source_dir)
     image_files = []
-    for ext in ['.jpg', '.jpeg', '.png', '.bmp']:
-        image_files.extend(source_path.glob(f'*{ext}'))
-        image_files.extend(source_path.glob(f'*{ext.upper()}'))
+    for ext in [".jpg", ".jpeg", ".png", ".bmp"]:
+        image_files.extend(source_path.glob(f"*{ext}"))
+        image_files.extend(source_path.glob(f"*{ext.upper()}"))
 
     # Create output directory
-    output_dir = source_path.parent / 'yolo'
+    output_dir = source_path.parent / "yolo"
     output_dir.mkdir(exist_ok=True)
 
     # Process each image
@@ -35,7 +35,7 @@ def detect_with_descriptions(source_dir: str, descriptions: list, save_results: 
             verbose=False,
             conf=0.3,
             classes=[0],  # Class 0 is person in COCO dataset
-            task='detect'
+            task="detect"
         )
         
         # Get person bounding boxes
@@ -51,10 +51,10 @@ def detect_with_descriptions(source_dir: str, descriptions: list, save_results: 
             verbose=False,
             save=save_results,
             project=str(output_dir),
-            name='',
+            name="",
             exist_ok=True,
             conf=0.25,
-            task='detect'
+            task="detect"
         )
         
         # Process results
@@ -99,12 +99,12 @@ def detect_with_descriptions(source_dir: str, descriptions: list, save_results: 
                 print(f"  This might match descriptions: {', '.join(descriptions)}")
 
 def main():
-    parser = argparse.ArgumentParser(description='Object detection with custom descriptions, excluding people')
-    parser.add_argument('source_dir', type=str, help='Directory containing images')
-    parser.add_argument('--descriptions', nargs='+', required=True,
-                        help='Natural language descriptions of objects to detect')
-    parser.add_argument('--no-save', action='store_true',
-                        help='Do not save annotated images')
+    parser = argparse.ArgumentParser(description="Object detection with custom descriptions, excluding people")
+    parser.add_argument("source_dir", type=str, help="Directory containing images")
+    parser.add_argument("--descriptions", nargs="+", required=True,
+                        help="Natural language descriptions of objects to detect")
+    parser.add_argument("--no-save", action="store_true",
+                        help="Do not save annotated images")
     
     args = parser.parse_args()
     

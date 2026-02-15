@@ -9,12 +9,12 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Suppress TensorFlow logging
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 def setup_cuda_paths():
     """Setup CUDA paths for Windows"""
-    if os.name != 'nt':  # Only for Windows
+    if os.name != "nt":  # Only for Windows
         return
         
     # Common CUDA paths for version 12.8
@@ -49,7 +49,7 @@ def setup_gpu():
         logger.info(f"TensorFlow version: {tf.__version__}")
         
         # Get GPU devices
-        gpus = tf.config.list_physical_devices('GPU')
+        gpus = tf.config.list_physical_devices("GPU")
         if not gpus:
             logger.warning("No GPU devices found!")
             return False
@@ -67,12 +67,12 @@ def setup_gpu():
                 logger.warning(f"Error setting memory growth: {e}")
                 
         # Enable mixed precision
-        tf.keras.mixed_precision.set_global_policy('mixed_float16')
+        tf.keras.mixed_precision.set_global_policy("mixed_float16")
         logger.info("Enabled mixed precision training")
         
         # Test GPU computation
         logger.info("Testing GPU computation...")
-        with tf.device('/GPU:0'):
+        with tf.device("/GPU:0"):
             # More comprehensive GPU test
             a = tf.random.normal([1000, 1000])
             b = tf.random.normal([1000, 1000])
@@ -109,26 +109,26 @@ if __name__ == "__main__":
     print(f"TensorFlow version: {tf.__version__}")
     
     print("\nGPU Information:")
-    gpus = tf.config.list_physical_devices('GPU')
+    gpus = tf.config.list_physical_devices("GPU")
     print(f"Number of GPUs available: {len(gpus)}")
     for gpu in gpus:
         print(f"GPU device: {gpu}")
     
     print("\nEnvironment Variables:")
     relevant_vars = [
-        'CUDA_PATH',
-        'CUDA_VISIBLE_DEVICES',
-        'PATH',
-        'LD_LIBRARY_PATH',
-        'PYTHONPATH'
+        "CUDA_PATH",
+        "CUDA_VISIBLE_DEVICES",
+        "PATH",
+        "LD_LIBRARY_PATH",
+        "PYTHONPATH"
     ]
     
     for var in relevant_vars:
-        value = os.environ.get(var, 'Not set')
-        if var == 'PATH':
+        value = os.environ.get(var, "Not set")
+        if var == "PATH":
             print(f"\nPATH entries:")
             for path in value.split(os.pathsep):
-                if 'cuda' in path.lower() or 'nvidia' in path.lower():
+                if "cuda" in path.lower() or "nvidia" in path.lower():
                     print(f"  {path}")
         else:
             print(f"{var}: {value}") 

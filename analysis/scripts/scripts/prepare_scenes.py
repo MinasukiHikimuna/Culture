@@ -10,8 +10,8 @@ def get_stashdb_performer(performer):
     for stash_id in performer["stashapp_performers_stash_ids"]:
         if stash_id["endpoint"] == "https://stashdb.org/graphql":
             return {
-                'stash_id': stash_id["stash_id"],
-                'name': performer["stashapp_performers_name"]
+                "stash_id": stash_id["stash_id"],
+                "name": performer["stashapp_performers_name"]
             }
     return None
 
@@ -50,8 +50,8 @@ def prepare_scenes_for_performer(performer_name: str, base_dir: str, exclude_vr:
     
     # Check which scenes are already in any state directory
     processed_scenes = set()
-    base_path = Path(base_dir) / 'scenes'
-    for state_dir in base_path.glob('*'):
+    base_path = Path(base_dir) / "scenes"
+    for state_dir in base_path.glob("*"):
         if state_dir.is_dir():
             processed_scenes.update(os.listdir(state_dir))
     
@@ -74,19 +74,19 @@ def prepare_scenes_for_performer(performer_name: str, base_dir: str, exclude_vr:
                 performers.append(f"{stashdb_info['stash_id']} - {stashdb_info['name']}")
         
         if performers:
-            scene_id = scene['stashapp_stashdb_id']
+            scene_id = scene["stashapp_stashdb_id"]
             scene_data = {
-                'video_path': scene['stashapp_primary_file_path'],
-                'performers': performers
+                "video_path": scene["stashapp_primary_file_path"],
+                "performers": performers
             }
             
             json_path = pending_dir / f"{scene_id}.json"
-            with open(json_path, 'w') as f:
+            with open(json_path, "w") as f:
                 json.dump(scene_data, f, indent=2)
             scenes_queued += 1
     
     return {
-        'total_scenes': len(scenes),
-        'already_processed': len(processed_scenes),
-        'newly_queued': scenes_queued
+        "total_scenes": len(scenes),
+        "already_processed": len(processed_scenes),
+        "newly_queued": scenes_queued
     } 

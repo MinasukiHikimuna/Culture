@@ -24,7 +24,7 @@ class FacePreprocessor:
             select_largest=True,
             min_face_size=60,
             thresholds=[0.7, 0.8, 0.8],
-            device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+            device=torch.device("cuda" if torch.cuda.is_available() else "cpu")
         )
     
     def align_face(self, image, landmarks):
@@ -49,7 +49,7 @@ class FacePreprocessor:
                 print(f"\nProcessing image: {image_path}")
             
             # Load image and ensure RGB
-            image = Image.open(image_path).convert('RGB')
+            image = Image.open(image_path).convert("RGB")
             if self.verbose:
                 print(f"Loaded image mode: {image.mode}")
             
@@ -200,13 +200,13 @@ class FacePreprocessor:
 
 def main():
     import argparse
-    parser = argparse.ArgumentParser(description='Preprocess face dataset')
-    parser.add_argument('--input', type=str, required=True,
-                      help='Input directory containing face images')
-    parser.add_argument('--output', type=str, required=True,
-                      help='Output directory for preprocessed images')
-    parser.add_argument('--workers', type=int, default=4,
-                      help='Number of worker processes')
+    parser = argparse.ArgumentParser(description="Preprocess face dataset")
+    parser.add_argument("--input", type=str, required=True,
+                      help="Input directory containing face images")
+    parser.add_argument("--output", type=str, required=True,
+                      help="Output directory for preprocessed images")
+    parser.add_argument("--workers", type=int, default=4,
+                      help="Number of worker processes")
     args = parser.parse_args()
     
     try:

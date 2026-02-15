@@ -43,15 +43,15 @@ class StashfaceAPIClient:
             raise FileNotFoundError(f"Image file not found: {file_path}")
         
         # Generate upload ID
-        upload_id = ''.join(str(uuid.uuid4()).split('-'))[:15]
+        upload_id = "".join(str(uuid.uuid4()).split("-"))[:15]
         
         # Upload the file
-        with open(file_path, 'rb') as f:
-            files = {'files': (os.path.basename(file_path), f, 'image/jpeg')}
+        with open(file_path, "rb") as f:
+            files = {"files": (os.path.basename(file_path), f, "image/jpeg")}
             response = self.session.post(
                 f"{self.base_url}/gradio_api/upload",
                 files=files,
-                params={'upload_id': upload_id}
+                params={"upload_id": upload_id}
             )
             response.raise_for_status()
             
@@ -87,7 +87,7 @@ class StashfaceAPIClient:
             raise ValueError("api_type must be 'json' or 'visual'")
         
         # Generate session hash
-        session_hash = ''.join(str(uuid.uuid4()).split('-'))[:11]
+        session_hash = "".join(str(uuid.uuid4()).split("-"))[:11]
         
         # Join the processing queue
         # Based on the Gradio interface structure:
@@ -136,14 +136,14 @@ class StashfaceAPIClient:
             response.raise_for_status()
             
             # Parse server-sent events response
-            lines = response.text.strip().split('\n')
+            lines = response.text.strip().split("\n")
             for line in lines:
-                if line.startswith('data: '):
+                if line.startswith("data: "):
                     try:
                         data = json.loads(line[6:])  # Remove 'data: ' prefix
-                        if data.get('msg') == 'process_completed':
+                        if data.get("msg") == "process_completed":
                             print("\n✅ Analysis completed!")
-                            output_data = data.get('output', {}).get('data', [])
+                            output_data = data.get("output", {}).get("data", [])
                             
                             # Handle nested list structure - Gradio sometimes returns [[data]]
                             if output_data and isinstance(output_data, list) and len(output_data) > 0:
@@ -151,44 +151,44 @@ class StashfaceAPIClient:
                                 if isinstance(output_data[0], list):
                                     output_data = output_data[0]
                             return {
-                                'success': True,
-                                'results': output_data,
-                                'metadata': {
-                                    'threshold': threshold,
-                                    'max_results': max_results,
-                                    'api_type': api_type,
-                                    'image_path': image_path,
-                                    'raw_response': data  # Include full response for debugging
+                                "success": True,
+                                "results": output_data,
+                                "metadata": {
+                                    "threshold": threshold,
+                                    "max_results": max_results,
+                                    "api_type": api_type,
+                                    "image_path": image_path,
+                                    "raw_response": data  # Include full response for debugging
                                 }
                             }
-                        elif data.get('msg') == 'process_starts':
+                        elif data.get("msg") == "process_starts":
                             continue
-                        elif data.get('msg') == 'estimation':
+                        elif data.get("msg") == "estimation":
                             continue
-                        elif 'error' in data.get('msg', '').lower():
+                        elif "error" in data.get("msg", "").lower():
                             print(f"\n❌ Server error: {data}")
                             return {
-                                'success': False, 
-                                'error': f"Server error: {data.get('msg', 'Unknown error')}"
+                                "success": False, 
+                                "error": f"Server error: {data.get('msg', 'Unknown error')}"
                             }
                     except json.JSONDecodeError as e:
                         print(f"\n🐛 JSON decode error: {e}, line: {line}")
                         continue
         
         print(f"\n❌ Timeout after {max_attempts} seconds")
-        return {'success': False, 'error': 'Processing timeout'}
+        return {"success": False, "error": "Processing timeout"}
     
     def format_results(self, results: Dict) -> str:
         """Format analysis results for display"""
-        if not results.get('success'):
+        if not results.get("success"):
             return f"❌ Analysis failed: {results.get('error', 'Unknown error')}"
         
-        faces_data = results['results']
+        faces_data = results["results"]
         if not faces_data:
             return "ℹ️  No faces detected in the image"
         
         # Handle visual API results (returns HTML)
-        if results['metadata']['api_type'] == 'visual':
+        if results["metadata"]["api_type"] == "visual":
             if isinstance(faces_data, list) and len(faces_data) > 0 and isinstance(faces_data[0], str):
                 return "🎨 Visual API returned HTML content (use --raw to see full HTML)"
         
@@ -202,15 +202,15 @@ class StashfaceAPIClient:
             output.append(f"   Detection confidence: {face['confidence']:.1%}")
             output.append(f"   Face area: {face['area']}")
             
-            performers = face.get('performers', [])
+            performers = face.get("performers", [])
             if performers:
                 output.append(f"   Found {len(performers)} match(es):")
                 for j, performer in enumerate(performers, 1):
-                    flag = "🇵🇱" if performer.get('country') == 'PL' else f"🌍 {performer.get('country', 'Unknown')}"
+                    flag = "🇵🇱" if performer.get("country") == "PL" else f"🌍 {performer.get('country', 'Unknown')}"
                     output.append(f"     {j}. {performer['name']} ({flag})")
                     output.append(f"        Confidence: {performer['confidence']}%")
                     output.append(f"        Profile: {performer['performer_url']}")
-                    if performer.get('image'):
+                    if performer.get("image"):
                         output.append(f"        Photo: {performer['image']}")
             else:
                 output.append("   ❌ No performer matches found")
@@ -269,7 +269,7 @@ Examples:
         
         # Save to file if requested
         if args.output:
-            with open(args.output, 'w') as f:
+            with open(args.output, "w") as f:
                 json.dump(results, f, indent=2)
             print(f"💾 Results saved to {args.output}")
         

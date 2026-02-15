@@ -56,7 +56,7 @@ class FemjoySpider(scrapy.Spider):
 
     def parse_photos(self, response):
         # Extract pagination data
-        pagination = response.css('div._pagination div.paginationArea')
+        pagination = response.css("div._pagination div.paginationArea")
 
         # Get the last page number
         last_page = int(pagination.css('div.right a.pageBtn[title="last"]::attr(data-page)').get())
@@ -70,25 +70,25 @@ class FemjoySpider(scrapy.Spider):
             )
 
     def parse_photos_page(self, response):
-        posts = response.css('div.post_item')
+        posts = response.css("div.post_item")
         for post in posts:
-            external_id = post.css('::attr(data-post-id)').get()
-            title = post.css('h1 a::text').get()
-            cover_url = post.css('div.post_image a img.item_cover::attr(src)').get()
+            external_id = post.css("::attr(data-post-id)").get()
+            title = post.css("h1 a::text").get()
+            cover_url = post.css("div.post_image a img.item_cover::attr(src)").get()
 
-            raw_release_date = post.css('h3 span.posted_on::text').get()
-            parsed_release_date = datetime.strptime(raw_release_date, '%b %d, %Y').date() if raw_release_date else None
+            raw_release_date = post.css("h3 span.posted_on::text").get()
+            parsed_release_date = datetime.strptime(raw_release_date, "%b %d, %Y").date() if raw_release_date else None
             release_date = parsed_release_date.isoformat() if parsed_release_date else None
 
-            photo_count = int(post.css('h3 span.counter_photos::text').re_first(r'\d+') or 0)
+            photo_count = int(post.css("h3 span.counter_photos::text").re_first(r"\d+") or 0)
 
             # Extract multiple models
             models = []
             model_elements = post.css('h2 a[href^="/models/"]')
             for model_element in model_elements:
-                model_name = model_element.css('::text').get()
-                model_url = model_element.css('::attr(href)').get()
-                model_short_name = model_url.split('/')[-1] if model_url else None
+                model_name = model_element.css("::text").get()
+                model_url = model_element.css("::attr(href)").get()
+                model_short_name = model_url.split("/")[-1] if model_url else None
                 models.append({
                     "name": model_name,
                     "short_name": model_short_name,
@@ -98,14 +98,14 @@ class FemjoySpider(scrapy.Spider):
             director = {}
             director_element = post.css('h2 a[href^="/director/"]')
             if director_element:
-                director_url = director_element.css('::attr(href)').get()
+                director_url = director_element.css("::attr(href)").get()
                 director = {
-                    "name": director_element.css('::text').get(),
-                    "short_name": director_url.split('/')[-1] if director_url else None,
+                    "name": director_element.css("::text").get(),
+                    "short_name": director_url.split("/")[-1] if director_url else None,
                     "url": director_url
                 }
 
-            post_url = post.css('h1 a::attr(href)').get()
+            post_url = post.css("h1 a::attr(href)").get()
 
             post_data = {
                 "external_id": external_id,
@@ -118,7 +118,7 @@ class FemjoySpider(scrapy.Spider):
             }
 
             # Check if any of the desired performers are in this release
-            if self.desired_performers and not any(model['short_name'] in self.desired_performers for model in models):
+            if self.desired_performers and not any(model["short_name"] in self.desired_performers for model in models):
                 continue  # Skip this release if it doesn't contain any desired performers
 
             yield scrapy.Request(
@@ -150,40 +150,40 @@ class FemjoySpider(scrapy.Spider):
         available_files = []
 
         # Extract gallery download links
-        gallery_links = response.css('div.column a.post_download')
+        gallery_links = response.css("div.column a.post_download")
         for link in gallery_links:
-            url = link.attrib['href']
-            variant = link.xpath('text()').get()
-            width = int(variant.split()[-1].replace('px', '')) if 'px' in variant else None
+            url = link.attrib["href"]
+            variant = link.xpath("text()").get()
+            width = int(variant.split()[-1].replace("px", "")) if "px" in variant else None
 
             available_files.append(AvailableGalleryZipFile(
-                file_type='zip',
-                content_type='gallery',
+                file_type="zip",
+                content_type="gallery",
                 variant=variant,
                 url=url,
                 resolution_width=width,
             ))
 
-        cover_url = post_data.get('cover_url')
+        cover_url = post_data.get("cover_url")
         if cover_url:
             available_files.append(AvailableImageFile(
-                file_type='image',
-                content_type='cover',
-                variant='',
+                file_type="image",
+                content_type="cover",
+                variant="",
                 url=cover_url,
             ))
 
         release_item = ReleaseItem(
             id=release_id,
-            release_date=post_data.get('release_date'),
+            release_date=post_data.get("release_date"),
             short_name=external_id,
-            name=post_data.get('title'),
+            name=post_data.get("title"),
             url=response.url,
             description="",
             duration=0,
             created=datetime.now(tz=UTC).astimezone(),
             last_updated=datetime.now(tz=UTC).astimezone(),
-            performers=post_data.get('models'),
+            performers=post_data.get("models"),
             tags=tags,
             available_files=json.dumps(available_files, cls=AvailableFileEncoder),
             json_document=json.dumps(post_data),
@@ -196,7 +196,7 @@ class FemjoySpider(scrapy.Spider):
 
     def parse_videos(self, response):
         # Extract pagination data
-        pagination = response.css('div._pagination div.paginationArea')
+        pagination = response.css("div._pagination div.paginationArea")
 
         # Get the last page number
         last_page = int(pagination.css('div.right a.pageBtn[title="last"]::attr(data-page)').get())
@@ -210,19 +210,19 @@ class FemjoySpider(scrapy.Spider):
             )
 
     def parse_videos_page(self, response):
-        posts = response.css('div.post_item')
+        posts = response.css("div.post_item")
         for post in posts:
-            external_id = post.css('::attr(data-post-id)').get()
-            title = post.css('h1 a::text').get()
-            cover_url = post.css('div.post_video a img.item_cover::attr(src)').get()
+            external_id = post.css("::attr(data-post-id)").get()
+            title = post.css("h1 a::text").get()
+            cover_url = post.css("div.post_video a img.item_cover::attr(src)").get()
 
-            raw_release_date = post.css('h3 span.posted_on::text').get()
-            parsed_release_date = datetime.strptime(raw_release_date, '%b %d, %Y').date() if raw_release_date else None
+            raw_release_date = post.css("h3 span.posted_on::text").get()
+            parsed_release_date = datetime.strptime(raw_release_date, "%b %d, %Y").date() if raw_release_date else None
             release_date = parsed_release_date.isoformat() if parsed_release_date else None
 
-            raw_duration_text = post.css('h3 span.counter_photos::text').get()
+            raw_duration_text = post.css("h3 span.counter_photos::text").get()
             if raw_duration_text:
-                duration_parts = raw_duration_text.strip().split(':')
+                duration_parts = raw_duration_text.strip().split(":")
                 if len(duration_parts) == 2:
                     minutes, seconds = map(int, duration_parts)
                     duration = minutes * 60 + seconds
@@ -235,9 +235,9 @@ class FemjoySpider(scrapy.Spider):
             models = []
             model_elements = post.css('h2 a[href^="/models/"]')
             for model_element in model_elements:
-                model_name = model_element.css('::text').get()
-                model_url = model_element.css('::attr(href)').get()
-                model_short_name = model_url.split('/')[-1] if model_url else None
+                model_name = model_element.css("::text").get()
+                model_url = model_element.css("::attr(href)").get()
+                model_short_name = model_url.split("/")[-1] if model_url else None
                 models.append({
                     "name": model_name,
                     "short_name": model_short_name,
@@ -245,20 +245,20 @@ class FemjoySpider(scrapy.Spider):
                 })
 
             # Check if any of the desired performers are in this release
-            if self.desired_performers and not any(model['short_name'] in self.desired_performers for model in models):
+            if self.desired_performers and not any(model["short_name"] in self.desired_performers for model in models):
                 continue  # Skip this release if it doesn't contain any desired performers
 
             director = {}
             director_element = post.css('h2 a[href^="/director/"]')
             if director_element:
-                director_url = director_element.css('::attr(href)').get()
+                director_url = director_element.css("::attr(href)").get()
                 director = {
-                    "name": director_element.css('::text').get(),
-                    "short_name": director_url.split('/')[-1] if director_url else None,
+                    "name": director_element.css("::text").get(),
+                    "short_name": director_url.split("/")[-1] if director_url else None,
                     "url": director_url
                 }
 
-            post_url = post.css('h1 a::attr(href)').get()
+            post_url = post.css("h1 a::attr(href)").get()
 
             post_data = {
                 "external_id": external_id,
@@ -299,11 +299,11 @@ class FemjoySpider(scrapy.Spider):
         available_files = []
 
         # Extract video download links
-        video_links = response.css('div.column a.post_download')
+        video_links = response.css("div.column a.post_download")
         video_files = {}
         for link in video_links:
-            url = link.attrib['href']
-            variant = link.xpath('text()').get()
+            url = link.attrib["href"]
+            variant = link.xpath("text()").get()
             width = parse_resolution_width(variant)
             height = parse_resolution_height(variant)
 
@@ -313,63 +313,63 @@ class FemjoySpider(scrapy.Spider):
             # Check if this resolution already exists and if the new file is MOV
             if resolution_key in video_files:
                 existing_file = video_files[resolution_key]
-                if 'mp4' in variant.lower():
+                if "mp4" in variant.lower():
                     # Always prefer MP4
                     video_files[resolution_key] = {
-                        'url': url,
-                        'variant': variant,
-                        'width': width,
-                        'height': height
+                        "url": url,
+                        "variant": variant,
+                        "width": width,
+                        "height": height
                     }
-                elif 'mov' in variant.lower() and 'mp4' not in existing_file['variant'].lower():
+                elif "mov" in variant.lower() and "mp4" not in existing_file["variant"].lower():
                     # Prefer MOV over WMV
                     video_files[resolution_key] = {
-                        'url': url,
-                        'variant': variant,
-                        'width': width,
-                        'height': height
+                        "url": url,
+                        "variant": variant,
+                        "width": width,
+                        "height": height
                     }
                 # If it's WMV and we don't have MP4 or MOV, keep the existing WMV
             else:
                 # Add new resolution
                 video_files[resolution_key] = {
-                    'url': url,
-                    'variant': variant,
-                    'width': width,
-                    'height': height
+                    "url": url,
+                    "variant": variant,
+                    "width": width,
+                    "height": height
                 }
 
         # Add the selected video files to available_files
         for video_file in video_files.values():
             available_files.append(AvailableVideoFile(
-                file_type='video',
-                content_type='scene',
-                variant=video_file['variant'],
-                url=video_file['url'],
-                resolution_width=video_file['width'],
-                resolution_height=video_file['height'],
+                file_type="video",
+                content_type="scene",
+                variant=video_file["variant"],
+                url=video_file["url"],
+                resolution_width=video_file["width"],
+                resolution_height=video_file["height"],
             ))
 
-        cover_url = post_data.get('cover_url')
+        cover_url = post_data.get("cover_url")
         if cover_url:
             available_files.append(AvailableImageFile(
-                file_type='image',
-                content_type='cover',
-                variant='',
+                file_type="image",
+                content_type="cover",
+                variant="",
                 url=cover_url,
             ))
 
         release_item = ReleaseItem(
             id=release_id,
-            release_date=post_data.get('release_date'),
+            release_date=post_data.get("release_date"),
             short_name=external_id,
-            name=post_data.get('title'),
+            name=post_data.get("title"),
             url=response.url,
             description="",
             duration=0,
             created=datetime.now(tz=UTC).astimezone(),
             last_updated=datetime.now(tz=UTC).astimezone(),
-            performers=post_data.get('models'),
+            performers=post_data.get("models"),
             tags=tags,
             available_files=json.dumps(available_files, cls=AvailableFileEncoder),
             json_document=json.dumps(post_data),

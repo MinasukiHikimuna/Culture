@@ -3,7 +3,7 @@ import polars as pl
 import sys
 import os
 
-sys.path.append(os.path.dirname(os.path.abspath('')))
+sys.path.append(os.path.dirname(os.path.abspath("")))
 
 from libraries.client_stashapp import get_stashapp_client, StashAppClient
 

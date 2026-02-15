@@ -371,14 +371,14 @@ class StashDbClient(StashboxClient):
 
         while True:
             result = self._gql_query(query, {"page": page, "per_page": per_page})
-            if result is None or 'data' not in result or 'queryTags' not in result['data']:
+            if result is None or "data" not in result or "queryTags" not in result["data"]:
                 break
 
-            tags_data = result['data']['queryTags']
-            all_tags.extend(tags_data['tags'])
+            tags_data = result["data"]["queryTags"]
+            all_tags.extend(tags_data["tags"])
 
             if total_count is None:
-                total_count = tags_data['count']
+                total_count = tags_data["count"]
 
             if len(all_tags) >= total_count:
                 break

@@ -7,8 +7,8 @@ import time
 class SABnzbdClient:
     def __init__(self):
         load_dotenv()
-        self.host = os.getenv('SABNZBD_HOST', 'http://localhost:8080').rstrip('/')
-        self.api_key = os.getenv('SABNZBD_API_KEY')
+        self.host = os.getenv("SABNZBD_HOST", "http://localhost:8080").rstrip("/")
+        self.api_key = os.getenv("SABNZBD_API_KEY")
         if not self.api_key:
             raise ValueError("SABNZBD_API_KEY not found in environment variables")
 
@@ -26,13 +26,13 @@ class SABnzbdClient:
                  or {'status': False, 'error': 'error message'} on failure
         """
         params = {
-            'apikey': self.api_key,
-            'mode': 'addurl',
-            'name': nzb_url,
-            'output': 'json'
+            "apikey": self.api_key,
+            "mode": "addurl",
+            "name": nzb_url,
+            "output": "json"
         }
         if name:
-            params['nzbname'] = name
+            params["nzbname"] = name
 
         try:
             response = requests.get(f"{self.host}/api", params=params)
@@ -40,36 +40,36 @@ class SABnzbdClient:
             
             # SABnzbd might return empty response for success
             if not response.text:
-                return {'status': True, 'error': 'No nzo_id returned'}
+                return {"status": True, "error": "No nzo_id returned"}
                 
             try:
                 result = response.json()
                 # SABnzbd returns different response formats
                 if isinstance(result, dict):
-                    if 'nzo_ids' in result:
+                    if "nzo_ids" in result:
                         return {
-                            'status': True,
-                            'nzo_id': result['nzo_ids'][0]
+                            "status": True,
+                            "nzo_id": result["nzo_ids"][0]
                         }
-                    elif 'error' in result:
+                    elif "error" in result:
                         return {
-                            'status': False,
-                            'error': result['error']
+                            "status": False,
+                            "error": result["error"]
                         }
-                return {'status': True, 'error': 'No nzo_id in response'}
+                return {"status": True, "error": "No nzo_id in response"}
             except ValueError:
                 # If response isn't JSON but request succeeded
                 return {
-                    'status': True,
-                    'error': 'Invalid JSON response'
+                    "status": True,
+                    "error": "Invalid JSON response"
                 }
                 
         except Exception as e:
             print(f"Error adding NZB to SABnzbd: {e}")
             print(f"Response content: {response.text if 'response' in locals() else 'No response'}")
             return {
-                'status': False,
-                'error': str(e)
+                "status": False,
+                "error": str(e)
             }
 
     def get_queue_details(self, nzo_id: str) -> Dict[str, Any]:
@@ -83,10 +83,10 @@ class SABnzbdClient:
             dict: Queue item details including status and path information
         """
         params = {
-            'apikey': self.api_key,
-            'mode': 'queue',
-            'output': 'json',
-            'nzo_ids': [nzo_id]
+            "apikey": self.api_key,
+            "mode": "queue",
+            "output": "json",
+            "nzo_ids": [nzo_id]
         }
 
         try:
@@ -95,9 +95,9 @@ class SABnzbdClient:
             data = response.json()
             
             # Find the specific queue item
-            if 'queue' in data and 'slots' in data['queue']:
-                for item in data['queue']['slots']:
-                    if item['nzo_id'] == nzo_id:
+            if "queue" in data and "slots" in data["queue"]:
+                for item in data["queue"]["slots"]:
+                    if item["nzo_id"] == nzo_id:
                         return item
             return {}
         except Exception as e:
@@ -115,10 +115,10 @@ class SABnzbdClient:
             dict: History item details including final path
         """
         params = {
-            'apikey': self.api_key,
-            'mode': 'history',
-            'output': 'json',
-            'nzo_ids': [nzo_id]
+            "apikey": self.api_key,
+            "mode": "history",
+            "output": "json",
+            "nzo_ids": [nzo_id]
         }
 
         try:
@@ -127,9 +127,9 @@ class SABnzbdClient:
             data = response.json()
             
             # Find the specific history item
-            if 'history' in data and 'slots' in data['history']:
-                for item in data['history']['slots']:
-                    if item['nzo_id'] == nzo_id:
+            if "history" in data and "slots" in data["history"]:
+                for item in data["history"]["slots"]:
+                    if item["nzo_id"] == nzo_id:
                         return item
             return {}
         except Exception as e:
@@ -154,8 +154,8 @@ class SABnzbdClient:
             # Check queue first
             queue_item = self.get_queue_details(nzo_id)
             if queue_item:
-                if queue_item.get('status', '').lower() == 'failed':
-                    return {'status': 'failed', 'error': queue_item.get('error', 'Unknown error')}
+                if queue_item.get("status", "").lower() == "failed":
+                    return {"status": "failed", "error": queue_item.get("error", "Unknown error")}
                 # Still in queue, wait and check again
                 time.sleep(check_interval)
                 continue
@@ -163,20 +163,20 @@ class SABnzbdClient:
             # Not in queue, check history
             history_item = self.get_history_details(nzo_id)
             if history_item:
-                status = history_item.get('status', '').lower()
-                if status == 'completed':
+                status = history_item.get("status", "").lower()
+                if status == "completed":
                     return {
-                        'status': 'completed',
-                        'path': history_item.get('storage', ''),
-                        'filename': history_item.get('filename', ''),
-                        'download_time': history_item.get('download_time', 0),
-                        'size': history_item.get('size', ''),
-                        'category': history_item.get('category', '')
+                        "status": "completed",
+                        "path": history_item.get("storage", ""),
+                        "filename": history_item.get("filename", ""),
+                        "download_time": history_item.get("download_time", 0),
+                        "size": history_item.get("size", ""),
+                        "category": history_item.get("category", "")
                     }
-                elif status == 'failed':
-                    return {'status': 'failed', 'error': history_item.get('fail_message', 'Unknown error')}
+                elif status == "failed":
+                    return {"status": "failed", "error": history_item.get("fail_message", "Unknown error")}
                     
             # Not found in either queue or history
             time.sleep(check_interval)
             
-        return {'status': 'timeout', 'error': f'Download did not complete within {timeout} seconds'} 
+        return {"status": "timeout", "error": f"Download did not complete within {timeout} seconds"} 

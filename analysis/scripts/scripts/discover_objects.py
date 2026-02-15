@@ -22,19 +22,19 @@ def discover_objects(source_dir: str, confidence_threshold: float = 0.25, save_r
     """
     Discover potential new objects using unsupervised learning and save cropped objects
     """
-    model = YOLO('yolo11n.pt')
+    model = YOLO("yolo11n.pt")
     
     source_path = Path(source_dir)
-    output_dir = source_path.parent / 'discoveries'
+    output_dir = source_path.parent / "discoveries"
     output_dir.mkdir(exist_ok=True)
     
     # Create directory for extracted objects
-    objects_dir = output_dir / 'extracted_objects'
+    objects_dir = output_dir / "extracted_objects"
     objects_dir.mkdir(exist_ok=True)
     
     image_files = []
-    for ext in ['.jpg', '.jpeg', '.png', '.bmp']:
-        image_files.extend(source_path.glob(f'*{ext}'))
+    for ext in [".jpg", ".jpeg", ".png", ".bmp"]:
+        image_files.extend(source_path.glob(f"*{ext}"))
     
     unknown_features = []
     locations = []
@@ -54,7 +54,7 @@ def discover_objects(source_dir: str, confidence_threshold: float = 0.25, save_r
             conf=0.01,
             save=save_results,
             project=str(output_dir),
-            name=''
+            name=""
         )
         
         for result in results:
@@ -84,12 +84,12 @@ def discover_objects(source_dir: str, confidence_threshold: float = 0.25, save_r
                     
                     unknown_features.append(features)
                     locations.append({
-                        'image': img_path,
-                        'box': box_coords,
-                        'confidence': confidence,
-                        'class_id': class_id,
-                        'class_name': model.names[class_id],
-                        'extracted_object': extract_object(image, box_coords)
+                        "image": img_path,
+                        "box": box_coords,
+                        "confidence": confidence,
+                        "class_id": class_id,
+                        "class_name": model.names[class_id],
+                        "extracted_object": extract_object(image, box_coords)
                     })
     
     if unknown_features:
@@ -109,7 +109,7 @@ def discover_objects(source_dir: str, confidence_threshold: float = 0.25, save_r
                 continue
                 
             # Create directory for this cluster
-            cluster_dir = objects_dir / f'cluster_{cluster_id}'
+            cluster_dir = objects_dir / f"cluster_{cluster_id}"
             cluster_dir.mkdir(exist_ok=True)
             
             cluster_locations = [loc for i, loc in enumerate(locations) 
@@ -128,18 +128,18 @@ def discover_objects(source_dir: str, confidence_threshold: float = 0.25, save_r
             # Save extracted objects for this cluster
             for i, loc in enumerate(cluster_locations):
                 output_path = cluster_dir / f"object_{i:04d}.jpg"
-                cv2.imwrite(str(output_path), loc['extracted_object'])
+                cv2.imwrite(str(output_path), loc["extracted_object"])
                 print(f"- Saved {output_path.name} from {loc['image'].name} "
                       f"(confidence: {loc['confidence']:.2f}, "
                       f"current guess: {loc['class_name']})")
 
 def main():
-    parser = argparse.ArgumentParser(description='Discover and extract new objects from images')
-    parser.add_argument('source_dir', type=str, help='Directory containing images')
-    parser.add_argument('--confidence', type=float, default=0.25,
-                        help='Confidence threshold for potential objects')
-    parser.add_argument('--no-save', action='store_true',
-                        help='Do not save annotated images')
+    parser = argparse.ArgumentParser(description="Discover and extract new objects from images")
+    parser.add_argument("source_dir", type=str, help="Directory containing images")
+    parser.add_argument("--confidence", type=float, default=0.25,
+                        help="Confidence threshold for potential objects")
+    parser.add_argument("--no-save", action="store_true",
+                        help="Do not save annotated images")
     
     args = parser.parse_args()
     

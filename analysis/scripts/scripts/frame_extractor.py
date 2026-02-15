@@ -24,10 +24,10 @@ class FrameExtractor:
             return
         
         # Store scene metadata permanently
-        with open(self.dataset.scene_data / f"{scene_id}.json", 'w') as f:
+        with open(self.dataset.scene_data / f"{scene_id}.json", "w") as f:
             json.dump(scene_data, f, indent=2)
         
-        video_path = scene_data['video_path']
+        video_path = scene_data["video_path"]
         drive = os.path.splitdrive(video_path)[0].upper()
         
         print(f"[{drive}] {scene_id}: Starting frame extraction...")
@@ -45,10 +45,10 @@ class FrameExtractor:
                 # Extract frames
                 (
                     ffmpeg
-                    .input(video_path, skip_frame='nokey')
-                    .filter('select', 'not(mod(n,10))')
+                    .input(video_path, skip_frame="nokey")
+                    .filter("select", "not(mod(n,10))")
                     .output(
-                        str(scene_dir / 'frame_%04d.jpg'),
+                        str(scene_dir / "frame_%04d.jpg"),
                         qscale=3,
                         vsync=0,
                         threads=10
@@ -71,7 +71,7 @@ class FrameExtractor:
                 # Move to failed state
                 failed_dir = self.dataset.scenes[SceneState.FAILED.value] / scene_id
                 os.makedirs(failed_dir, exist_ok=True)
-                with open(failed_dir / 'error.txt', 'w') as f:
+                with open(failed_dir / "error.txt", "w") as f:
                     f.write(str(e))
                 if scene_dir.exists():
                     shutil.rmtree(scene_dir)
@@ -82,11 +82,11 @@ class FrameExtractor:
             try:
                 # Check for pending scenes with JSON data
                 pending_dir = self.dataset.scenes[SceneState.PENDING.value]
-                for json_file in pending_dir.glob('*.json'):
+                for json_file in pending_dir.glob("*.json"):
                     scene_id = json_file.stem
                     
                     # Load scene data
-                    with open(json_file, 'r') as f:
+                    with open(json_file, "r") as f:
                         scene_data = json.load(f)
                     
                     # Process the scene

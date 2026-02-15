@@ -26,24 +26,24 @@ class Categories:
         
         # Parse XML response
         root = ET.fromstring(response.text)
-        categories_elem = root.find('categories')
+        categories_elem = root.find("categories")
         
         if categories_elem is None:
             raise ValueError("No categories found in API response")
             
         self.categories = []
-        for cat in categories_elem.findall('category'):
+        for cat in categories_elem.findall("category"):
             category = Category(
-                id=int(cat.get('id', 0)),
-                name=cat.get('name', ''),
+                id=int(cat.get("id", 0)),
+                name=cat.get("name", ""),
                 subcats=[]
             )
             
-            for subcat in cat.findall('subcat'):
+            for subcat in cat.findall("subcat"):
                 category.subcats.append(
                     Subcat(
-                        id=int(subcat.get('id', 0)),
-                        name=subcat.get('name', '')
+                        id=int(subcat.get("id", 0)),
+                        name=subcat.get("name", "")
                     )
                 )
             
