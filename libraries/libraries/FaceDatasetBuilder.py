@@ -6,7 +6,6 @@ import shutil
 import threading
 from datetime import datetime
 from pathlib import Path
-from typing import Union
 
 import cv2
 import ffmpeg

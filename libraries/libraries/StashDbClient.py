@@ -1,7 +1,6 @@
 import json
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Optional
 
 import polars as pl
 import requests

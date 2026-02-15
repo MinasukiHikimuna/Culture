@@ -1,6 +1,5 @@
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
-from typing import Optional
 
 import requests
 
