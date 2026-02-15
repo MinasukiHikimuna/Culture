@@ -27,6 +27,7 @@ from urllib.parse import urlparse
 
 import config as aural_config
 import httpx
+from analyze_reddit_post import EnhancedRedditPostAnalyzer
 from ao3_extractor import AO3Extractor
 from audiochan_extractor import AudiochanExtractor
 from erocast_extractor import ErocastExtractor
@@ -1448,7 +1449,6 @@ Examples:
             print(f"📋 Loaded analysis from: {args.analysis}")
         else:
             print("🤖 Running LLM analysis...")
-            from analyze_reddit_post import EnhancedRedditPostAnalyzer
             analyzer = EnhancedRedditPostAnalyzer()
             llm_analysis = analyzer.analyze_post(post_path)
             print("✅ LLM analysis complete")

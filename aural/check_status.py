@@ -9,6 +9,9 @@ Usage:
 """
 
 import argparse
+import os
+import socket
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -131,10 +134,6 @@ def log(msg: str):
 
 def get_network_diagnostics() -> str:
     """Get network diagnostics for debugging."""
-    import os
-    import socket
-    import subprocess
-
     lines = []
     try:
         # Check default route
@@ -376,7 +375,6 @@ def get_network_diagnostics() -> str:
 
         # Check current TTY
         try:
-            import os
             tty = os.ttyname(0) if os.isatty(0) else "not a tty"
             lines.append(f"  TTY: {tty}")
         except Exception as e:

@@ -11,12 +11,14 @@ Requirements:
 """
 
 import argparse
+import csv
 import json
 import re
 import sys
 import time
 from datetime import UTC, datetime
 from pathlib import Path
+from urllib.parse import urljoin
 
 import config as aural_config
 from bs4 import BeautifulSoup
@@ -169,8 +171,6 @@ class ScriptBinExtractor:
             metadata["author"] = author_text
             href = author_link.get("href", "")
             if href:
-                from urllib.parse import urljoin
-
                 metadata["author_url"] = urljoin(url, href)
 
             # Use author from link if username wasn't extracted from URL
@@ -477,8 +477,6 @@ class ScriptBinExtractor:
         filepath = self.output_dir / filename
 
         try:
-            import csv
-
             # Flatten script_content for CSV
             flattened_data = []
             for entry in data:

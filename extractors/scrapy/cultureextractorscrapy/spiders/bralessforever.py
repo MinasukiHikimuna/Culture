@@ -18,6 +18,7 @@ Site Structure:
 import json
 import os
 from datetime import UTC, datetime
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 import newnewid
 import scrapy
@@ -218,8 +219,6 @@ class BralessForeverSpider(scrapy.Spider):
                 if release_date_str:
                     try:
                         # Parse ISO datetime and convert to date
-                        from datetime import datetime
-
                         release_dt = datetime.fromisoformat(release_date_str.replace("Z", "+00:00"))
                         release_date = release_dt.date().isoformat()
                     except (ValueError, AttributeError) as e:
@@ -288,8 +287,6 @@ class BralessForeverSpider(scrapy.Spider):
                 # Build next page URL - based on the pattern you provided
                 current_url = response.url
                 # Use a more robust URL parsing approach
-                from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
-
                 parsed_url = urlparse(current_url)
                 query_params = parse_qs(parsed_url.query)
 

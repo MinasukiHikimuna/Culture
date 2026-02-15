@@ -13,6 +13,7 @@ Requirements:
 
 import argparse
 import contextlib
+import csv
 import json
 import re
 import sys
@@ -513,8 +514,6 @@ class AO3Extractor:
         filepath = self.output_dir / filename
 
         try:
-            import csv
-
             # Flatten content and list fields for CSV
             flattened_data = []
             for entry in data:

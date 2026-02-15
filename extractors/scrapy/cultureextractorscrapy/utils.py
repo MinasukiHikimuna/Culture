@@ -1,8 +1,11 @@
+import datetime
 import logging
 import re
 import shutil
 import sys
 from pathlib import Path
+
+from scrapy.utils.project import get_project_settings
 
 
 class WindowsSafeFormatter(logging.Formatter):
@@ -102,10 +105,6 @@ def parse_resolution_height(resolution_string):
 
 
 def get_log_filename(spider_name):
-    import datetime
-
-    from scrapy.utils.project import get_project_settings
-
     settings = get_project_settings()
     log_dir = settings.get("LOG_DIR", "logs")
 

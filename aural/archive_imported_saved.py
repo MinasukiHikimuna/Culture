@@ -12,6 +12,7 @@ Usage:
 
 import argparse
 import json
+import re
 import shutil
 from pathlib import Path
 
@@ -31,8 +32,6 @@ def get_all_scenes_with_post_ids(client: StashappClient) -> dict[str, dict]:
     Fetch all scenes from Stashapp and extract Reddit post IDs from filenames.
     Returns a dict mapping post_id -> scene info.
     """
-    import re
-
     query = """
         query FindScenes($filter: FindFilterType!) {
             findScenes(filter: $filter) {

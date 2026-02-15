@@ -19,6 +19,7 @@ import json
 import re
 import sys
 import time
+import traceback
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -503,8 +504,6 @@ class AnalyzeDownloadImportPipeline:
         except Exception as e:
             print(f"  Processing failed for {analysis_file_path}: {e}")
             if self.verbose:
-                import traceback
-
                 traceback.print_exc()
             return {
                 "success": False,
@@ -572,8 +571,6 @@ class AnalyzeDownloadImportPipeline:
         Returns:
             dict with success status and script info
         """
-        from release_orchestrator import ReleaseOrchestrator
-
         release_path = release_dir / "release.json"
         if not release_path.exists():
             print(f"  Error: No release.json found in {release_dir}")
@@ -625,8 +622,6 @@ class AnalyzeDownloadImportPipeline:
         except Exception as e:
             print(f"  Script re-extraction failed: {e}")
             if self.verbose:
-                import traceback
-
                 traceback.print_exc()
             return {"success": False, "error": str(e)}
 
@@ -1444,8 +1439,6 @@ Examples:
     except Exception as e:
         print(f"  Pipeline error: {e}")
         if args.verbose:
-            import traceback
-
             traceback.print_exc()
         return 1
 

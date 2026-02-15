@@ -11,6 +11,7 @@ import json
 import os
 import re
 import sys
+import time
 import urllib.parse
 from datetime import datetime
 from pathlib import Path
@@ -432,8 +433,6 @@ Return JSON:
 
     def _repair_json(self, json_str: str) -> str:
         """Attempts to repair common JSON malformations from LLM output."""
-        import re
-
         repaired = json_str
 
         # Step 1: Fix invalid escape sequences
@@ -794,8 +793,6 @@ Return JSON:
 
     def _extract_cyoa_version_name(self, url: str, selftext: str) -> str:
         """Extract a descriptive name for a CYOA audio from its URL or context."""
-        import urllib.parse
-
         # Try to get name from URL path
         parsed = urllib.parse.urlparse(url)
         path_parts = parsed.path.strip("/").split("/")
@@ -1021,8 +1018,6 @@ Return JSON:
                 results.append(analysis)
 
                 # Small delay to avoid overwhelming the LLM
-                import time
-
                 time.sleep(2)
             except Exception as e:
                 print(f"Error processing {file}: {e}")

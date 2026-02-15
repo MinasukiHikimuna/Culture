@@ -15,6 +15,7 @@ import re
 import shutil
 import sys
 import time
+import traceback
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -449,7 +450,6 @@ Examples:
     except Exception as e:
         print(f"Error: {e}")
         if args.verbose:
-            import traceback
             traceback.print_exc()
         return 1
 

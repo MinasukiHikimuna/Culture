@@ -6,6 +6,7 @@ This utility extracts script URLs from Reddit posts when they're referenced
 indirectly (e.g., through Reddit shortlinks or in post content).
 """
 
+import argparse
 import json
 import os
 import re
@@ -252,8 +253,6 @@ class ScriptUrlExtractor:
 
 def main():
     """Example usage"""
-    import argparse
-
     parser = argparse.ArgumentParser(description="Extract script URLs from Reddit posts")
     parser.add_argument("post_id", help="Reddit post ID to analyze")
     parser.add_argument("--update-analysis", help="Path to analysis file to update")

@@ -14,9 +14,11 @@ Usage:
 
 import argparse
 import json
+import os
 import re
 import shutil
 import sys
+import traceback
 from pathlib import Path
 
 import praw
@@ -53,8 +55,6 @@ class RedditProcessor:
     def reddit(self) -> praw.Reddit:
         """Lazy initialization of Reddit API client."""
         if self._reddit is None:
-            import os
-
             client_id = os.getenv("REDDIT_CLIENT_ID")
             client_secret = os.getenv("REDDIT_CLIENT_SECRET")
             user_agent = os.getenv("REDDIT_USER_AGENT", "Aural/1.0")
@@ -497,8 +497,6 @@ Output Structure:
 
     except Exception as error:
         print(f"\nFatal error: {error}")
-        import traceback
-
         traceback.print_exc()
         return 1
 

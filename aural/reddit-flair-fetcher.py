@@ -11,6 +11,7 @@ Returns JSON with flair information that can be used to determine gender.
 import argparse
 import json
 import os
+import re
 import sys
 
 import praw
@@ -123,8 +124,6 @@ def parse_gender_from_flair(flair_text: str, flair_css_class: str) -> str | None
     - "nb-flair" for non-binary
     - "t-flair" for trans
     """
-    import re
-
     if not flair_text and not flair_css_class:
         return None
 

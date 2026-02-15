@@ -1,6 +1,8 @@
+import hashlib
 import json
 import os
 import re
+import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urlencode
@@ -1105,9 +1107,6 @@ class PatreonSpider(scrapy.Spider):
             Dict with audio metadata (duration, bitrate, sample_rate, channels, codec)
         """
         try:
-            import json
-            import subprocess
-
             # Run ffprobe to get audio metadata
             cmd = [
                 "ffprobe",
@@ -1182,8 +1181,6 @@ class PatreonSpider(scrapy.Spider):
             SHA-256 hash as hexadecimal string, or None if error
         """
         try:
-            import hashlib
-
             hash_sha256 = hashlib.sha256()
             with Path(file_path).open("rb") as f:
                 # Read file in chunks to handle large files

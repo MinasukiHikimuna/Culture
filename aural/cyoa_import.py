@@ -19,6 +19,7 @@ import json
 import re
 import sys
 import time
+import traceback
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -540,8 +541,6 @@ Examples:
         return 0
     except Exception as e:
         print(f"Error: {e}")
-        import traceback
-
         traceback.print_exc()
         return 1
 

@@ -1,5 +1,8 @@
 import os
+import random
+import re
 from datetime import datetime
+from types import SimpleNamespace
 
 import polars as pl
 from dotenv import load_dotenv
@@ -382,8 +385,6 @@ class StashAppClient:
         self, base_url, include_tags, exclude_tags, sort_by="random", sort_dir="desc"
     ):
         # Create random number for sort if needed
-        import random
-
         random_num = random.randint(10000000, 99999999) if sort_by == "random" else ""
 
         # Format tags into the required structure
@@ -448,9 +449,6 @@ class StashAppClient:
         Returns:
             SimpleNamespace object with tag names as clean variable names
         """
-        import re
-        from types import SimpleNamespace
-
         tags = SimpleNamespace()
 
         print("🏷️  Tag Lookup Results:")

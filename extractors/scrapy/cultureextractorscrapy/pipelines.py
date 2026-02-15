@@ -8,15 +8,19 @@ import hashlib
 import json
 import logging
 import os
+import re
 import shutil
 import subprocess
+import time
 import uuid
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse
 
 import newnewid
+import requests
 from scrapy import Request
+from scrapy.exceptions import DropItem
 
 # useful for handling different item types with a single interface
 from scrapy.pipelines.files import FilesPipeline
@@ -357,8 +361,6 @@ class BaseDownloadPipeline:
 
     def create_downloaded_item_from_path(self, item, file_path, spider):
         """Create DownloadedFileItem from a file path"""
-        from datetime import datetime
-
         file_info = item["file_info"]
 
         # Process file metadata
@@ -398,8 +400,6 @@ class BaseDownloadPipeline:
 
     def process_video_metadata(self, file_path):
         """Process video file metadata with both video hashes and ffprobe data"""
-        import json as json_lib
-
         metadata = {"$type": "VideoFileMetadata"}
 
         # Get video hashes (phash, oshash, md5, duration)
@@ -432,7 +432,7 @@ class BaseDownloadPipeline:
             logging.info(f"[process_video_metadata] videohashes stderr: {result.stderr}")
 
             if result.returncode == 0:
-                video_hashes = json_lib.loads(result.stdout)
+                video_hashes = json.loads(result.stdout)
                 logging.info(f"[process_video_metadata] Parsed video hashes: {video_hashes}")
                 # Add video hashes at root level for compatibility
                 metadata["duration"] = video_hashes.get("duration")
@@ -465,7 +465,7 @@ class BaseDownloadPipeline:
             result = subprocess.run(ffprobe_command, check=False, capture_output=True, text=True, timeout=60)
 
             if result.returncode == 0:
-                ffprobe_data = json_lib.loads(result.stdout)
+                ffprobe_data = json.loads(result.stdout)
                 metadata["ffprobe"] = ffprobe_data
             else:
                 logging.error(f"ffprobe failed: {result.stderr}")
@@ -532,8 +532,6 @@ class AvailableFilesPipeline(BaseDownloadPipeline, FilesPipeline):
                         available_gb,
                         full_path,
                     )
-                    from scrapy.exceptions import DropItem
-
                     raise DropItem(
                         f"Insufficient disk space: {available_gb:.2f}GB available, 50GB required"
                     )
@@ -652,8 +650,6 @@ class M3u8DownloadPipeline(BaseDownloadPipeline):
                     available_gb,
                     file_path,
                 )
-                from scrapy.exceptions import DropItem
-
                 raise DropItem(
                     f"Insufficient disk space: {available_gb:.2f}GB available, 50GB required"
                 )
@@ -676,16 +672,12 @@ class M3u8DownloadPipeline(BaseDownloadPipeline):
                 relative_path = os.path.relpath(actual_path, self.store_uri)
                 return self.create_downloaded_item_from_path(item, relative_path, spider)
             spider.logger.error("[M3u8DownloadPipeline] Download failed: %s", item["url"])
-            from scrapy.exceptions import DropItem
-
             raise DropItem(f"M3U8 download failed: {item['url']}")
 
         return item
 
     def download_hls_with_ytdlp(self, url, output_path, spider):
         """Download HLS stream using yt-dlp with timeout detection and retry logic"""
-        import time
-
         for attempt in range(self.max_retries + 1):
             if attempt > 0:
                 spider.logger.info(
@@ -878,8 +870,6 @@ class M3u8DownloadPipeline(BaseDownloadPipeline):
 
     def parse_ytdlp_progress(self, output_line):
         """Parse yt-dlp progress output to extract download statistics including fragment info"""
-        import re
-
         # Enhanced regex to capture fragment info: [download] 32.9% of ~ 3.18GiB at 30.49MiB/s ETA 01:14 (frag 86/262)
         fragment_progress_match = re.search(
             r"\[download\]\s+(\d+\.?\d*)%\s+of\s+~?\s*([\d.]+\w+)(?:\s+at\s+([\d.]+\w+/s))?\s+ETA\s+([\d:]+)\s+\(frag\s+(\d+)/(\d+)\)",
@@ -938,8 +928,6 @@ class M3u8DownloadPipeline(BaseDownloadPipeline):
 
     def parse_size_string(self, size_str):
         """Convert size string like '1.23GB' to bytes"""
-        import re
-
         match = re.match(r"([\d.]+)(\w+)", size_str)
         if not match:
             return 0
@@ -1001,8 +989,6 @@ class FfmpegDownloadPipeline(BaseDownloadPipeline):
                     available_gb,
                     file_path,
                 )
-                from scrapy.exceptions import DropItem
-
                 raise DropItem(
                     f"Insufficient disk space: {available_gb:.2f}GB available, 50GB required"
                 )
@@ -1025,8 +1011,6 @@ class FfmpegDownloadPipeline(BaseDownloadPipeline):
                 relative_path = os.path.relpath(actual_path, self.store_uri)
                 return self.create_downloaded_item_from_path(item, relative_path, spider)
             spider.logger.error("[FfmpegDownloadPipeline] Download failed: %s", item["url"])
-            from scrapy.exceptions import DropItem
-
             raise DropItem(f"FFmpeg download failed: {item['url']}")
 
         return item
@@ -1071,8 +1055,6 @@ class FfmpegDownloadPipeline(BaseDownloadPipeline):
                     break
                 if output:
                     # Log progress every 30 seconds or on important messages
-                    import time
-
                     current_time = time.time()
                     if (
                         "time=" in output
@@ -1164,8 +1146,6 @@ class Aria2DownloadPipeline(BaseDownloadPipeline):
                     available_gb,
                     full_path,
                 )
-                from scrapy.exceptions import DropItem
-
                 raise DropItem(
                     f"Insufficient disk space: {available_gb:.2f}GB available, 50GB required"
                 )
@@ -1186,8 +1166,6 @@ class Aria2DownloadPipeline(BaseDownloadPipeline):
                 )
                 return self.create_downloaded_item_from_path(item, file_path, spider)
             self.logger.error("[Aria2DownloadPipeline] Download failed: %s", item["url"])
-            from scrapy.exceptions import DropItem
-
             raise DropItem(f"aria2c download failed: {item['url']}")
 
         return item
@@ -1238,8 +1216,6 @@ class Aria2DownloadPipeline(BaseDownloadPipeline):
                 cmd.extend(["--header", f"Cookie: {cookie_header}"])
 
             # Add referer header based on URL domain
-            from urllib.parse import urlparse
-
             parsed_url = urlparse(url)
             referer = f"{parsed_url.scheme}://{parsed_url.netloc}/"
             cmd.extend(["--header", f"Referer: {referer}"])
@@ -1394,8 +1370,6 @@ class PerformerImagePipeline:
 
     def _download_image(self, url, filepath, spider):
         """Download an image from URL to filepath."""
-        import requests
-
         # Use cookies if available from spider
         cookies = {}
         if hasattr(spider, "cookies"):
@@ -1426,7 +1400,7 @@ class StashDbImagePipeline:
 
     def process_item(self, item, spider):
         # Import here to avoid circular imports
-        from .spiders.stashdb import StashDbImageItem
+        from .spiders.stashdb import StashDbImageItem  # noqa: PLC0415
 
         if not isinstance(item, StashDbImageItem):
             return item
@@ -1484,8 +1458,6 @@ class StashDbImagePipeline:
 
     def _download_image(self, url, filepath):
         """Download an image from URL to filepath."""
-        import requests
-
         response = requests.get(url, timeout=30)
         response.raise_for_status()
 

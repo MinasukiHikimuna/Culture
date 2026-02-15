@@ -87,10 +87,12 @@ unfixable = []
     "E402",     # Notebook-style scripts need sys.path.append before library imports
     "ERA001",   # Notebook-style scripts keep commented-out code for alternate workflows
     "B018",     # Bare expressions display output in notebook cells
+    "PLC0415",  # Notebook-style scripts use imports inside functions/cells
 ]
 "analysis/**/*.ipynb" = [
     "ERA001",   # Notebooks keep commented-out code for alternate workflows
     "B018",     # Bare expressions display output in notebook cells
+    "PLC0415",  # Notebooks use imports inside cells
 ]
 "extractors/scrapy/cultureextractorscrapy/settings.py" = [
     "ERA001",   # Scrapy template settings kept as documentation
