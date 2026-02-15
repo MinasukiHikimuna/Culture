@@ -841,7 +841,7 @@ class AnalyzeDownloadImportPipeline:
         # Filter to only available platforms
         available_platforms = [
             p
-            for p in audio_urls_by_platform.keys()
+            for p in audio_urls_by_platform
             if self.availability_tracker.is_available(p)
         ]
 
