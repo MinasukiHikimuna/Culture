@@ -1,11 +1,13 @@
-from typing import Dict, List
-import numpy as np
-import stashapi.log as log
-from stashapi.stashapp import StashInterface
-from datetime import datetime
-from dotenv import load_dotenv
 import os
+from datetime import datetime
+from typing import Dict, List
+
+import numpy as np
 import polars as pl
+import stashapi.log as log
+from dotenv import load_dotenv
+from stashapi.stashapp import StashInterface
+
 
 # Load the .env file
 load_dotenv()

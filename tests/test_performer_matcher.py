@@ -1,7 +1,10 @@
 import json
+
 import polars as pl
 import pytest
+
 from libraries.performer_matcher import PerformerMatcher
+
 
 @pytest.fixture
 def all_stashapp_performers():

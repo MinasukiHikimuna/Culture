@@ -1,14 +1,16 @@
-import torch
-from facenet_pytorch import MTCNN
-from PIL import Image
-import numpy as np
-from pathlib import Path
-import shutil
-import torchvision.transforms.functional as TF
 import math
 import os
+import shutil
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+
+import numpy as np
+import torch
+import torchvision.transforms.functional as TF
+from facenet_pytorch import MTCNN
+from PIL import Image
 from tqdm import tqdm
+
 
 class FacePreprocessor:
     def __init__(self, input_dir: Path, output_dir: Path, verbose: bool = False):

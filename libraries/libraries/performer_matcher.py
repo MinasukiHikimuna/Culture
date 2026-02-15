@@ -1,6 +1,8 @@
 from dataclasses import dataclass
-from typing import List, Optional, Dict
+from typing import Dict, List, Optional
+
 import polars as pl
+
 
 @dataclass
 class PerformerMatch:

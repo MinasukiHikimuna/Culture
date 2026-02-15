@@ -1,12 +1,15 @@
-import os
 import json
-import time
+import os
 import shutil
 import threading
+import time
 from pathlib import Path
-import ffmpeg
 from typing import Dict
-from libraries.scene_states import SceneState, DatasetStructure
+
+import ffmpeg
+
+from libraries.scene_states import DatasetStructure, SceneState
+
 
 class FrameExtractor:
     def __init__(self, base_dir: str, max_per_drive: int = 2):

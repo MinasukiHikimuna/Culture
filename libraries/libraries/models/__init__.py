@@ -19,6 +19,7 @@ from .culture_extractor import (
     release_tag,
 )
 
+
 __all__ = [
     # Base
     "Base",

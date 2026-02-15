@@ -1,9 +1,11 @@
-from ultralytics import YOLO
-from pathlib import Path
 import argparse
+from pathlib import Path
+
+import cv2
 import numpy as np
 from sklearn.cluster import DBSCAN
-import cv2
+from ultralytics import YOLO
+
 
 def extract_object(image, box_coords, padding=10):
     """Extract object from image with padding"""

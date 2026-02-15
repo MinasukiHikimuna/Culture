@@ -1,8 +1,9 @@
+import logging
 import os
 import sys
-import logging
-from pathlib import Path
 import time
+from pathlib import Path
+
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

@@ -1,11 +1,13 @@
-import os
+import argparse
 import json
+import os
 import shutil
 from pathlib import Path
-import ffmpeg
 from typing import Dict
-import argparse
+
+import ffmpeg
 from face_preprocessor import FacePreprocessor
+
 
 class TestFrameExtractor:
     def __init__(self, output_dir: str, verbose: bool = False):

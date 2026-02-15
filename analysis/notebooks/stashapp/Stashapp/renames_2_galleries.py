@@ -1,12 +1,15 @@
 # %%
-import polars as pl
 import os
 import sys
+
+import polars as pl
 from dotenv import load_dotenv
+
 
 sys.path.append(os.path.dirname(os.getcwd()))
 
 from libraries.client_stashapp import StashAppClient, get_stashapp_client
+
 
 load_dotenv()
 
@@ -76,7 +79,9 @@ print(len(galleries_df))
 
 # %%
 import os
+
 from libraries.file_renamer import create_filename
+
 
 gallery_renames_df = galleries_df.select([
     pl.col("stashapp_id"),
@@ -128,7 +133,9 @@ gallery_renames_df
 # %%
 # Rename the files
 import os
+
 import polars as pl
+
 
 galleries_success_rows = []
 galleries_failed_rows = []

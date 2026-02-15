@@ -2,8 +2,8 @@
 Builder pattern for creating Stash data quality checks with a fluent API.
 """
 
-from typing import List, Dict, Any, Optional, Union
 from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, Union
 
 
 def create_tag_resolver(stash):

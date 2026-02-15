@@ -1,16 +1,18 @@
+import argparse
+import os
+import random
+import sys
+from datetime import datetime
+from pathlib import Path
+
+import numpy as np
 import torch
 import torch.nn as nn
-from torch.utils.data import Dataset, DataLoader
-from torchvision import transforms
-from facenet_pytorch import InceptionResnetV1, MTCNN
+from facenet_pytorch import MTCNN, InceptionResnetV1
 from PIL import Image
-import os
-from pathlib import Path
-import numpy as np
-import random
-from datetime import datetime
-import sys
-import argparse
+from torch.utils.data import DataLoader, Dataset
+from torchvision import transforms
+
 
 class FaceDataset(Dataset):
     def __init__(self, root_dir, transform=None, min_images=2, source_type="scene"):

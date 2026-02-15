@@ -1,6 +1,8 @@
+import json
+
 import pytest
 from decrypt_hotaudio import HotAudioDecryptor
-import json
+
 
 @pytest.fixture
 def sample_keys():

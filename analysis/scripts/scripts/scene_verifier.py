@@ -1,11 +1,15 @@
 import os
+
+
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"  # Suppress TF logging
 
 import json
-import time
 import shutil
+import time
 from pathlib import Path
-from libraries.scene_states import SceneState, DatasetStructure
+
+from libraries.scene_states import DatasetStructure, SceneState
+
 
 class SceneVerifier:
     def __init__(self, base_dir: str):

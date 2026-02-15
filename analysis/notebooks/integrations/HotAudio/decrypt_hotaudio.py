@@ -1,14 +1,16 @@
-import json
-import hashlib
-import struct
-import math
-from typing import Dict, List, Optional, Tuple
-from dataclasses import dataclass
-import bencodepy
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-from cryptography.hazmat.backends import default_backend
 import binascii
+import hashlib
+import json
 import logging
+import math
+import struct
+from dataclasses import dataclass
+from typing import Dict, List, Optional, Tuple
+
+import bencodepy
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)

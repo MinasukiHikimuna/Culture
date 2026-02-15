@@ -1,8 +1,9 @@
-from enum import Enum
-import os
-from pathlib import Path
 import json
+import os
 import time
+from enum import Enum
+from pathlib import Path
+
 
 class SceneState(Enum):
     PENDING = "1_pending"  # JSON files waiting to be processed

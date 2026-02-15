@@ -1,8 +1,10 @@
-from bs4 import BeautifulSoup
-import requests
-from datetime import datetime
-import time
 import json
+import time
+from datetime import datetime
+
+import requests
+from bs4 import BeautifulSoup
+
 
 class Release:
     def __init__(self, url, title, date, models):

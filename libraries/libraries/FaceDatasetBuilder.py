@@ -1,18 +1,21 @@
-import os
-import json
-import shutil
-from datetime import datetime
-from mtcnn import MTCNN
-import cv2
-from typing import Dict, List, Union
-import ffmpeg
-import tensorflow as tf
-from multiprocessing import cpu_count
-import queue as thread_queue
 import concurrent.futures
+import json
+import os
+import queue as thread_queue
+import shutil
 import subprocess
 import threading
+from datetime import datetime
+from multiprocessing import cpu_count
+from typing import Dict, List, Union
+
+import cv2
+import ffmpeg
+import tensorflow as tf
+from mtcnn import MTCNN
+
 from libraries.scene_states import SceneState
+
 
 class FaceDatasetBuilder:
     def __init__(self, max_concurrent_scenes=4):

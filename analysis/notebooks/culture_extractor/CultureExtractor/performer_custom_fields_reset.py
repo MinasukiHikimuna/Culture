@@ -5,18 +5,22 @@
 
 # %%
 import os
-import polars as pl
 import sys
+
+import polars as pl
 from dotenv import load_dotenv
+
 
 sys.path.append(os.path.dirname(os.getcwd()))
 
 import libraries.client_culture_extractor as client_culture_extractor
 
+
 load_dotenv()
 
 # StashApp
 from libraries.client_stashapp import StashAppClient, get_stashapp_client
+
 
 stash_client = StashAppClient()
 stash_raw_client = get_stashapp_client()

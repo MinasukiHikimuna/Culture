@@ -1,15 +1,15 @@
 import os
-import subprocess
 import re
+import subprocess
+import sys
 from pathlib import Path
 
 import polars as pl
-import sys
-import os
+
 
 sys.path.append(os.path.dirname(os.path.abspath("")))
 
-from libraries.client_stashapp import get_stashapp_client, StashAppClient
+from libraries.client_stashapp import StashAppClient, get_stashapp_client
 
 
 def get_sidecar_file(video_path):

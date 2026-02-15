@@ -21,6 +21,7 @@ from pathlib import Path
 import requests
 from dotenv import load_dotenv
 
+
 # Load .env from monorepo root (Culture/)
 monorepo_root = Path(__file__).resolve().parents[4]
 load_dotenv(monorepo_root / ".env")

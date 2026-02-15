@@ -1,5 +1,7 @@
-import tensorflow as tf
 import os
+
+import tensorflow as tf
+
 
 # Suppress TensorFlow logging
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"

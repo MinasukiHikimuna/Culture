@@ -1,7 +1,9 @@
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from typing import List, Optional
-import xml.etree.ElementTree as ET
+
 import requests
+
 
 @dataclass
 class Subcat:

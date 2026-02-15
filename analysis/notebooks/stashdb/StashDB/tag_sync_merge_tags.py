@@ -1,14 +1,15 @@
 # %%
-import polars as pl
-import dotenv
 import os
 import sys
+
+import dotenv
+import polars as pl
+
 
 sys.path.append(os.path.dirname(os.path.abspath("")))
 
 from libraries.client_stashapp import get_stashapp_client
 from libraries.StashDbClient import StashDbClient
-
 
 
 # Format a StashDB ID for use as an aliasin Stash

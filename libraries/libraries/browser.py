@@ -1,8 +1,9 @@
 import json
-import websocket
-import requests
-from typing import List, Dict, Any, Optional
 import time
+from typing import Any, Dict, List, Optional
+
+import requests
+import websocket
 
 
 def inject_data_to_window(

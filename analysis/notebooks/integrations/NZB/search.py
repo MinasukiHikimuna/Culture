@@ -1,10 +1,13 @@
+import json
+import os
+import urllib.parse
+
 import polars as pl
 import requests
 from dotenv import load_dotenv
-import os
-import urllib.parse
+
 from .Categories import Categories
-import json
+
 
 load_dotenv()
 
@@ -535,7 +538,7 @@ class NZBSearch:
             return False
 
         # Check if date appears in title in any common format
-        from datetime import datetime, date
+        from datetime import date, datetime
 
         try:
             # Handle both string and date objects

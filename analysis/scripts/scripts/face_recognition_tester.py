@@ -1,16 +1,18 @@
-import torch
-from torchvision import transforms
-from PIL import Image
-import os
 import argparse
+import os
+import traceback
+from collections import defaultdict
+from pathlib import Path
+
+import numpy as np
+import torch
+import torch.nn.functional as F
 from face_recognition_trainer import FaceRecognitionModel
 from facenet_pytorch import MTCNN
-from pathlib import Path
-from collections import defaultdict
-import numpy as np
+from PIL import Image
+from torchvision import transforms
 from tqdm import tqdm
-import torch.nn.functional as F
-import traceback
+
 
 class FaceRecognizer:
     def __init__(self, model_path):

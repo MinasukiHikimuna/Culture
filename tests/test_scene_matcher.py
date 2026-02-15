@@ -1,7 +1,9 @@
 import json
 import os
 from pathlib import Path
+
 from libraries.scene_matcher import SceneMatcher
+
 
 def load_sample_data(filename: str):
     """Load test data from sample JSON file"""

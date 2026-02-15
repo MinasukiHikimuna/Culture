@@ -1,24 +1,30 @@
-import setup_env  # Add this at the very top
 import os
+
+import setup_env  # Add this at the very top
+
+
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"  # Suppress TF logging
 
-import json
-import time
-import shutil
-from pathlib import Path
-import cv2
-from mtcnn import MTCNN
-import tensorflow as tf
-import numpy as np
-from concurrent.futures import ThreadPoolExecutor
-from libraries.scene_states import SceneState, DatasetStructure
-import cProfile
-import pstats
-from datetime import datetime
 import argparse
-from facenet_pytorch import MTCNN
+import cProfile
+import json
+import pstats
+import shutil
+import time
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
+from pathlib import Path
+
+import cv2
+import numpy as np
+import tensorflow as tf
 import torch
+from facenet_pytorch import MTCNN
+from mtcnn import MTCNN
 from PIL import Image
+
+from libraries.scene_states import DatasetStructure, SceneState
+
 
 class FaceDetector:
     def __init__(self, base_dir: str, max_concurrent: int = 4):

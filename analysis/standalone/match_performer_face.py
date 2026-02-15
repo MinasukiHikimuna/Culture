@@ -31,11 +31,11 @@ import requests
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
+from stashface_api_client import StashfaceAPIClient
 
 from culture_cli.modules.ce.utils.config import config
 from libraries.client_stashapp import StashAppClient
 from libraries.StashDbClient import StashDbClient
-from stashface_api_client import StashfaceAPIClient
 
 
 if TYPE_CHECKING:

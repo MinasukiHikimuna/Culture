@@ -1,6 +1,9 @@
 import json
+
 import pytest
+
 from libraries.GroupMakeup import GroupMakeup
+
 
 @pytest.fixture
 def group_makeup_tags():

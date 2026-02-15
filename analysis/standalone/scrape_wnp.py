@@ -1,12 +1,15 @@
 # %%
-import polars as pl
-import sys
 import os
+import sys
+
+import polars as pl
+
 
 sys.path.append(os.path.dirname(os.path.abspath("")))
 
-from libraries.client_stashapp import get_stashapp_client, StashAppClient
+from libraries.client_stashapp import StashAppClient, get_stashapp_client
 from libraries.StashDbClient import StashDbClient
+
 
 stash = get_stashapp_client()
 stash_client = StashAppClient()
@@ -21,6 +24,8 @@ existing_scene = stash_client.find_scenes({ "id": { "value": scene_id, "modifier
 existing_scene
 
 import re
+
+
 # Function to parse slug from filename
 def parse_slug(filename):
     # Remove resolution and extension using regex
@@ -37,9 +42,11 @@ slug = "ana-video-dido-angel"
 
 
 # %%
+from datetime import datetime
+
 import requests
 from bs4 import BeautifulSoup
-from datetime import datetime
+
 
 headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
@@ -54,7 +61,9 @@ print(response.text)
 
 # %%
 import base64
+
 from bs4 import BeautifulSoup
+
 
 soup = BeautifulSoup(response.text, "html.parser")
 

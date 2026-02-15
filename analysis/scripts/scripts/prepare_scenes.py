@@ -1,9 +1,11 @@
+import json
 import os
 from pathlib import Path
-import json
-from typing import List, Dict
-from libraries.client_stashapp import get_stashapp_client, StashAppClient
+from typing import Dict, List
+
+from libraries.client_stashapp import StashAppClient, get_stashapp_client
 from libraries.scene_states import SceneState
+
 
 def get_stashdb_performer(performer):
     """Extract StashDB ID and name from performer data"""

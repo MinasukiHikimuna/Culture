@@ -1,7 +1,9 @@
-from ultralytics import YOLO
-from pathlib import Path
 import argparse
+from pathlib import Path
+
 import yaml
+from ultralytics import YOLO
+
 
 def create_dataset_config(data_dir: str, classes: list) -> str:
     """

@@ -1,6 +1,8 @@
-from ultralytics import YOLO
-from pathlib import Path
 import argparse
+from pathlib import Path
+
+from ultralytics import YOLO
+
 
 def process_directory(source_dir: str, model_name: str = "yolo11n.pt", save_results: bool = True):
     """

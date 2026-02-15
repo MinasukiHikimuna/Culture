@@ -1,4 +1,5 @@
 import pytest
+
 from libraries.file_renamer import (
     get_performers_value,
     get_studio_value,

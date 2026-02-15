@@ -1,6 +1,7 @@
 import os
 from typing import Dict, List, Optional
 
+
 MAX_LENGTH = 255
 
 def create_filename_with_directory(use_studio_code_tag: Dict, row: Dict, base_directory: str = None) -> Dict[str, str]:

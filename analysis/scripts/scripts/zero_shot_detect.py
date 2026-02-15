@@ -1,6 +1,8 @@
-from ultralytics import YOLO
-from pathlib import Path
 import argparse
+from pathlib import Path
+
+from ultralytics import YOLO
+
 
 def detect_with_descriptions(source_dir: str, descriptions: list, save_results: bool = True):
     """

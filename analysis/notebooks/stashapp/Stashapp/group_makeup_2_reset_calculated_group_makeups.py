@@ -1,11 +1,14 @@
 # %% Initialize the clients
-import polars as pl
-import sys
 import os
+import sys
+
+import polars as pl
+
 
 sys.path.append(os.path.dirname(os.path.abspath("")))
 
-from libraries.client_stashapp import get_stashapp_client, StashAppClient
+from libraries.client_stashapp import StashAppClient, get_stashapp_client
+
 
 stash = get_stashapp_client()
 stash_client = StashAppClient()
