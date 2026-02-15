@@ -167,11 +167,7 @@ class WowGirlsSpider(scrapy.Spider):
             # Extract title from the title link
             title_link = item.css("a.title")
             title = title_link.css("::text").get()
-            if title:
-                title = title.strip()
-            else:
-                # Fallback to image alt
-                title = item.css("img::attr(alt)").get() or short_name
+            title = title.strip() if title else item.css("img::attr(alt)").get() or short_name
 
             # Check release status
             status, log_line = self._get_release_status(short_name, title, content_type)
