@@ -86,7 +86,7 @@ def inject_data_to_window(
 
 
 def open_or_update_tabs_with_data(
-    urls: list[str], data: Optional[dict[str, Any]] = None, namespace: str = "stashData"
+    urls: list[str], data: dict[str, Any] | None = None, namespace: str = "stashData"
 ) -> dict[str, bool]:
     """
     Opens or updates multiple tabs for the given URLs and optionally injects data into window global object.

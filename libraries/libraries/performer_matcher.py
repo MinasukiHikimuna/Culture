@@ -26,14 +26,14 @@ class UnmatchedPerformerMatch:
     reason: str  # Reason for the match/confidence
 
 class PerformerMatcher:
-    def __init__(self, all_stashapp_performers: Optional[pl.DataFrame] = None):
+    def __init__(self, all_stashapp_performers: pl.DataFrame | None = None):
         self.matches: list[PerformerMatch] = []
         self.all_stashapp_performers = all_stashapp_performers
 
     def match_performers(self,
                         ce_performers: pl.Series,
                         stashapp_performers: pl.Series,
-                        stashdb_performers: Optional[pl.Series] = None) -> list[PerformerMatch]:
+                        stashdb_performers: pl.Series | None = None) -> list[PerformerMatch]:
         """
         Match performers between Culture Extractor and Stashapp/StashDB
 
@@ -171,7 +171,7 @@ class PerformerMatcher:
                         ce_perf: dict,
                         performers: list[dict],
                         source: str,
-                        context_confidence_boost: float = 0.0) -> Optional[PerformerMatch]:
+                        context_confidence_boost: float = 0.0) -> PerformerMatch | None:
         """Find the best matching performer for a CE performer"""
         best_match = None
         best_confidence = 0.0

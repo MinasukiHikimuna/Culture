@@ -51,14 +51,14 @@ class Categories:
 
             self.categories.append(category)
 
-    def get_category_name(self, cat_id: int) -> Optional[str]:
+    def get_category_name(self, cat_id: int) -> str | None:
         """Get category name by ID"""
         for cat in self.categories:
             if cat.id == cat_id:
                 return cat.name
         return None
 
-    def get_subcat_name(self, cat_id: int, subcat_id: int) -> Optional[str]:
+    def get_subcat_name(self, cat_id: int, subcat_id: int) -> str | None:
         """Get subcategory name by category ID and subcategory ID"""
         for cat in self.categories:
             if cat.id == cat_id:

@@ -377,10 +377,10 @@ class QueryBuilder:
     """Builder for constructing GraphQL queries"""
 
     def __init__(self):
-        self._tags_builder: Optional[QueryTagsBuilder] = None
-        self._performer_tags_builder: Optional[QueryPerformerTagsBuilder] = None
-        self._studios_builder: Optional[QueryStudiosBuilder] = None
-        self._performer_count: Optional[dict[str, Any]] = None
+        self._tags_builder: QueryTagsBuilder | None = None
+        self._performer_tags_builder: QueryPerformerTagsBuilder | None = None
+        self._studios_builder: QueryStudiosBuilder | None = None
+        self._performer_count: dict[str, Any] | None = None
 
     def tags(self, tags_builder: QueryTagsBuilder) -> QueryBuilder:
         """Add tag-based filters"""
@@ -513,7 +513,7 @@ class StashCheckBuilder:
 
     def __init__(self):
         self._name: str = ""
-        self._query_builder: Optional[QueryBuilder] = None
+        self._query_builder: QueryBuilder | None = None
         self._fragment: str = "id title date tags { id name }"
         self._fix_builders: list[FixBuilder] = []
 

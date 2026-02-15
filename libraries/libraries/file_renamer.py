@@ -178,7 +178,7 @@ def get_suffix(primary_file_basename: str) -> str:
     file_suffix = Path(primary_file_basename).suffix
     return file_suffix
 
-def get_studio_value(studio: Optional[dict]) -> str:
+def get_studio_value(studio: dict | None) -> str:
     """
     Format studio name with parent if available.
 

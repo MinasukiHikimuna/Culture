@@ -14,7 +14,7 @@ class SABnzbdClient:
         if not self.api_key:
             raise ValueError("SABNZBD_API_KEY not found in environment variables")
 
-    def add_nzb_url(self, nzb_url: str, name: Optional[str] = None) -> dict[str, Any]:
+    def add_nzb_url(self, nzb_url: str, name: str | None = None) -> dict[str, Any]:
         """
         Add an NZB to SABnzbd queue via URL
 

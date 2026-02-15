@@ -13,7 +13,7 @@ class SceneMatcher:
         bin2 = bin(int(hash2, 16))[2:].zfill(64)
         return sum(b1 != b2 for b1, b2 in zip(bin1, bin2))
 
-    def match_scenes(self, input_scenes: list[dict], stashdb_scenes: list[dict]) -> dict[str, Optional[dict]]:
+    def match_scenes(self, input_scenes: list[dict], stashdb_scenes: list[dict]) -> dict[str, dict | None]:
         """
         Match input scenes to StashDB scenes using phash and duration.
         """

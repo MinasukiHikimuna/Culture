@@ -532,7 +532,7 @@ class StashDbClient(StashboxClient):
             }
         """
 
-    def _transform_scene_data(self, scene_data: dict, queried_phash: Optional[str] = None) -> dict:
+    def _transform_scene_data(self, scene_data: dict, queried_phash: str | None = None) -> dict:
         """Transform raw GraphQL scene data into standardized format"""
         if not scene_data:
             return {"queried_phash": queried_phash} if queried_phash else {}
@@ -670,7 +670,7 @@ class StashDbClient(StashboxClient):
             "stashdb_data": json.dumps(scene_data)
         }
 
-    def query_scenes(self, scene_ids: Optional[list[str]] = None, phashes: Optional[list[str]] = None) -> pl.DataFrame:
+    def query_scenes(self, scene_ids: list[str] | None = None, phashes: list[str] | None = None) -> pl.DataFrame:
         """
         Query scenes by either their StashDB IDs or phash values.
 
