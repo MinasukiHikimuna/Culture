@@ -2,6 +2,7 @@ import os
 
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
+import sys
 
 # Load environment variables from the correct path
 # Don't touch this! This works! You will break it!
@@ -11,7 +12,7 @@ load_dotenv(r"H:\Git\scrapytickling\scrapy\cultureextractorscrapy\spiders\.env")
 connection_string = os.getenv("CONNECTION_STRING")
 if not connection_string:
     print("Error: CONNECTION_STRING not found in environment variables")
-    exit(1)
+    sys.exit(1)
 
 # Create database engine
 engine = create_engine(connection_string)
@@ -41,7 +42,7 @@ with engine.connect() as conn:
     site_result = conn.execute(site_query).fetchone()
     if not site_result:
         print("Error: LezKiss site not found")
-        exit(1)
+        sys.exit(1)
 
     site_uuid = site_result[0]
     print(f"UUID: {site_uuid}, Short name: {site_result[1]}, Name: {site_result[2]}")

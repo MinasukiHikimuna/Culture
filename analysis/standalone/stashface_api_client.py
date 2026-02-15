@@ -19,6 +19,7 @@ import uuid
 from pathlib import Path
 
 import requests
+import sys
 
 
 class StashfaceAPIClient:
@@ -286,4 +287,4 @@ Examples:
 
 
 if __name__ == "__main__":
-    exit(main())
+    sys.exit(main())
