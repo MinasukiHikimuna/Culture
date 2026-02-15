@@ -11,7 +11,7 @@ class TestFrameExtractor:
         self.base_dir = Path(output_dir) / "test_frames"
         self.verbose = verbose
 
-    def extract_frames(self, video_path: str, scene_id: str = None):
+    def extract_frames(self, video_path: str, scene_id: str | None = None):
         """
         Extract key frames from a video for performer testing
 

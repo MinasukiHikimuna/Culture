@@ -70,7 +70,7 @@ class StashappChecker:
         self.url = url
         self.headers = {"ApiKey": api_key, "Content-Type": "application/json"}
 
-    def query(self, query: str, variables: dict = None) -> dict:
+    def query(self, query: str, variables: dict | None = None) -> dict:
         """Execute a GraphQL query."""
         response = requests.post(
             self.url,

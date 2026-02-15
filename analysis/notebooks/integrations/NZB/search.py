@@ -409,7 +409,7 @@ class NZBSearch:
         return combined_df.sort(by="size", descending=True)
 
     def search_multiple(
-        self, search_queries_list: list[list[str]], validation_info: list[dict] = None
+        self, search_queries_list: list[list[str]], validation_info: list[dict] | None = None
     ) -> pl.DataFrame:
         """
         Search for multiple sets of queries, trying each query in a set until results are found.

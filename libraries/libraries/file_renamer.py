@@ -4,7 +4,7 @@ from pathlib import Path
 
 MAX_LENGTH = 255
 
-def create_filename_with_directory(use_studio_code_tag: dict, row: dict, base_directory: str = None) -> dict[str, str]:
+def create_filename_with_directory(use_studio_code_tag: dict, row: dict, base_directory: str | None = None) -> dict[str, str]:
     """
     Create a filename and directory structure from a Polars DataFrame row dictionary.
 

@@ -452,7 +452,7 @@ class FaceDatasetBuilder:
         self.move_scene_to_status(scene_id, SceneState.VERIFIED.value)
         print(f"Scene {scene_id} verification completed")
 
-    def get_performer_face_count(self, performer_id: str = None) -> dict[str, int]:
+    def get_performer_face_count(self, performer_id: str | None = None) -> dict[str, int]:
         """
         Get count of verified faces for performers.
         """
