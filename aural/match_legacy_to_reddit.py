@@ -50,7 +50,7 @@ def extract_title_from_reddit_title(full_title: str) -> str:
 
 def parse_legacy_filename(filename: str) -> tuple[str, str] | None:
     """Parse legacy filename into (performer, title)."""
-    # Pattern: "Performer - Title.m4a"
+    # Pattern: "Performer - Title.m4a"  # noqa: ERA001
     stem = Path(filename).stem
     match = re.match(r"^(.+?)\s*-\s*(.+)$", stem)
     if match:

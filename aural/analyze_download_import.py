@@ -72,7 +72,7 @@ class RedditResolver:
             # Try fetching via crosspost_parent ID
             crosspost_parent = reddit_data.get("crosspost_parent")
             if crosspost_parent:
-                # Format: t3_postid
+                # Format: t3_postid  # noqa: ERA001
                 post_id = crosspost_parent.replace("t3_", "")
                 return self._fetch_post_by_id(post_id)
 

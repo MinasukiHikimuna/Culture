@@ -370,7 +370,7 @@ class StashappClient:
     def find_scene_by_basename(self, basename: str) -> dict | None:
         """Find a scene by file basename using path filter."""
         # Extract the video/post ID from the filename
-        # Format: "Author - YYYY-MM-DD - ID - Title.mp4"
+        # Format: "Author - YYYY-MM-DD - ID - Title.mp4"  # noqa: ERA001
         # IDs can be: Reddit (alphanumeric), YouTube (with hyphens/underscores), etc.
         post_id_match = re.search(r"- ([\w\-]{6,}) -", basename)
         search_value = post_id_match.group(1) if post_id_match else basename
@@ -1131,7 +1131,7 @@ class StashappImporter:
         if urls:
             updates["urls"] = urls
 
-        # Details (description)
+        # Details (description)  # noqa: ERA001
         selftext = reddit_data.get("selftext", "")
         if selftext:
             details = re.sub(r"\*\*([^*]+)\*\*", r"\1", selftext)  # Bold
