@@ -9,7 +9,7 @@ from typing import Any, Optional, Union
 def create_tag_resolver(stash):
     """Create a tag resolver function that maps tag names to TagReference objects"""
 
-    def resolve_tag(tag_name: str) -> "TagReference":
+    def resolve_tag(tag_name: str) -> TagReference:
         tag_dict = stash.find_tag(tag_name)
         if not tag_dict:
             raise ValueError(f"Tag '{tag_name}' not found")
@@ -21,7 +21,7 @@ def create_tag_resolver(stash):
 def create_studio_resolver(stash):
     """Create a studio resolver function that maps studio names to StudioReference objects"""
 
-    def resolve_studio(studio_name: str) -> "StudioReference":
+    def resolve_studio(studio_name: str) -> StudioReference:
         studio_dict = stash.find_studio(studio_name)
         if not studio_dict:
             raise ValueError(f"Studio '{studio_name}' not found")
@@ -38,7 +38,7 @@ class TagReference:
     name: str
 
     @classmethod
-    def from_dict(cls, tag_dict: dict[str, Any]) -> "TagReference":
+    def from_dict(cls, tag_dict: dict[str, Any]) -> TagReference:
         return cls(id=tag_dict["id"], name=tag_dict["name"])
 
 
@@ -50,7 +50,7 @@ class StudioReference:
     name: str
 
     @classmethod
-    def from_dict(cls, studio_dict: dict[str, Any]) -> "StudioReference":
+    def from_dict(cls, studio_dict: dict[str, Any]) -> StudioReference:
         return cls(id=studio_dict["id"], name=studio_dict["name"])
 
 
@@ -81,7 +81,7 @@ class QueryTagsBuilder:
         self._modifier = "INCLUDES"
         self._depth = 0
 
-    def include(self, *tags: Union[str, TagReference]) -> "QueryTagsBuilder":
+    def include(self, *tags: Union[str, TagReference]) -> QueryTagsBuilder:
         """Include tags in the query"""
         for tag in tags:
             if isinstance(tag, str):
@@ -91,7 +91,7 @@ class QueryTagsBuilder:
                 self._included_tags.append(tag)
         return self
 
-    def exclude(self, *tags: Union[str, TagReference]) -> "QueryTagsBuilder":
+    def exclude(self, *tags: Union[str, TagReference]) -> QueryTagsBuilder:
         """Exclude tags from the query"""
         for tag in tags:
             if isinstance(tag, str):
@@ -101,12 +101,12 @@ class QueryTagsBuilder:
                 self._excluded_tags.append(tag)
         return self
 
-    def modifier(self, modifier: str) -> "QueryTagsBuilder":
+    def modifier(self, modifier: str) -> QueryTagsBuilder:
         """Set the modifier (INCLUDES, INCLUDES_ALL, etc.)"""
         self._modifier = modifier
         return self
 
-    def depth(self, depth: int) -> "QueryTagsBuilder":
+    def depth(self, depth: int) -> QueryTagsBuilder:
         """Set the depth for hierarchical tags"""
         self._depth = depth
         return self
@@ -182,7 +182,7 @@ class QueryPerformerTagsBuilder:
         self._modifier = "INCLUDES"
         self._depth = 0
 
-    def include(self, *tags: Union[str, TagReference]) -> "QueryPerformerTagsBuilder":
+    def include(self, *tags: Union[str, TagReference]) -> QueryPerformerTagsBuilder:
         """Include performer tags in the query"""
         for tag in tags:
             if isinstance(tag, str):
@@ -191,7 +191,7 @@ class QueryPerformerTagsBuilder:
                 self._included_tags.append(tag)
         return self
 
-    def exclude(self, *tags: Union[str, TagReference]) -> "QueryPerformerTagsBuilder":
+    def exclude(self, *tags: Union[str, TagReference]) -> QueryPerformerTagsBuilder:
         """Exclude performer tags from the query"""
         for tag in tags:
             if isinstance(tag, str):
@@ -200,12 +200,12 @@ class QueryPerformerTagsBuilder:
                 self._excluded_tags.append(tag)
         return self
 
-    def modifier(self, modifier: str) -> "QueryPerformerTagsBuilder":
+    def modifier(self, modifier: str) -> QueryPerformerTagsBuilder:
         """Set the modifier (INCLUDES, INCLUDES_ALL, etc.)"""
         self._modifier = modifier
         return self
 
-    def depth(self, depth: int) -> "QueryPerformerTagsBuilder":
+    def depth(self, depth: int) -> QueryPerformerTagsBuilder:
         """Set the depth for hierarchical tags"""
         self._depth = depth
         return self
@@ -281,7 +281,7 @@ class QueryStudiosBuilder:
         self._modifier = "INCLUDES"
         self._depth = 0
 
-    def include(self, *studios: Union[str, StudioReference]) -> "QueryStudiosBuilder":
+    def include(self, *studios: Union[str, StudioReference]) -> QueryStudiosBuilder:
         """Include studios in the query"""
         for studio in studios:
             if isinstance(studio, str):
@@ -290,7 +290,7 @@ class QueryStudiosBuilder:
                 self._included_studios.append(studio)
         return self
 
-    def exclude(self, *studios: Union[str, StudioReference]) -> "QueryStudiosBuilder":
+    def exclude(self, *studios: Union[str, StudioReference]) -> QueryStudiosBuilder:
         """Exclude studios from the query"""
         for studio in studios:
             if isinstance(studio, str):
@@ -299,12 +299,12 @@ class QueryStudiosBuilder:
                 self._excluded_studios.append(studio)
         return self
 
-    def modifier(self, modifier: str) -> "QueryStudiosBuilder":
+    def modifier(self, modifier: str) -> QueryStudiosBuilder:
         """Set the modifier (INCLUDES, INCLUDES_ALL, etc.)"""
         self._modifier = modifier
         return self
 
-    def depth(self, depth: int) -> "QueryStudiosBuilder":
+    def depth(self, depth: int) -> QueryStudiosBuilder:
         """Set the depth for hierarchical studios"""
         self._depth = depth
         return self
@@ -382,24 +382,24 @@ class QueryBuilder:
         self._studios_builder: Optional[QueryStudiosBuilder] = None
         self._performer_count: Optional[dict[str, Any]] = None
 
-    def tags(self, tags_builder: QueryTagsBuilder) -> "QueryBuilder":
+    def tags(self, tags_builder: QueryTagsBuilder) -> QueryBuilder:
         """Add tag-based filters"""
         self._tags_builder = tags_builder
         return self
 
     def performer_tags(
         self, performer_tags_builder: QueryPerformerTagsBuilder
-    ) -> "QueryBuilder":
+    ) -> QueryBuilder:
         """Add performer tag-based filters"""
         self._performer_tags_builder = performer_tags_builder
         return self
 
-    def studios(self, studios_builder: QueryStudiosBuilder) -> "QueryBuilder":
+    def studios(self, studios_builder: QueryStudiosBuilder) -> QueryBuilder:
         """Add studio-based filters"""
         self._studios_builder = studios_builder
         return self
 
-    def performer_count(self, modifier: str, value: int) -> "QueryBuilder":
+    def performer_count(self, modifier: str, value: int) -> QueryBuilder:
         """Add performer count filter"""
         self._performer_count = {"modifier": modifier, "value": value}
         return self
@@ -461,7 +461,7 @@ class FixBuilder:
         self._add_tags: list[TagReference] = []
         self._remove_tags: list[TagReference] = []
 
-    def add_tags(self, *tags: Union[str, TagReference]) -> "FixBuilder":
+    def add_tags(self, *tags: Union[str, TagReference]) -> FixBuilder:
         """Add tags to be added in the fix"""
         for tag in tags:
             if isinstance(tag, str):
@@ -470,7 +470,7 @@ class FixBuilder:
                 self._add_tags.append(tag)
         return self
 
-    def remove_tags(self, *tags: Union[str, TagReference]) -> "FixBuilder":
+    def remove_tags(self, *tags: Union[str, TagReference]) -> FixBuilder:
         """Add tags to be removed in the fix"""
         for tag in tags:
             if isinstance(tag, str):
@@ -517,22 +517,22 @@ class StashCheckBuilder:
         self._fragment: str = "id title date tags { id name }"
         self._fix_builders: list[FixBuilder] = []
 
-    def name(self, name: str) -> "StashCheckBuilder":
+    def name(self, name: str) -> StashCheckBuilder:
         """Set the name of the check"""
         self._name = name
         return self
 
-    def query(self, query_builder: QueryBuilder) -> "StashCheckBuilder":
+    def query(self, query_builder: QueryBuilder) -> StashCheckBuilder:
         """Set the query builder"""
         self._query_builder = query_builder
         return self
 
-    def fragment(self, fragment: str) -> "StashCheckBuilder":
+    def fragment(self, fragment: str) -> StashCheckBuilder:
         """Set the GraphQL fragment"""
         self._fragment = fragment
         return self
 
-    def fix(self, fix_builder: FixBuilder) -> "StashCheckBuilder":
+    def fix(self, fix_builder: FixBuilder) -> StashCheckBuilder:
         """Add a fix action"""
         self._fix_builders.append(fix_builder)
         return self
