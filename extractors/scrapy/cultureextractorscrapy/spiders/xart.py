@@ -60,6 +60,7 @@ class XArtSpider(scrapy.Spider):
     def __init__(self, mode="performers", *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.mode = mode
+        self.seen_slugs: set[str] = set()
         cookies_list, cookies_dict = get_cookies()
         self.cookies_list = cookies_list  # For Scrapy requests
         self.cookies = cookies_dict  # For requests library (used by pipelines)
@@ -248,10 +249,14 @@ class XArtSpider(scrapy.Spider):
             else:
                 continue
 
-            # Extract slug from URL
-            slug = href.rstrip("/").split("/")[-1]
-            # Skip if it's not a valid slug
-            if not slug or "+" in slug:
+            # Extract slug from URL and append content type suffix
+            raw_slug = href.rstrip("/").split("/")[-1]
+            if not raw_slug or "+" in raw_slug:
+                continue
+            slug = f"{raw_slug}-{content_type}"
+
+            # Skip if we already yielded a request for this slug in this crawl
+            if slug in self.seen_slugs:
                 continue
 
             # Check if we already have this release
@@ -263,11 +268,12 @@ class XArtSpider(scrapy.Spider):
             if has_no_downloads:
                 self.logger.info(f"Re-processing release with no downloads: {slug}")
 
-            # Handle plural forms correctly (video→videos, gallery→galleries)
+            # Build URL from the raw slug (without suffix)
             url_path = "galleries" if content_type == "gallery" else f"{content_type}s"
-            release_url = f"{BASE_URL}/{url_path}/{slug}"
+            release_url = f"{BASE_URL}/{url_path}/{raw_slug}"
             self.logger.info(f"Found {content_type}: {slug} -> {release_url}")
 
+            self.seen_slugs.add(slug)
             yield scrapy.Request(
                 url=release_url,
                 callback=callback,
