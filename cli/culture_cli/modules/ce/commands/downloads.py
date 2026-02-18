@@ -1,5 +1,7 @@
 """Downloads commands for the Culture CLI."""
 
+import os
+from pathlib import Path
 from typing import Annotated
 
 import httpx
@@ -14,6 +16,7 @@ from culture_cli.modules.ce.utils.formatters import (
     print_json,
     print_success,
     print_table,
+    print_warning,
 )
 
 
@@ -181,3 +184,99 @@ def _display_results(
     type_summary = format_download_type_summary(summaries)
     if type_summary:
         print_info(type_summary)
+
+
+@downloads_app.command("reset")
+def reset_download(
+    download_uuid: Annotated[str, typer.Argument(help="Download UUID to reset")],
+    yes: Annotated[
+        bool,
+        typer.Option("--yes", "-y", help="Skip confirmation prompt"),
+    ] = False,
+) -> None:
+    """Reset (delete) a specific download so it will be re-downloaded next time.
+
+    Deletes the download record from the database and removes the file from disk.
+    Any external IDs referencing this download are also removed.
+    The parent release is preserved.
+
+    Examples:
+        ce downloads reset 018f1477-f285-726b-9136-21956e3e8b92
+        ce downloads reset 018f1477-f285-726b-9136-21956e3e8b92 --yes
+    """
+    try:
+        with _get_api_client() as api:
+            download = api.get_download(download_uuid)
+
+            if not yes:
+                confirmed = _confirm_download_reset(download)
+                if not confirmed:
+                    print_info("Reset cancelled")
+                    raise typer.Exit(code=0)
+
+            result = api.delete_download(download_uuid)
+
+            file_deleted = _delete_download_file(
+                result["site_name"],
+                result["release_uuid"],
+                result.get("saved_filename"),
+            )
+            _print_reset_summary(result, file_deleted)
+
+    except httpx.ConnectError:
+        print_error("Cannot connect to Culture API. Is the API server running?")
+        print_info("Start the API with: cd api && uv run uvicorn api.main:app --port 8000")
+        raise typer.Exit(code=1) from None
+    except httpx.HTTPStatusError as e:
+        _handle_reset_http_error(e, download_uuid)
+
+
+def _confirm_download_reset(download: dict) -> bool:
+    """Prompt user to confirm download reset."""
+    filename = download.get("saved_filename") or download.get("original_filename") or "N/A"
+    print_warning(
+        f"You are about to reset download '{download['file_type']}/{download['content_type']}' "
+        f"from release '{download['release_name']}'"
+    )
+    print_info(f"UUID: {download['download_uuid']}")
+    print_info(f"Filename: {filename}")
+    print_info("This will delete the download record and any referencing external IDs.")
+    return typer.confirm("Are you sure you want to proceed?")
+
+
+def _delete_download_file(
+    site_name: str, release_uuid: str, saved_filename: str | None
+) -> bool:
+    """Delete a single download file from disk if metadata path is configured."""
+    metadata_base_path = os.environ.get("CE_METADATA_BASE_PATH")
+    if not metadata_base_path or not saved_filename:
+        return False
+
+    file_path = Path(metadata_base_path) / site_name / "Metadata" / release_uuid / saved_filename
+    if not file_path.exists():
+        return False
+
+    file_path.unlink()
+    return True
+
+
+def _handle_reset_http_error(e: httpx.HTTPStatusError, download_uuid: str) -> None:
+    """Handle HTTP errors from the reset command."""
+    if e.response.status_code == 404:
+        print_error(f"Download with UUID '{download_uuid}' not found")
+    else:
+        detail = e.response.json().get("detail", str(e)) if e.response.content else str(e)
+        print_error(f"API error: {detail}")
+    raise typer.Exit(code=1) from e
+
+
+def _print_reset_summary(result: dict, file_deleted: bool) -> None:
+    """Print summary of what was reset."""
+    print_success(
+        f"Reset download '{result['file_type']}/{result['content_type']}' "
+        f"from release '{result['release_name']}'"
+    )
+    if result.get("external_ids_deleted", 0) > 0:
+        print_info(f"Removed {result['external_ids_deleted']} external ID reference(s)")
+    if file_deleted:
+        print_info(f"Deleted file '{result['saved_filename']}' from disk")

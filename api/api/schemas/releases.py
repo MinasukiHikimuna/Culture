@@ -129,3 +129,33 @@ class DeleteReleaseResponse(BaseModel):
     release_name: str = Field(description="Deleted release name")
     site_name: str = Field(description="Site name")
     downloads: list[DeletedDownload] = Field(default_factory=list, description="Deleted download records")
+
+
+class DownloadDetail(BaseModel):
+    """Detailed info about a single download with parent context."""
+
+    download_uuid: str = Field(description="Download UUID")
+    saved_filename: str | None = Field(default=None, description="Saved filename")
+    original_filename: str | None = Field(default=None, description="Original filename")
+    file_type: str = Field(description="File type")
+    content_type: str = Field(description="Content type")
+    variant: str | None = Field(default=None, description="Variant")
+    downloaded_at: datetime = Field(description="When downloaded")
+    release_uuid: str = Field(description="Parent release UUID")
+    release_name: str = Field(description="Parent release name")
+    site_name: str = Field(description="Site name")
+
+
+class DeleteDownloadResponse(BaseModel):
+    """Response from deleting a single download."""
+
+    message: str = Field(description="Success message")
+    download_uuid: str = Field(description="Deleted download UUID")
+    saved_filename: str | None = Field(default=None, description="Saved filename for file cleanup")
+    file_type: str = Field(description="File type of deleted download")
+    content_type: str = Field(description="Content type of deleted download")
+    variant: str | None = Field(default=None, description="Variant of deleted download")
+    release_uuid: str = Field(description="Parent release UUID")
+    release_name: str = Field(description="Parent release name")
+    site_name: str = Field(description="Site name")
+    external_ids_deleted: int = Field(description="Number of external ID references deleted")

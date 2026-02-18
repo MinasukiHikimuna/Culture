@@ -1768,6 +1768,53 @@ class ClientCultureExtractor:
 
             return pl.DataFrame(downloads, schema=schema)
 
+    def get_download_by_uuid(self, download_uuid: str) -> dict | None:
+        """Get a single download by UUID with release and site context.
+
+        Args:
+            download_uuid: UUID of the download
+
+        Returns:
+            Dictionary with download details plus release_uuid, release_name,
+            site_name, or None if not found
+        """
+        with self.connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT
+                    d.uuid,
+                    d.saved_filename,
+                    d.original_filename,
+                    d.file_type,
+                    d.content_type,
+                    d.variant,
+                    d.downloaded_at,
+                    r.uuid AS release_uuid,
+                    r.name AS release_name,
+                    s.name AS site_name
+                FROM downloads d
+                JOIN releases r ON d.release_uuid = r.uuid
+                JOIN sites s ON r.site_uuid = s.uuid
+                WHERE d.uuid = %s
+                """,
+                (download_uuid,),
+            )
+            row = cursor.fetchone()
+            if not row:
+                return None
+            return {
+                "download_uuid": str(row[0]),
+                "saved_filename": row[1],
+                "original_filename": row[2],
+                "file_type": row[3],
+                "content_type": row[4],
+                "variant": row[5],
+                "downloaded_at": row[6],
+                "release_uuid": str(row[7]),
+                "release_name": row[8],
+                "site_name": row[9],
+            }
+
     def get_release_external_ids(self, release_uuid: str) -> list[dict]:
         """Get external IDs for a release from the release_external_ids table.
 
@@ -2277,3 +2324,73 @@ class ClientCultureExtractor:
             "DELETE FROM releases WHERE uuid = %s",
             (release_uuid,),
         )
+
+    def delete_download(self, download_uuid: str) -> dict:
+        """Delete a single download record and its referencing external IDs.
+
+        Args:
+            download_uuid: UUID of the download to delete
+
+        Returns:
+            Dictionary containing deletion details (site_name, release_name,
+            release_uuid, saved_filename, file_type, content_type, variant,
+            external_ids_deleted)
+
+        Raises:
+            ValueError: If download does not exist
+        """
+        with self.connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT
+                    d.uuid,
+                    d.saved_filename,
+                    d.file_type,
+                    d.content_type,
+                    d.variant,
+                    r.uuid AS release_uuid,
+                    r.name AS release_name,
+                    s.name AS site_name
+                FROM downloads d
+                JOIN releases r ON d.release_uuid = r.uuid
+                JOIN sites s ON r.site_uuid = s.uuid
+                WHERE d.uuid = %s
+                """,
+                (download_uuid,),
+            )
+            row = cursor.fetchone()
+            if not row:
+                raise ValueError(f"Download with UUID {download_uuid} does not exist")
+
+            saved_filename = row[1]
+            file_type = row[2]
+            content_type = row[3]
+            variant = row[4]
+            release_uuid = row[5]
+            release_name = row[6]
+            site_name = row[7]
+
+            cursor.execute(
+                "DELETE FROM release_external_ids WHERE download_uuid = %s",
+                (download_uuid,),
+            )
+            external_ids_deleted = cursor.rowcount
+
+            cursor.execute(
+                "DELETE FROM downloads WHERE uuid = %s",
+                (download_uuid,),
+            )
+
+            self.connection.commit()
+
+            return {
+                "download_uuid": str(download_uuid),
+                "saved_filename": saved_filename,
+                "file_type": file_type,
+                "content_type": content_type,
+                "variant": variant,
+                "release_uuid": str(release_uuid),
+                "release_name": release_name,
+                "site_name": site_name,
+                "external_ids_deleted": external_ids_deleted,
+            }

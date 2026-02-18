@@ -3,11 +3,11 @@
 from typing import Annotated
 
 import polars as pl
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from api.dependencies import get_ce_client
 from api.routers.utils import resolve_site
-from api.schemas.releases import ReleaseDownloadSummary
+from api.schemas.releases import DeleteDownloadResponse, DownloadDetail, ReleaseDownloadSummary
 from libraries.client_culture_extractor import ClientCultureExtractor
 
 
@@ -103,3 +103,47 @@ def _apply_download_filters(
         )
 
     return df
+
+
+@router.get("/{uuid}")
+def get_download(
+    uuid: str,
+    client: Annotated[ClientCultureExtractor, Depends(get_ce_client)],
+) -> DownloadDetail:
+    """Get details about a specific download."""
+    download = client.get_download_by_uuid(uuid)
+    if not download:
+        raise HTTPException(status_code=404, detail=f"Download with UUID '{uuid}' not found")
+    return DownloadDetail(**download)
+
+
+@router.delete("/{uuid}")
+def delete_download(
+    uuid: str,
+    client: Annotated[ClientCultureExtractor, Depends(get_ce_client)],
+) -> DeleteDownloadResponse:
+    """Delete a single download record and its referencing external IDs.
+
+    This removes the download from the database along with any external IDs
+    that reference it. File system cleanup must be handled separately by the client.
+    """
+    try:
+        result = client.delete_download(uuid)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+
+    return DeleteDownloadResponse(
+        message=(
+            f"Deleted download '{result['file_type']}/{result['content_type']}' "
+            f"from release '{result['release_name']}'"
+        ),
+        download_uuid=result["download_uuid"],
+        saved_filename=result["saved_filename"],
+        file_type=result["file_type"],
+        content_type=result["content_type"],
+        variant=result["variant"],
+        release_uuid=result["release_uuid"],
+        release_name=result["release_name"],
+        site_name=result["site_name"],
+        external_ids_deleted=result["external_ids_deleted"],
+    )

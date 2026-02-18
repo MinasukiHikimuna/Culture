@@ -210,6 +210,7 @@ def _display_downloads_table(downloads: list[dict]) -> None:
     """Display downloaded files in a formatted table."""
     console = Console()
     downloads_table = Table(title="Downloaded Files", show_header=True, header_style="bold magenta")
+    downloads_table.add_column("UUID", style="dim")
     downloads_table.add_column("Filename", style="green")
     downloads_table.add_column("File Type", style="cyan")
     downloads_table.add_column("Content Type", style="yellow")
@@ -224,6 +225,7 @@ def _display_downloads_table(downloads: list[dict]) -> None:
         )
         downloaded_at = download.get("ce_downloads_downloaded_at") or "N/A"
         downloads_table.add_row(
+            download.get("ce_downloads_uuid") or "N/A",
             filename,
             download.get("ce_downloads_file_type") or "N/A",
             download.get("ce_downloads_content_type") or "N/A",

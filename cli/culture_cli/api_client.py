@@ -233,6 +233,35 @@ class CultureAPIClient:
         response.raise_for_status()
         return response.json()
 
+    # Downloads endpoints
+
+    def get_download(self, uuid: str) -> dict:
+        """Get details about a specific download.
+
+        Args:
+            uuid: Download UUID
+
+        Returns:
+            Download dictionary with release and site context
+        """
+        response = self.client.get(f"/downloads/{uuid}")
+        response.raise_for_status()
+        return response.json()
+
+    def delete_download(self, uuid: str) -> dict:
+        """Delete a single download from the database.
+
+        Args:
+            uuid: Download UUID
+
+        Returns:
+            Response with deletion details (site_name, release_name, release_uuid,
+            saved_filename, file_type, content_type, variant, external_ids_deleted)
+        """
+        response = self.client.delete(f"/downloads/{uuid}")
+        response.raise_for_status()
+        return response.json()
+
     # Performers endpoints
 
     def get_performers(
