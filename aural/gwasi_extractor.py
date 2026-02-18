@@ -15,8 +15,9 @@ import argparse
 import json
 import re
 import time
-from datetime import UTC, datetime
+from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import config as aural_config
 import requests
@@ -212,7 +213,7 @@ class GwasiExtractor:
         cache_data = {
             "base_version": base_version,
             "entry_count": len(entries),
-            "cached_at": datetime.now(tz=UTC).isoformat(),
+            "cached_at": datetime.now(tz=ZoneInfo("Europe/Helsinki")).isoformat(),
             "entries": entries,
         }
 
@@ -672,7 +673,7 @@ class GwasiExtractor:
         print(f"✅ Final dataset: {len(unique_entries)} unique entries")
 
         # Step 5: Save data
-        timestamp = datetime.now(tz=UTC).strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now(tz=ZoneInfo("Europe/Helsinki")).strftime("%Y%m%d_%H%M%S")
         self.save_to_json(unique_entries, f"gwasi_data_{timestamp}.json")
 
         # Generate summary report
@@ -687,7 +688,7 @@ class GwasiExtractor:
 
         summary = {
             "total_entries": len(data),
-            "extraction_date": datetime.now(tz=UTC).isoformat(),
+            "extraction_date": datetime.now(tz=ZoneInfo("Europe/Helsinki")).isoformat(),
             "subreddits": {},
             "content_types": {},
             "date_range": {"earliest": None, "latest": None},
@@ -802,7 +803,7 @@ def main():
             data = extractor.load_from_cache_only()
 
             # Save processed data
-            timestamp = datetime.now(tz=UTC).strftime("%Y%m%d_%H%M%S")
+            timestamp = datetime.now(tz=ZoneInfo("Europe/Helsinki")).strftime("%Y%m%d_%H%M%S")
             extractor.save_to_json(data, f"gwasi_data_{timestamp}.json")
             extractor.generate_summary(data, timestamp)
         else:

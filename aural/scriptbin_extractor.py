@@ -16,9 +16,10 @@ import json
 import re
 import sys
 import time
-from datetime import UTC, datetime
+from datetime import datetime
 from pathlib import Path
 from urllib.parse import urljoin
+from zoneinfo import ZoneInfo
 
 import config as aural_config
 from bs4 import BeautifulSoup
@@ -144,7 +145,7 @@ class ScriptBinExtractor:
         """Extract metadata from script page."""
         metadata = {
             "url": url,
-            "extracted_at": datetime.now(UTC)
+            "extracted_at": datetime.now(tz=ZoneInfo("Europe/Helsinki"))
             .isoformat()
             .replace("+00:00", "Z"),
         }
@@ -537,7 +538,7 @@ class ScriptBinExtractor:
 
         # Save failed URLs if any
         if failed_urls:
-            timestamp = datetime.now(tz=UTC).strftime("%Y-%m-%d_%H%M%S")
+            timestamp = datetime.now(tz=ZoneInfo("Europe/Helsinki")).strftime("%Y-%m-%d_%H%M%S")
             self.save_to_json(failed_urls, f"failed_urls_{timestamp}.json")
 
         return extracted_data

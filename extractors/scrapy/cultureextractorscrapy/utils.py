@@ -4,6 +4,7 @@ import re
 import shutil
 import sys
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from scrapy.utils.project import get_project_settings
 
@@ -111,7 +112,7 @@ def get_log_filename(spider_name):
     if not Path(log_dir).exists():
         Path(log_dir).mkdir(parents=True)
 
-    timestamp = datetime.datetime.now(tz=datetime.UTC).strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.datetime.now(tz=ZoneInfo("Europe/Helsinki")).strftime("%Y%m%d_%H%M%S")
     log_file = str(Path(log_dir) / f"{spider_name}_{timestamp}.log")
 
     # Set up logging to both file and console

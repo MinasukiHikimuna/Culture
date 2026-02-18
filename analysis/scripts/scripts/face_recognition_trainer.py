@@ -1,8 +1,9 @@
 import argparse
 import random
 import sys
-from datetime import UTC, datetime
+from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import torch
 from facenet_pytorch import InceptionResnetV1
@@ -160,7 +161,7 @@ def train_model(dataset_path, batch_size=32, num_epochs=50, learning_rate=0.0001
         sys.stdout = Logger(log_file)
 
     # Log training parameters
-    print(f"Training started at: {datetime.now(tz=UTC).strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"Training started at: {datetime.now(tz=ZoneInfo("Europe/Helsinki")).strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"Dataset path: {dataset_path}")
     print(f"Batch size: {batch_size}")
     print(f"Learning rate: {learning_rate}")
@@ -203,8 +204,15 @@ def train_model(dataset_path, batch_size=32, num_epochs=50, learning_rate=0.0001
 
     # Copy splits for inspection
     output_dir = Path(log_file).parent.parent if log_file else Path("training_runs")
-    train_dir = copy_dataset_split(full_dataset, train_indices, output_dir, f"train_split_{datetime.now(tz=UTC).strftime('%Y%m%d_%H%M%S')}")
-    val_dir = copy_dataset_split(full_dataset, val_indices, output_dir, f"val_split_{datetime.now(tz=UTC).strftime('%Y%m%d_%H%M%S')}")
+    now = datetime.now(tz=ZoneInfo("Europe/Helsinki"))
+    train_dir = copy_dataset_split(
+        full_dataset, train_indices, output_dir,
+        f"train_split_{now.strftime('%Y%m%d_%H%M%S')}",
+    )
+    val_dir = copy_dataset_split(
+        full_dataset, val_indices, output_dir,
+        f"val_split_{now.strftime('%Y%m%d_%H%M%S')}",
+    )
 
     print("\nDataset splits copied to:")
     print(f"Training: {train_dir}")
@@ -341,7 +349,7 @@ def train_model(dataset_path, batch_size=32, num_epochs=50, learning_rate=0.0001
     # Print final results
     print("\nTraining completed!")
     print(f"Best validation accuracy: {best_val_acc:.2f}%")
-    print(f"Training finished at: {datetime.now(tz=UTC).strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"Training finished at: {datetime.now(tz=ZoneInfo("Europe/Helsinki")).strftime('%Y-%m-%d %H:%M:%S')}")
 
     # Restore stdout if needed
     if log_file:
@@ -368,7 +376,7 @@ class TransformSubset(Dataset):
 
 if __name__ == "__main__":
     # Generate timestamp for this training run
-    timestamp = datetime.now(tz=UTC).strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(tz=ZoneInfo("Europe/Helsinki")).strftime("%Y%m%d_%H%M%S")
 
     # Create output directory
     output_dir = Path(__file__).parent / "training_runs"

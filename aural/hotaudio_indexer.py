@@ -11,8 +11,9 @@ import json
 import re
 import sys
 import time
-from datetime import UTC, datetime
+from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import config as aural_config
 from playwright.sync_api import sync_playwright
@@ -136,7 +137,7 @@ class HotAudioIndexer:
 
         return {
             "platform": "hotaudio",
-            "timestamp": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+            "timestamp": datetime.now(tz=ZoneInfo("Europe/Helsinki")).isoformat().replace("+00:00", "Z"),
             "user": self.extract_user_from_url(user_url),
             "totalReleases": len(releases),
             "storyMap": story_map,
@@ -174,7 +175,7 @@ class HotAudioIndexer:
                 if link_id not in releases:
                     releases[link_id] = {
                         **link,
-                        "discoveredAt": datetime.now(UTC)
+                        "discoveredAt": datetime.now(tz=ZoneInfo("Europe/Helsinki"))
                         .isoformat()
                         .replace("+00:00", "Z"),
                         "discoveredFrom": url,
@@ -275,7 +276,7 @@ def main():
         index_data = indexer.index_user_profile(user_url, args.depth)
 
         # Generate timestamp for filename
-        timestamp = datetime.now(tz=UTC).strftime("%Y-%m-%d")
+        timestamp = datetime.now(tz=ZoneInfo("Europe/Helsinki")).strftime("%Y-%m-%d")
         output_file = Path(args.output) / f"{args.user}_index_{timestamp}.json"
 
         indexer.save_index(index_data, output_file)

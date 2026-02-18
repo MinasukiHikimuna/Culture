@@ -18,9 +18,10 @@ import json
 import re
 import sys
 import time
-from datetime import UTC, datetime
+from datetime import datetime
 from pathlib import Path
 from urllib.parse import urljoin
+from zoneinfo import ZoneInfo
 
 import config as aural_config
 from bs4 import BeautifulSoup
@@ -156,7 +157,7 @@ class AO3Extractor:
         """Extract metadata from AO3 work page."""
         return {
             "url": url,
-            "extracted_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+            "extracted_at": datetime.now(tz=ZoneInfo("Europe/Helsinki")).isoformat().replace("+00:00", "Z"),
             **self._extract_work_id(url),
             **self._extract_title(soup),
             **self._extract_authors(soup, url),
@@ -584,7 +585,7 @@ class AO3Extractor:
 
         # Save failed URLs if any
         if failed_urls:
-            timestamp = datetime.now(tz=UTC).strftime("%Y-%m-%d_%H%M%S")
+            timestamp = datetime.now(tz=ZoneInfo("Europe/Helsinki")).strftime("%Y-%m-%d_%H%M%S")
             failed_filepath = self.output_dir / f"failed_urls_{timestamp}.json"
             try:
                 failed_filepath.write_text(

@@ -17,8 +17,9 @@ import hashlib
 import json
 import re
 import sys
-from datetime import UTC, datetime
+from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import config as aural_config
 import yt_dlp
@@ -215,7 +216,7 @@ class YtDlpExtractor:
             "backupFiles": {
                 "metadata": None,  # Set by caller
             },
-            "extractedAt": datetime.now(UTC)
+            "extractedAt": datetime.now(tz=ZoneInfo("Europe/Helsinki"))
             .isoformat()
             .replace("+00:00", "Z"),
         }
@@ -397,7 +398,7 @@ class YtDlpExtractor:
 
         summary = {
             "total_videos": len(data),
-            "extraction_date": datetime.now(UTC)
+            "extraction_date": datetime.now(tz=ZoneInfo("Europe/Helsinki"))
             .isoformat()
             .replace("+00:00", "Z"),
             "uploaders": {},
@@ -504,7 +505,7 @@ def main() -> int:
 
             if results:
                 # Generate filename from URL
-                timestamp = datetime.now(tz=UTC).strftime("%Y-%m-%d")
+                timestamp = datetime.now(tz=ZoneInfo("Europe/Helsinki")).strftime("%Y-%m-%d")
                 filename = f"index_{timestamp}.json"
                 extractor.save_index(results, filename)
 

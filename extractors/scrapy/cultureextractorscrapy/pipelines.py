@@ -13,9 +13,10 @@ import shutil
 import subprocess
 import time
 import uuid
-from datetime import UTC, datetime
+from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse
+from zoneinfo import ZoneInfo
 
 import newnewid
 import requests
@@ -370,7 +371,7 @@ class BaseDownloadPipeline:
         # Create DownloadedFileItem
         downloaded_item = DownloadedFileItem(
             uuid=newnewid.uuid7(),
-            downloaded_at=datetime.now(tz=UTC),
+            downloaded_at=datetime.now(tz=ZoneInfo("Europe/Helsinki")),
             file_type=file_info["file_type"],
             content_type=file_info["content_type"],
             variant=file_info["variant"],
